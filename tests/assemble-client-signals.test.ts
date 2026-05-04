@@ -371,6 +371,45 @@ describe('assembleClientSignals', () => {
     expect(cs.recentChatTopics).toEqual(['keyword strategy', 'blog content']);
   });
 
+  it('normalizes object-based business priorities into prompt-safe strings', async () => {
+    const defaultStmt = () => ({
+      all: vi.fn(() => []),
+      get: vi.fn(() => undefined),
+      run: vi.fn(),
+    });
+
+    try {
+      vi.resetModules();
+      const db = (await import('../server/db/index.js')).default;
+      vi.mocked(db.prepare).mockImplementation((sql: string) => {
+        if (sql.includes('SELECT priorities FROM client_business_priorities')) {
+          return {
+            all: vi.fn(() => []),
+            get: vi.fn(() => ({
+              priorities: JSON.stringify([
+                { text: 'Launch APAC market', category: 'growth' },
+                { text: 'Expand brand awareness', category: 'brand' },
+                { text: '   ', category: 'other' },
+              ]),
+            })),
+            run: vi.fn(),
+          } as any;
+        }
+        return defaultStmt() as any;
+      });
+      const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+      const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });
+
+      const cs = result.clientSignals as ClientSignalsSlice;
+      expect(cs.businessPriorities).toEqual([
+        '[growth] Launch APAC market',
+        '[brand] Expand brand awareness',
+      ]);
+    } finally {
+      vi.resetModules();
+    }
+  });
+
   it('populates keyword feedback from DB queries', async () => {
     const db = (await import('../server/db/index.js')).default;
     vi.mocked(db.prepare).mockImplementation((sql: string) => {

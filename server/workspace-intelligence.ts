@@ -11,7 +11,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafe } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
 import type {
   WorkspaceIntelligence,
@@ -101,6 +101,24 @@ const stmts = createStmtCache(() => ({
     'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
   ),
 }));
+
+const clientBusinessPrioritySchema = z.union([
+  z.string(),
+  z.object({
+    text: z.string(),
+    category: z.string().optional(),
+  }),
+]);
+
+function formatClientBusinessPriority(
+  priority: string | { text: string; category?: string },
+): string {
+  if (typeof priority === 'string') return priority.trim();
+  const text = priority.text.trim();
+  if (!text) return '';
+  const category = priority.category?.trim();
+  return category ? `[${category}] ${text}` : text;
+}
 
 // Separate cache for copy pipeline tables — isolated so that missing tables
 // (environments without migration 058) don't break the main stmt cache.
@@ -1165,7 +1183,14 @@ async function assembleClientSignals(
   try {
     const row = stmts().clientBusinessPriorities.get(workspaceId) as { priorities: string } | undefined;
     if (row) {
-      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), [] as string[], { workspaceId, field: 'priorities', table: 'client_business_priorities' });
+      const priorities = parseJsonSafeArray(
+        row.priorities,
+        clientBusinessPrioritySchema,
+        { workspaceId, field: 'priorities', table: 'client_business_priorities' },
+      );
+      businessPriorities = priorities
+        .map(formatClientBusinessPriority)
+        .filter((priority): priority is string => priority.length > 0);
     }
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities table optional, degrading gracefully');

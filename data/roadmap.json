@@ -7,30 +7,12 @@
       "rationale": "P1 items and fast visual wins — closes open UX gaps and knocks out the QA backlog before hardening begins.",
       "items": [
         {
-          "id": 503,
-          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
-          "source": "UI_UX_AUDIT §7",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.",
-          "status": "pending"
-        },
-        {
           "id": 535,
           "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
           "source": "PR #138 review / manual testing",
           "est": "3-5h",
           "priority": "P1",
           "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
-          "status": "pending"
-        },
-        {
-          "id": 624,
-          "title": "Stripe payment modal — visual QA in test mode (light + dark)",
-          "source": "Phase 5 Phase 2 follow-up — PR #314",
-          "est": "10-15m",
-          "priority": "P1",
-          "notes": "Phase 2 token sweep PR #314 touched StripePaymentForm.tsx + StripePaymentModal.tsx + inner PaymentFormInner. Devin caught the always-dark constraint (Stripe Elements is hardcoded to theme: 'night') and the changes were reverted to hardcoded zinc shades with a comment block warning future migrations. Reverts are clean on main, but a real test-mode checkout flow visually confirming no regressions (light mode + dark mode side-by-side) was deferred from the original ship cycle. Use Stripe test card 4242 4242 4242 4242 — confirm modal renders correctly, payment intent succeeds, success state matches prior look. Risk if skipped: low (code-level diff confirms no theme-token references remain).",
           "status": "pending"
         },
         {
@@ -132,15 +114,6 @@
           "status": "done"
         },
         {
-          "id": 587,
-          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
-          "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
-          "status": "pending"
-        },
-        {
           "id": 577,
           "title": "Page Rewriter: applyToSection feedback when target heading not found",
           "source": "PR #159 code review flag",
@@ -165,60 +138,6 @@
           "est": "1.5h",
           "priority": "P2",
           "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
-          "status": "pending"
-        },
-        {
-          "id": 599,
-          "title": "Per-feature usage budgets (split strategy_generations pool)",
-          "source": "PR #255 code review — Devin comment on shared billing pool",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.",
-          "status": "pending"
-        },
-        {
-          "id": 365,
-          "title": "Normalize contentGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 367,
-          "title": "Normalize quickWins into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 368,
-          "title": "Normalize keywordGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 369,
-          "title": "Normalize topicClusters into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 370,
-          "title": "Normalize cannibalization into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
           "status": "pending"
         },
         {
@@ -326,6 +245,215 @@
       ]
     },
     {
+      "id": "sprint-platform-consolidation",
+      "name": "Platform Consolidation",
+      "hours": "80-118",
+      "rationale": "Architecture debt surfaced by the 2026-05-04 platform consolidation audit: rapid product expansion left duplicate implementations, partially completed migrations, shared-infrastructure drift, and large feature modules that now slow safe iteration.",
+      "items": [
+        {
+          "id": "platform-consolidation-billing-checkout-only",
+          "title": "Billing architecture - consolidate on Stripe Checkout",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Retire the remaining PaymentIntent/Stripe Elements purchase path and make Checkout the only client purchase architecture, matching MONETIZATION.md. Audit and remove or quarantine /api/stripe/create-payment-intent, StripePaymentForm, publishable-key dependencies used only by Elements, and tests that assume inline payment. Keep checkout/cart/upgrade flows intact, then run Stripe test-mode visual QA separately via item #624.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": 624,
+          "title": "Billing QA - validate Checkout after PaymentIntent retirement",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md; Phase 5 Phase 2 follow-up - PR #314",
+          "est": "30-45m",
+          "priority": "P1",
+          "notes": "After platform-consolidation-billing-checkout-only removes the inline PaymentIntent/Stripe Elements purchase path, run Stripe test-mode QA against the surviving Checkout flows: single content purchase, cart checkout, and tier upgrade. Confirm success/cancel return URLs, client-visible payment states, and no lingering UI entry point opens StripePaymentForm. This supersedes the older light/dark modal QA, which only mattered while the Elements modal remained in production.",
+          "status": "pending"
+        },
+        {
+          "id": "platform-consolidation-client-data-react-query",
+          "title": "Client portal data - finish React Query migration and retire useClientData facade",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Replace src/hooks/useClientData.ts compatibility layer with smaller feature hooks consumed directly by ClientDashboard tabs. Remove legacy local state/no-op setters/query-cache subscription bridge, migrate remaining manual client-tab fetch patterns to src/hooks/client React Query hooks, and add regression coverage for pricing, content plan, strategy, and dashboard loading/error states.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-tab-deeplink-contracts",
+          "title": "Deep-link contract sweep - fix senders whose ?tab= targets ignore search params",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Start with InsightsBriefingPage -> StrategyTab, where the sender navigates to ?tab=content-gaps and StrategyTab does not initialize from useSearchParams. Sweep navigate()/Link URL construction for ?tab= and verify every receiver reads the param. Extend tests/contract/tab-deep-link-wiring.test.ts coverage for any newly discovered pairs.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-streaming",
+          "title": "Keyword strategy streaming - use one SSE helper",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Move src/components/KeywordStrategy.tsx off its inline fetch/readable-stream parser and onto streamKeywordStrategy() from src/api/seo.ts. Ensure abort, error, progress, done, and query invalidation behavior remain equivalent. Add a focused unit/contract test for malformed SSE and non-streaming error responses if coverage does not already exist.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-ai-dispatch-migration",
+          "title": "AI dispatch - migrate general server generation paths to callAI",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Audit direct callOpenAI/callAnthropic imports in server routes and services. Migrate general generation to server/ai.ts callAI(), keep explicit Anthropic creative-prose exceptions where intended, and document any remaining direct helper usage with rationale. Prioritize high-churn keyword strategy and webflow SEO routes first.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-seo-provider-boundary",
+          "title": "SEO provider boundary - finish Semrush/DataForSEO abstraction cleanup",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Reduce feature-facing Semrush assumptions now that SeoDataProvider exists. Audit server/semrush.ts, server/seo-data-provider.ts, provider status UI, keyword strategy generation, and capability checks. Move remaining provider-specific behavior behind capability methods or document intentional provider-specific controls.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": 599,
+          "title": "Per-feature usage budgets (split strategy_generations pool)",
+          "source": "PR #255 code review — Devin comment on shared billing pool; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.\n[Platform consolidation 2026-05-04] Rehomed because this is another straddled abstraction: many independent AI features share a single legacy usage bucket even though product surfaces now behave like separate paid capabilities.",
+          "status": "pending"
+        },
+        {
+          "id": 503,
+          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
+          "source": "UI_UX_AUDIT §7; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.\n[Platform consolidation 2026-05-04] Move into the consolidation sprint because notification fragmentation spans admin/client toasts, NotificationBell, TaskPanel, and async system events. Treat as a shared platform primitive, not just UI polish.",
+          "status": "pending"
+        },
+        {
+          "id": 587,
+          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
+          "source": "Platform Health Sprint PR1 Devin review (2026-04-14); docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.\n[Platform consolidation 2026-05-04] Rehomed from Hardening because this is a platform-scale partial migration: useWorkspaceEvents centralizes event handling, but connection ownership is still per-hook.",
+          "status": "pending"
+        },
+        {
+          "id": 365,
+          "title": "Normalize contentGaps into dedicated SQLite table",
+          "source": "TECH DEBT; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.\n[Platform consolidation 2026-05-04] Rehomed with keyword strategy backend split so storage normalization and route decomposition can be sequenced together.",
+          "status": "pending"
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-route-split",
+          "title": "Keyword strategy backend - split route monolith into services",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Decompose server/routes/keyword-strategy.ts into thin route handlers plus service modules for generation orchestration, page analysis, feedback, tracked keywords/signals, history diff, and broadcasts. Preserve @reads/@writes route contract, usage tracking behavior, broadcast events, and existing tests. Coordinate with existing keyword strategy normalization items #365/#367/#368/#369/#370.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": 367,
+          "title": "Normalize quickWins into dedicated SQLite table",
+          "source": "TECH DEBT; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.\n[Platform consolidation 2026-05-04] Rehomed with keyword strategy backend split so storage normalization and route decomposition can be sequenced together.",
+          "status": "pending"
+        },
+        {
+          "id": 368,
+          "title": "Normalize keywordGaps into dedicated SQLite table",
+          "source": "TECH DEBT; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.\n[Platform consolidation 2026-05-04] Rehomed with keyword strategy backend split so storage normalization and route decomposition can be sequenced together.",
+          "status": "pending"
+        },
+        {
+          "id": 369,
+          "title": "Normalize topicClusters into dedicated SQLite table",
+          "source": "TECH DEBT; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.\n[Platform consolidation 2026-05-04] Rehomed with keyword strategy backend split so storage normalization and route decomposition can be sequenced together.",
+          "status": "pending"
+        },
+        {
+          "id": 370,
+          "title": "Normalize cannibalization into dedicated SQLite table",
+          "source": "TECH DEBT; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.\n[Platform consolidation 2026-05-04] Rehomed with keyword strategy backend split so storage normalization and route decomposition can be sequenced together.",
+          "status": "pending"
+        },
+        {
+          "id": "platform-consolidation-webflow-seo-route-split",
+          "title": "Webflow SEO backend - split audit, rewrite, bulk jobs, and apply flows",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Decompose server/routes/webflow-seo.ts without changing endpoint behavior. Candidate services: audit bridge handling, SEO suggestions, rewrite generation, bulk job orchestration, and apply/publish persistence. Preserve requireWorkspace* guards, activity logging, broadcast coverage, and discarded-updatePageSeo-return guardrails.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-client-strategy-tab-split",
+          "title": "Client StrategyTab - split workflow state into hooks and sections",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Break src/components/client/StrategyTab.tsx into owned subflows before adding more strategy UX: keyword feedback, tracked keywords, business priorities, content gaps, drawer/detail UI, and request flow. Preserve client-facing copy/tier behavior and use existing primitives. This should follow the React Query/deep-link work so state ownership is clearer.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "schema-context-builder-pattern-b-migration",
+          "title": "Migrate buildSchemaContext direct reads to intelligence slices",
+          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6; docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h cumulative across opportunistic PRs",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "in-progress",
+          "notes": "Trajectory 3 → 1 migration. Direct reads in server/helpers.ts:buildSchemaContext → corresponding seoContext slice fields. Each migration is opportunistic — done when adjacent code is touched for other reasons. Completion gates Pillar 3 reactivation.\n\nRemaining queue (5 fields):\n  1. brandVoice            → seoContext.brandVoice\n  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)\n  3. knowledgeBase         → seoContext.knowledgeBase\n  4. _businessProfile      → seoContext.businessProfile\n  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)\n\nPR1 (schema-yoast-parity-fields) ports siteKeywords as the pattern anchor (committed outside this queue since it shipped with the PR). Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) intentionally stay as direct reads — they're per-entity DB fields, not on a slice.\n\nMigration completion criterion: zero non-allowlisted direct reads in buildSchemaContext (verified by pr-check rule schema-context-direct-read-not-on-allowlist). At that point, Pillar 3 (compile-time + CI gates) reactivates.\n\n[Platform consolidation 2026-05-04] Rehomed from Future because it is a concrete incomplete migration: schema context still straddles direct workspace reads and intelligence-slice reads."
+        },
+        {
+          "id": "platform-consolidation-feature-tool-splits",
+          "title": "Feature tool monoliths - split SchemaSuggester, PageIntelligence, SeoEditor, VoiceTab",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "10-16h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Opportunistic decomposition pass for large feature tools: SchemaSuggester generator/CMS template/publish/impact subflows; PageIntelligence analysis/SEO copy/rank tracking; SeoEditor draft persistence/bulk job recovery/WebSocket progress; VoiceTab samples/DNA/guardrails/calibration sections. Prefer extracting shared hooks only when 2+ components need the behavior.",
+          "createdAt": "2026-05-04"
+        },
+        {
+          "id": "platform-consolidation-workspace-intelligence-slices",
+          "title": "Workspace intelligence - split slice assemblers behind stable API",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Keep buildWorkspaceIntelligence() and formatter contracts stable, but move internal slice assemblers out of server/workspace-intelligence.ts into focused modules once formatter/cache behavior is covered. Add tests that protect graceful degradation, assembled-but-rendered slice coverage, and cache invalidation before splitting.",
+          "createdAt": "2026-05-04"
+        }
+      ]
+    },
+    {
       "id": "sprint-deep-bug-remediation",
       "name": "Deep Bug Remediation",
       "hours": "24-40",
@@ -377,8 +505,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 10, 13-15",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Add contract/integration tests for each producer-consumer pair."
+          "status": "done",
+          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Added contract/integration tests for each producer-consumer pair.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-content-data-flow-invalidation",
@@ -644,16 +773,6 @@
           "sprint": "future",
           "status": "pending",
           "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
-        },
-        {
-          "id": "schema-context-builder-pattern-b-migration",
-          "title": "Migrate buildSchemaContext direct reads to intelligence slices",
-          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
-          "est": "2-3h cumulative across opportunistic PRs",
-          "priority": "P1",
-          "sprint": "I",
-          "status": "in-progress",
-          "notes": "Trajectory 3 → 1 migration. Direct reads in server/helpers.ts:buildSchemaContext → corresponding seoContext slice fields. Each migration is opportunistic — done when adjacent code is touched for other reasons. Completion gates Pillar 3 reactivation.\n\nRemaining queue (5 fields):\n  1. brandVoice            → seoContext.brandVoice\n  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)\n  3. knowledgeBase         → seoContext.knowledgeBase\n  4. _businessProfile      → seoContext.businessProfile\n  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)\n\nPR1 (schema-yoast-parity-fields) ports siteKeywords as the pattern anchor (committed outside this queue since it shipped with the PR). Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) intentionally stay as direct reads — they're per-entity DB fields, not on a slice.\n\nMigration completion criterion: zero non-allowlisted direct reads in buildSchemaContext (verified by pr-check rule schema-context-direct-read-not-on-allowlist). At that point, Pillar 3 (compile-time + CI gates) reactivates."
         },
         {
           "id": "schema-cleanup-dead-pageKeywordMap",

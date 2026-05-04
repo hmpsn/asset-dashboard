@@ -49,7 +49,7 @@ import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } f
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
-import { getWorkspace, getBrandName } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace, getBrandName } from '../workspaces.js';
 import { getOrComputeInsights } from '../analytics-intelligence.js';
 import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
@@ -261,7 +261,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
   if (!question) return res.status(400).json({ error: 'question required' });
 
   // Rate limit check — always enforced (betaMode is cosmetic, not a rate-limit bypass)
-  const tier = ws.tier || 'free';
+  const tier = computeEffectiveTier(ws);
   const rl = checkChatRateLimit(ws.id, tier, sessionId);
   if (!rl.allowed) {
     return res.status(429).json({

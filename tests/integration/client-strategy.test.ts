@@ -64,6 +64,11 @@ function buildStrategy(overrides?: Partial<KeywordStrategy>): KeywordStrategy {
         rationale: 'High search volume, no existing coverage',
         volume: 3200,
         difficulty: 38,
+        trendDirection: 'rising',
+        serpFeatures: ['featured_snippet', 'people_also_ask'],
+        competitorProof: 'competitor.com ranks #3',
+        questionKeywords: ['how to audit technical seo'],
+        opportunityScore: 87,
       },
       {
         topic: 'Link Building Strategies',
@@ -262,6 +267,19 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(techGap).toBeDefined();
     expect(techGap.volume).toBe(3200);
     expect(techGap.difficulty).toBe(38);
+  });
+
+  it('contentGaps preserve client-facing enrichment fields', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    const body = await res.json();
+
+    const techGap = body.contentGaps.find((g: { targetKeyword: string }) => g.targetKeyword === 'technical seo checklist');
+    expect(techGap).toBeDefined();
+    expect(techGap.trendDirection).toBe('rising');
+    expect(techGap.serpFeatures).toEqual(['featured_snippet', 'people_also_ask']);
+    expect(techGap.competitorProof).toBe('competitor.com ranks #3');
+    expect(techGap.questionKeywords).toEqual(['how to audit technical seo']);
+    expect(techGap.opportunityScore).toBe(87);
   });
 
   it('quickWins array preserves client-safe fields only (no roiScore)', async () => {

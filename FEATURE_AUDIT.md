@@ -907,6 +907,17 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 ---
 
+### 69A. Client API Contract Drift Hardening
+**What it does:** Keeps the client portal's public APIs and the intelligence layer in sync: public tier-gated usage routes now honor the workspace's effective tier, strategy responses preserve the enrichment fields the Strategy tab renders (`trendDirection`, `serpFeatures`, `competitorProof`, `questionKeywords`, `opportunityScore`), delivered content requests expose `deliveryUrl` and `deliveryNotes`, and client business priorities are normalized so the intelligence engine can read both string and object-based rows consistently.
+
+**Agency value:** Fewer support surprises caused by the UI and API disagreeing about what data exists. Trial users see the right limits, strategy reviews keep their signal, and delivered work shows the right handoff links.
+
+**Client value:** The dashboard behaves more predictably. Trial access, strategy suggestions, delivery status, and business-priority context now line up with what clients expect to see.
+
+**Mutual:** Removes a class of silent mismatches between storage, API serialization, and client rendering. That keeps the portal trustworthy without changing the overall product flow.
+
+---
+
 ### 70. CMS SEO Editor Issue Highlighting
 **What it does:** The CMS SEO Editor now matches the static page SEO editor's color-highlight system. Item rows show color-coded left borders (amber for SEO issues, status-colored for tracking state). Collapsed rows display "No title" (amber) and "No desc" (red) badges. Collection headers surface aggregate issue counts (missing names, SEO titles, meta descriptions). Character counts on Name and SEO fields use green/amber/red color coding with target thresholds. Unsaved changes shown as blue badges. Untitled items rendered in red italic.
 
