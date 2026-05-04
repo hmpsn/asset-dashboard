@@ -3,7 +3,7 @@ import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle,
-  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
+  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Trash2, Briefcase,
 } from 'lucide-react';
 import { TierGate, EmptyState, Skeleton, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -194,6 +194,30 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
   const [openKeywordDrawer, setOpenKeywordDrawer] = useState<string | null>(null);
+  const [drawerClosing, setDrawerClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      setOpenKeywordDrawer(null);
+      setDrawerClosing(false);
+      closeTimerRef.current = null;
+    }, 200);
+  }, []);
+
+  const openOrSwapDrawer = useCallback((keyword: string) => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+      setDrawerClosing(false);
+    }
+    setOpenKeywordDrawer(keyword);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); };
+  }, []);
 
   const removePriorityKeyword = useCallback(async (item: PriorityKeywordItem) => {
     if (!workspaceId) return;
@@ -282,7 +306,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        setOpenKeywordDrawer(null);
+        closeDrawer();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -705,13 +729,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       idea: 'keyword idea',
     };
     const label = labelMap[row.role];
-    const hasMetrics = row.volume != null || row.difficulty != null;
+    const hasMetrics = (row.volume != null && row.volume > 0) || (row.difficulty != null && row.difficulty > 0);
     if (!hasMetrics) return `${label} · no data yet`;
     const parts: string[] = [label];
-    if (row.volume != null) {
+    if (row.volume != null && row.volume > 0) {
       parts.push(row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`);
     }
-    if (row.difficulty != null) parts.push(`KD ${row.difficulty}`);
+    if (row.difficulty != null && row.difficulty > 0) parts.push(`KD ${row.difficulty}`);
     return parts.join(' · ');
   };
 
@@ -815,11 +839,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         ? 'bg-[var(--surface-3)] border border-teal-500/40 ring-1 ring-teal-500/10'
                         : 'bg-[var(--surface-3)] border border-transparent hover:border-[var(--brand-border)]'
                     }`}
-                    onClick={() => setOpenKeywordDrawer(isOpen ? null : row.normalized)}
+                    onClick={() => { if (isOpen) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setOpenKeywordDrawer(isOpen ? null : row.normalized);
+                        if (isOpen) closeDrawer(); else openOrSwapDrawer(row.normalized);
                       }
                     }}
                   >
@@ -833,14 +857,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       <button
                         type="button"
                         aria-label={`Remove ${row.label} from strategy`}
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors disabled:opacity-40"
+                        title="Remove from strategy"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-2)] transition-colors disabled:opacity-40"
                         disabled={isRemoving}
                         onClick={e => {
                           e.stopPropagation();
                           void removePriorityKeyword(row);
                         }}
                       >
-                        <Icon as={X} size="xs" />
+                        <Icon as={Trash2} size="xs" />
                       </button>
                     )}
                   </div>
@@ -867,21 +892,21 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   role="button"
                   tabIndex={0}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-950/60 border border-blue-900/50 cursor-pointer hover:border-blue-800/60 transition-colors"
-                  onClick={() => setOpenKeywordDrawer(openKeywordDrawer === row.normalized ? null : row.normalized)}
+                  onClick={() => { if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setOpenKeywordDrawer(openKeywordDrawer === row.normalized ? null : row.normalized);
+                      if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized);
                     }
                   }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
-                    {(row.volume != null || row.difficulty != null) && (
+                    {((row.volume != null && row.volume > 0) || (row.difficulty != null && row.difficulty > 0)) && (
                       <div className="t-caption text-[var(--brand-text-muted)] truncate">
                         {[
-                          row.volume != null && (row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`),
-                          row.difficulty != null && `KD ${row.difficulty}`,
+                          (row.volume != null && row.volume > 0) && (row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`),
+                          (row.difficulty != null && row.difficulty > 0) && `KD ${row.difficulty}`,
                         ].filter(Boolean).join(' · ')}
                       </div>
                     )}
@@ -1760,16 +1785,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       })()}
 
       {/* Keyword detail drawer */}
-      {openKeywordDrawer && (() => {
+      {(openKeywordDrawer || drawerClosing) && (() => {
         const allRows: StrategyKeywordTableRow[] = [...sortedConfirmed, ...keywordIdeaRows];
         const drawerRow = allRows.find(r => r.normalized === openKeywordDrawer);
         if (!drawerRow) return null;
         const isConfirmed = drawerRow.status === 'client' || drawerRow.status === 'strategy';
         const isRemoving = removingKeyword === drawerRow.normalized;
         const kdColorClass =
-          drawerRow.difficulty == null  ? 'text-[var(--brand-text-muted)]'
-          : drawerRow.difficulty < 30   ? 'text-emerald-400'
-          : drawerRow.difficulty < 50   ? 'text-amber-400'
+          !drawerRow.difficulty        ? 'text-[var(--brand-text-muted)]'
+          : drawerRow.difficulty < 30  ? 'text-emerald-400'
+          : drawerRow.difficulty < 50  ? 'text-amber-400'
           : 'text-red-400';
         const trendIcon =
           drawerRow.trendDirection === 'rising'    ? '↑'
@@ -1788,7 +1813,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <div
               className={"fixed inset-0 z-[var(--z-modal-backdrop)]" // fixed-inset-ok — keyword detail drawer backdrop
               }
-              onClick={() => setOpenKeywordDrawer(null)}
+              onClick={closeDrawer}
               aria-hidden="true"
             />
             <div
@@ -1797,7 +1822,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               aria-modal="true"
               aria-label={`Keyword details: ${drawerRow.label}`}
               tabIndex={-1}
-              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none" // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile
+              className={`fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none ${drawerClosing ? 'animate-out slide-out-to-right fill-mode-forwards' : 'animate-in slide-in-from-right'}`} // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile
             >
               {/* Drawer header */}
               <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
@@ -1813,7 +1838,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   type="button"
                   aria-label="Close keyword detail"
                   className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
-                  onClick={() => setOpenKeywordDrawer(null)}
+                  onClick={closeDrawer}
                 >
                   <Icon as={X} size="sm" />
                 </button>
@@ -1834,7 +1859,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <div className="px-3 py-2.5">
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Difficulty</div>
                   <div className={`t-stat-sm ${kdColorClass}`}>
-                    {drawerRow.difficulty != null ? `KD ${drawerRow.difficulty}` : '—'}
+                    {drawerRow.difficulty ? `KD ${drawerRow.difficulty}` : '—'}
                   </div>
                 </div>
                 <div className="px-3 py-2.5">
@@ -1850,6 +1875,34 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {/* Scrollable body */}
               <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
 
+                {/* Performance row — rank + impressions when available */}
+                {(drawerRow.currentPosition != null || (drawerRow.impressions != null && drawerRow.impressions > 0)) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {drawerRow.currentPosition != null && (
+                      <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
+                        <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current rank</div>
+                        <div className={`t-stat-sm font-semibold ${
+                          drawerRow.currentPosition <= 10  ? 'text-emerald-400'
+                          : drawerRow.currentPosition <= 30 ? 'text-amber-400'
+                          : 'text-[var(--brand-text)]'
+                        }`}>
+                          #{drawerRow.currentPosition}
+                        </div>
+                      </div>
+                    )}
+                    {drawerRow.impressions != null && drawerRow.impressions > 0 && (
+                      <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
+                        <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">GSC impressions</div>
+                        <div className="t-stat-sm font-semibold text-[var(--brand-text-bright)]">
+                          {drawerRow.impressions >= 1000
+                            ? `${(drawerRow.impressions / 1000).toFixed(1)}k/mo`
+                            : `${drawerRow.impressions}/mo`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Why it's in the strategy */}
                 <div>
                   <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">
@@ -1861,12 +1914,17 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </div>
 
                 {/* Signals */}
-                {drawerRow.contextSources.length > 0 && (
+                {(drawerRow.contextSources.length > 0 || drawerRow.searchIntent) && (
                   <div>
                     <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">
                       Signals
                     </div>
                     <div className="flex flex-wrap gap-1.5">
+                      {drawerRow.searchIntent && (
+                        <span className="px-2 py-0.5 bg-teal-500/10 border border-teal-500/25 rounded-[var(--radius-sm)] t-caption text-teal-400 capitalize">
+                          {drawerRow.searchIntent}
+                        </span>
+                      )}
                       {drawerRow.contextSources.map(src => (
                         <span
                           key={src}
@@ -1893,7 +1951,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       size="sm"
                       onClick={() => {
                         onTabChange?.('content');
-                        setOpenKeywordDrawer(null);
+                        closeDrawer();
                       }}
                     >
                       Request content
@@ -1905,7 +1963,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       size="sm"
                       onClick={() => {
                         onTabChange?.('health');
-                        setOpenKeywordDrawer(null);
+                        closeDrawer();
                       }}
                     >
                       Go to page
