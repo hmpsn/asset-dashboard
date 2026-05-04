@@ -130,14 +130,6 @@ function fmtAudience(volume?: number): string {
   return `~${fmtNum(volume)} searches/month`;
 }
 
-function fmtCompetition(difficulty?: number): string {
-  if (difficulty == null) return 'Gathering…';
-  if (difficulty < 30) return 'Approachable — good entry point';
-  if (difficulty < 50) return 'Moderate competition';
-  if (difficulty < 75) return 'Competitive';
-  return 'Highly competitive';
-}
-
 function fmtMomentum(direction?: 'rising' | 'declining' | 'stable'): string {
   if (!direction) return 'Gathering…';
   if (direction === 'rising') return 'Interest growing';
@@ -427,6 +419,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywordsRef = useRef<HTMLDivElement>(null);
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
+
+  // Gradient fade — ref and state; effect wired below after sortedConfirmed is defined
+  const kwListScrollRef = useRef<HTMLDivElement>(null);
+  const [kwListOverflows, setKwListOverflows] = useState(false);
 
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -814,6 +810,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     (a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0)
   );
 
+  // Show gradient only when the list actually overflows the 420px cap
+  useEffect(() => {
+    const el = kwListScrollRef.current;
+    if (!el) return;
+    setKwListOverflows(el.scrollHeight > el.clientHeight);
+  }, [sortedConfirmed]);
+
   const priorityKeywordsPanel = (
     // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
@@ -887,7 +890,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               description="Add your first keyword above to start tracking and shaping recommendations."
             />
           ) : (
-            <div className="flex flex-col gap-1">
+            <div className="relative">
+              <div ref={kwListScrollRef} className="max-h-[420px] overflow-y-auto flex flex-col gap-1">
               {sortedConfirmed.map(row => {
                 const isOpen = openKeywordDrawer === row.normalized;
                 const isRemoving = removingKeyword === row.normalized;
@@ -945,6 +949,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 );
               })}
+              </div>
+              {kwListOverflows && (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--surface-2)] to-transparent" />
+              )}
             </div>
           )}
         </div>
@@ -1120,12 +1128,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
           This is a planning-readiness score, not a grade. It shows how much clear SEO work is ready to review or move into production.
         </p>
-      </div>
-
-      <div ref={priorityKeywordsRef}>
-        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
-          {priorityKeywordsPanel}
-        </TierGate>
       </div>
 
       {/* ── RECOMMENDED NEXT STEPS ── */}
@@ -1779,6 +1781,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       </div>
       )}
 
+      {/* ── STRATEGY KEYWORDS ── */}
+      <div ref={priorityKeywordsRef}>
+        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
+          {priorityKeywordsPanel}
+        </TierGate>
+      </div>
+
       {/* ── PAGE KEYWORD MAP (advanced page detail) ── */}
       <div>
       <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
@@ -1939,7 +1948,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       </div>
                       <div className="flex items-center justify-between py-1.5 border-b border-[var(--brand-border)]/40">
                         <span className="t-caption text-[var(--brand-text-muted)]">Competition</span>
-                        <span className="t-caption font-medium text-[var(--brand-text)]">{fmtCompetition(drawerRow.difficulty)}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)]">{kdFraming(drawerRow.difficulty ?? undefined) ?? 'Gathering…'}</span>
                       </div>
                       <div className="flex items-center justify-between py-1.5">
                         <span className="t-caption text-[var(--brand-text-muted)]">Momentum</span>
