@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **310 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **329 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3369,7 +3369,7 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**310 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**329 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 Current feature count: **310**. Last updated: April 2026.
 
@@ -4225,3 +4225,15 @@ All replaced `.includes()` / `.endsWith()` with `normalizePath()` + exact compar
 **Client value:** Strategy keywords are now browsable and actionable. Each keyword shows why it matters (AI rationale), how hard it is to rank for (KD color), where the trend is heading, and what to do next — all in one panel.
 
 **Mutual:** Faster strategy alignment with clients. The drawer surfaces the "next move" recommendation so the conversation can be about action, not data interpretation.
+
+
+### 329. Platform Consolidation — Monolith Split Phase 1
+**What it does:** First behavior-preserving split in the platform consolidation monolith track. `server/routes/webflow-seo.ts` no longer owns every Webflow SEO utility route: SEO suggestion CRUD/apply routes now live in `server/routes/webflow-seo-suggestions.ts`, while page HTML fetching and per-page SEO copy generation live in `server/routes/webflow-seo-page-tools.ts`. `server/workspace-intelligence.ts` also delegates the page-scoped `pageElements` assembler/formatter to `server/intelligence/page-elements-slice.ts`.
+
+**Agency value:** Smaller route and intelligence files make SEO tooling safer to change. Engineers can work on suggestions, page tools, bulk jobs, and intelligence slices without reopening one giant file for every change.
+
+**Client value:** N/A — infrastructure-only refactor with preserved endpoints and behavior.
+
+**Mutual:** Creates the first clean stepping stone for the larger monolith roadmap: keyword strategy route split, StrategyTab decomposition, Webflow SEO job split, and workspace intelligence slice extraction.
+
+**Files:** `server/routes/webflow-seo.ts`; `server/routes/webflow-seo-suggestions.ts`; `server/routes/webflow-seo-page-tools.ts`; `server/route-groups/webflow.ts`; `server/workspace-intelligence.ts`; `server/intelligence/page-elements-slice.ts`; `tests/unit/page-elements-slice.test.ts`.

@@ -22,7 +22,6 @@ import type {
   InsightsSlice,
   LearningsSlice,
   PageProfileSlice,
-  PageElementSlice,
   ContentPipelineSlice,
   SiteHealthSlice,
   RedirectDetail,
@@ -43,7 +42,6 @@ import type {
   CopyPipelineSummary,
   SerpFeatures,
 } from '../shared/types/intelligence.js';
-import { getPageElements } from './page-elements-store.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { BriefingSummary } from '../shared/types/briefing.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
@@ -79,6 +77,7 @@ import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
 import type { CwvSummary } from './seo-audit.js';
 import { findPageMapEntry, matchPageIdentity, matchPagePath, toAuditFindingPageId } from './helpers.js';
+import { assemblePageElements, formatPageElementsSection } from './intelligence/page-elements-slice.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -2450,26 +2449,6 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   return lines.join('\n');
 }
 
-function formatPageElementsSection(slice: PageElementSlice | undefined): string {
-  if (!slice) return '';
-  const c = slice.catalog;
-  const summary: string[] = [];
-  if (c.videos.length > 0) summary.push(`${c.videos.length} video${c.videos.length === 1 ? '' : 's'}`);
-  const howToCount = c.lists.filter(l => l.isHowToLike).length;
-  if (howToCount > 0) summary.push(`${howToCount} HowTo list${howToCount === 1 ? '' : 's'}`);
-  if (c.citations.length > 0) summary.push(`${c.citations.length} citation${c.citations.length === 1 ? '' : 's'}`);
-  if (c.tables.length > 0) summary.push(`${c.tables.length} table${c.tables.length === 1 ? '' : 's'}`);
-  if (c.images.length > 0) summary.push(`${c.images.length} image${c.images.length === 1 ? '' : 's'}`);
-  if (c.testimonials.length > 0) summary.push(`${c.testimonials.length} testimonial${c.testimonials.length === 1 ? '' : 's'}`);
-  if (c.headings.length > 0) summary.push(`${c.headings.length} heading${c.headings.length === 1 ? '' : 's'}`);
-  if (c.codeBlocks.length > 0) summary.push(`${c.codeBlocks.length} code block${c.codeBlocks.length === 1 ? '' : 's'}`);
-  if (summary.length === 0) return '';
-  // No leading/trailing newlines — formatForPrompt joins all sections with
-  // '\n\n', so each formatter must return a string starting at '## …' and
-  // ending without a trailing newline. Matches every other format*Section.
-  return `## Page elements (${slice.pagePath})\n${summary.join(' · ')}`;
-}
-
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = [`## Page Profile: ${profile.pagePath}`];
 
@@ -2533,29 +2512,6 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 }
 
 // ── Page Profile assembler ──────────────────────────────────────────────
-
-async function assemblePageElements(
-  workspaceId: string,
-  pagePath: string,
-): Promise<PageElementSlice | undefined> {
-  try {
-    const record = getPageElements(workspaceId, pagePath);
-    if (!record) {
-      // No persisted catalog — extraction will happen during the next
-      // generator pass (Task 13 wires lazy refresh inside generator.ts).
-      // Returning undefined here is correct; consumers gracefully
-      // degrade (no schema enrichment until catalog exists).
-      return undefined;
-    }
-    return {
-      pagePath: record.pagePath,
-      catalog: record.catalog,
-    };
-  } catch (err) { // catch-ok: graceful degrade — slice stays undefined
-    log.warn({ err, workspaceId, pagePath }, 'assemblePageElements: store read failed, slice unavailable');
-    return undefined;
-  }
-}
 
 async function assemblePageProfile(
   workspaceId: string,

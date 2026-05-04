@@ -6,21 +6,20 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess, requireWorkspaceAccessFromBody, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
 import { callCreativeAI } from '../content-posts-ai.js';
 import {
   type SeoSuggestion,
-  saveSuggestion, listSuggestions, selectVariation,
-  getSelectedSuggestions, markApplied, dismissSuggestions, getSuggestionCounts,
+  saveSuggestion,
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
-import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
+import { updatePageSeo } from '../webflow.js';
 import {
   listWorkspaces,
   getWorkspace,
@@ -972,251 +971,6 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
 
   log.info(`Bulk rewrite: ${suggestions.length}/${pages.length} ${field} suggestions generated (${errors.length} errors)`);
   res.json({ suggestions, errors, field, generated: suggestions.length, total: pages.length });
-});
-
-// --- SEO Suggestions: List pending suggestions ---
-router.get('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  const { workspaceId } = req.params;
-  const field = req.query.field as 'title' | 'description' | undefined;
-  const suggestions = listSuggestions(workspaceId, field);
-  const counts = getSuggestionCounts(workspaceId);
-  res.json({ suggestions, counts });
-});
-
-// --- SEO Suggestions: Select a variation ---
-router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  const { workspaceId, suggestionId } = req.params;
-  const { selectedIndex } = req.body as { selectedIndex: number };
-  if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
-    return res.status(400).json({ error: 'selectedIndex must be 0, 1, or 2' });
-  }
-  const ok = selectVariation(workspaceId, suggestionId, selectedIndex);
-  if (!ok) return res.status(404).json({ error: 'Suggestion not found or already applied' });
-  res.json({ ok: true });
-});
-
-// --- SEO Suggestions: Apply selected suggestions to Webflow ---
-router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  const { workspaceId } = req.params;
-  const { suggestionIds } = req.body as { suggestionIds?: string[] };
-
-  // Get suggestions to apply — either specific IDs or all selected
-  let toApply = getSelectedSuggestions(workspaceId);
-  if (suggestionIds?.length) {
-    const idSet = new Set(suggestionIds);
-    toApply = toApply.filter(s => idSet.has(s.id));
-  }
-
-  if (!toApply.length) return res.status(400).json({ error: 'No suggestions with selected variations to apply' });
-
-  const results: Array<{ pageId: string; field: string; text: string; applied: boolean; error?: string }> = [];
-
-  for (const s of toApply) {
-    try {
-      const text = s.variations[s.selectedIndex!];
-      if (!text) { results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: 'No text at selected index' }); continue; }
-
-      const token = getTokenForSite(s.siteId) || undefined;
-      const seoFields = s.field === 'description'
-        ? { seo: { description: text } }
-        : { seo: { title: text } };
-      const seoResult = await updatePageSeo(s.pageId, seoFields, token);
-      if (!seoResult.success) {
-        results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: seoResult.error });
-        continue;
-      }
-
-      const ws = getWorkspace(workspaceId);
-      if (ws) {
-        updatePageState(ws.id, s.pageId, { status: 'live', source: 'bulk-rewrite', fields: [s.field], updatedBy: 'admin' });
-        recordSeoChange(ws.id, s.pageId, s.pageSlug, s.pageTitle, [s.field], 'bulk-rewrite');
-      }
-
-      results.push({ pageId: s.pageId, field: s.field, text, applied: true });
-    } catch (err) {
-      results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: String(err) });
-    }
-  }
-
-  // Mark applied suggestions
-  const appliedIds = results.filter(r => r.applied).map(r => toApply.find(s => s.pageId === r.pageId)?.id).filter(Boolean) as string[];
-  if (appliedIds.length) markApplied(workspaceId, appliedIds);
-
-  log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
-  res.json({ results, applied: appliedIds.length, total: toApply.length });
-});
-
-// --- SEO Suggestions: Dismiss suggestions ---
-router.delete('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  const { workspaceId } = req.params;
-  const { suggestionIds } = req.body as { suggestionIds?: string[] } || {};
-  const dismissed = dismissSuggestions(workspaceId, suggestionIds);
-  res.json({ dismissed });
-});
-
-// --- Fetch page HTML body text (for keyword analysis) ---
-router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
-  const { siteId } = req.params;
-  const pagePath = req.query.path as string;
-  if (!pagePath) return res.status(400).json({ error: 'path query param required' });
-  const token = getTokenForSite(siteId) || undefined;
-  try {
-    // Try live domain first (CMS collection pages often only accessible there)
-    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
-    const subdomain = await getSiteSubdomain(siteId, token);
-    const urls: string[] = [];
-    if (ws?.liveDomain) {
-      const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      urls.push(`${domain.replace(/\/+$/, '')}${pagePath}`);
-    }
-    if (subdomain) urls.push(`https://${subdomain}.webflow.io${pagePath}`);
-    if (urls.length === 0) return res.status(400).json({ error: 'Could not resolve site URL' });
-
-    let html = '';
-    for (const url of urls) {
-      try {
-        const htmlRes = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' } });
-        if (htmlRes.ok) { html = await htmlRes.text(); break; }
-      } catch { /* try next URL */ }
-    }
-    if (!html) return res.status(404).json({ error: 'Failed to fetch page from live domain or webflow.io' });
-
-    // Extract title and meta description from HTML (critical for CMS pages that lack Webflow API seo data)
-    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-    const seoTitle = titleMatch ? titleMatch[1].trim() : undefined;
-    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
-      || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
-    const metaDescription = metaDescMatch ? metaDescMatch[1].trim() : undefined;
-
-    // Extract body text: strip tags, scripts, styles
-    const text = stripHtmlToText(html, { maxLength: 8000 });
-    res.json({ text, seoTitle, metaDescription });
-  } catch (e) {
-    log.error({ err: e }, 'Page HTML fetch error');
-    res.status(500).json({ error: 'Failed to fetch page content' });
-  }
-});
-
-// --- Per-Page SEO Copy Generator ---
-router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (req, res) => {
-  const { pagePath, pageTitle, currentSeoTitle, currentDescription, currentH1, pageContent, workspaceId } = req.body;
-  if (!pagePath || !workspaceId) return res.status(400).json({ error: 'pagePath and workspaceId required' });
-
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
-
-  // Build full context: keywords + brand voice + keyword map
-  const copyIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath });
-  const copySeo = copyIntel.seoContext;
-  const keywordBlock = formatKeywordsForPrompt(copySeo);
-  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-  const brandVoiceBlock = copySeo?.effectiveBrandVoiceBlock ?? '';
-  const kwMapContext = formatPageMapForPrompt(copySeo);
-
-  // If no page content was passed, try to fetch it from the live site
-  let content = pageContent || '';
-  if (!content) {
-    const ws = getWorkspace(workspaceId);
-    const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
-    if (baseUrl) {
-      try {
-        const url = `${baseUrl}${pagePath === '/' ? '' : pagePath}`;
-        log.info(`Fetching page content from ${url}`);
-        const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
-        if (r.ok) {
-          const html = await r.text();
-          content = stripHtmlToText(html, { maxLength: 4000 });
-        }
-      } catch { /* non-critical — proceed without content */ }
-    }
-  }
-
-  // Find this page's keyword data
-  const pageKw = getPageKeyword(workspaceId, pagePath);
-
-  // Resolve brand name
-  const copyWs = getWorkspace(workspaceId);
-  const copyBrandName = getBrandName(copyWs);
-
-  const prompt = `You are an expert SEO copywriter. Generate optimized SEO copy for this specific web page.
-
-PAGE: ${pagePath}
-Current title: ${pageTitle || '(none)'}
-Current SEO title: ${currentSeoTitle || '(same as title)'}
-Current meta description: ${currentDescription || '(none)'}
-Current H1: ${currentH1 || '(none)'}
-${pageKw ? `Primary keyword: "${pageKw.primaryKeyword}"
-Secondary keywords: ${pageKw.secondaryKeywords?.join(', ') || 'none'}
-Search intent: ${pageKw.searchIntent || 'unknown'}
-${pageKw.currentPosition ? `Current Google position: #${pageKw.currentPosition.toFixed(0)}` : ''}
-${pageKw.impressions ? `Monthly impressions: ${pageKw.impressions}` : ''}` : ''}
-${content ? `\nPage content:\n${content.slice(0, 3000)}` : ''}${keywordBlock}${brandVoiceBlock}${kwMapContext}
-
-Generate optimized copy in this exact JSON format:
-{
-  "seoTitle": "Optimized SEO title tag (50-60 chars, front-load primary keyword)",
-  "metaDescription": "Compelling meta description (150-160 chars, include CTA, naturally incorporate keywords)",
-  "h1": "Optimized H1 heading (clear, keyword-rich, matches search intent)",
-  "introParagraph": "Rewritten opening paragraph (2-3 sentences, hook the reader, incorporate primary keyword naturally within first sentence, set clear expectations for the page content)",
-  "internalLinkSuggestions": [
-    { "targetPath": "/page-path", "anchorText": "suggested link text", "context": "Where/why to place this link" }
-  ],
-  "changes": [
-    "Brief bullet explaining each change you made and why it will improve rankings"
-  ]
-}
-
-CRITICAL RULES:
-- PRESERVE the existing brand voice and tone exactly — do NOT make it sound generic or corporate
-- Every piece of copy must sound like it was written by the same person/team who wrote the existing content
-- Incorporate keywords NATURALLY — never stuff or force them
-- The intro paragraph should feel like a natural improvement, not a complete rewrite from scratch
-- Internal link suggestions should reference real pages from the keyword map
-- Changes array should explain your reasoning so the team can learn
-${copyBrandName ? `- The brand name is "${copyBrandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
-Return ONLY valid JSON, no markdown fences.`;
-
-  try {
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
-        { role: 'user', content: prompt },
-      ],
-      maxTokens: 1500,
-      temperature: 0.6,
-      feature: 'content-score',
-      workspaceId,
-    });
-
-    const raw = aiResult.text || '{}';
-    const cleaned = stripCodeFences(raw);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (err) {
-      log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
-      return res.status(500).json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 500) });
-    }
-
-    // Enforce character limits
-    if (parsed.seoTitle && parsed.seoTitle.length > 60) {
-      const t = parsed.seoTitle.slice(0, 60);
-      const ls = t.lastIndexOf(' ');
-      parsed.seoTitle = ls > 36 ? t.slice(0, ls) : t;
-    }
-    if (parsed.metaDescription && parsed.metaDescription.length > 160) {
-      const t = parsed.metaDescription.slice(0, 160);
-      const ls = t.lastIndexOf(' ');
-      parsed.metaDescription = ls > 96 ? t.slice(0, ls) : t;
-    }
-
-    res.json(parsed);
-  } catch (err) {
-    log.error({ err: err }, 'SEO copy generator error');
-    res.status(500).json({ error: 'SEO copy generation failed' });
-  }
 });
 
 // ═══════════════════════════════════════════════════════════════════
