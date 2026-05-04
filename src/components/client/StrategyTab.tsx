@@ -680,6 +680,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             }}
             className="flex gap-2"
           >
+            <label htmlFor="strategy-keyword-input" className="sr-only">Add a strategy keyword</label>
             <input
               id="strategy-keyword-input"
               type="text"
@@ -791,6 +792,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       type="button"
+                      aria-label={`Add ${row.label} to strategy`}
                       className="t-caption text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap disabled:opacity-40"
                       disabled={addingKeyword}
                       onClick={e => {
