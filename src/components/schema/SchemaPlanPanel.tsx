@@ -14,6 +14,7 @@ import { Icon, cn } from '../ui';
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 const ROLE_OPTIONS: SchemaPageRole[] = [
@@ -51,7 +52,7 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
 };
 const DEFAULT_ROLE_COLOR = 'bg-[var(--brand-text-muted)]/10 text-[var(--brand-text)] border-[var(--brand-text-dim)]/30';
 
-export function SchemaPlanPanel({ siteId }: Props) {
+export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -72,20 +73,20 @@ export function SchemaPlanPanel({ siteId }: Props) {
     (async () => {
       setLoading(true);
       try {
-        const result = await schemaPlan.get(siteId);
+        const result = await schemaPlan.get(siteId, workspaceId);
         if (!cancelled) setPlan(result ?? null);
       } catch { /* no plan yet */ }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
     setSuccess(null);
     try {
-      const result = await schemaPlan.generate(siteId);
+      const result = await schemaPlan.generate(siteId, workspaceId);
       setPlan(result);
       setDirty(false);
       setSuccess(`Plan generated: ${result.pageRoles.length} pages, ${result.canonicalEntities.length} entities`);
@@ -110,7 +111,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const result = await schemaPlan.update(siteId, plan.pageRoles, plan.canonicalEntities);
+      const result = await schemaPlan.update(siteId, plan.pageRoles, plan.canonicalEntities, workspaceId);
       setPlan(result);
       setDirty(false);
       setSuccess('Plan saved');
@@ -126,7 +127,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
     setSending(true);
     setError(null);
     try {
-      const { plan: updatedPlan } = await schemaPlan.sendToClient(siteId, plan.workspaceId);
+      const { plan: updatedPlan } = await schemaPlan.sendToClient(siteId, plan.workspaceId || workspaceId);
       setPlan(updatedPlan);
       setSuccess('Schema strategy preview sent to client for review');
       setTimeout(() => setSuccess(null), 5000);
@@ -141,7 +142,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
     setActivating(true);
     setError(null);
     try {
-      const result = await schemaPlan.activate(siteId);
+      const result = await schemaPlan.activate(siteId, workspaceId);
       setPlan(result);
       setSuccess('Plan activated — schema generation will now follow this plan');
       setTimeout(() => setSuccess(null), 5000);
@@ -289,7 +290,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                     setRetracting(true);
                     setError(null);
                     try {
-                      await schemaPlan.retract(siteId);
+                      await schemaPlan.retract(siteId, workspaceId);
                       setPlan(null);
                       setSuccess('Schema plan retracted');
                       setTimeout(() => setSuccess(null), 4000);

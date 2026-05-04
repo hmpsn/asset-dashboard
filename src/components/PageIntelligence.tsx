@@ -264,7 +264,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       try {
         const pagePath = page.publishedPath || page.path;
         if (pagePath) {
-          const result = await get<{ text?: string; seoTitle?: string; metaDescription?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          const result = await get<{ text?: string; seoTitle?: string; metaDescription?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
           pageContent = result.text || '';
           htmlSeoTitle = result.seoTitle;
           htmlMetaDesc = result.metaDescription;

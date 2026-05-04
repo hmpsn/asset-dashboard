@@ -27,6 +27,7 @@ interface PageWeightResult {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 function formatSize(bytes: number): string {
@@ -54,7 +55,7 @@ function getBarColor(bytes: number): string {
   return 'bg-emerald-500';
 }
 
-function PageWeight({ siteId }: Props) {
+function PageWeight({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<PageWeightResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -67,7 +68,7 @@ function PageWeight({ siteId }: Props) {
     setLoading(true);
     setHasRun(true);
     setError(null);
-    pageWeightApi.webflowPageWeight(siteId)
+    pageWeightApi.webflowPageWeight(siteId, workspaceId)
       .then(d => setData(d as PageWeightResult))
       .catch(e => setError(e instanceof Error ? e.message : 'Page weight analysis failed'))
       .finally(() => setLoading(false));
@@ -77,14 +78,14 @@ function PageWeight({ siteId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setData(null); setHasRun(false); setError(null);
-    pageWeightApi.webflowPageWeightSnapshot(siteId)
+    pageWeightApi.webflowPageWeightSnapshot(siteId, workspaceId)
       .then(snap => {
         const s = snap as { result?: PageWeightResult } | null;
         if (!cancelled && s?.result) { setData(s.result); setHasRun(true); }
       })
       .catch((err) => { console.error('PageWeight operation failed:', err); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const toggleExpand = (page: string) => {
     setExpanded(prev => {

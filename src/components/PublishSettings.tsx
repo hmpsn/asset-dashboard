@@ -63,7 +63,7 @@ const FIELD_MAP_KEYS: { key: keyof FieldMap; label: string; required: boolean; h
   { key: 'category', label: 'Category', required: false, hint: 'Category or tag' },
 ];
 
-export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publishTarget, onSave, toast }: Props) {
+export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onSave, toast }: Props) {
   const [collections, setCollections] = useState<CollectionInfo[]>([]);
   const [fields, setFields] = useState<CollectionField[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>(publishTarget?.collectionId || '');
@@ -78,21 +78,21 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
   useEffect(() => {
     if (!webflowSiteId) return;
     setLoading(true);
-    get<CollectionInfo[]>(`/api/webflow/publish-collections/${webflowSiteId}`)
+    get<CollectionInfo[]>(`/api/webflow/publish-collections/${webflowSiteId}?workspaceId=${encodeURIComponent(workspaceId)}`)
       .then(data => setCollections(Array.isArray(data) ? data : []))
       .catch(() => toast('Failed to load collections', 'error'))
       .finally(() => setLoading(false));
-  }, [webflowSiteId, toast]);
+  }, [webflowSiteId, workspaceId, toast]);
 
   // Load schema when collection changes
   useEffect(() => {
     if (!selectedCollection || !webflowSiteId) { setFields([]); return; }
     setLoadingFields(true);
-    get<{ fields: CollectionField[] }>(`/api/webflow/publish-schema/${selectedCollection}?siteId=${webflowSiteId}`)
+    get<{ fields: CollectionField[] }>(`/api/webflow/publish-schema/${selectedCollection}?siteId=${encodeURIComponent(webflowSiteId)}&workspaceId=${encodeURIComponent(workspaceId)}`)
       .then(data => setFields(data.fields || []))
       .catch(() => toast('Failed to load collection schema', 'error'))
       .finally(() => setLoadingFields(false));
-  }, [selectedCollection, webflowSiteId, toast]);
+  }, [selectedCollection, webflowSiteId, workspaceId, toast]);
 
   const handleCollectionChange = (collectionId: string) => {
     const col = collections.find(c => c.id === collectionId);
@@ -107,7 +107,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
     try {
       const result = await post<{ mapping: Record<string, string | null>; fields: CollectionField[] }>(
         `/api/webflow/suggest-field-mapping/${webflowSiteId}`,
-        { collectionId: selectedCollection },
+        { collectionId: selectedCollection, workspaceId },
       );
       if (result.mapping) {
         const suggested: FieldMap = { title: '', slug: '', body: '' };

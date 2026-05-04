@@ -17,14 +17,14 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-organize');
 
-import { requireWorkspaceAccessFromBody, requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromBody, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- Organize Assets into Folders ---
 
 // Preview: builds a plan of which assets go into which folders
-router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   const token = getTokenForSite(siteId) || undefined;
   if (!token) return res.status(400).json({ error: 'No token for site' });
@@ -71,11 +71,11 @@ router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQu
                 if (!m) continue;
                 for (const id of allAssetIds) { if (m[1].includes(id)) ogAssetIds.add(id); }
               }
-            } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* skip */ }
+            } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* skip */ } // url-fetch-ok
           }));
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* proceed without OG detection */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* proceed without OG detection */ } // url-fetch-ok
 
     // 3. Build the organization plan
     const existingFolderNames = new Set(existingFolders.map(f => f.displayName));
@@ -140,7 +140,7 @@ router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQu
 });
 
 // Execute: creates folders and moves assets according to a plan
-router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromBody(), async (req, res) => {
+router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceSiteAccessFromBody(), async (req, res) => {
   const { siteId } = req.params;
   const { moves, foldersToCreate } = req.body as {
     moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;
@@ -199,7 +199,10 @@ router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromB
 });
 
 // --- Rename Asset ---
-router.patch('/api/webflow/rename/:assetId', requireWorkspaceAccessFromBody(), async (req, res) => {
+router.patch('/api/webflow/rename/:assetId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { displayName, siteId } = req.body;
   if (!displayName) return res.status(400).json({ error: 'displayName required' });
 

@@ -139,7 +139,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       } else if (issue.check === 'og-tags' && issue.message.includes('description')) {
         fields.openGraph = { description: text };
       }
-      const result = await put<{ success?: boolean }>(`/api/webflow/pages/${pageId}/seo`, { siteId, ...fields });
+      const result = await put<{ success?: boolean }>(`/api/webflow/pages/${pageId}/seo`, { siteId, workspaceId, ...fields });
       if (result.success) {
         setAppliedFixes(prev => new Set(prev).add(fixKey));
       }
@@ -947,4 +947,3 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 }
 
 export { SeoAudit };
-

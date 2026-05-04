@@ -56,6 +56,7 @@ interface SiteSpeedResult {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 function scoreColor(score: number): string {
@@ -118,7 +119,7 @@ interface WebflowPage {
   slug: string;
 }
 
-export function PageSpeedPanel({ siteId }: Props) {
+export function PageSpeedPanel({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<SiteSpeedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -133,7 +134,7 @@ export function PageSpeedPanel({ siteId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    webflow.pages(siteId)
+    webflow.pages(siteId, workspaceId)
       .then(d => {
         if (cancelled) return;
         const list = (Array.isArray(d) ? d as WebflowPage[] : []).filter((p: WebflowPage) => !p.title.toLowerCase().includes('password'));
@@ -142,7 +143,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       })
       .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     // Load last saved bulk PageSpeed snapshot
-    pageWeight.pagespeedSnapshot(siteId)
+    pageWeight.pagespeedSnapshot(siteId, workspaceId)
       .then(snap => {
         if (cancelled) return;
         const s = snap as { result?: SiteSpeedResult } | null;
@@ -150,7 +151,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       })
       .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const runBulkTest = (strat: 'mobile' | 'desktop') => {
     setLoading(true);
@@ -159,7 +160,7 @@ export function PageSpeedPanel({ siteId }: Props) {
     setData(null);
     setSingleResult(null);
     setError(null);
-    pageWeight.pagespeedBulk(siteId, strat, 3)
+    pageWeight.pagespeedBulk(siteId, strat, 3, workspaceId)
       .then(d => {
         const result = d as SiteSpeedResult & { error?: string };
         if (result.error) { setError(result.error); return; }
@@ -182,7 +183,7 @@ export function PageSpeedPanel({ siteId }: Props) {
     setSingleResult(null);
     setError(null);
 
-    pageWeight.pagespeedSingle(siteId, { pageSlug: page.slug, strategy: strat, pageTitle: page.title })
+    pageWeight.pagespeedSingle(siteId, { pageSlug: page.slug, strategy: strat, pageTitle: page.title }, workspaceId)
       .then(d => {
         const result = d as PageSpeedResult & { error?: string };
         if (result.error) { setError(result.error); return; }

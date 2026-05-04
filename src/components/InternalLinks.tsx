@@ -84,14 +84,14 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   // Load last saved snapshot on mount
   useEffect(() => {
     let cancelled = false;
-    webflow.internalLinksSnapshot(siteId)
+    webflow.internalLinksSnapshot(siteId, workspaceId)
       .then(snap => {
         const s = snap as { result?: InternalLinkResult } | null;
         if (!cancelled && s?.result) setData(s.result);
       })
       .catch((err) => { console.error('InternalLinks operation failed:', err); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const toggleExpanded = (idx: number) => {
     setExpanded(prev => {

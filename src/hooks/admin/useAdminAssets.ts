@@ -22,7 +22,7 @@ interface Asset {
  */
 export function useWebflowAssets(siteId: string, workspaceId: string) {
   return useQuery<Asset[]>({
-    queryKey: queryKeys.admin.webflowAssets(siteId),
+    queryKey: queryKeys.admin.webflowAssets(siteId, workspaceId),
     queryFn: async () => {
       const data = await getSafe<Asset[]>(`/api/webflow/assets/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`, []);
       return Array.isArray(data) ? data : [];
@@ -38,7 +38,7 @@ export function useWebflowAssets(siteId: string, workspaceId: string) {
  */
 export function useAssetAudit(siteId: string, workspaceId: string, enabled: boolean) {
   return useQuery<Set<string>>({
-    queryKey: queryKeys.admin.assetAudit(siteId),
+    queryKey: queryKeys.admin.assetAudit(siteId, workspaceId),
     queryFn: async () => {
       const data = await get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`);
       return new Set<string>(
@@ -56,7 +56,7 @@ export function useAssetAudit(siteId: string, workspaceId: string, enabled: bool
  */
 export function useCmsImages(siteId: string, workspaceId: string, enabled: boolean) {
   return useQuery<CmsImageScanResult>({
-    queryKey: queryKeys.admin.cmsImages(siteId),
+    queryKey: queryKeys.admin.cmsImages(siteId, workspaceId),
     queryFn: () => get<CmsImageScanResult>(`/api/webflow/cms-images/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`),
     enabled: !!siteId && !!workspaceId && enabled,
     staleTime: STALE_TIMES.STABLE,

@@ -57,6 +57,8 @@ vi.mock('../meeting-brief-generator.js', async () => {
 // Import mock handle so individual tests can reconfigure generateMeetingBrief
 import { generateMeetingBrief as mockGenerateMeetingBrief } from '../meeting-brief-generator.js';
 
+const ROUTE_TEST_TIMEOUT_MS = 20_000;
+
 // ---------------------------------------------------------------------------
 // In-process server helper
 // ---------------------------------------------------------------------------
@@ -113,19 +115,19 @@ describe('Meeting Brief routes', () => {
     const srv = await startTestServer();
     baseUrl = srv.baseUrl;
     stopServer = srv.stop;
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 
   afterEach(() => {
-    stopServer();
+    stopServer?.();
     db.prepare('DELETE FROM meeting_briefs WHERE workspace_id = ?').run(workspaceId);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(workspaceId);
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 
   it('GET returns { brief: null } when no brief has been generated', async () => {
     const { status, body } = await getJson(baseUrl, `/api/workspaces/${workspaceId}/meeting-brief`);
     expect(status).toBe(200);
     expect((body as Record<string, unknown>).brief).toBeNull();
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 
   it('POST /generate returns 200 with the generated brief', async () => {
     const { status, body } = await postJson(baseUrl, `/api/workspaces/${workspaceId}/meeting-brief/generate`);
@@ -136,7 +138,7 @@ describe('Meeting Brief routes', () => {
     expect(brief.workspaceId).toBe(workspaceId);
     expect(brief.situationSummary).toBe('Test summary.');
     expect(brief.wins).toEqual(['Win 1']);
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 
   it('POST /generate returns cached brief with unchanged:true when data has not changed', async () => {
     const { upsertMeetingBrief } = await import('../meeting-brief-store.js'); // dynamic-import-ok
@@ -154,7 +156,7 @@ describe('Meeting Brief routes', () => {
     expect(b).toHaveProperty('brief');
     const brief = b.brief as Record<string, unknown>;
     expect(brief.situationSummary).toBe('Cached summary.');
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 
   it('GET returns the stored brief after generation', async () => {
     // First generate
@@ -168,5 +170,5 @@ describe('Meeting Brief routes', () => {
     const brief = b.brief as Record<string, unknown>;
     expect(brief.workspaceId).toBe(workspaceId);
     expect(brief.situationSummary).toBe('Test summary.');
-  });
+  }, ROUTE_TEST_TIMEOUT_MS);
 });

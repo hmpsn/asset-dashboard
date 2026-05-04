@@ -21,7 +21,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('content-publish');
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- Publish a content post to Webflow CMS ---
@@ -158,7 +158,10 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
 });
 
 // --- Suggest field mapping for a collection ---
-router.post('/api/webflow/suggest-field-mapping/:siteId', async (req, res) => {
+router.post('/api/webflow/suggest-field-mapping/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { siteId } = req.params;
   const { collectionId } = req.body as { collectionId: string };
 
@@ -222,7 +225,7 @@ Return ONLY the JSON object with the mapping.`,
 });
 
 // --- Get collections for a site (used by PublishSettings UI) ---
-router.get('/api/webflow/publish-collections/:siteId', async (req, res) => {
+router.get('/api/webflow/publish-collections/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   try {
     const token = getTokenForSite(siteId) || undefined;
@@ -235,7 +238,10 @@ router.get('/api/webflow/publish-collections/:siteId', async (req, res) => {
 });
 
 // --- Get collection schema (used by PublishSettings UI) ---
-router.get('/api/webflow/publish-schema/:collectionId', async (req, res) => {
+router.get('/api/webflow/publish-schema/:collectionId', requireWorkspaceSiteAccess({
+  workspace: { source: 'query', name: 'workspaceId' },
+  site: { source: 'query', name: 'siteId' },
+}), async (req, res) => {
   const { collectionId } = req.params;
   const { siteId } = req.query as { siteId?: string };
   try {

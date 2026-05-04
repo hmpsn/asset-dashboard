@@ -50,14 +50,21 @@ export const queryKeys = {
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
-    schemaSnapshot: (siteId: string) => ['admin-schema-snapshot', siteId] as const,
-    schemaValidations: (siteId: string) => ['admin-schema-validations', siteId] as const,
-    schemaCmsFieldMappings: (siteId: string) => ['admin-schema-cms-field-mappings', siteId] as const,
+    schemaSnapshot: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-snapshot', siteId, wsId] as const : ['admin-schema-snapshot', siteId] as const,
+    schemaValidations: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-validations', siteId, wsId] as const : ['admin-schema-validations', siteId] as const,
+    schemaCmsFieldMappings: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-cms-field-mappings', siteId, wsId] as const : ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,
-    webflowPages: (siteId: string) => ['admin-webflow-pages', siteId] as const,
-    webflowAssets: (siteId: string) => ['admin-webflow-assets', siteId] as const,
-    assetAudit: (siteId: string) => ['admin-asset-audit', siteId] as const,
-    seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
+    webflowPages: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-webflow-pages', siteId, wsId] as const : ['admin-webflow-pages', siteId] as const,
+    webflowAssets: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-webflow-assets', siteId, wsId] as const : ['admin-webflow-assets', siteId] as const,
+    assetAudit: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-asset-audit', siteId, wsId] as const : ['admin-asset-audit', siteId] as const,
+    seoEditor: (siteId: string, wsId?: string) =>
+      wsId ? ['seo-editor', siteId, wsId] as const : ['seo-editor', siteId] as const,
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
@@ -103,7 +110,8 @@ export const queryKeys = {
     copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
 
     // Page join
-    pageJoinPages: (siteId: string) => ['admin-page-join-pages', siteId] as const,
+    pageJoinPages: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-page-join-pages', siteId, wsId] as const : ['admin-page-join-pages', siteId] as const,
 
     // Diagnostics
     diagnostics: (wsId: string) => ['admin-diagnostics', wsId] as const,
@@ -113,8 +121,10 @@ export const queryKeys = {
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
-    cmsCollections: (siteId: string) => ['cms-collections', siteId] as const,
-    cmsImages: (siteId: string) => ['admin-cms-images', siteId] as const,
+    cmsCollections: (siteId: string, wsId?: string) =>
+      wsId ? ['cms-collections', siteId, wsId] as const : ['cms-collections', siteId] as const,
+    cmsImages: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-cms-images', siteId, wsId] as const : ['admin-cms-images', siteId] as const,
 
     // Workspace / global
     workspaces: () => ['admin-workspaces'] as const,
