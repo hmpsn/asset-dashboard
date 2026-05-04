@@ -908,7 +908,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   >
                     {/* Role indicator dot */}
                     <div
-                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1 ${
+                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${
                         row.role === 'content' ? 'bg-emerald-400' :
                         row.role === 'page' ? 'bg-blue-400' :
                         row.role === 'strategy' ? 'bg-teal-400' :
