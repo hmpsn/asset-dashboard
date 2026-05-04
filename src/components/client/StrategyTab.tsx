@@ -729,7 +729,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      <div className="px-4 py-3 flex flex-col gap-4">
+      <div className="relative z-[var(--z-modal)] px-4 py-3 flex flex-col gap-4">
 
         {/* Confirmed zone */}
         <div>
@@ -756,12 +756,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 return (
                   <div
                     key={row.normalized}
+                    role="button"
+                    tabIndex={0}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] cursor-pointer transition-colors ${
                       isOpen
                         ? 'bg-[var(--surface-3)] border border-teal-500/40 ring-1 ring-teal-500/10'
                         : 'bg-[var(--surface-3)] border border-transparent hover:border-[var(--brand-border)]'
                     }`}
                     onClick={() => setOpenKeywordDrawer(isOpen ? null : row.normalized)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOpenKeywordDrawer(isOpen ? null : row.normalized);
+                      }
+                    }}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
@@ -800,8 +808,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {keywordIdeaRows.map(row => (
                 <div
                   key={row.normalized}
+                  role="button"
+                  tabIndex={0}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-950/60 border border-blue-900/50 cursor-pointer hover:border-blue-800/60 transition-colors"
                   onClick={() => setOpenKeywordDrawer(openKeywordDrawer === row.normalized ? null : row.normalized)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setOpenKeywordDrawer(openKeywordDrawer === row.normalized ? null : row.normalized);
+                    }
+                  }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
