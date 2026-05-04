@@ -326,6 +326,164 @@
       ]
     },
     {
+      "id": "sprint-platform-consolidation",
+      "name": "Platform Consolidation",
+      "hours": "70-108",
+      "rationale": "Verified against origin/staging eb0a5832 on 2026-05-04. Phase 0 baseline confirms rapid product expansion left uneven background-generation coverage, duplicate implementations, partially completed migrations, and large feature modules that now slow safe iteration.",
+      "items": [
+        {
+          "id": "platform-consolidation-phase0-baseline",
+          "title": "Phase 0 baseline - verify platform consolidation audit against staging",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed against origin/staging eb0a5832 on 2026-05-04. Confirmed no relevant stash already contained this work, inventoried admin generation surfaces, decided TaskPanel/useBackgroundTasks should be the canonical job UX foundation, classified drifted synchronous/partial generation paths, and defined Phase 1 background-generation contract, UX, and guardrail targets."
+        },
+        {
+          "id": "platform-consolidation-background-generation-contract",
+          "title": "Background generation contract - all admin AI/generation flows run as jobs",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. Job coverage already exists for seo-audit, keyword-strategy, schema-generator, page-analysis, bulk-alt, bulk-seo-fix, compress/bulk-compress, sales-report, and deep-diagnostic. Make that a platform contract and migrate drifted surfaces such as content brief generation, content post generation, post section regeneration, content-plan/matrix bulk actions, AEO/page rewrites, brand/page deliverables, and any future admin AI generation that can exceed an interactive request budget."
+        },
+        {
+          "id": "platform-consolidation-background-generation-ui-parity",
+          "title": "Background generation UX - one admin progress surface for jobs",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. TaskPanel/useBackgroundTasks exists, but progress UX is uneven and useBackgroundTasks owns a separate raw WebSocket connection. Standardize Start/Cancel/Resume/Completed/Error states, progress labels, completion notification, and result handoff back into the originating admin surface. Coordinate with existing roadmap item #587 for shared websocket work and item #503 for unified NotificationBell/TaskPanel hub scope."
+        },
+        {
+          "id": "platform-consolidation-background-generation-guardrails",
+          "title": "Background generation guardrails - prevent new synchronous admin generation drift",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. Add a lightweight pr-check rule, contract test, or documented allowlist that flags new admin route handlers/components that trigger long-running generation synchronously instead of through the background job system. Allow short interactive refinements only with explicit rationale."
+        },
+        {
+          "id": "platform-consolidation-billing-checkout-only",
+          "title": "Billing architecture - consolidate on Stripe Checkout",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. PaymentIntent/Stripe Elements still exists alongside Checkout in server/routes/stripe.ts, server/stripe.ts, src/hooks/usePayments.ts, src/components/StripePaymentForm.tsx, and Stripe tests. Retire the inline PaymentIntent purchase path and make Checkout the only client purchase architecture."
+        },
+        {
+          "id": "platform-consolidation-client-data-react-query",
+          "title": "Client portal data - finish React Query migration and retire useClientData facade",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. src/hooks/useClientData.ts remains a compatibility facade with legacy local state, no-op setters, and query-cache bridging. Replace it with smaller feature hooks consumed directly by ClientDashboard tabs."
+        },
+        {
+          "id": "platform-consolidation-tab-deeplink-contracts",
+          "title": "Deep-link contract sweep - fix senders whose ?tab= targets ignore search params",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. InsightsBriefingPage still sends ?tab=content-gaps, while StrategyTab still does not read useSearchParams/searchParams.get('tab'). Sweep all ?tab= senders and extend tests/contract/tab-deep-link-wiring.test.ts coverage."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-streaming",
+          "title": "Keyword strategy streaming - use one SSE helper",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. KeywordStrategy.tsx still hand-parses the keyword strategy SSE response while src/api/seo.ts exposes streamKeywordStrategy(). Move the component to the shared helper and preserve abort/error/progress/done behavior."
+        },
+        {
+          "id": "platform-consolidation-ai-dispatch-migration",
+          "title": "AI dispatch - migrate general server generation paths to callAI",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. server/ai.ts callAI exists, but many server modules and high-churn routes still import callOpenAI directly. Migrate general generation paths to callAI and keep intentional Anthropic creative-prose exceptions documented."
+        },
+        {
+          "id": "platform-consolidation-seo-provider-boundary",
+          "title": "SEO provider boundary - finish Semrush/DataForSEO abstraction cleanup",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. SeoDataProvider exists, but server/routes/keyword-strategy.ts still imports helpers from server/semrush.ts, semrushMode remains feature-facing, and provider-specific naming leaks through strategy UI/state."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-route-split",
+          "title": "Keyword strategy backend - split route monolith and sequence storage normalization",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. server/routes/keyword-strategy.ts is still 2,755 lines. Split generation orchestration, page analysis, feedback, tracked keywords/signals, history diff, and broadcasts into services. Sequence with existing normalization items #365, #367, #368, #369, and #370."
+        },
+        {
+          "id": "platform-consolidation-webflow-seo-route-split",
+          "title": "Webflow SEO backend - split audit, rewrite, bulk jobs, and apply flows",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. server/routes/webflow-seo.ts is still 1,910 lines. Split audit bridge handling, SEO suggestions, rewrite generation, bulk job orchestration, and apply/publish persistence without changing endpoint behavior."
+        },
+        {
+          "id": "platform-consolidation-client-strategy-tab-split",
+          "title": "Client StrategyTab - split workflow state into hooks and sections",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. StrategyTab is still 2,157 lines and combines keyword feedback, tracked keywords, business priorities, content gaps, drawers, tier gates, and request flows."
+        },
+        {
+          "id": "platform-consolidation-feature-tool-splits",
+          "title": "Feature tool monoliths - split SchemaSuggester, PageIntelligence, SeoEditor, VoiceTab",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "10-16h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. SchemaSuggester, PageIntelligence, SeoEditor, and VoiceTab remain >1,000-line feature modules. Split opportunistically around adjacent feature work."
+        },
+        {
+          "id": "platform-consolidation-workspace-intelligence-slices",
+          "title": "Workspace intelligence - split slice assemblers behind stable API",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. workspace-intelligence.ts is still 3,027 lines. Preserve staging's newer pageElements slice behavior and tests when splitting slice assemblers."
+        }
+      ]
+    },
+    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",
