@@ -1847,8 +1847,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     type="button"
                     className="t-caption text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-50"
                     disabled={isRemoving}
-                    onClick={() => {
-                      void removePriorityKeyword(drawerRow);
+                    onClick={async () => {
+                      await removePriorityKeyword(drawerRow);
                       setOpenKeywordDrawer(null);
                     }}
                   >
