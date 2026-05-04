@@ -130,7 +130,6 @@ function fmtAudience(volume?: number): string {
   return `~${fmtNum(volume)} searches/month`;
 }
 
-
 function fmtMomentum(direction?: 'rising' | 'declining' | 'stable'): string {
   if (!direction) return 'Gathering…';
   if (direction === 'rising') return 'Interest growing';
@@ -940,7 +939,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 );
               })}
               </div>
-              {sortedConfirmed.length > 6 && (
+              {sortedConfirmed.length > 8 && (
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--surface-2)] to-transparent" />
               )}
             </div>
