@@ -171,7 +171,8 @@ function getCacheDir(workspaceId: string): string {
 }
 
 function getCachePath(workspaceId: string, key: string): string {
-  return path.join(getCacheDir(workspaceId), `${key}.json`);
+  const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(getCacheDir(workspaceId), `${safeKey}.json`);
 }
 
 function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | null {
