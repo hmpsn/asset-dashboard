@@ -1903,7 +1903,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 {/* Opportunity section — plain English */}
                 {unenriched ? (
                   <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] px-3 py-3 flex items-start gap-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" /> {/* rounded-literal-ok — circle dot indicator */}
                     <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed">
                       We're collecting search data for this keyword. Volume and competition metrics will appear within 24 hours.
                     </p>
