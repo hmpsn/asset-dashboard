@@ -49,6 +49,20 @@ vi.mock('../server/rank-tracking.js', () => ({
 vi.mock('../server/schema-validator.js', () => ({
   getValidations: vi.fn(() => []),
 }));
+vi.mock('../server/schema-store.js', () => ({
+  getSchemaSnapshot: vi.fn(() => null),
+}));
+vi.mock('../server/reports.js', () => ({
+  getLatestSnapshot: vi.fn(() => null),
+}));
+vi.mock('../server/performance-store.js', () => ({
+  getInternalLinks: vi.fn(() => null),
+  getPageSpeed: vi.fn(() => null),
+}));
+vi.mock('../server/site-architecture.js', () => ({
+  getCachedArchitecture: vi.fn(() => null),
+  flattenTree: vi.fn(() => []),
+}));
 
 vi.mock('../server/content-brief.js', () => ({
   listBriefs: vi.fn(() => []),
@@ -121,6 +135,103 @@ describe('assemblePageProfile', () => {
     });
 
     expect(result.pageProfile!.recommendations).toContain('Add meta description');
+  });
+
+  it('matches page recommendations by exact normalized identity without sibling overmatch', async () => {
+    const recommendations = await import('../server/recommendations.js');
+    vi.mocked(recommendations.loadRecommendations).mockReturnValueOnce({
+      recommendations: [
+        { id: 'r1', priority: 'fix_now', status: 'pending', affectedPages: ['https://example.com/about?utm=1'], title: 'About page rec' },
+        { id: 'r2', priority: 'fix_now', status: 'pending', affectedPages: ['services/about'], title: 'Nested sibling rec' },
+      ],
+    } as ReturnType<typeof recommendations.loadRecommendations>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/about',
+    });
+
+    expect(result.pageProfile!.recommendations).toContain('About page rec');
+    expect(result.pageProfile!.recommendations).not.toContain('Nested sibling rec');
+  });
+
+  it('matches audit and CWV page data by URL path when slug is only a leaf', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    const reports = await import('../server/reports.js');
+    const performanceStore = await import('../server/performance-store.js');
+
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      webflowSiteId: 'site-1',
+      personas: [],
+    } as ReturnType<typeof workspaces.getWorkspace>);
+    vi.mocked(reports.getLatestSnapshot).mockReturnValueOnce({
+      audit: {
+        pages: [
+          {
+            pageId: 'page-services-seo',
+            slug: 'seo',
+            url: 'https://example.com/services/seo?utm=1',
+            issues: [{ message: 'Nested page audit issue' }],
+          },
+        ],
+      },
+    } as ReturnType<typeof reports.getLatestSnapshot>);
+    vi.mocked(performanceStore.getPageSpeed).mockReturnValueOnce({
+      result: {
+        pages: [
+          { slug: 'seo', url: 'https://example.com/services/seo#top', score: 94 },
+        ],
+      },
+    } as ReturnType<typeof performanceStore.getPageSpeed>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/services/seo',
+    });
+
+    expect(result.pageProfile!.auditIssues).toContain('Nested page audit issue');
+    expect(result.pageProfile!.cwvStatus).toBe('good');
+  });
+
+  it('matches schema validation status through snapshot URL/path identity for nested pages', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    const schemaStore = await import('../server/schema-store.js');
+    const schemaValidator = await import('../server/schema-validator.js');
+
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      webflowSiteId: 'site-1',
+      personas: [],
+    } as ReturnType<typeof workspaces.getWorkspace>);
+    vi.mocked(schemaStore.getSchemaSnapshot).mockReturnValueOnce({
+      siteId: 'site-1',
+      workspaceId: 'ws-1',
+      generatedAt: new Date().toISOString(),
+      results: [
+        {
+          pageId: 'page-services-seo',
+          pageTitle: 'SEO Services',
+          slug: 'seo',
+          url: 'https://example.com/services/seo',
+          existingSchemas: [],
+          suggestedSchemas: [],
+        },
+      ],
+    } as ReturnType<typeof schemaStore.getSchemaSnapshot>);
+    vi.mocked(schemaValidator.getValidations).mockReturnValueOnce([
+      { pageId: 'page-services-seo', status: 'warnings' },
+    ] as ReturnType<typeof schemaValidator.getValidations>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/services/seo',
+    });
+
+    expect(result.pageProfile!.schemaStatus).toBe('warnings');
   });
 
   it('has all required shape fields', async () => {

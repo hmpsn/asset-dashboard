@@ -133,6 +133,19 @@ export function normalizePageUrl(url: string): string {
   return normalizePath(url);
 }
 
+/** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
+export function matchPageIdentity(a: string, b: string): boolean {
+  return normalizePageUrl(a).toLowerCase() === normalizePageUrl(b).toLowerCase();
+}
+
+/** Find a pageMap entry from a full URL/path/bare slug using exact normalized page identity. */
+export function findPageMapEntryByIdentity<T extends { pagePath: string }>(
+  pageMap: T[],
+  pageIdentity: string,
+): T | undefined {
+  return findPageMapEntry(pageMap, normalizePageUrl(pageIdentity));
+}
+
 // ── Input Validation ──
 
 /** Sanitize a string field: trim, limit length, strip control characters */

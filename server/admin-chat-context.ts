@@ -28,7 +28,7 @@ import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath, normalizePath } from './helpers.js';
+import { applySuppressionsToAudit, findPageMapEntryByIdentity, getAuditTrafficForWorkspace, resolvePagePath, normalizePageUrl, normalizePath } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
 import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
@@ -441,9 +441,8 @@ export async function assembleAdminContext(
       pageContext = { url: targetUrl };
 
       // Get page-specific keyword context from strategy pageMap
-      const normalizedPath = targetUrl.startsWith('/') ? targetUrl : targetUrl.replace(/^https?:\/\/[^/]+/, '');
-      const pageKw = strategy?.pageMap?.find(p => p.pagePath.toLowerCase() === normalizedPath.toLowerCase())
-        ?? (normalizedPath ? strategy?.pageMap?.find(p => normalizedPath.toLowerCase().endsWith(p.pagePath.toLowerCase()) || p.pagePath.toLowerCase().endsWith(normalizedPath.toLowerCase())) : undefined);
+      const normalizedPath = normalizePageUrl(targetUrl);
+      const pageKw = strategy?.pageMap ? findPageMapEntryByIdentity(strategy.pageMap, normalizedPath) : undefined;
       if (pageKw) {
         let pageKeywordBlock = `\n\nTHIS PAGE'S TARGET (overrides general context):`;
         pageKeywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;

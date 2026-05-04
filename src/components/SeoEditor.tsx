@@ -778,8 +778,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const q = search.toLowerCase();
     return p.title.toLowerCase().includes(q) || (p.slug || '').toLowerCase().includes(q);
   }).sort((a, b) => {
-    const scoreA = (!a.seo?.title ? 2 : 0) + (!a.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(a.slug).filter((r: { type: string }) => r.type === 'metadata').length : 0);
-    const scoreB = (!b.seo?.title ? 2 : 0) + (!b.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(b.slug).filter((r: { type: string }) => r.type === 'metadata').length : 0);
+    const scoreA = (!a.seo?.title ? 2 : 0) + (!a.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(resolvePagePath(a)).filter((r: { type: string }) => r.type === 'metadata').length : 0);
+    const scoreB = (!b.seo?.title ? 2 : 0) + (!b.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(resolvePagePath(b)).filter((r: { type: string }) => r.type === 'metadata').length : 0);
     return scoreB - scoreA;
   });
 
@@ -1034,7 +1034,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
               isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
               isSelected={approvalSelected.has(page.id)}
-              pageRecs={recsLoaded ? recsForPage(page.slug) : []}
+              pageRecs={recsLoaded ? recsForPage(resolvePagePath(page)) : []}
               pageState={getState(page.id)} variations={variations[page.id]}
               showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
               isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && ((edits[page.id].seoTitle ?? '') !== (page.seo?.title ?? '') || (edits[page.id].seoDescription ?? '') !== (page.seo?.description ?? '')))}
