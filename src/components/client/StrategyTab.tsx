@@ -420,9 +420,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
 
-  // Gradient fade — ref and state; effect wired below after sortedConfirmed is defined
   const kwListScrollRef = useRef<HTMLDivElement>(null);
   const [kwListOverflows, setKwListOverflows] = useState(false);
+  useEffect(() => {
+    const el = kwListScrollRef.current;
+    if (!el) return;
+    setKwListOverflows(el.scrollHeight > el.clientHeight);
+  });
 
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -809,13 +813,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const sortedConfirmed = [...strategyKeywordRows].sort(
     (a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0)
   );
-
-  // Show gradient only when the list actually overflows the 420px cap
-  useEffect(() => {
-    const el = kwListScrollRef.current;
-    if (!el) return;
-    setKwListOverflows(el.scrollHeight > el.clientHeight);
-  }, [sortedConfirmed]);
 
   const priorityKeywordsPanel = (
     // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
