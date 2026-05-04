@@ -338,7 +338,7 @@
           "est": "4-6h",
           "priority": "P1",
           "status": "done",
-          "notes": "Added shared requireWorkspaceSiteAccess guard proving workspace -> Webflow site ownership before token lookup or resource mutation. Applied it to Webflow asset/page/publish routes, CMS collection item read/write/publish routes, organize/rename routes, and schema site routes. Threaded workspaceId through scoped admin callers and added cross-workspace JWT integration tests for asset reads, page SEO writes, organize, CMS publish, and schema publish.",
+          "notes": "Added shared requireWorkspaceSiteAccess guard proving workspace -> Webflow site ownership before token lookup or resource mutation. Applied it to Webflow asset/page/publish routes, CMS collection item read/write/publish routes, organize/rename routes, schema site routes, Smart Name, SEO copy, and guarded Webflow job/content-publish surfaces. Threaded workspaceId through scoped admin callers and added cross-workspace JWT integration tests plus owned-site positive-path coverage for schema validation, Smart Name, and SEO copy.",
           "shippedAt": "2026-05-04"
         },
         {
