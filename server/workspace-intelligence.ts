@@ -77,6 +77,7 @@ import type { SchemaValidation } from './schema-validator.js';
 import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
 import type { CwvSummary } from './seo-audit.js';
+import { findPageMapEntry, matchPageIdentity, matchPagePath, toAuditFindingPageId } from './helpers.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -312,8 +313,7 @@ async function assembleSeoContext(
 
   // Page-specific keywords — populate from strategy.pageMap when pagePath is provided
   if (opts?.pagePath && base.strategy?.pageMap?.length) {
-    const pagePathLower = opts.pagePath.toLowerCase();
-    const pageKw = base.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePathLower);
+    const pageKw = findPageMapEntry(base.strategy.pageMap, opts.pagePath);
     if (pageKw) base.pageKeywords = pageKw;
   }
 
@@ -483,7 +483,7 @@ async function assembleInsights(
   // Page-specific filtering
   let forPage: AnalyticsInsight[] | undefined;
   if (opts?.pagePath) {
-    forPage = capped.filter(i => i.pageId === opts.pagePath);
+    forPage = capped.filter(i => i.pageId ? matchPageIdentity(i.pageId, opts.pagePath!) : false);
   }
 
   return { all: capped, byType, bySeverity, topByImpact, forPage };
@@ -2590,7 +2590,7 @@ async function assemblePageProfile(
     const recSetPP: RecommendationSet | null = loadRecommendations(workspaceId);
     if (recSetPP?.recommendations) {
       recommendations = recSetPP.recommendations
-        .filter(r => r.affectedPages?.includes(pagePath) && (r.status === 'pending' || !r.status))
+        .filter(r => r.affectedPages?.some(p => matchPageIdentity(p, pagePath)) && (r.status === 'pending' || !r.status))
         .map(r => r.title ?? r.description ?? '')
         .filter(Boolean);
     }
@@ -2603,7 +2603,7 @@ async function assemblePageProfile(
   try {
     const { getInsights } = await import('./analytics-insights-store.js');
     const all = getInsights(workspaceId);
-    insights = all.filter(i => i.pageId === pagePath).slice(0, 10);
+    insights = all.filter(i => i.pageId ? matchPageIdentity(i.pageId, pagePath) : false).slice(0, 10);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assemblePageProfile: insights optional, degrading gracefully');
   }
@@ -2633,7 +2633,10 @@ async function assemblePageProfile(
       const { getLatestSnapshot } = await import('./reports.js');
       const snap = getLatestSnapshot(ws.webflowSiteId);
       if (snap?.audit?.pages) {
-        const pagData = (snap.audit.pages as PageSeoResult[]).find(p => p.url === pagePath || p.slug === pagePath);
+        const pagData = (snap.audit.pages as PageSeoResult[]).find(p =>
+          matchPageIdentity(toAuditFindingPageId(p), pagePath)
+          || (p.url ? matchPageIdentity(p.url, pagePath) : false)
+        );
         if (pagData?.issues) {
           auditIssues = pagData.issues.map((i: SeoIssue) => i.message).filter(Boolean);
         }
@@ -2654,8 +2657,9 @@ async function assemblePageProfile(
     const { toCmsPageId } = await import('./webflow-pages.js');
     const validations: SchemaValidation[] = getValidations(workspaceId);
     const snapshot = ws?.webflowSiteId ? getSchemaSnapshot(ws.webflowSiteId) : null;
-    const pagePathTrimmed = pagePath.replace(/^\//, '');
-    const resolvedPageId = snapshot?.results.find(r => r.slug === pagePathTrimmed)?.pageId
+    // Nested Webflow pages can share leaf slugs, so the URL branch is the authoritative
+    // identity match when a page lives below a parent path.
+    const resolvedPageId = snapshot?.results.find(r => matchPageIdentity(r.slug, pagePath) || matchPageIdentity(r.url, pagePath))?.pageId
       ?? toCmsPageId(pagePath);
     const pageValidation = validations.find(v => v.pageId === resolvedPageId);
     if (pageValidation) {
@@ -2681,9 +2685,8 @@ async function assemblePageProfile(
         const linkSnapshot = getInternalLinks(wsForLinks.webflowSiteId);
         const linkData = linkSnapshot?.result as import('./internal-links.js').InternalLinkResult | null;
         if (linkData?.pageHealth) {
-          const normalizedPath = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
           const entry = linkData.pageHealth.find(
-            ph => (ph.path === '/' ? '/' : ph.path.replace(/\/$/, '')) === normalizedPath,
+            ph => matchPagePath(ph.path, pagePath),
           );
           if (entry) {
             linkHealth = {
@@ -2707,12 +2710,12 @@ async function assemblePageProfile(
       ]);
       if (arch) {
         const nodes: SiteNode[] = flattenTree(arch.tree);
-        const nodeExists = nodes.some(n => n.path === pagePath);
+        const nodeExists = nodes.some(n => matchPagePath(n.path, pagePath));
         if (nodeExists) {
           linkHealth = {
             inbound: 0,
             outbound: 0,
-            orphan: arch.orphanPaths?.includes(pagePath) ?? false,
+            orphan: arch.orphanPaths?.some(p => matchPagePath(p, pagePath)) ?? false,
           };
         }
       }
@@ -2726,7 +2729,12 @@ async function assemblePageProfile(
   try {
     const { getSeoChanges } = await import('./seo-change-tracker.js');
     const changes: SeoChangeEvent[] = getSeoChanges(workspaceId, 50);
-    const pageChanges = changes.filter(c => c.pageSlug === pagePath || c.pageId === pagePath);
+    const pageChanges = changes.filter(c =>
+      (c.pageSlug ? matchPageIdentity(c.pageSlug, pagePath) : false)
+      // Legacy events may not consistently distinguish slug/path/pageId; keep this
+      // fallback for historical rows even though Webflow UUIDs do not path-match.
+      || (c.pageId ? matchPageIdentity(c.pageId, pagePath) : false)
+    );
     if (pageChanges.length > 0) {
       seoEdits.lastEditedAt = pageChanges[0].changedAt ?? null;
     }
@@ -2764,7 +2772,7 @@ async function assemblePageProfile(
     try {
       const { loadDecayAnalysis } = await import('./content-decay.js');
       const decayPP: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
-      isDecaying = decayPP?.decayingPages?.some(d => d.page === pagePath) ?? false;
+      isDecaying = decayPP?.decayingPages?.some(d => matchPageIdentity(d.page, pagePath)) ?? false;
     } catch (err) {
       log.debug({ err, workspaceId }, 'assemblePageProfile: decay analysis optional, degrading gracefully');
     }
@@ -2808,7 +2816,11 @@ async function assemblePageProfile(
       if (speedSnap?.result) {
         const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
         const pages = result.pages ?? [];
-        const pageData = pages.find(p => p.url === pagePath || p.slug === pagePath);
+        const pageData = pages.find(p =>
+          (p.url ? matchPageIdentity(p.url, pagePath) : false)
+          // Bare slugs only identify top-level pages; nested pages rely on URL matching.
+          || (p.slug ? matchPageIdentity(p.slug, pagePath) : false)
+        );
         if (pageData?.score != null) {
           cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';
         }
@@ -2982,9 +2994,8 @@ export function formatPersonasForPrompt(personas: AudiencePersona[] | null | und
 export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
   if (!seo?.strategy?.pageMap?.length) return '';
 
-  const pagePathLower = pagePath?.toLowerCase();
-  const pageMap = pagePathLower
-    ? seo.strategy.pageMap.filter(p => p.pagePath.toLowerCase() === pagePathLower)
+  const pageMap = pagePath
+    ? seo.strategy.pageMap.filter(p => matchPagePath(p.pagePath, pagePath))
     : seo.strategy.pageMap;
 
   if (!pageMap.length) return '';

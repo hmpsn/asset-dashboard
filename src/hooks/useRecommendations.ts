@@ -2,11 +2,19 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
+import { matchPageIdentity } from '../lib/pathUtils';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.ts';
+
+export function recommendationAppliesToPage(
+  recommendation: Pick<Recommendation, 'affectedPages'>,
+  pageIdentity: string,
+): boolean {
+  return recommendation.affectedPages.some(page => matchPageIdentity(page, pageIdentity));
+}
 
 /**
  * Fetch active recommendations for a workspace and provide helpers
- * to filter them by page slug and type.
+ * to filter them by page identity and type.
  *
  * Uses queryKeys.shared.recommendations — the same key as InsightsEngine.
  * The queryFn caches the full RecommendationSet; select projects to Recommendation[]
@@ -22,16 +30,9 @@ export function useRecommendations(workspaceId?: string) {
     staleTime: 60_000,
   });
 
-  /** Get recommendations relevant to a specific page slug */
-  const forPage = useCallback((slug: string): Recommendation[] => {
-    if (!slug) return [];
-    const normalized = slug.startsWith('/') ? slug : `/${slug}`;
-    return recs.filter(r =>
-      r.affectedPages.some(p => {
-        const np = p.startsWith('/') ? p : `/${p}`;
-        return np === normalized || normalized.includes(np) || np.includes(normalized);
-      })
-    );
+  /** Get recommendations relevant to a specific page identity (path, URL, or homepage slug). */
+  const forPage = useCallback((pageIdentity: string): Recommendation[] => {
+    return recs.filter(r => recommendationAppliesToPage(r, pageIdentity));
   }, [recs]);
 
   /** Get recommendations of a specific type */
@@ -39,8 +40,8 @@ export function useRecommendations(workspaceId?: string) {
     recs.filter(r => r.type === type), [recs]);
 
   /** Get recommendations matching both page and type */
-  const forPageAndType = useCallback((slug: string, type: Recommendation['type']): Recommendation[] =>
-    forPage(slug).filter(r => r.type === type), [forPage]);
+  const forPageAndType = useCallback((pageIdentity: string, type: Recommendation['type']): Recommendation[] =>
+    forPage(pageIdentity).filter(r => r.type === type), [forPage]);
 
   return { recs, loaded, forPage, ofType, forPageAndType };
 }

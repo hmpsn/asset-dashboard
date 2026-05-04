@@ -1268,7 +1268,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       {/* Page list */}
       <div className="space-y-3">
         {data.map(page => {
-          const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
+          const schemaRecs = recsLoaded ? recsForPage(page.url || page.slug).filter(r => r.type === 'schema') : [];
           return (
             <SchemaPageCard
               key={page.pageId}

@@ -367,8 +367,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 9",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Replace remaining full-URL/bare-slug/path direct comparisons and fuzzy endsWith/includes matching in page-profile, admin chat, recommendation lookup, schema status, audit/CWV joins, and SEO-context filtering. Use shared path helpers and tests covering homepage, nested static pages, CMS synthetic IDs, full URLs, and sibling leaf slugs like /seo vs /services/seo."
+          "status": "done",
+          "notes": "Replaced remaining fuzzy/raw page identity joins with exact shared identity helpers across admin chat pageMap lookup, workspace intelligence SEO-context/insights/page-profile joins, audit/CWV/schema/link/SEO edit/content-decay matching, and frontend recommendation filtering. Added frontend/server helper parity tests plus regression coverage for homepage identities, full URLs with query/hash, nested pages, and sibling leaf paths like /seo vs /services/seo.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-client-api-contract-drift",

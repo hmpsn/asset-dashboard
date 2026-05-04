@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { matchPagePath, resolvePagePath, tryResolvePagePath, findPageMapEntry, findPageMapEntryForPage } from '../../src/lib/pathUtils.js';
+import { matchPageIdentity, matchPagePath, normalizePageUrl, resolvePagePath, tryResolvePagePath, findPageMapEntry, findPageMapEntryByIdentity, findPageMapEntryForPage } from '../../src/lib/pathUtils.js';
 import {
   matchGscUrlToPath,
+  matchPageIdentity as serverMatchPageIdentity,
+  normalizePageUrl as serverNormalizePageUrl,
   resolvePagePath as serverResolvePagePath,
   tryResolvePagePath as serverTryResolvePagePath,
   findPageMapEntry as serverFindPageMapEntry,
+  findPageMapEntryByIdentity as serverFindPageMapEntryByIdentity,
   findPageMapEntryForPage as serverFindPageMapEntryForPage,
 } from '../../server/helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -251,6 +254,53 @@ describe('matchPagePath — nested page regression guard', () => {
   it('matches when both use resolvePagePath output', () => {
     const page = { slug: 'seo', publishedPath: '/services/seo' };
     expect(matchPagePath('/services/seo', resolvePagePath(page))).toBe(true);
+  });
+});
+
+describe('page identity matching — URL/path/slug exact normalization', () => {
+  const pageMap = [
+    { pagePath: '/seo', pageTitle: 'SEO Root' },
+    { pagePath: '/services/seo', pageTitle: 'SEO Service' },
+    { pagePath: '/', pageTitle: 'Home' },
+  ];
+
+  it('frontend and backend normalize full URLs consistently', () => {
+    const input = 'https://example.com/services/seo/?utm=1#top';
+    expect(normalizePageUrl(input)).toBe('/services/seo');
+    expect(normalizePageUrl(input)).toBe(serverNormalizePageUrl(input));
+  });
+
+  it('matches homepage variants without sitewide overmatch', () => {
+    expect(matchPageIdentity('', '/')).toBe(true);
+    expect(matchPageIdentity('https://example.com', '/')).toBe(true);
+    expect(matchPageIdentity('/', '/services/seo')).toBe(false);
+  });
+
+  it('does not fuzzy-match sibling leaf paths', () => {
+    expect(matchPageIdentity('/seo', '/services/seo')).toBe(false);
+    expect(matchPageIdentity('/services/seo', '/seo')).toBe(false);
+    expect(matchPageIdentity('/blog/seo', '/services/seo')).toBe(false);
+  });
+
+  it('pageMap identity lookup handles full URLs exactly', () => {
+    expect(findPageMapEntryByIdentity(pageMap, 'https://example.com/services/seo?utm=1')?.pageTitle)
+      .toBe('SEO Service');
+    expect(findPageMapEntryByIdentity(pageMap, '/blog/seo')).toBeUndefined();
+  });
+
+  it('frontend and backend identity helpers agree', () => {
+    const cases = [
+      ['', '/'],
+      ['https://example.com/services/seo?utm=1', '/services/seo'],
+      ['/seo', '/services/seo'],
+      ['/services/seo/', '/services/seo'],
+    ] as const;
+
+    for (const [a, b] of cases) {
+      expect(matchPageIdentity(a, b)).toBe(serverMatchPageIdentity(a, b));
+    }
+    expect(findPageMapEntryByIdentity(pageMap, '/Services/SEO')?.pageTitle)
+      .toBe(serverFindPageMapEntryByIdentity(pageMap, '/Services/SEO')?.pageTitle);
   });
 });
 
