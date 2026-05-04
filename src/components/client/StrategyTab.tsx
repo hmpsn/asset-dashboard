@@ -1831,7 +1831,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     {drawerRow.label}
                   </div>
                   <span className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleBadgeClass(drawerRow.role)}`}>
-                    {drawerRow.roleLabel}
+                    {({ content: 'content opportunity', page: 'page opportunity', strategy: 'strategy keyword', idea: 'keyword idea' } as Record<string, string>)[drawerRow.role] ?? drawerRow.roleLabel}
                   </span>
                 </div>
                 <button
@@ -1982,7 +1982,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     disabled={isRemoving}
                     onClick={async () => {
                       await removePriorityKeyword(drawerRow);
-                      setOpenKeywordDrawer(null);
+                      closeDrawer();
                     }}
                   >
                     {isRemoving ? 'Removing...' : 'Remove from strategy'}
@@ -1996,7 +1996,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       disabled={addingKeyword}
                       onClick={async () => {
                         await addStrategyKeyword(drawerRow.label);
-                        setOpenKeywordDrawer(null);
+                        closeDrawer();
                       }}
                     >
                       Add to strategy
@@ -2006,7 +2006,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                       onClick={async () => {
                         await submitFeedback(drawerRow.label, 'declined', 'suggestion');
-                        setOpenKeywordDrawer(null);
+                        closeDrawer();
                       }}
                     >
                       Dismiss
