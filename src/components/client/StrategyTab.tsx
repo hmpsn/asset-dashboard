@@ -112,6 +112,7 @@ interface StrategyKeywordTableRow extends PriorityKeywordItem {
   contextSources: string[];
   rationale?: string;                                      // AI rationale from contentGaps, if available
   trendDirection?: 'rising' | 'declining' | 'stable';    // from contentGaps, if available
+  enrichmentStatus: 'enriched' | 'partial' | 'unenriched';
 }
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
@@ -667,6 +668,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       currentPosition,
     });
 
+    const enrichmentStatus: 'enriched' | 'partial' | 'unenriched' = (() => {
+      if (volume != null && difficulty != null) return 'enriched';
+      if (volume != null || difficulty != null || impressions != null || currentPosition != null) return 'partial';
+      return 'unenriched';
+    })();
+
     return {
       ...item,
       ...role,
@@ -685,6 +692,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       contextSources,
       rationale: contentGap?.rationale,
       trendDirection: contentGap?.trendDirection,
+      enrichmentStatus,
     };
   };
 
