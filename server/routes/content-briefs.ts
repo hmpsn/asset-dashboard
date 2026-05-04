@@ -1,5 +1,8 @@
 /**
  * content-briefs routes — extracted from server/index.ts
+ *
+ * @reads content_briefs, content_requests, search_console, seo_provider, workspaces, analytics_insights, workspace_learnings, feature_flags
+ * @writes content_briefs, content_requests, outcome_actions, activities
  */
 import { Router } from 'express';
 

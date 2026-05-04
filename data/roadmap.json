@@ -110,8 +110,8 @@
           "source": "PR #254 code review flag 3",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "The pr-check rule added in #597 only matches [WS_EVENTS.X] computed-property patterns. Components using raw string literals like 'activity:new' bypass it entirely. Fix: at check time, build a reverse map of WS_EVENTS string values → constant names from wsEvents.ts, then flag raw string literal subscriptions whose value matches a centralized event (unless ws-invalidation-ok hatch present). After the WorkspaceHome fix in PR #254 only ClientDashboard retains string-literal handlers — that's the one legitimate case (client route, useWsInvalidation not mounted there), so it would need a ws-invalidation-ok hatch. Low-risk, ~1h of pr-check work.",
-          "status": "pending"
+          "notes": "Done 2026-05-04: extended the useWorkspaceEvents centralization pr-check rule to parse raw string handler keys like 'activity:new' by reverse-mapping src/lib/wsEvents.ts values to constants. Added fixture coverage for computed keys, raw string keys, non-centralized events, and hatches. ClientDashboard retains client-route string handlers with explicit ws-invalidation-ok hatches because useWsInvalidation is not mounted on /client routes.",
+          "status": "done"
         },
         {
           "id": 595,
@@ -119,8 +119,8 @@
           "source": "Devin review of PR #249 + recurring asymmetry bug pattern",
           "est": "3-5h",
           "priority": "P2",
-          "notes": "Recurring bug pattern: GET endpoint short-circuits on one data source (e.g. ws.keywordStrategy) while writes populate adjacent storage (e.g. page_keywords table). Examples: PR #248 (PageIntelligence case-sensitivity), PR #249 (synthesized shell for partial state). Proposed convention: every GET handler gets a `@reads: <table|blob>, <table|blob>, ...` JSDoc tag; every write handler gets a matching `@writes: ...` tag. Mechanize with a pr-check rule that parses these tags across all routes and flags tables that are written without a corresponding read endpoint (or vice versa). Deliverables: (1) tag convention documented in docs/rules/automated-rules.md, (2) pr-check rule that parses @reads/@writes from route files and builds a read/write graph, (3) initial annotation pass on the 10 most-touched routes. Audit pass to find existing asymmetry: grep for `if (!ws\\.\\w+) return.*json\\(null\\)` patterns across server/routes/.",
-          "status": "pending"
+          "notes": "Done 2026-05-04: added the @reads/@writes route contract convention, documented it in docs/rules/route-read-write-contracts.md, and enforced the first ten highest-churn route files with pr-check. Annotated keyword-strategy, jobs, webflow-seo, webflow-schema, workspaces, public-portal, content-requests, public-analytics, content-briefs, and webflow-alt-text. Initial enforcement validates contract presence and malformed/TODO values; future work can make it route-level or SQL-aware.",
+          "status": "done"
         },
         {
           "id": 594,
@@ -128,8 +128,8 @@
           "source": "Post-slug-path-hardening discussion 2026-04-21",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "Audit-only task. Grep every client-side pairing site across the platform (pages↔strategy, pages↔GSC, pages↔insights, pages↔content pipeline, pages↔page keywords, keywords↔rank tracking). For each join, document: (a) which components consume it, (b) what fields each consumer actually reads, (c) invalidation surface (which writes should trigger a refetch), (d) whether it's worth lifting to a server-side assembler (extending server/workspace-intelligence.ts pattern) vs leaving as a client hook. Output: planning doc with per-join recommendation table. Do NOT implement — this is scoping work to decide platform-wide architecture. Prerequisite for any multi-phase server-join refactor.",
-          "status": "pending"
+          "notes": "Done 2026-05-04: completed the audit-only server-side page-join assembler scoping doc at docs/superpowers/audits/2026-05-04-server-side-page-join-assembler-audit.md. Recommendation: do not implement a generic server assembler yet; keep admin UI on usePageJoin and intelligence/prompt flows on workspace-intelligence slices. Future candidate is a narrow read-only PagePerformanceProfile assembler once at least two backend consumers need page + keyword + analytics in one response.",
+          "status": "done"
         },
         {
           "id": 587,

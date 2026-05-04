@@ -180,25 +180,39 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   } : undefined, [clientUser]);
 
   useWorkspaceEvents(authenticated ? workspaceId : undefined, {
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'post:updated': () => refetchClient('post-preview', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'audit:complete': () => {
       refetchClient('audit', '');
       refetchClient('activity', '');
     },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'workspace:updated': () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
       refetchClient('pricing', '');
     },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'recommendations:updated': () => refetchClient('recommendations', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'briefing:published': () => refetchClient('briefing', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.STRATEGY_UPDATED]: () => {

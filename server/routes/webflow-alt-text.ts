@@ -1,5 +1,8 @@
 /**
  * AI alt text generation & image compression routes — extracted from webflow.ts
+ *
+ * @reads workspaces, workspace_pages, webflow_api, cms_items, usage_tracking, workspace_intelligence
+ * @writes webflow_assets, cms_items, usage_tracking
  */
 import { Router } from 'express';
 import fs from 'fs';

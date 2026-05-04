@@ -204,6 +204,19 @@ const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 250;
  *  balancer never reaches zero (e.g. malformed input). */
 const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
+const ROUTE_CONTRACT_REQUIRED_BASENAMES = new Set([
+  'keyword-strategy.ts',
+  'jobs.ts',
+  'webflow-seo.ts',
+  'webflow-schema.ts',
+  'workspaces.ts',
+  'public-portal.ts',
+  'content-requests.ts',
+  'public-analytics.ts',
+  'content-briefs.ts',
+  'webflow-alt-text.ts',
+]);
+
 // ─── Check definitions ────────────────────────────────────────────────────────
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
@@ -3721,9 +3734,31 @@ export const CHECKS: Check[] = [
         );
       }
 
-      // ── Scan src/ files for inline [WS_EVENTS.X] patterns whose event is centralized ──
+      // Build a reverse lookup so raw string handler keys (e.g. 'activity:new')
+      // get the same protection as [WS_EVENTS.ACTIVITY_NEW]. This matters
+      // because string-literal duplicates are exactly where drift hides: the
+      // import-free file otherwise never mentions WS_EVENTS and would be
+      // skipped by a computed-key-only scanner.
+      const wsEventsPath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
+      const wsEventsContent = readFileOrEmpty(wsEventsPath);
+      const wsEventsBlock = wsEventsContent.match(/export const WS_EVENTS = \{([\s\S]*?)\n\} as const;/)?.[1] ?? '';
+      const eventValueToName = new Map<string, string>();
+      const eventConstRe = /^\s*([A-Z_]+):\s*['"]([^'"]+)['"]/gm;
+      let em: RegExpExecArray | null;
+      while ((em = eventConstRe.exec(wsEventsBlock)) !== null) {
+        eventValueToName.set(em[2], em[1]);
+      }
+      if (eventValueToName.size === 0) {
+        throw new Error(
+          'useWorkspaceEvents-centralization rule: found zero WS_EVENTS values in ' +
+          'src/lib/wsEvents.ts. Expected pattern: `EVENT_NAME: \'event:value\'`'
+        );
+      }
+
+      // ── Scan src/ files for inline handlers whose event is centralized ──
       const hits: CustomCheckMatch[] = [];
       const lineRe = /\[WS_EVENTS\.([A-Z_]+)\]/;
+      const stringKeyRe = /^\s*(?:\[\s*)?['"]([^'"]+)['"](?:\s*\])?\s*:/;
 
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
@@ -3734,20 +3769,111 @@ export const CHECKS: Check[] = [
 
         const content = readFileOrEmpty(file);
         if (!content) continue;
-        // Quick pre-filter: skip files that don't reference WS_EVENTS at all.
-        if (!content.includes('WS_EVENTS.')) continue;
+        // Quick pre-filter: only files with workspace subscriptions can
+        // duplicate the centralized invalidation map.
+        if (!content.includes('useWorkspaceEvents(')) continue;
 
         const lines = content.split('\n');
+        let inUseWorkspaceEventsCall = false;
+        let parenDepth = 0;
+
         for (let i = 0; i < lines.length; i++) {
-          const m = lines[i].match(lineRe);
-          if (!m) continue;
-          const eventName = m[1];
-          if (!centralizedEvents.has(eventName)) continue;
-          // Check escape hatch on this line or the line immediately above.
-          if (hasHatch(lines, i, '// ws-invalidation-ok')) continue;
-          hits.push({ file, line: i + 1, text: lines[i].trim() });
+          const line = lines[i];
+          if (!inUseWorkspaceEventsCall && !line.includes('useWorkspaceEvents(')) continue;
+
+          if (!inUseWorkspaceEventsCall) {
+            inUseWorkspaceEventsCall = true;
+            parenDepth = 0;
+          }
+
+          const computedKey = line.match(lineRe)?.[1];
+          const rawEventValue = line.match(stringKeyRe)?.[1];
+          const rawKey = rawEventValue ? eventValueToName.get(rawEventValue) : undefined;
+          const eventName = computedKey ?? rawKey;
+
+          if (eventName && centralizedEvents.has(eventName) && !hasHatch(lines, i, '// ws-invalidation-ok')) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+
+          parenDepth += (line.match(/\(/g) ?? []).length;
+          parenDepth -= (line.match(/\)/g) ?? []).length;
+          if (inUseWorkspaceEventsCall && parenDepth <= 0) {
+            inUseWorkspaceEventsCall = false;
+          }
         }
       }
+      return hits;
+    },
+  },
+  {
+    // ── Route read/write contracts ────────────────────────────────────────
+    //
+    // High-churn route files need an explicit, grep-friendly contract for the
+    // tables or stores they read and write. This is intentionally a first-pass
+    // convention rule: it locks the annotation shape for the most-touched route
+    // modules before we expand coverage to every server route.
+    name: 'Route read/write contract annotations',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    displayScope: 'server/routes/{keyword-strategy,jobs,webflow-seo,webflow-schema,workspaces,public-portal,content-requests,public-analytics,content-briefs,webflow-alt-text}.ts',
+    excludeLines: ['// route-contract-ok'],
+    message:
+      'High-churn server route files must declare file-level @reads and @writes contracts. ' +
+      'Use comma-separated store/table names, or `none` when a side is intentionally empty. ' +
+      'Example: `* @reads workspaces, page_keywords` and `* @writes page_keywords`.',
+    severity: 'error',
+    rationale:
+      'Route modules with implicit data dependencies are hard to review safely; explicit read/write contracts make cross-route mutations, broadcasts, and tests auditable before edits land.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const tagLineRe = /@(reads|writes)\b:?\s*(.*)$/;
+      const tokenRe = /^[a-zA-Z][a-zA-Z0-9_.:-]*$/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        if (content.includes('// route-contract-ok')) continue;
+
+        const basename = path.basename(file);
+        const requiresContract = ROUTE_CONTRACT_REQUIRED_BASENAMES.has(basename);
+        const contractHeaderLines = lines.slice(0, 40);
+        const readsLine = contractHeaderLines.findIndex((line) => line.match(tagLineRe)?.[1] === 'reads');
+        const writesLine = contractHeaderLines.findIndex((line) => line.match(tagLineRe)?.[1] === 'writes');
+
+        if (requiresContract && readsLine === -1) {
+          hits.push({ file, line: 1, text: 'missing @reads contract' });
+        }
+        if (requiresContract && writesLine === -1) {
+          hits.push({ file, line: 1, text: 'missing @writes contract' });
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const tagMatch = lines[i].match(tagLineRe);
+          if (!tagMatch) continue;
+          const raw = tagMatch[2].replace(/\*\/.*$/, '').trim();
+          const values = raw.split(',').map((value) => value.trim()).filter(Boolean);
+          const isInvalid =
+            values.length === 0 ||
+            values.some((value) =>
+              /^todo$/i.test(value) ||
+              value.includes('?') ||
+              (!tokenRe.test(value) && value.toLowerCase() !== 'none')
+            );
+          if (isInvalid) {
+            hits.push({
+              file,
+              line: i + 1,
+              text: `malformed route contract value: ${raw || '<empty>'}`,
+            });
+          }
+        }
+      }
+
       return hits;
     },
   },

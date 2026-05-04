@@ -1,5 +1,8 @@
 /**
  * workspaces routes — extracted from server/index.ts
+ *
+ * @reads workspaces, approvals, requests, content_requests, work_orders, content_matrices, client_signals, churn_signals, workspace_pages, page_states, client_users, audit_suppressions
+ * @writes workspaces, page_states, client_users, audit_suppressions, activities, bridge_invalidation, workspace_page_cache
  */
 import { Router } from 'express';
 

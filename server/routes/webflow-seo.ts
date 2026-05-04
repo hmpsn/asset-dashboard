@@ -1,5 +1,8 @@
 /**
  * webflow-seo routes — extracted from server/index.ts
+ *
+ * @reads workspaces, seo_suggestions, snapshots, page_keywords, analytics_insights, workspace_intelligence, search_console, webflow_api
+ * @writes seo_suggestions, page_keywords, jobs, seo_changes, webflow_pages, activities
  */
 import { Router } from 'express';
 
