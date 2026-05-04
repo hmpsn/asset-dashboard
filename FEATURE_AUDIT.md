@@ -4178,3 +4178,39 @@ All replaced `.includes()` / `.endsWith()` with `normalizePath()` + exact compar
 **Mutual:** Eliminates a class of data-integrity bugs that caused incorrect keyword/traffic attribution across all SEO tools.
 
 **Files modified:** `src/components/CmsEditor.tsx` (bugs 1, 3); `src/components/SeoEditor.tsx` (bug 10); `server/routes/webflow-seo.ts` (bugs 4, 6); `server/seo-change-tracker.ts` (bug 8); `server/admin-chat-context.ts` (bug 9); `tests/admin-chat-path-matching.test.ts` (updated assertions).
+
+
+### 328. Strategy Keywords — Two-Zone Flat List + Keyword Detail Drawer (PRs #430–#434 + task commits)
+**What it does:** Full rebuild of the client-facing strategy keywords panel in `StrategyTab.tsx`. Replaces the sortable 7-column table with accordion expand with a scannable two-zone flat list and a slide-in keyword detail drawer.
+
+**Two-zone flat list:**
+- **Confirmed** keywords appear above with standard surface styling.
+- **Suggestions** (keyword ideas / content gap candidates) appear below with a blue-tinted row background (`bg-blue-950/60 border border-blue-900/50`) visually separating them from confirmed keywords.
+- Each row shows: keyword name (truncated, one line) + role·volume·KD sublabel (truncated, one line). No sort controls.
+- Role sublabel format: `"role · N/mo · KD N"` — role as plain text, volume as `/mo` suffix, KD as numeric.
+
+**Keyword detail drawer:**
+- Opens on row click. Desktop: right-side slide-in panel (`sm:w-full sm:max-w-sm`, `animate-in slide-in-from-right duration-200`). Mobile: bottom sheet (`fixed inset-x-0 bottom-0 h-[65vh]`, `rounded-t-[var(--radius-signature-lg)]`).
+- **Metrics strip:** volume, KD (with difficulty color), trend direction (with trend color).
+- **AI rationale:** prose from `contentGaps.rationale`, falls back to `opportunityDetail`.
+- **Signals chips:** `serpFeatures`, competitor proof, impression data — small info badges.
+- **Next move:** `nextMoveLabel` + `nextMoveDetail` text + context-appropriate CTA (e.g. "Improve page", "Map a page", "Add to strategy").
+- **Footer actions:** "Remove from strategy" (confirmed rows) / "Add to strategy" + "Dismiss" (suggestion rows).
+
+**Role badge colors (in drawer):**
+- `content opportunity` → `border-emerald-500/20 bg-emerald-500/8 text-accent-success`
+- `page opportunity` → `border-blue-500/20 bg-blue-500/10 text-accent-info`
+- `strategy keyword` → `border-teal-500/20 bg-teal-500/8 text-accent-brand`
+- `keyword idea` → `border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]`
+
+**KD difficulty coloring (in drawer metrics + list sublabel):** emerald ≤29, amber 30–49, red ≥50. No KD → muted.
+
+**Trend coloring (in drawer metrics):** rising = `text-emerald-400`, declining = `text-red-400`, stable/unknown = muted.
+
+**Files:** `src/components/client/StrategyTab.tsx` (full panel rebuild: two-zone list, drawer, role/KD/trend helpers, `StrategyKeywordTableRow` extended with `rationale` + `trendDirection`, dead sort/filter state removed, `openKeywordDrawer` state added).
+
+**Agency value:** Cleaner keyword review UX. Clients can scan all keywords at a glance and get full context on demand without leaving the strategy tab.
+
+**Client value:** Strategy keywords are now browsable and actionable. Each keyword shows why it matters (AI rationale), how hard it is to rank for (KD color), where the trend is heading, and what to do next — all in one panel.
+
+**Mutual:** Faster strategy alignment with clients. The drawer surfaces the "next move" recommendation so the conversation can be about action, not data interpretation.

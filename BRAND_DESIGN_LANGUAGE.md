@@ -374,6 +374,47 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | Status badge: failed | `bg-red-500/10 text-red-400` | Error = red |
 | Status badge: running/pending | `bg-amber-500/10 text-amber-400` | In-progress = amber |
 
+### Strategy Keywords (`StrategyTab.tsx` — `priorityKeywordsPanel`)
+
+Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
+
+#### Two-zone flat list
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Confirmed keyword row (default) | `bg-[var(--surface-2)]` (via SectionCard/standard row) | No special tint — confirmed = native surface |
+| Suggestion keyword row | `bg-blue-950/60 border border-blue-900/50` | Blue tint distinguishes suggestions from confirmed; hover `border-blue-800/60` |
+| Row keyword name | `text-[var(--brand-text-bright)]` truncated 1 line | Primary identifier |
+| Role·volume·KD sublabel | `text-[var(--brand-text-muted)]` truncated 1 line | Supporting metadata, not primary |
+
+#### Keyword detail drawer (desktop = right slide-in, mobile = bottom sheet)
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Drawer backdrop | `fixed inset-0 z-[var(--z-modal-backdrop)]` | Standard modal backdrop token |
+| Drawer panel (desktop) | `sm:inset-y-0 sm:right-0 sm:border-l bg-[var(--surface-2)]` | Right-side slide-in, surface-2 for contrast |
+| Drawer panel (mobile) | `inset-x-0 bottom-0 h-[65vh] rounded-t-[var(--radius-signature-lg)]` | Bottom sheet with brand signature radius |
+| **Role badge — content opportunity** | `border-emerald-500/20 bg-emerald-500/8 text-accent-success` | Emerald = content/success opportunity |
+| **Role badge — page opportunity** | `border-blue-500/20 bg-blue-500/10 text-accent-info` | Blue = data/page-level read |
+| **Role badge — strategy keyword** | `border-teal-500/20 bg-teal-500/8 text-accent-brand` | Teal = primary strategy signal (Law 1) |
+| **Role badge — keyword idea** | `border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]` | Zinc/muted = low-confidence idea |
+| **KD difficulty — easy (≤29)** | `text-emerald-400` | Low difficulty = quick win = emerald |
+| **KD difficulty — medium (30–49)** | `text-amber-400` | Moderate difficulty = needs work = amber |
+| **KD difficulty — hard (≥50)** | `text-red-400` | High difficulty = costly = red |
+| **KD difficulty — unknown** | `text-[var(--brand-text-muted)]` | No data = muted |
+| **Trend — rising** | `text-emerald-400` + ↑ icon | Positive direction = emerald (Law 3) |
+| **Trend — declining** | `text-red-400` + ↓ icon | Negative direction = red |
+| **Trend — stable / unknown** | `text-[var(--brand-text-muted)]` + → or — | No direction signal = muted |
+| AI rationale prose | `t-caption-sm text-[var(--brand-text-muted)] leading-relaxed` | Supporting context, not the headline |
+| Next move CTA (add to strategy) | `bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30` | Teal = action (Law 1) |
+| Footer "Remove" action | `text-[var(--brand-text-muted)] hover:text-red-400` | Destructive = red on hover |
+
+**Intent coloring (search intent badges in inline rows):**
+- `commercial` → `text-accent-info bg-blue-500/10 border-blue-500/20`
+- `informational` → `text-accent-success bg-emerald-500/10 border-emerald-500/20`
+- `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
+- `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
+
 ### Stripe Payment (`StripePaymentForm.tsx`)
 
 | Element | Color |
@@ -611,5 +652,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-04-29 | **`.t-body` → DIN Pro 500** (PR #379): Body text utility class promoted from `Inter / 400` to `'DIN Pro', 'Inter' / 500` in both `src/index.css` + `public/styleguide.css` (lockstep per styleguide-typography-parity rule). Affects every consumer of `.t-body` platform-wide — page cards, form descriptions, schema widgets, BodyText primitive, etc. Inter remains the fallback so glyphs missing from DIN Pro degrade gracefully. Other `.t-*` classes unchanged. |
 
 ---
+
+| 2026-05-03 | **Strategy Keywords rebuild** (PRs #430–#434 + task commits): Two-zone flat list (confirmed rows = standard surface, suggestion rows = `bg-blue-950/60 border border-blue-900/50`). Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD difficulty coloring: ≤29=emerald-400, 30–49=amber-400, ≥50=red-400. Trend coloring: rising=emerald-400, declining=red-400, stable/unknown=muted. Drawer: right slide-in on desktop, bottom sheet on mobile. No sort controls. Per-component map section added. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
