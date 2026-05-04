@@ -383,11 +383,30 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 | Element | Color | Rationale |
 |---------|-------|-----------|
 | Confirmed keyword row (default) | `bg-[var(--surface-2)]` (via SectionCard/standard row) | No special tint — confirmed = native surface |
-| Suggestion keyword row | `bg-blue-950/60 border border-blue-900/50` | Blue tint distinguishes suggestions from confirmed; hover `border-blue-800/60` |
+| Suggestion keyword row | `bg-blue-500/5 border border-blue-500/20` | Blue tint distinguishes suggestions from confirmed; hover `border-blue-500/30` |
 | Row keyword name | `text-[var(--brand-text-bright)]` truncated 1 line | Primary identifier |
 | Role·volume·KD sublabel | `text-[var(--brand-text-muted)]` truncated 1 line | Supporting metadata, not primary |
+| **Role indicator dot — content** | `w-1.5 h-1.5 rounded-full bg-emerald-400 mt-0.5` | Emerald = content role (Law 3); `aria-hidden="true"` |
+| **Role indicator dot — page** | `bg-blue-400` | Blue = page/data role (Law 2); `aria-hidden="true"` |
+| **Role indicator dot — strategy** | `bg-teal-400` | Teal = strategy/action role (Law 1); `aria-hidden="true"` |
+| **Role indicator dot — unknown** | `bg-[var(--brand-text-muted)]` | Muted = unclassified; `aria-hidden="true"` |
+| **Enrichment pending suffix** | ` · data pending` appended to sublabel when `enrichmentStatus === 'unenriched'` | Plain English, no special color |
+| **Opportunity accent bar** | `absolute left-0 top-0 bottom-0 w-0.5 bg-blue-400` + inline `opacity` scaled to `opportunityScore/100` (min 0.2) | Blue = data metric (Law 2); strength visually encoded; `aria-hidden="true"` |
 
 #### Keyword detail drawer (desktop = right slide-in, mobile = bottom sheet)
+
+**Three enrichment states:**
+- `unenriched` — pulsing `w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-pulse` dot + "Gathering data for this keyword…" message
+- `partial` — metric cards render with "Gathering…" placeholder for missing fields
+- `enriched` — full plain-English metrics rendered
+
+**Plain-English metric translation layer** (`fmtAudience`, `fmtCompetition`, `fmtMomentum` helpers):
+- KD 0–29 → "Approachable" (`text-emerald-400`)
+- KD 30–49 → "Moderate competition" (`text-amber-400`)
+- KD 50–74 → "Competitive" (`text-red-400`)
+- KD 75+ → "Highly competitive" (`text-red-400`)
+- Volume → audience size label (e.g. "~2.4K searches/mo")
+- Trend → "Interest growing / steady / declining"
 
 | Element | Color | Rationale |
 |---------|-------|-----------|
@@ -398,14 +417,14 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 | **Role badge — page opportunity** | `border-blue-500/20 bg-blue-500/10 text-accent-info` | Blue = data/page-level read |
 | **Role badge — strategy keyword** | `border-teal-500/20 bg-teal-500/8 text-accent-brand` | Teal = primary strategy signal (Law 1) |
 | **Role badge — keyword idea** | `border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]` | Zinc/muted = low-confidence idea |
-| **KD difficulty — easy (≤29)** | `text-emerald-400` | Low difficulty = quick win = emerald |
-| **KD difficulty — medium (30–49)** | `text-amber-400` | Moderate difficulty = needs work = amber |
-| **KD difficulty — hard (≥50)** | `text-red-400` | High difficulty = costly = red |
-| **KD difficulty — unknown** | `text-[var(--brand-text-muted)]` | No data = muted |
-| **Trend — rising** | `text-emerald-400` + ↑ icon | Positive direction = emerald (Law 3) |
-| **Trend — declining** | `text-red-400` + ↓ icon | Negative direction = red |
-| **Trend — stable / unknown** | `text-[var(--brand-text-muted)]` + → or — | No direction signal = muted |
+| **Competition label — Approachable** | `text-emerald-400` | Low KD = quick win (Law 3) |
+| **Competition label — Moderate** | `text-amber-400` | Medium KD = caution |
+| **Competition label — Competitive / Highly competitive** | `text-red-400` | High KD = costly |
+| **Trend — growing** | `text-emerald-400` | Positive direction (Law 3) |
+| **Trend — declining** | `text-red-400` | Negative direction |
+| **Trend — steady / unknown** | `text-[var(--brand-text-muted)]` | No direction signal |
 | AI rationale prose | `t-caption-sm text-[var(--brand-text-muted)] leading-relaxed` | Supporting context, not the headline |
+| Foldable "See the numbers" section | `bg-[var(--surface-3)] rounded-[var(--radius-lg)]` | Raw KD/volume/CPC hidden by default (progressive disclosure) |
 | Next move CTA (add to strategy) | `bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30` | Teal = action (Law 1) |
 | Footer "Remove" action | `text-[var(--brand-text-muted)] hover:text-red-400` | Destructive = red on hover |
 

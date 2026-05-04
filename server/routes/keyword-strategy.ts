@@ -83,17 +83,17 @@ const activeGenerations = new Set<string>();
  *  Max raw = 0.95 (the 5% headroom is intentional — GSC signal is an additive
  *  bonus on top of volume/ease, not a co-equal component).
  *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
- *  Returns 0 when no signal data (volume, difficulty, impressions) is present. */
+ *  Returns undefined when no signal data (volume, difficulty, impressions) is present. */
 export function computeOpportunityScore(cg: {
   volume?: number;
   difficulty?: number;
   impressions?: number;
   trendDirection?: string;
-}): number {
+}): number | undefined {
   const hasData = (cg.volume != null && cg.volume > 0)
     || cg.difficulty != null
     || (cg.impressions != null && cg.impressions > 0);
-  if (!hasData) return 0;
+  if (!hasData) return undefined;
   const vol = Math.min((cg.volume ?? 0) / 10000, 1);
   const ease = 1 - (cg.difficulty ?? 50) / 100;
   const gscBonus = Math.min((cg.impressions ?? 0) / 2000, 0.5);
@@ -2251,7 +2251,7 @@ Rules:
       }
       if (missing.length > 0) {
         try {
-          const extra = await provider.getKeywordMetrics(missing.slice(0, 15), ws.id);
+          const extra = await provider.getKeywordMetrics(missing.slice(0, 30), ws.id);
           for (const m of extra) {
             found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
           }
@@ -2260,33 +2260,34 @@ Rules:
       siteKeywordMetrics = found;
     }
 
-    // ── Impact-based filtering & sorting ──────────────────────────
-    // Prefer content gaps with real search volume; if filtering would remove ALL, keep originals sorted by priority
+    // ── Impact-based sorting (no filtering — keep all keywords including volume=0) ──
+    // Previously dropped volume=0 keywords, but that silently removed AI-identified
+    // opportunities after enrichment. Now we keep all and sort: positive-volume first,
+    // then unenriched (no data yet), then confirmed-zero-volume at bottom.
     if (strategy.contentGaps?.length) {
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-      const withVolume = strategy.contentGaps
-        .filter((cg: { volume?: number; impressions?: number }) =>
-          // Keep: no enrichment data at all (unenriched), OR positive volume, OR positive impressions.
-          // Items enriched to volume=0 with no impressions ARE dropped — if SEMRush/pool says
-          // volume is 0 and GSC shows no impressions, the keyword has no proven demand.
-          (cg.volume == null && cg.impressions == null) ||
-          (cg.volume != null && cg.volume > 0) ||
-          (cg.impressions != null && cg.impressions > 0)
-        );
-      if (withVolume.length > 0) {
-        // Sort by volume descending, then priority
-        strategy.contentGaps = withVolume.sort(
-          (a: StrategyContentGap, b: StrategyContentGap) =>
-            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
-        );
-      } else {
-        // No volume data available — keep all but sort by priority
-        strategy.contentGaps = strategy.contentGaps.sort(
-          (a: StrategyContentGap, b: StrategyContentGap) =>
-            prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
-        );
-      }
-      log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
+      strategy.contentGaps = [...strategy.contentGaps].sort(
+        (a: StrategyContentGap, b: StrategyContentGap) => {
+          // Bucket values (higher = sorted first, descending):
+          //   2 = Positive volume (>0) OR GSC-proven impressions — confirmed demand
+          //   1 = Unenriched (null/undefined) — not yet checked, potential
+          //   0 = Zero volume with no impressions — enriched but no proven demand
+          const getBundle = (gap: StrategyContentGap) => {
+            if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
+            if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive volume bucket 2
+            if ((gap.impressions ?? 0) > 0) return { bucket: 2, vol: gap.impressions! }; // GSC-proven demand even at volume=0
+            return { bucket: 0, vol: 0 };                                 // confirmed zero demand bucket 0
+          };
+          const aBundle = getBundle(a);
+          const bBundle = getBundle(b);
+
+          // Sort by bucket desc, then by volume desc within bucket, then by priority desc
+          return bBundle.bucket - aBundle.bucket ||
+                 bBundle.vol - aBundle.vol ||
+                 prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '');
+        }
+      );
+      log.info(`Content gaps: ${strategy.contentGaps.length} total (sorted, none dropped)`);
     }
 
     // ── Quick Win ROI Scoring ──────────────────────────────────

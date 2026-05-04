@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { computeOpportunityScore } from '../../server/routes/keyword-strategy.js';
 
 describe('computeOpportunityScore', () => {
-  it('returns 0 for a gap with no data', () => {
-    expect(computeOpportunityScore({})).toBe(0);
+  it('returns undefined for a gap with no data', () => {
+    expect(computeOpportunityScore({})).toBeUndefined();
   });
 
   it('rewards rising trend', () => {
@@ -32,5 +32,11 @@ describe('computeOpportunityScore', () => {
 
   it('caps at 100', () => {
     expect(computeOpportunityScore({ volume: 50000, difficulty: 5, impressions: 5000, trendDirection: 'rising' })).toBeLessThanOrEqual(100);
+  });
+
+  it('returns a number when impressions alone is present (GSC without SEMRush data)', () => {
+    const score = computeOpportunityScore({ impressions: 500 });
+    expect(typeof score).toBe('number');
+    expect(score).toBeGreaterThan(0);
   });
 });
