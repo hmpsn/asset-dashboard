@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
 
-import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
@@ -907,7 +907,7 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
 
 // ── Pending Schemas (D7: pre-generated schema skeletons) ──
 
-router.get('/api/pending-schemas/:workspaceId', (req, res) => {
+router.get('/api/pending-schemas/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const pendingSchemas = listPendingSchemas(req.params.workspaceId);
     res.json({ pendingSchemas });

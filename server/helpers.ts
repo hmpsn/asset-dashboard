@@ -672,11 +672,13 @@ export function toInsightPageId(url: string): string {
 
 /**
  * Convert a Webflow audit page object to the canonical relative path used for
- * `analytics_insights.page_id`. Prefers slug (→ /slug), falls back to URL pathname,
- * and finally falls back to the raw pageId (Webflow UUID) as a last resort.
+ * `analytics_insights.page_id`. Prefers the URL pathname because nested Webflow
+ * pages can share leaf slugs, falls back to slug (→ /slug), and finally falls
+ * back to the raw pageId (Webflow UUID) as a last resort.
  * Defensively strips leading slashes from slug to avoid `//foo` from a leading-slash slug.
  */
 export function toAuditFindingPageId(page: { slug: string; url: string; pageId: string }): string {
+  try { if (page.url) return new URL(page.url).pathname; } catch { /* fall through */ }
   if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
-  try { return new URL(page.url).pathname; } catch { return page.pageId; }
+  return page.pageId;
 }

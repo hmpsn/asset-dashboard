@@ -2,6 +2,7 @@
  * backlinks routes — lightweight backlink profile overview via SEO data provider
  */
 import { Router } from 'express';
+import { requireWorkspaceAccess } from '../auth.js';
 import { getBacklinksProvider } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
@@ -9,7 +10,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('backlinks');
 const router = Router();
 
-router.get('/api/backlinks/:workspaceId', async (req, res) => {
+router.get('/api/backlinks/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });

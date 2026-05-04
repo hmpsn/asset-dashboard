@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment, SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callOpenAI } from './openai-helpers.js';
-import { resolvePagePath, findPageMapEntryForPage } from './helpers.js';
+import { resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
@@ -50,9 +50,7 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
       })
       .map(n => {
         const isHomepage = n.path === '/' || n.depth === 0;
-        const strategyMatch = strategy?.pageMap?.find(
-          (pm: PageKeywordMap) => pm.pagePath === n.path || pm.pagePath === n.path.replace(/\/$/, ''),
-        );
+        const strategyMatch = strategy?.pageMap ? findPageMapEntry<PageKeywordMap>(strategy.pageMap, n.path) : undefined;
         return {
           path: n.path,
           title: n.name || '(untitled)',
@@ -99,9 +97,7 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
           const lp = cms.path.toLowerCase();
           if (/\/(password|404|thank|success)/.test(lp)) continue;
 
-          const strategyMatch = strategy?.pageMap?.find(
-            (pm: PageKeywordMap) => pm.pagePath === cms.path || pm.pagePath === cms.path.replace(/\/$/, ''),
-          );
+          const strategyMatch = strategy?.pageMap ? findPageMapEntry<PageKeywordMap>(strategy.pageMap, cms.path) : undefined;
 
           pageList.push({
             path: cms.path,

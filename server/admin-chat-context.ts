@@ -610,9 +610,9 @@ export async function assembleAdminContext(
 
           // If analyzing a specific page, pull its audit data
           if (pageContext) {
-            const targetSlug = normalizePath(pageContext.url.replace(/^https?:\/\/[^/]+/, ''));
+            const targetSlug = normalizePageUrl(pageContext.url);
             const pageAudit = pages?.find((p) => {
-              const pSlug = normalizePath(resolvePagePath(p));
+              const pSlug = p.url ? normalizePageUrl(p.url) : normalizePath(resolvePagePath(p));
               return pSlug.toLowerCase() === targetSlug.toLowerCase();
             });
             if (pageAudit) {

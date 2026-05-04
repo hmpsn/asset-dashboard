@@ -64,6 +64,26 @@ import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('workspaces');
 
+const MEMBER_RESTRICTED_WORKSPACE_FIELDS = new Set([
+  'webflowSiteId',
+  'webflowSiteName',
+  'webflowToken',
+  'liveDomain',
+  'gscPropertyUrl',
+  'ga4PropertyId',
+  'publishTarget',
+  'seoDataProvider',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'billingMode',
+  'tier',
+  'trialEndsAt',
+]);
+
+function hasMemberRestrictedWorkspaceUpdate(updates: Record<string, unknown>): boolean {
+  return Object.keys(updates).some(key => MEMBER_RESTRICTED_WORKSPACE_FIELDS.has(key));
+}
+
 // Workspaces
 function listVisibleWorkspaces(req: express.Request): Workspace[] {
   const workspaces = listWorkspaces();
@@ -199,6 +219,9 @@ router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
 
 router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
   const updates = { ...req.body };
+  if (req.user && req.user.role !== 'owner' && hasMemberRestrictedWorkspaceUpdate(updates)) {
+    return res.status(403).json({ error: 'Owner access is required to update workspace integration settings' });
+  }
   // When unlinking, clear the token too
   if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
     updates.webflowToken = '';
