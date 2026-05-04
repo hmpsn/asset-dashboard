@@ -4343,6 +4343,179 @@ describe('Rule: SectionCard titleExtra with ml-auto (use action prop)', () => {
   });
 });
 
+describe('Rule: Background generation in high-churn routes must be allowlisted', () => {
+  const RULE = 'Background generation in high-churn routes must be allowlisted';
+
+  it('flags unallowlisted post-response generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(req.params.workspaceId, brief).then(() => {});',
+        '});',
+      )
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags unallowlisted multiline post-response generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(',
+        '    req.params.workspaceId,',
+        '    brief,',
+        '  ).then(() => {});',
+        '});',
+      )
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects inline // background-generation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(req.params.workspaceId, brief).then(() => {}); // background-generation-ok — legacy skeleton flow',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // background-generation-ok on the line above', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  // background-generation-ok — legacy skeleton flow',
+        '  generatePost(req.params.workspaceId, brief).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag awaited generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/workspaces.ts'),
+      lines(
+        "router.post('/api/workspaces/:id/generate-brand-voice', async (req, res) => {",
+        '  const result = await generateBrandVoice(req.params.id);',
+        '  res.json(result);',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows canonical jobs route background workers', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/jobs.ts'),
+      lines(
+        "router.post('/api/jobs', async (req, res) => {",
+        "  const job = createJob('schema-generator', { message: 'Generating...' });",
+        '  res.json({ jobId: job.id });',
+        '  generateSchemaSuggestions().then(() => updateJob(job.id, { status: "done" }));',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('requires site-level hatch for legacy content-posts skeleton generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-posts.ts'),
+      lines(
+        "router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {",
+        "  res.json({ status: 'generating' });",
+        '  // background-generation-ok — legacy skeleton flow',
+        '  generatePost(req.params.workspaceId, brief, postId).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not let a legacy callee allowlist hide new content-posts call sites', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-posts.ts'),
+      lines(
+        "router.post('/api/content-posts/:workspaceId/future-generate', async (req, res) => {",
+        "  res.json({ status: 'generating' });",
+        '  generatePost(req.params.workspaceId, brief, postId).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('allows audited site-specific follow-up signatures without broad callee allowlists', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {",
+        '  res.json(strategy);',
+        "  queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');",
+        '  generateRecommendations(ws.id)',
+        '    .catch(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags the same legacy callee when the call site text is new', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId/new-follow-up', async (req, res) => {",
+        '  res.json(strategy);',
+        "  queueLlmsTxtRegeneration(req.params.workspaceId, 'keyword_strategy_updated');",
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('requires site-level hatches for legacy keyword-strategy post-response regeneration', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {",
+        '  res.json(strategy);',
+        '  // background-generation-ok — legacy llms.txt refresh',
+        "  queueLlmsTxtRegeneration(req.params.workspaceId, 'keyword_strategy_updated');",
+        '  // background-generation-ok — legacy recommendations refresh',
+        '  generateRecommendations(req.params.workspaceId).catch(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4398,6 +4571,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)
     'useWorkspaceEvents handler for centralized event',
+    // Platform consolidation Phase 1 (2026-05-04)
+    'Background generation in high-churn routes must be allowlisted',
     // Bug guardrail sweep (2026-05-03)
     'Route read/write contract annotations',
     // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258

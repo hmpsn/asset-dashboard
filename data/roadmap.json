@@ -343,23 +343,23 @@
         },
         {
           "id": "platform-consolidation-background-generation-contract",
-          "title": "Background generation contract - all admin AI/generation flows run as jobs",
+          "title": "Background generation contract - shared job metadata and start policy",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "6-10h",
+          "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. Job coverage already exists for seo-audit, keyword-strategy, schema-generator, page-analysis, bulk-alt, bulk-seo-fix, compress/bulk-compress, sales-report, and deep-diagnostic. Make that a platform contract and migrate drifted surfaces such as content brief generation, content post generation, post section regeneration, content-plan/matrix bulk actions, AEO/page rewrites, brand/page deliverables, and any future admin AI generation that can exceed an interactive request budget."
+          "notes": "Completed in Phase 1 on 2026-05-04. Added docs/rules/background-generation.md, shared/types/background-jobs.ts, shared job labels/cancellation semantics/result behavior, and server default messages based on the shared metadata. This makes existing /api/jobs + TaskPanel conventions the official platform contract without migrating Phase 2 generation flows yet."
         },
         {
           "id": "platform-consolidation-background-generation-ui-parity",
-          "title": "Background generation UX - one admin progress surface for jobs",
+          "title": "Background generation UX - TaskPanel parity foundation",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "4-6h",
+          "est": "3-4h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. TaskPanel/useBackgroundTasks exists, but progress UX is uneven and useBackgroundTasks owns a separate raw WebSocket connection. Standardize Start/Cancel/Resume/Completed/Error states, progress labels, completion notification, and result handoff back into the originating admin surface. Coordinate with existing roadmap item #587 for shared websocket work and item #503 for unified NotificationBell/TaskPanel hub scope."
+          "notes": "Completed in Phase 1 on 2026-05-04. TaskPanel now consumes shared job metadata, labels feature-specific SEO bulk jobs, shows stop only for abort-aware jobs, filters by current workspace, and avoids globally destructive clear-completed behavior in the filtered panel. useBackgroundTasks now exposes active/latest-terminal lookup helpers for Phase 2 surfaces. Shared WebSocket work remains coordinated with #587; notification hub merge remains scoped to #503."
         },
         {
           "id": "platform-consolidation-background-generation-guardrails",
@@ -367,9 +367,19 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "2-4h",
           "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed in Phase 1 on 2026-05-04. Added a warning pr-check rule, fixture coverage, verified-clean registry entry, generated automated-rules docs, and a background-generation-ok hatch for reviewed exceptions. The rule starts narrowly by catching unallowlisted post-response generation in audited high-churn routes."
+        },
+        {
+          "id": "platform-consolidation-background-generation-migrations",
+          "title": "Background generation Phase 2 - migrate drifted long-running generation flows",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "12-18h",
+          "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. Add a lightweight pr-check rule, contract test, or documented allowlist that flags new admin route handlers/components that trigger long-running generation synchronously instead of through the background job system. Allow short interactive refinements only with explicit rationale."
+          "notes": "Phase 2 follow-up after the Phase 1 foundation. Migrate drifted surfaces such as content post generation, keyword strategy, schema/page-analysis duplicate workers, and crawl-heavy workspace knowledge/voice/persona generation onto the shared background job contract."
         },
         {
           "id": "platform-consolidation-billing-checkout-only",

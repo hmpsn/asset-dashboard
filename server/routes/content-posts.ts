@@ -128,6 +128,7 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
     res.json(skeleton);
 
     // Generate in background — pass skeleton's postId so it updates the same post
+    // background-generation-ok: legacy skeleton flow; Phase 2 migrates this post generation to /api/jobs.
     generatePost(req.params.workspaceId, brief, postId).then((generated) => {
       addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
       notifyContentUpdated(req.params.workspaceId, { postId: generated.id, briefId: brief.id, action: 'post_generated' });
@@ -284,7 +285,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
         if (fieldMap.metaTitle) fieldData[fieldMap.metaTitle] = updated.seoTitle || updated.title;
         if (fieldMap.metaDescription) fieldData[fieldMap.metaDescription] = updated.seoMetaDescription || updated.metaDescription;
         if (fieldMap.publishDate) fieldData[fieldMap.publishDate] = new Date().toISOString();
-
+        // background-generation-ok: legacy auto-publish follow-up; Phase 2 keeps this visible through jobs or a domain queue.
         createCollectionItem(collectionId, fieldData, false, token).then(async (result) => {
           if (result.success && result.itemId) {
             const publishResult = await publishCollectionItems(collectionId, [result.itemId], token);

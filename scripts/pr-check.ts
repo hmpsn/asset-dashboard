@@ -799,6 +799,50 @@ function loadClientVisibleTypes(): Set<string> {
   return values;
 }
 
+const BACKGROUND_GENERATION_ROUTE_BASENAMES = new Set([
+  'jobs.ts',
+  'content-posts.ts',
+  'content-briefs.ts',
+  'content-requests.ts',
+  'keyword-strategy.ts',
+  'webflow-schema.ts',
+  'workspaces.ts',
+]);
+
+const BACKGROUND_GENERATION_ALLOWLIST = new Set([
+  'server/routes/jobs.ts::*',
+]);
+
+const BACKGROUND_GENERATION_SITE_ALLOWLIST = new Set([
+  "server/routes/keyword-strategy.ts::queueLlmsTxtRegeneration::queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');",
+  'server/routes/keyword-strategy.ts::generateRecommendations::generateRecommendations(ws.id)',
+  "server/routes/webflow-schema.ts::queueLlmsTxtRegeneration::if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');",
+]);
+
+function backgroundGenerationRoutePath(file: string): string {
+  const normalized = file.split(path.sep).join('/');
+  const routeIdx = normalized.lastIndexOf('server/routes/');
+  if (routeIdx >= 0) return normalized.slice(routeIdx);
+  return path.relative(ROOT, file).split(path.sep).join('/');
+}
+
+function backgroundGenerationAllowlistKey(file: string, callee: string): string {
+  return `${backgroundGenerationRoutePath(file)}::${callee}`;
+}
+
+function backgroundGenerationSiteKey(file: string, callee: string, line: string): string {
+  return `${backgroundGenerationAllowlistKey(file, callee)}::${line.trim().replace(/\s+/g, ' ')}`;
+}
+
+function isBackgroundGenerationAllowed(file: string, callee: string, line: string): boolean {
+  const rel = backgroundGenerationRoutePath(file);
+  return (
+    BACKGROUND_GENERATION_ALLOWLIST.has(`${rel}::*`) ||
+    BACKGROUND_GENERATION_ALLOWLIST.has(`${rel}::${callee}`) ||
+    BACKGROUND_GENERATION_SITE_ALLOWLIST.has(backgroundGenerationSiteKey(file, callee, line))
+  );
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -3800,6 +3844,70 @@ export const CHECKS: Check[] = [
           if (inUseWorkspaceEventsCall && parenDepth <= 0) {
             inUseWorkspaceEventsCall = false;
           }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Phase 1 platform-consolidation guardrail.
+    //
+    // This intentionally starts narrower than "every synchronous generation
+    // route must be job-backed." Phase 2 still needs to migrate several
+    // audited synchronous routes. For Phase 1, prevent the riskier pattern:
+    // post-response generation work in high-churn admin routes that is neither
+    // the canonical jobs dispatcher nor an explicitly reviewed legacy site.
+    //
+    // Escape hatch: add `// background-generation-ok — reason` on the same line
+    // or immediately above for reviewed short-lived exceptions.
+    name: 'Background generation in high-churn routes must be allowlisted',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// background-generation-ok'],
+    message:
+      'Post-response admin generation must use the background job platform or be explicitly allowlisted. ' +
+      'Move long-running work behind createJob()/updateJob() and return { jobId }, or add ' +
+      '// background-generation-ok with a reason for reviewed short-lived exceptions.',
+    severity: 'warn',
+    rationale:
+      'Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const detachedGenerationRe =
+        /\b(generate[A-Z]\w*|regenerate[A-Z]\w*|createCollectionItem|generateRecommendations)\s*\([^;]*?\)\s*\.(then|catch|finally)\s*\(|\b(queue[A-Z]\w*(?:Generation|Regeneration))\s*\(/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        const basename = path.basename(file);
+        if (!BACKGROUND_GENERATION_ROUTE_BASENAMES.has(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const lineStarts = [0];
+        for (let i = 0; i < content.length; i++) {
+          if (content[i] === '\n') lineStarts.push(i + 1);
+        }
+
+        for (const match of content.matchAll(detachedGenerationRe)) {
+          const callee = match[1] || match[3];
+          if (!callee) continue;
+          let lineIndex = -1;
+          for (let i = lineStarts.length - 1; i >= 0; i--) {
+            if (lineStarts[i] <= match.index) {
+              lineIndex = i;
+              break;
+            }
+          }
+          if (lineIndex < 0) continue;
+          if (hasHatch(lines, lineIndex, '// background-generation-ok')) continue;
+          if (isBackgroundGenerationAllowed(file, callee, lines[lineIndex])) continue;
+          hits.push({
+            file,
+            line: lineIndex + 1,
+            text: `${backgroundGenerationAllowlistKey(file, callee)} ${lines[lineIndex].trim()}`,
+          });
         }
       }
       return hits;

@@ -148,6 +148,17 @@ router.get('/api/jobs/:id', (req, res) => {
 });
 
 router.delete('/api/jobs/completed', (_req, res) => {
+  const workspaceId = typeof _req.query.workspaceId === 'string' ? _req.query.workspaceId : undefined;
+  const scope = typeof _req.query.scope === 'string' ? _req.query.scope : undefined;
+  if (workspaceId) {
+    if (!requestUserCanAccessWorkspace(_req, workspaceId)) return sendWorkspaceAccessDenied(res);
+    const count = clearCompletedJobs({ workspaceId });
+    return res.json({ cleared: count });
+  }
+  if (scope === 'global') {
+    const count = clearCompletedJobs({ globalOnly: true });
+    return res.json({ cleared: count });
+  }
   if (_req.user && _req.user.role !== 'owner') return sendWorkspaceAccessDenied(res);
   const count = clearCompletedJobs();
   res.json({ cleared: count });

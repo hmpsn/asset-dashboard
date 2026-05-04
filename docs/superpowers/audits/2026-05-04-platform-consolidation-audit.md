@@ -130,3 +130,15 @@ Later consolidation work should remain separate from the background-generation p
 ### Platform Value
 
 These upgrades make the platform safer to scale. Admins can start expensive generation, leave the page, and come back without losing visibility. Support gets fewer "did it hang?" cases. Engineers get one lifecycle for progress, cancellation, completion, errors, and cache invalidation instead of rediscovering each feature's private pattern. The product also gains a cleaner foundation for queues, retries, notifications, and usage accounting as generation volume grows.
+
+## Phase 1 Completion - 2026-05-04
+
+Phase 1 established the foundation without migrating Phase 2 generation flows:
+
+- Added `docs/rules/background-generation.md` as the reusable contract.
+- Added `shared/types/background-jobs.ts` for job type labels, cancellation semantics, and result behavior.
+- Updated `TaskPanel` to use shared labels, show cancellation only for abort-aware jobs, filter by workspace, and avoid globally clearing completed jobs from a scoped panel.
+- Added `useBackgroundTasks` lookup helpers for active/latest terminal jobs so Phase 2 surfaces can rediscover work after remount.
+- Added a warning pr-check rule for unallowlisted post-response generation in high-churn routes, with fixture coverage and generated rule docs.
+
+Phase 2 should now focus on migrating actual drifted long-running flows: content post generation, keyword strategy, schema/page-analysis duplicate workers, and crawl-heavy workspace setup generation.
