@@ -81,31 +81,31 @@ export const ga4 = {
 };
 
 // ── Admin GSC endpoints (require auth, used in admin dashboard) ──
-function gscQs(gscSiteUrl: string, days: number): string {
-  return `gscSiteUrl=${encodeURIComponent(gscSiteUrl)}&days=${days}`;
+function gscQs(workspaceId: string, gscSiteUrl: string, days: number): string {
+  return `workspaceId=${encodeURIComponent(workspaceId)}&gscSiteUrl=${encodeURIComponent(gscSiteUrl)}&days=${days}`;
 }
 
 export const gscAdmin = {
-  overview: (siteId: string, gscSiteUrl: string, days: number) =>
-    getOptional<SearchOverview>(`/api/google/search-overview/${siteId}?${gscQs(gscSiteUrl, days)}`),
+  overview: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getOptional<SearchOverview>(`/api/google/search-overview/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`),
 
-  trend: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+  trend: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getSafe<PerformanceTrend[]>(`/api/google/performance-trend/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
 
-  devices: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchDeviceBreakdown[]>(`/api/google/search-devices/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+  devices: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getSafe<SearchDeviceBreakdown[]>(`/api/google/search-devices/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
 
-  countries: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchCountryBreakdown[]>(`/api/google/search-countries/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+  countries: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getSafe<SearchCountryBreakdown[]>(`/api/google/search-countries/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
 
-  searchTypes: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchTypeBreakdown[]>(`/api/google/search-types/${siteId}?${gscQs(gscSiteUrl, days)}`, []),
+  searchTypes: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getSafe<SearchTypeBreakdown[]>(`/api/google/search-types/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, []),
 
-  comparison: (siteId: string, gscSiteUrl: string, days: number) =>
-    getSafe<SearchComparison | null>(`/api/google/search-comparison/${siteId}?${gscQs(gscSiteUrl, days)}`, null),
+  comparison: (workspaceId: string, siteId: string, gscSiteUrl: string, days: number) =>
+    getSafe<SearchComparison | null>(`/api/google/search-comparison/${siteId}?${gscQs(workspaceId, gscSiteUrl, days)}`, null),
 
-  chat: (siteId: string, body: { question: string; context: Record<string, unknown> }) =>
-    post<{ answer: string }>(`/api/google/search-chat/${siteId}`, body),
+  chat: (workspaceId: string, siteId: string, body: { question: string; context: Record<string, unknown> }) =>
+    post<{ answer: string }>(`/api/google/search-chat/${siteId}`, { ...body, workspaceId }),
 };
 
 // ── Client Intelligence ────────────────────────────────────────────

@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import { getBookingUrl, setBookingUrl, clearBookingUrl } from '../studio-config.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/api/settings', (_req, res) => {
   });
 });
 
-router.post('/api/settings/webflow-token', (req, res) => {
+router.post('/api/settings/webflow-token', requireAdminAuth, (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token required' });
 
@@ -37,7 +38,7 @@ router.get('/api/studio-config', (_req, res) => {
   res.json({ bookingUrl: getBookingUrl() ?? '' });
 });
 
-router.patch('/api/studio-config', (req, res) => {
+router.patch('/api/studio-config', requireAdminAuth, (req, res) => {
   const { bookingUrl } = req.body as { bookingUrl?: string };
   if (bookingUrl === undefined) return res.status(400).json({ error: 'bookingUrl required' });
   if (bookingUrl === '') {

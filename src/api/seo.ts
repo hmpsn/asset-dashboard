@@ -28,8 +28,11 @@ export const audit = {
   detail: (wsId: string) =>
     getOptional<unknown>(`/api/public/audit-detail/${wsId}`),
 
-  traffic: (siteId: string) =>
-    getSafe<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>(`/api/audit-traffic/${siteId}`, {}),
+  traffic: (workspaceId: string, siteId: string) =>
+    getSafe<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>(
+      appendWorkspaceQuery(`/api/audit-traffic/${siteId}`, workspaceId),
+      {},
+    ),
 
   publicAudit: (wsId: string) =>
     getOptional<unknown>(`/api/public/audit/${wsId}`),
@@ -49,14 +52,14 @@ export const auditSchedules = {
 
 // ── Reports / snapshots ─────────────────────────────────────────
 export const reports = {
-  history: (siteId: string) =>
-    getSafe<unknown[]>(`/api/reports/${siteId}/history`, []),
+  history: (workspaceId: string, siteId: string) =>
+    getSafe<unknown[]>(appendWorkspaceQuery(`/api/reports/${siteId}/history`, workspaceId), []),
 
-  latest: (siteId: string) =>
-    getOptional<unknown>(`/api/reports/${siteId}/latest`),
+  latest: (workspaceId: string, siteId: string) =>
+    getOptional<unknown>(appendWorkspaceQuery(`/api/reports/${siteId}/latest`, workspaceId)),
 
-  snapshot: (siteId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/reports/${siteId}/snapshot`, body),
+  snapshot: (workspaceId: string, siteId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/reports/${siteId}/snapshot`, { ...body, workspaceId }),
 
   updateAction: (snapshotId: string, actionId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/reports/snapshot/${snapshotId}/actions/${actionId}`, body),

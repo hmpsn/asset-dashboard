@@ -1,7 +1,7 @@
 /**
  * google routes — extracted from server/index.ts
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 
 const router = Router();
 
@@ -33,16 +33,41 @@ import {
 } from '../search-console.js';
 import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
-import { listWorkspaces } from '../workspaces.js';
+import { getWorkspace, listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
 import { validate, z } from '../middleware/validate.js';
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery, sendWorkspaceAccessDenied } from '../auth.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 
 const log = createLogger('google-auth');
 
+const requireWorkspaceGscPropertyAccess: RequestHandler = (req, res, next) => {
+  const rawWorkspaceId = req.query.workspaceId;
+  const workspaceId = Array.isArray(rawWorkspaceId) ? rawWorkspaceId[0] : rawWorkspaceId;
+  const rawGscSiteUrl = req.query.gscSiteUrl;
+  const gscSiteUrl = Array.isArray(rawGscSiteUrl) ? rawGscSiteUrl[0] : rawGscSiteUrl;
+
+  if (typeof workspaceId !== 'string' || typeof gscSiteUrl !== 'string') {
+    if (!req.user || req.user.role === 'owner') {
+      next();
+      return;
+    }
+    sendWorkspaceAccessDenied(res);
+    return;
+  }
+
+  const workspace = getWorkspace(workspaceId);
+  if (workspace?.gscPropertyUrl !== gscSiteUrl) {
+    sendWorkspaceAccessDenied(res);
+    return;
+  }
+
+  next();
+};
+
 // --- Google Search Console / GA4 ---
-router.get('/api/google/status/:siteId', (req, res) => {
+router.get('/api/google/status/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const creds = getGoogleCredentials();
   res.json({
     configured: !!creds,
@@ -51,22 +76,22 @@ router.get('/api/google/status/:siteId', (req, res) => {
 });
 
 // --- Global Google Auth (configure once, use everywhere) ---
-router.get('/api/google/auth-url', (_req, res) => {
+router.get('/api/google/auth-url', requireAdminAuth, (_req, res) => {
   const url = getGlobalAuthUrl();
   if (!url) return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
   res.json({ url });
 });
 
-router.get('/api/google/status', (_req, res) => {
+router.get('/api/google/status', requireAdminAuth, (_req, res) => {
   res.json({ connected: isGlobalConnected(), configured: !!getGoogleCredentials() });
 });
 
-router.post('/api/google/disconnect', (_req, res) => {
+router.post('/api/google/disconnect', requireAdminAuth, (_req, res) => {
   disconnectGlobal();
   res.json({ success: true });
 });
 
-router.get('/api/google/gsc-sites', async (_req, res) => {
+router.get('/api/google/gsc-sites', requireAdminAuth, async (_req, res) => {
   try {
     const token = await getGlobalToken();
     if (!token) return res.status(401).json({ error: 'Google not connected' });
@@ -79,7 +104,7 @@ router.get('/api/google/gsc-sites', async (_req, res) => {
 });
 
 // Legacy per-site auth (kept for backward compat)
-router.get('/api/google/auth-url/:siteId', (req, res) => {
+router.get('/api/google/auth-url/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const url = getAuthUrl(req.params.siteId);
   if (!url) return res.status(400).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
   res.json({ url });
@@ -106,13 +131,16 @@ router.get('/api/google/callback', async (req, res) => {
   }
 });
 
-router.post('/api/google/disconnect/:siteId', (req, res) => {
+router.post('/api/google/disconnect/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), (req, res) => {
   disconnect(req.params.siteId);
   res.json({ success: true });
 });
 
 // GA4 Analytics
-router.get('/api/google/ga4-properties', async (_req, res) => {
+router.get('/api/google/ga4-properties', requireAdminAuth, async (_req, res) => {
   try {
     const properties = await listGA4Properties();
     res.json(properties);
@@ -122,7 +150,7 @@ router.get('/api/google/ga4-properties', async (_req, res) => {
   }
 });
 
-router.get('/api/google/gsc-sites/:siteId', async (req, res) => {
+router.get('/api/google/gsc-sites/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const sites = await listGscSites(req.params.siteId);
     res.json(sites);
@@ -132,7 +160,10 @@ router.get('/api/google/gsc-sites/:siteId', async (req, res) => {
   }
 });
 
-router.post('/api/google/search-chat/:siteId', async (req, res) => {
+router.post('/api/google/search-chat/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { question, context, workspaceId } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -186,7 +217,7 @@ ${JSON.stringify(context, null, 2)}`;
   }
 });
 
-router.get('/api/google/search-overview/:siteId', async (req, res) => {
+router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
@@ -199,7 +230,7 @@ router.get('/api/google/search-overview/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/google/performance-trend/:siteId', async (req, res) => {
+router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
@@ -212,7 +243,7 @@ router.get('/api/google/performance-trend/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/google/search-devices/:siteId', async (req, res) => {
+router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
@@ -223,7 +254,7 @@ router.get('/api/google/search-devices/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/google/search-countries/:siteId', async (req, res) => {
+router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   const limit = parseInt(req.query.limit as string) || 20;
@@ -235,7 +266,7 @@ router.get('/api/google/search-countries/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/google/search-types/:siteId', async (req, res) => {
+router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
@@ -246,7 +277,7 @@ router.get('/api/google/search-types/:siteId', async (req, res) => {
   }
 });
 
-router.get('/api/google/search-comparison/:siteId', async (req, res) => {
+router.get('/api/google/search-comparison/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });

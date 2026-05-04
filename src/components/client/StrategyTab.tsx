@@ -196,15 +196,17 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [openKeywordDrawer, setOpenKeywordDrawer] = useState<string | null>(null);
   const [drawerClosing, setDrawerClosing] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawerSnapshotRef = useRef<StrategyKeywordTableRow | null>(null);
 
   const closeDrawer = useCallback(() => {
+    if (closeTimerRef.current || !openKeywordDrawer) return;
     setDrawerClosing(true);
     closeTimerRef.current = setTimeout(() => {
       setOpenKeywordDrawer(null);
       setDrawerClosing(false);
       closeTimerRef.current = null;
     }, 200);
-  }, []);
+  }, [openKeywordDrawer]);
 
   const openOrSwapDrawer = useCallback((keyword: string) => {
     if (closeTimerRef.current) {
@@ -325,7 +327,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     };
     document.addEventListener('keydown', handler); // keydown-ok — drawer dialog intentionally traps Escape + Tab
     return () => document.removeEventListener('keydown', handler);
-  }, [openKeywordDrawer]);
+  }, [openKeywordDrawer, closeDrawer]);
 
   // Move focus to first focusable in drawer on open (deferred one frame for mount).
   useEffect(() => {
@@ -741,9 +743,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const roleBadgeClass = (role: StrategyKeywordRole): string => {
     switch (role) {
-      case 'content':  return 'border-emerald-500/20 bg-emerald-500/8 text-accent-success';
+      case 'content':  return 'border-emerald-500/20 bg-emerald-500/10 text-accent-success';
       case 'page':     return 'border-blue-500/20 bg-blue-500/10 text-accent-info';
-      case 'strategy': return 'border-teal-500/20 bg-teal-500/8 text-accent-brand';
+      case 'strategy': return 'border-teal-500/20 bg-teal-500/10 text-accent-brand';
       case 'idea':     return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]';
     }
   };
@@ -805,7 +807,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      <div className="relative z-[var(--z-modal)] px-4 py-3 flex flex-col gap-4">
+      <div className="relative px-4 py-3 flex flex-col gap-4">
 
         {/* Confirmed zone */}
         <div>
@@ -891,7 +893,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   key={row.normalized}
                   role="button"
                   tabIndex={0}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-950/60 border border-blue-900/50 cursor-pointer hover:border-blue-800/60 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-500/5 border border-blue-500/20 cursor-pointer hover:border-blue-500/30 transition-colors"
                   onClick={() => { if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -927,7 +929,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <button
                       type="button"
                       aria-label={`Dismiss ${row.label}`}
-                      className="w-6 h-6 flex items-center justify-center text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-6 h-6 flex items-center justify-center text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
+                      disabled={isLoadingFeedback(row.label)}
                       onClick={e => {
                         e.stopPropagation();
                         void submitFeedback(row.label, 'declined', 'suggestion');
@@ -1787,7 +1790,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* Keyword detail drawer */}
       {(openKeywordDrawer || drawerClosing) && (() => {
         const allRows: StrategyKeywordTableRow[] = [...sortedConfirmed, ...keywordIdeaRows];
-        const drawerRow = allRows.find(r => r.normalized === openKeywordDrawer);
+        const liveRow = allRows.find(r => r.normalized === openKeywordDrawer);
+        if (liveRow) drawerSnapshotRef.current = liveRow;
+        const drawerRow = liveRow ?? drawerSnapshotRef.current;
         if (!drawerRow) return null;
         const isConfirmed = drawerRow.status === 'client' || drawerRow.status === 'strategy';
         const isRemoving = removingKeyword === drawerRow.normalized;

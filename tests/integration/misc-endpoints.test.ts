@@ -17,6 +17,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
 
 const ctx = createTestContext(13209);
@@ -26,6 +27,8 @@ let testWsId = '';
 let otherWsId = '';
 let scopedUserId = '';
 let scopedUserToken = '';
+let clientUserId = '';
+let clientUserToken = '';
 const ownedSiteId = 'site_guard_owned';
 const otherSiteId = 'site_guard_other';
 
@@ -35,8 +38,16 @@ beforeAll(async () => {
   testWsId = ws.id;
   const otherWs = createWorkspace('Misc Other Test Workspace');
   otherWsId = otherWs.id;
-  updateWorkspace(testWsId, { webflowSiteId: ownedSiteId, webflowToken: 'site-guard-owned-token' });
-  updateWorkspace(otherWsId, { webflowSiteId: otherSiteId, webflowToken: 'site-guard-other-token' });
+  updateWorkspace(testWsId, {
+    webflowSiteId: ownedSiteId,
+    webflowToken: 'site-guard-owned-token',
+    gscPropertyUrl: 'https://owned.example.com/',
+  });
+  updateWorkspace(otherWsId, {
+    webflowSiteId: otherSiteId,
+    webflowToken: 'site-guard-other-token',
+    gscPropertyUrl: 'https://other.example.com/',
+  });
   const scopedUser = await createUser(
     'misc-scoped-user@test.local',
     'ScopedPass1!',
@@ -46,9 +57,19 @@ beforeAll(async () => {
   );
   scopedUserId = scopedUser.id;
   scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+  const clientUser = await createClientUser(
+    'misc-billing-client@test.local',
+    'ClientPass1!',
+    'Misc Billing Client',
+    testWsId,
+    'client_member',
+  );
+  clientUserId = clientUser.id;
+  clientUserToken = signClientToken(clientUser);
 }, 25_000);
 
 afterAll(async () => {
+  deleteClientUser(clientUserId, testWsId);
   deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
@@ -176,9 +197,59 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     expect(res.status).toBe(403);
   });
 
+  it('filters workspace list responses to the JWT-scoped workspaces', async () => {
+    const res = await api('/api/workspaces', { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ id: string }>;
+    expect(body.some(ws => ws.id === testWsId)).toBe(true);
+    expect(body.some(ws => ws.id === otherWsId)).toBe(false);
+  });
+
+  it('filters workspace overview responses to the JWT-scoped workspaces', async () => {
+    const res = await api('/api/workspace-overview', { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ id: string }>;
+    expect(body.some(ws => ws.id === testWsId)).toBe(true);
+    expect(body.some(ws => ws.id === otherWsId)).toBe(false);
+  });
+
+  it('rejects Google search data reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(
+      `/api/google/search-overview/${otherSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Google search data reads when a scoped user pairs their workspace with another GSC property', async () => {
+    const res = await api(
+      `/api/google/search-overview/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://other.example.com/')}`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(403);
+  });
+
   it('rejects Stripe payment reads for a workspace outside the JWT scope', async () => {
     const res = await api(`/api/stripe/payments/${otherWsId}`, { headers: scopedHeaders() });
     expect(res.status).toBe(403);
+  });
+
+  it('rejects passwordless billing portal access without an authenticated actor', async () => {
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects subscription cancellation without an authenticated actor', async () => {
+    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows authenticated client users through the billing portal guard', async () => {
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, {
+      method: 'POST',
+      headers: { Cookie: `client_user_token_${testWsId}=${clientUserToken}` },
+    });
+    expect(res.status).toBe(503);
   });
 
   it('rejects keyword strategy reads for a workspace outside the JWT scope', async () => {
@@ -219,6 +290,14 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
       method: 'PATCH',
       headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ altText: 'Blocked', siteId: 'site_guard_test', workspaceId: otherWsId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects workspace uploads when the route workspace is outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/upload/${otherWsId}`, {
+      method: 'POST',
+      headers: scopedHeaders(),
     });
     expect(res.status).toBe(403);
   });

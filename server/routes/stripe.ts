@@ -6,7 +6,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { sanitizeString } from '../helpers.js';
-import { checkoutLimiter, requireClientPortalAuth } from '../middleware.js';
+import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
@@ -255,7 +255,7 @@ router.get('/api/public/roi/:workspaceId', (req, res) => {
 // --- Subscription Management ---
 
 // Create a Stripe Billing Portal session (client self-service: update payment, cancel)
-router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (req, res) => {
+router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
@@ -274,7 +274,7 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (r
 });
 
 // Cancel subscription (graceful — at period end)
-router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, async (req, res) => {
+router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);

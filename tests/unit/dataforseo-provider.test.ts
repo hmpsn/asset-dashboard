@@ -396,14 +396,23 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
   });
 
   it('writes API results to L1 cache after fetching', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        tasks: [{ status_code: 20000, cost: 0.001, result: [
-          { keyword: 'l1-write-test-kw', search_volume: 5000, competition_index: 30, cpc: 2.0, competition: 0.3, monthly_searches: [] }
-        ]}]
-      }),
-    } as Response);
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          tasks: [{ status_code: 20000, cost: 0.001, result: [
+            { keyword: 'l1-write-test-kw', search_volume: 5000, competition_index: 30, cpc: 2.0, competition: 0.3, monthly_searches: [] }
+          ]}]
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          tasks: [{ status_code: 20000, cost: 0.0005, result: [
+            { keyword: 'l1-write-test-kw', keyword_difficulty: 30 }
+          ]}]
+        }),
+      } as Response);
 
     const cacheSpy = vi.mocked(cacheMetricsBatch);
 

@@ -286,7 +286,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           formData.append('fileName', fileName);
 
           try {
-            const data = await postForm<{ fileName: string }>(`/api/upload/${selected.folder}/clipboard`, formData);
+            const data = await postForm<{ fileName: string }>(`/api/upload/${selected.id}/clipboard`, formData);
             setClipboardStatus(`Pasted: ${data.fileName} (resized 2x for HDPI)`);
             setTimeout(() => setClipboardStatus(null), 3000);
           } catch (err) {

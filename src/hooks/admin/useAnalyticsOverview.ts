@@ -47,7 +47,7 @@ export function useAnalyticsOverview(
   ga4PropertyId: string | undefined,
   days: number,
 ): AnalyticsOverviewData {
-  const gsc = useAdminSearch(siteId ?? '', gscPropertyUrl, days);
+  const gsc = useAdminSearch(workspaceId, siteId ?? '', gscPropertyUrl, days);
   const ga4 = useAdminGA4(workspaceId, days, !!ga4PropertyId);
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
   const createAnnotation = useCreateAnnotation(workspaceId);
