@@ -70,6 +70,28 @@ export interface ReviewChecklist {
   word_count_target: boolean;
 }
 
+export const REVIEW_CHECKLIST_KEYS = [
+  'factual_accuracy',
+  'brand_voice',
+  'internal_links',
+  'no_hallucinations',
+  'meta_optimized',
+  'word_count_target',
+] as const;
+
+export type ReviewChecklistKey = typeof REVIEW_CHECKLIST_KEYS[number];
+
+export const PROVENANCE_SENSITIVE_REVIEW_KEYS = [
+  'factual_accuracy',
+  'no_hallucinations',
+] as const satisfies readonly ReviewChecklistKey[];
+
+export interface AIReviewResult {
+  pass: boolean;
+  reason: string;
+  humanReviewRequired?: boolean;
+}
+
 /**
  * Lightweight post summary used in admin list views (RequestList, ContentBriefs).
  * Full shape lives in GeneratedPost; this is the summary projection returned by

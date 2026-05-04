@@ -11,47 +11,8 @@ import {
 import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
-
-// ─── Types ────────────────────────────────────────────────────────
-
-type AeoChangeType =
-  | 'rewrite_intro' | 'add_author' | 'add_date' | 'add_section'
-  | 'add_citations' | 'add_schema' | 'add_faq' | 'add_comparison'
-  | 'add_definition' | 'restructure_content' | 'remove_dark_pattern' | 'copy_edit';
-
-type AeoEffort = 'quick' | 'moderate' | 'significant';
-
-interface AeoPageChange {
-  id: string;
-  changeType: AeoChangeType;
-  location: string;
-  currentContent?: string;
-  suggestedChange: string;
-  rationale: string;
-  effort: AeoEffort;
-  priority: 'high' | 'medium' | 'low';
-  aeoImpact: string;
-}
-
-interface AeoPageReview {
-  pageUrl: string;
-  pageTitle: string;
-  reviewedAt: string;
-  overallScore: number;
-  summary: string;
-  changes: AeoPageChange[];
-  quickWinCount: number;
-  estimatedTimeMinutes: number;
-}
-
-interface AeoSiteReview {
-  workspaceId: string;
-  generatedAt: string;
-  pages: AeoPageReview[];
-  sitewideSummary: string;
-  totalChanges: number;
-  quickWins: number;
-}
+import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
+import { countAeoQuickWins, estimateAeoChangesMinutes } from '../../shared/types/aeo';
 
 interface Props {
   workspaceId: string;
@@ -85,6 +46,16 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string }> = {
   medium: { color: 'text-accent-warning', bg: 'bg-amber-500/10 border-amber-500/20' },
   low:    { color: 'text-accent-info',  bg: 'bg-blue-500/10 border-blue-500/20' },
 };
+
+function getClientReadyPage(page: AeoPageReview): AeoPageReview {
+  const changes = page.changes.filter(change => !change.requiresSourceResearch);
+  return {
+    ...page,
+    changes,
+    quickWinCount: countAeoQuickWins(changes),
+    estimatedTimeMinutes: estimateAeoChangesMinutes(changes),
+  };
+}
 
 
 // ─── Component ────────────────────────────────────────────────────
@@ -170,14 +141,20 @@ export function AeoReview({ workspaceId }: Props) {
     setSendingPage(page.pageUrl);
     setError(null);
     try {
-      const highCount = page.changes.filter(c => c.priority === 'high').length;
+      const clientReadyPage = getClientReadyPage(page);
+      const omittedCount = page.changes.length - clientReadyPage.changes.length;
+      if (clientReadyPage.changes.length === 0) {
+        setError('All AEO recommendations for this page need source research before they can be sent to the client.');
+        return;
+      }
+      const highCount = clientReadyPage.changes.filter(c => c.priority === 'high').length;
       await clientActions.create(workspaceId, {
         sourceType: 'aeo_change',
         sourceId: `aeo:${page.pageUrl}`,
         title: `AEO recommendations for ${page.pageTitle || page.pageUrl}`,
-        summary: `${page.summary}\n\n${page.changes.length} recommended change${page.changes.length !== 1 ? 's' : ''}, including ${highCount} high-priority item${highCount !== 1 ? 's' : ''}.`,
+        summary: `${page.summary}\n\n${clientReadyPage.changes.length} client-ready recommended change${clientReadyPage.changes.length !== 1 ? 's' : ''}, including ${highCount} high-priority item${highCount !== 1 ? 's' : ''}.${omittedCount > 0 ? ` ${omittedCount} citation recommendation${omittedCount !== 1 ? 's' : ''} omitted pending source research.` : ''}`,
         priority: highCount > 0 ? 'high' : 'medium',
-        payload: { page },
+        payload: { page: clientReadyPage },
       });
       setSentPages(prev => new Set(prev).add(page.pageUrl));
     } catch (err) {
@@ -442,6 +419,11 @@ export function AeoReview({ workspaceId }: Props) {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{typeCfg.label}</span>
                                 <span className="t-caption-sm text-[var(--brand-text-muted)]">· {change.location}</span>
+                                {change.requiresSourceResearch && (
+                                  <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/20 text-accent-warning">
+                                    research needed
+                                  </span>
+                                )}
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text)] mt-0.5 line-clamp-1">{change.rationale}</div>
                             </div>
@@ -478,6 +460,18 @@ export function AeoReview({ workspaceId }: Props) {
                               <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
                                 <span className="font-medium text-[var(--brand-text)]">Why:</span> {change.rationale}
                               </div>
+
+                              {change.verifiedSourceEvidence && (
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
+                                  <span className="font-medium text-[var(--brand-text)]">Source evidence:</span> {change.verifiedSourceEvidence}
+                                </div>
+                              )}
+
+                              {change.requiresSourceResearch && (
+                                <div className="rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/15 px-3 py-2 t-caption-sm text-accent-warning leading-relaxed">
+                                  Verify source evidence before this recommendation is sent to the client.
+                                </div>
+                              )}
 
                               {/* AEO Impact — styleguide brand accent */}
                               <div className="flex items-start gap-1.5 t-caption-sm">

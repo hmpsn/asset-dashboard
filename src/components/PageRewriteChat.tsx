@@ -8,6 +8,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
+import { extractRewriteOnly, parseRewriteSectionTarget } from '../lib/rewriteResponse';
 import { Icon, IconButton } from './ui';
 
 interface SeoIssue {
@@ -210,8 +211,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         pageIssues: pageData?.issues,
       });
 
-      const sectionMatch = resp.answer.match(/^\*{0,2}Rewriting:\s*([^*\n]+?)\*{0,2}\s*$/im);
-      const sectionTarget = sectionMatch ? sectionMatch[1].trim() : undefined;
+      const sectionTarget = parseRewriteSectionTarget(resp.answer);
       const assistantMsg: ChatMessage = { role: 'assistant', content: resp.answer, timestamp: Date.now(), sectionTarget };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
@@ -257,17 +257,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         p.slug.toLowerCase().includes(comboQuery.toLowerCase()) ||
         p.title.toLowerCase().includes(comboQuery.toLowerCase())
       );
-
-  const stripRewritingPrefix = (content: string): string =>
-    content.replace(/^\*{0,2}Rewriting:\s*[^*\n]+\*{0,2}\s*\n?/im, '');
-
-  /** Strip prefix AND rationale — returns only the rewrite prose for Apply/editable */
-  const extractRewriteOnly = (content: string): string => {
-    const stripped = stripRewritingPrefix(content);
-    // Remove "Rationale:" or "**Rationale:**" section and everything after
-    const rationaleIdx = stripped.search(/\n\s*\*{0,2}Rationale:?\*{0,2}/i);
-    return (rationaleIdx > 0 ? stripped.slice(0, rationaleIdx) : stripped).trim();
-  };
 
   const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (filteredPages.length > 0) setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }

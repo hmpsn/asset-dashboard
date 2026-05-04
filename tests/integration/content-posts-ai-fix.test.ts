@@ -221,3 +221,31 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     expect(body.suggestedText).toContain('<p>Improved.</p>');
   });
 });
+
+describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
+  it('marks provenance-sensitive checklist items as human-review required even when AI returns pass', async () => {
+    resetOpenAIMocks();
+    mockOpenAIJsonResponse('content-review', {
+      factual_accuracy: { pass: true, reason: 'No suspicious claims detected.' },
+      brand_voice: { pass: true, reason: 'Tone is consistent.' },
+      internal_links: { pass: true, reason: 'Internal links are present.' },
+      no_hallucinations: { pass: true, reason: 'No obvious fabricated statistics detected.' },
+      meta_optimized: { pass: true, reason: 'Metadata is in range.' },
+      word_count_target: { pass: true, reason: 'Word count is in range.' },
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      review: Record<string, { pass: boolean; reason: string; humanReviewRequired?: boolean }>;
+    };
+
+    expect(body.review.factual_accuracy.pass).toBe(false);
+    expect(body.review.factual_accuracy.humanReviewRequired).toBe(true);
+    expect(body.review.factual_accuracy.reason).toMatch(/Human verification is required/);
+    expect(body.review.no_hallucinations.pass).toBe(false);
+    expect(body.review.no_hallucinations.humanReviewRequired).toBe(true);
+    expect(body.review.brand_voice.pass).toBe(true);
+    expect(body.review.internal_links.pass).toBe(true);
+  });
+});
