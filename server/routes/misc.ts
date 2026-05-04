@@ -26,7 +26,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
-import { requireWorkspaceSiteAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 
 const log = createLogger('misc');
 
@@ -38,7 +38,7 @@ router.get('/api/public/page-states/:workspaceId', (req, res) => {
 });
 
 // File upload
-router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
+router.post('/api/upload/:workspaceId', requireWorkspaceAccess('workspaceId'), upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, false);
 
@@ -56,7 +56,7 @@ router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   res.json({ uploaded: files.length });
 });
 
-router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) => {
+router.post('/api/upload/:workspaceId/meta', requireWorkspaceAccess('workspaceId'), upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, true);
 
@@ -75,7 +75,7 @@ router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) =
 });
 
 // --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
-router.get('/api/audit-traffic/:siteId', async (req, res) => {
+router.get('/api/audit-traffic/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
@@ -244,7 +244,7 @@ Just output the filename slug, nothing else.`;
 });
 
 // --- Clipboard Upload (with HDPI 2x resize) ---
-router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (req, res) => {
+router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('workspaceId'), upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file' });
 

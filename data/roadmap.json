@@ -357,8 +357,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 4-8",
           "est": "5-8h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Harden remaining route/resource authorization gaps: Google/GSC/GA routes, audit report/snapshot routes, workspace list/overview filtering for scoped JWT users, global settings requireAdminAuth, billing-management auth for passwordless portals, and workspace upload authorization. Add targeted authorization tests for each route family."
+          "status": "done",
+          "notes": "Hardened Google/GSC/GA admin data routes with workspace-site and GSC-property ownership checks, made global Google/settings writes require HMAC admin auth, filtered workspace list and overview responses for scoped JWT users, guarded audit report/snapshot/action routes by owning workspace, required workspace access before uploads, and added authenticated-actor-only billing management for passwordless portals. Added targeted scoped-JWT and passwordless-route regression tests across Google, reports, settings, billing, uploads, and workspace list/overview.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-page-identity-joins",

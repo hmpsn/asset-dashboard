@@ -16,22 +16,56 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
+import { saveSnapshot } from '../../server/reports.js';
+import type { SeoAuditResult } from '../../server/seo-audit.js';
 
 const ctx = createTestContext(13211);
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
+let scopedUserId = '';
+let scopedUserToken = '';
+let otherSnapshotId = '';
 const testSiteId = 'test_site_' + Date.now();
+const otherSiteId = 'other_site_' + Date.now();
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Reports Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Reports Other Test Workspace');
+  otherWsId = otherWs.id;
+  updateWorkspace(testWsId, { webflowSiteId: testSiteId });
+  updateWorkspace(otherWsId, { webflowSiteId: otherSiteId });
+  const scopedUser = await createUser(
+    'reports-scoped-user@test.local',
+    'ScopedPass1!',
+    'Reports Scoped User',
+    'member',
+    [testWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+  const otherSnapshot = saveSnapshot(otherSiteId, 'Other Test Site', {
+    siteScore: 70,
+    totalPages: 1,
+    errors: 0,
+    warnings: 1,
+    infos: 0,
+    pages: [],
+    siteWideIssues: [],
+  } satisfies SeoAuditResult);
+  otherSnapshotId = otherSnapshot.id;
 }, 25_000);
 
 afterAll(async () => {
+  deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
@@ -55,6 +89,20 @@ describe('Reports — snapshot listing', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Report not found');
+  });
+
+  it('rejects scoped JWT history reads for a site owned by another workspace', async () => {
+    const res = await api(`/api/reports/${otherSiteId}/history?workspaceId=${testWsId}`, {
+      headers: { Authorization: `Bearer ${scopedUserToken}` },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects scoped JWT snapshot reads when the snapshot belongs to another workspace', async () => {
+    const res = await api(`/api/reports/snapshot/${otherSnapshotId}`, {
+      headers: { Authorization: `Bearer ${scopedUserToken}` },
+    });
+    expect(res.status).toBe(403);
   });
 });
 

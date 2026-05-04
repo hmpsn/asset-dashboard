@@ -41,6 +41,7 @@ import { stopChildProcess } from './helpers.js';
 // ─── Unit imports (in-process) ───
 import { signAdminToken, verifyAdminToken } from '../../server/middleware.js';
 import { signToken, verifyToken, requireAuth, requireWorkspaceAccess } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -58,6 +59,8 @@ const GATED_PORT = 13342;
 const GATED_BASE = `http://localhost:${GATED_PORT}`;
 
 let gatedProc: ChildProcess | null = null;
+let gatedJwtUserId = '';
+let gatedJwtToken = '';
 
 async function startGatedServer(): Promise<void> {
   if (gatedProc) return;
@@ -349,11 +352,21 @@ describe('Unit — requireWorkspaceAccess: passes through when no JWT user', () 
 
 describe('Integration — APP_PASSWORD gate (gated server)', () => {
   beforeAll(async () => {
+    const user = await createUser(
+      'admin-guard-scoped@test.local',
+      'ScopedPass1!',
+      'Admin Guard Scoped',
+      'member',
+      [],
+    );
+    gatedJwtUserId = user.id;
+    gatedJwtToken = signToken({ userId: user.id, email: user.email, role: user.role });
     await startGatedServer();
   }, 25_000);
 
   afterAll(async () => {
     await stopGatedServer();
+    deleteUser(gatedJwtUserId);
   });
 
   // ── Requests that should be BLOCKED (401) ──
@@ -409,6 +422,33 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
 
   it('GET /api/settings with no auth returns 401', async () => {
     const res = await gatedFetch('/api/settings');
+    expect(res.status).toBe(401);
+  });
+
+  it('PATCH /api/studio-config rejects a valid JWT without admin HMAC', async () => {
+    const res = await gatedFetch('/api/studio-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      extraHeaders: { Authorization: `Bearer ${gatedJwtToken}` },
+      body: JSON.stringify({ bookingUrl: 'https://example.com/book' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/settings/webflow-token rejects a valid JWT without admin HMAC', async () => {
+    const res = await gatedFetch('/api/settings/webflow-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      extraHeaders: { Authorization: `Bearer ${gatedJwtToken}` },
+      body: JSON.stringify({ token: 'blocked-webflow-token' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/google/status rejects a valid JWT without admin HMAC', async () => {
+    const res = await gatedFetch('/api/google/status', {
+      extraHeaders: { Authorization: `Bearer ${gatedJwtToken}` },
+    });
     expect(res.status).toBe(401);
   });
 

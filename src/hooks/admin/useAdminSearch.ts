@@ -18,46 +18,47 @@ export interface AdminSearchData {
 }
 
 export function useAdminSearch(
+  workspaceId: string,
   siteId: string,
   gscSiteUrl: string | undefined,
   days: number,
 ): AdminSearchData {
-  const enabled = !!gscSiteUrl;
+  const enabled = !!workspaceId && !!siteId && !!gscSiteUrl;
   const url = gscSiteUrl ?? '';
 
   const overviewQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'overview', days),
-    queryFn: () => gscAdmin.overview(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'overview', days),
+    queryFn: () => gscAdmin.overview(workspaceId, siteId, url, days),
     enabled,
   });
 
   const trendQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'trend', days),
-    queryFn: () => gscAdmin.trend(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'trend', days),
+    queryFn: () => gscAdmin.trend(workspaceId, siteId, url, days),
     enabled,
   });
 
   const devicesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'devices', days),
-    queryFn: () => gscAdmin.devices(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'devices', days),
+    queryFn: () => gscAdmin.devices(workspaceId, siteId, url, days),
     enabled,
   });
 
   const countriesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'countries', days),
-    queryFn: () => gscAdmin.countries(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'countries', days),
+    queryFn: () => gscAdmin.countries(workspaceId, siteId, url, days),
     enabled,
   });
 
   const typesQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'types', days),
-    queryFn: () => gscAdmin.searchTypes(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'types', days),
+    queryFn: () => gscAdmin.searchTypes(workspaceId, siteId, url, days),
     enabled,
   });
 
   const comparisonQ = useQuery({
-    queryKey: queryKeys.admin.gsc(siteId, url, 'comparison', days),
-    queryFn: () => gscAdmin.comparison(siteId, url, days),
+    queryKey: queryKeys.admin.gsc(`${workspaceId}:${siteId}`, url, 'comparison', days),
+    queryFn: () => gscAdmin.comparison(workspaceId, siteId, url, days),
     enabled,
   });
 

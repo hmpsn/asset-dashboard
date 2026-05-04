@@ -56,6 +56,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [searchParams] = useSearchParams();
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
+  const reportWorkspaceQuery = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -86,7 +87,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [actionMenuKey, setActionMenuKey] = useState<string | null>(null);
 
   // Traffic intelligence (#12) — React Query
-  const { data: trafficMap = {} } = useAuditTrafficMap(siteId);
+  const { data: trafficMap = {} } = useAuditTrafficMap(siteId, workspaceId);
   const [sortMode, setSortMode] = useState<'issues' | 'traffic'>('issues');
 
   // Unified page edit states
@@ -310,10 +311,10 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   };
 
   const loadHistory = useCallback(() => {
-    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history`, [])
+    getSafe<SnapshotSummary[]>(`/api/reports/${siteId}/history${reportWorkspaceQuery}`, [])
       .then(h => setHistory(Array.isArray(h) ? h : []))
       .catch(() => {});
-  }, [siteId]);
+  }, [siteId, reportWorkspaceQuery]);
 
   // Watch for audit job completion via WebSocket-driven jobs array // effect-layout-ok — jobs is driven by WS events, state update is genuinely post-paint
   useEffect(() => {
@@ -357,7 +358,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       setHasRun(true);
     } else if (!existingJob && !runningJob && !data) {
       // No in-memory job — try loading latest persisted snapshot from disk
-      getOptional<{ id: string; audit: SeoAuditResult }>(`/api/reports/${siteId}/latest`)
+      getOptional<{ id: string; audit: SeoAuditResult }>(`/api/reports/${siteId}/latest${reportWorkspaceQuery}`)
         .then(snapshot => {
           if (snapshot && snapshot.audit && Array.isArray(snapshot.audit.pages)) {
             setData({ ...snapshot.audit, snapshotId: snapshot.id } as SeoAuditResult & { snapshotId: string });
@@ -384,7 +385,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         return;
       }
       // Fallback: manual save for audits that weren't auto-saved
-      const result = await post<{ id: string }>(`/api/reports/${siteId}/snapshot`, { siteName: siteName || siteId, audit: data });
+      const result = await post<{ id: string }>(`/api/reports/${siteId}/snapshot`, { workspaceId, siteName: siteName || siteId, audit: data });
       const url = `${window.location.origin}/report/${result.id}`;
       setShareUrl(url);
       loadHistory();

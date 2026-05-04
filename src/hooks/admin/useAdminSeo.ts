@@ -6,14 +6,14 @@ import { STALE_TIMES } from '../../lib/queryClient';
 // ── Audit traffic map ────────────────────────────────────────────
 type TrafficMap = Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>;
 
-export function useAuditTrafficMap(siteId: string | undefined) {
+export function useAuditTrafficMap(siteId: string | undefined, workspaceId?: string) {
   return useQuery<TrafficMap>({
-    queryKey: queryKeys.admin.auditTraffic(siteId ?? ''),
+    queryKey: queryKeys.admin.auditTraffic(`${workspaceId ?? ''}:${siteId ?? ''}`),
     queryFn: async () => {
-      const m = await getOptional<TrafficMap>(`/api/audit-traffic/${siteId}`);
+      const m = await getOptional<TrafficMap>(`/api/audit-traffic/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`);
       return (m && typeof m === 'object') ? m : {};
     },
-    enabled: !!siteId,
+    enabled: !!siteId && !!workspaceId,
     staleTime: STALE_TIMES.STABLE,
   });
 }

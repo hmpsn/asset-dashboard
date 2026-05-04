@@ -86,7 +86,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const {
     overview, trend, devices, countries, searchTypes,
     comparison, isLoading, error,
-  } = useAdminSearch(siteId, gscPropertyUrl, days);
+  } = useAdminSearch(workspaceId, siteId, gscPropertyUrl, days);
 
   const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);

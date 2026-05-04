@@ -65,14 +65,21 @@ import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 const log = createLogger('workspaces');
 
 // Workspaces
-router.get('/api/workspaces', (_req, res) => {
-  const workspaces = listWorkspaces().map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
+function listVisibleWorkspaces(req: express.Request): Workspace[] {
+  const workspaces = listWorkspaces();
+  if (!req.user || req.user.role === 'owner') return workspaces;
+  const allowed = new Set(req.user.workspaceIds ?? []);
+  return workspaces.filter(ws => allowed.has(ws.id));
+}
+
+router.get('/api/workspaces', (req, res) => {
+  const workspaces = listVisibleWorkspaces(req).map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
   res.json(workspaces);
 });
 
 // Workspace overview: aggregated metrics for all workspaces
-router.get('/api/workspace-overview', (_req, res) => {
-  const workspaces = listWorkspaces();
+router.get('/api/workspace-overview', (req, res) => {
+  const workspaces = listVisibleWorkspaces(req);
   const overview = workspaces.map(ws => {
     // Audit
     let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;

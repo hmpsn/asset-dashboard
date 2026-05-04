@@ -205,6 +205,32 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
   };
 }
 
+/**
+ * Require a real authenticated actor for sensitive client-portal actions.
+ * Unlike requireClientPortalAuth(), passwordless workspaces are NOT accessible
+ * by URL alone here. Use for billing/subscription self-service endpoints.
+ */
+export function requireAuthenticatedClientPortalAuth(wsIdParam = 'workspaceId') {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const workspaceId = req.params[wsIdParam];
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+    if (adminToken && verifyAdminToken(adminToken)) return next();
+
+    const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
+    if (verifyClientUserTokenForWorkspace(workspaceId, clientToken)) return next();
+
+    const sessionCookie = req.cookies?.[`client_session_${workspaceId}`];
+    if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
+
+    if (internalJwtCanAccessWorkspace(req, workspaceId)) return next();
+
+    return res.status(401).json({ error: 'Authentication required' });
+  };
+}
+
 // ── File Upload ──
 
 const tmpDir = path.join(getUploadRoot(), '.tmp');
