@@ -25,6 +25,7 @@ import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
@@ -450,14 +451,27 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords: getTrackedKeywords(ws.id) });
 });
 
-router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), (req, res) => {
+router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
+  const actor = getClientActor(req, ws.id);
   const keywords = addTrackedKeyword(ws.id, keyword);
+  addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
   res.json({ keywords });
+
+  // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
+  // strategy GET has volume/difficulty data available immediately.
+  const provider = getConfiguredProvider(ws.seoDataProvider ?? undefined);
+  if (provider) {
+    provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+      if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
+      // Non-critical — enrichment will run again on next strategy generation
+    });
+  }
 });
 
 router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTrackedKeywordSchema), (req, res) => {
