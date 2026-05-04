@@ -2270,10 +2270,10 @@ Rules:
         (a: StrategyContentGap, b: StrategyContentGap) => {
           // Three buckets in descending order of priority:
           // 1. Positive volume (>0) — enriched with confirmed demand
-          // 2. Unenriched (undefined/null) — not yet checked for demand, potential
+          // 2. Unenriched (null/undefined) — not yet checked for demand, potential
           // 3. Zero volume (=0) — enriched but no proven demand
           const getBundle = (gap: StrategyContentGap) => {
-            if (gap.volume === undefined) return { bucket: 1, vol: 0 };  // unenriched bucket 1
+            if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
             if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive bucket 2
             return { bucket: 0, vol: 0 };                                 // zero bucket 0
           };

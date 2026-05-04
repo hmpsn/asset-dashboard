@@ -14,16 +14,16 @@ describe('computeOpportunityScore', () => {
 });
 
 describe('content gap sort order', () => {
-  function sortGaps(gaps: Array<{ volume?: number; priority?: string }>) {
+  function sortGaps(gaps: Array<{ volume?: number | null; priority?: string }>) {
     const prioWeight = (p?: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
     return [...gaps].sort(
       (a, b) => {
         // Three buckets in descending order of priority:
         // 1. Positive volume (>0) — enriched with demand
-        // 2. Unenriched (undefined) — not yet checked for demand, potential
+        // 2. Unenriched (null/undefined) — not yet checked for demand, potential
         // 3. Zero volume (=0) — enriched but no demand
         const getBundle = (gap: typeof gaps[0]) => {
-          if (gap.volume === undefined) return { bucket: 1, vol: 0 };  // unenriched bucket 1
+          if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
           if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive bucket 2
           return { bucket: 0, vol: 0 };                                 // zero bucket 0
         };
@@ -57,6 +57,18 @@ describe('content gap sort order', () => {
     const sorted = sortGaps(gaps);
     expect(sorted[0].volume).toBe(500);
     expect(sorted[1].volume).toBeUndefined();
+    expect(sorted[2].volume).toBe(0);
+  });
+
+  it('treats null volume the same as undefined (unenriched, not zero-volume)', () => {
+    const gaps = [
+      { volume: 500 },
+      { volume: null as unknown as undefined },  // null from DB
+      { volume: 0 },
+    ];
+    const sorted = sortGaps(gaps);
+    expect(sorted[0].volume).toBe(500);
+    expect(sorted[1].volume).toBeNull();  // null sorts as unenriched (middle)
     expect(sorted[2].volume).toBe(0);
   });
 });
