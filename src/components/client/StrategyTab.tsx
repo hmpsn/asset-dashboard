@@ -799,11 +799,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
 
         {/* Suggestions zone */}
-        {keywordIdeaRows.length > 0 && (
-          <div>
-            <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
-              Suggestions · {keywordIdeaRows.length}
-            </div>
+        <div>
+          <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
+            Suggestions · {keywordIdeaRows.length}
+          </div>
+          {keywordIdeaRows.length === 0 ? (
+            <p className="t-caption text-[var(--brand-text-muted)]">
+              No suggestions right now — check back after your next data sync.
+            </p>
+          ) : (
             <div className="flex flex-col gap-1">
               {keywordIdeaRows.map(row => (
                 <div
@@ -858,8 +862,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
       </div>
     </div>
@@ -1720,6 +1724,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           : drawerRow.trendDirection === 'declining' ? '↓'
           : drawerRow.trendDirection === 'stable'    ? '→'
           : '—';
+        const trendLabel: Record<'rising' | 'declining' | 'stable', string> = {
+          rising: 'growing', declining: 'declining', stable: 'stable',
+        };
         const trendColorClass =
           drawerRow.trendDirection === 'rising'    ? 'text-emerald-400'
           : drawerRow.trendDirection === 'declining' ? 'text-red-400'
@@ -1781,7 +1788,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Trend</div>
                   <div className={`t-stat-sm ${trendColorClass}`}>
                     {drawerRow.trendDirection != null
-                      ? `${trendIcon} ${drawerRow.trendDirection}`
+                      ? `${trendIcon} ${trendLabel[drawerRow.trendDirection]}`
                       : trendIcon}
                   </div>
                 </div>
@@ -1876,8 +1883,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       size="sm"
                       loading={addingKeyword}
                       disabled={addingKeyword}
-                      onClick={() => {
-                        void addStrategyKeyword(drawerRow.label);
+                      onClick={async () => {
+                        await addStrategyKeyword(drawerRow.label);
                         setOpenKeywordDrawer(null);
                       }}
                     >
@@ -1886,8 +1893,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <button
                       type="button"
                       className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-                      onClick={() => {
-                        void submitFeedback(drawerRow.label, 'declined', 'suggestion');
+                      onClick={async () => {
+                        await submitFeedback(drawerRow.label, 'declined', 'suggestion');
                         setOpenKeywordDrawer(null);
                       }}
                     >
