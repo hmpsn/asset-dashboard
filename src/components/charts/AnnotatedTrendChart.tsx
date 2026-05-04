@@ -172,7 +172,7 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
           <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] p-2 shadow-lg text-center">
             <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] block">{annotation.date}</span>
             <span
-              className="t-caption-sm px-1.5 py-0.5 rounded-md font-medium inline-block mt-0.5"
+              className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-md)] font-medium inline-block mt-0.5"
               style={{ backgroundColor: `${color}33`, color }}
             >
               {catLabel}
@@ -369,6 +369,7 @@ export function AnnotatedTrendChart({
               strokeWidth={2}
               dot={false}
               name={line.label}
+              isAnimationActive={false}
             />
           ))}
           {/* Annotation reference lines — use whichever Y-axis is present */}

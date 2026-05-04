@@ -42,7 +42,7 @@ export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; 
           { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
           { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
         ]} />} />
-        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -77,8 +77,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
             { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
             { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
           ]} />} />
-          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
-          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
           {anns?.map(ann => {
             const idx = data.findIndex(d => d.date === ann.date);
             if (idx < 0) return null;
@@ -127,7 +127,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
               </div>
             );
           }} />
-          <Area type="monotone" dataKey="siteScore" stroke={CHART_SERIES_COLORS.emerald} strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.emerald, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area type="monotone" dataKey="siteScore" stroke={CHART_SERIES_COLORS.emerald} strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.emerald, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex justify-between t-caption-sm text-[var(--brand-text-muted)] mt-1">
