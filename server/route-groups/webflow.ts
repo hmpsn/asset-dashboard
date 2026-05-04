@@ -6,7 +6,9 @@ import webflowAltTextRoutes from '../routes/webflow-alt-text.js';
 import webflowOrganizeRoutes from '../routes/webflow-organize.js';
 import webflowCmsRoutes from '../routes/webflow-cms.js';
 import webflowCmsImagesRoutes from '../routes/webflow-cms-images.js';
+import webflowSeoPageToolsRoutes from '../routes/webflow-seo-page-tools.js';
 import webflowSeoRoutes from '../routes/webflow-seo.js';
+import webflowSeoSuggestionsRoutes from '../routes/webflow-seo-suggestions.js';
 import webflowSchemaRoutes from '../routes/webflow-schema.js';
 import webflowPagespeedRoutes from '../routes/webflow-pagespeed.js';
 import webflowAnalysisRoutes from '../routes/webflow-analysis.js';
@@ -19,6 +21,8 @@ export function registerWebflowRoutes(app: Express): void {
   app.use(webflowOrganizeRoutes);
   app.use(webflowCmsRoutes);
   app.use(webflowCmsImagesRoutes);
+  app.use(webflowSeoPageToolsRoutes);
+  app.use(webflowSeoSuggestionsRoutes);
   app.use(webflowSeoRoutes);
   app.use(webflowSchemaRoutes);
   app.use(webflowPagespeedRoutes);

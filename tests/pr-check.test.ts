@@ -1401,6 +1401,23 @@ describe('Rule: Assembled-but-never-rendered slice fields', () => {
     expect(hits.some(h => h.text.includes('brandVoice'))).toBe(false);
   });
 
+  it('finds formatter bodies in concatenated extracted formatter modules', () => {
+    const typesSrc = lines(
+      "export interface PageElementSlice {",
+      "  pagePath: string;",
+      "  catalog: PageElementCatalog;",
+      "}",
+    );
+    const serverSrc = lines(
+      "function formatPageElementsSection(slice: PageElementSlice) {",
+      "  return `${slice.pagePath}: ${slice.catalog.videos.length}`;",
+      "}",
+    );
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    expect(hits.some(h => h.text.includes('pagePath'))).toBe(false);
+    expect(hits.some(h => h.text.includes('catalog'))).toBe(false);
+  });
+
   it('emits a "formatter not found" hit when the format*Section function is missing', () => {
     const typesSrc = lines(
       "export interface SeoContextSlice {",

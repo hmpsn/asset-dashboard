@@ -496,7 +496,8 @@ export function extractDbPrepareArg(chunk: string): string {
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
 // declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
-// in their corresponding format*Section function (server/workspace-intelligence.ts).
+// in their corresponding format*Section function (server/workspace-intelligence.ts
+// or a focused extracted formatter module).
 // Must live at module scope because the rule lives in the CHECKS array and its
 // customCheck closure looks these up by lexical binding at invocation time.
 
@@ -612,7 +613,9 @@ function extractFormatterBody(formatterFileContent: string, formatterName: strin
  *
  * Returns a list of matches for fields declared in any *Slice interface in
  * `typesContent` but never referenced in the corresponding format*Section
- * function in `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS are skipped.
+ * function in `serverContent`. Callers may concatenate focused extracted
+ * formatter modules into `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS
+ * are skipped.
  */
 export function findUnrenderedSliceFields(
   typesContent: string,
@@ -2127,15 +2130,14 @@ export const CHECKS: Check[] = [
     // assembled at query time and silently dropped at prompt time — they
     // never reach the AI. Add to KNOWN_UNRENDERED_FIELDS if intentional.
     //
-    // Scope: diff-mode fires when either `shared/types/intelligence.ts` or
-    // `server/workspace-intelligence.ts` changes; the customCheck always
-    // reads both from disk. The fileGlobs include both basenames so that
-    // the diff-mode filter matches whichever file triggered the run; the
-    // customCheck then operates on the fixed pair.
+    // Scope: diff-mode fires when either `shared/types/intelligence.ts`,
+    // `server/workspace-intelligence.ts`, or an extracted intelligence
+    // formatter module changes; the customCheck always reads the fixed type
+    // file plus formatter sources from disk.
     name: 'Assembled-but-never-rendered slice fields',
-    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts'],
+    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'page-elements-slice.ts'],
     exclude: ['.test.ts'],
-    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
+    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts + extracted intelligence formatters',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
     severity: 'error',
     rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
@@ -2147,9 +2149,16 @@ export const CHECKS: Check[] = [
       if (files.length === 0) return [];
       const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
       const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+      const formatterModules = [
+        path.join(ROOT, 'server/intelligence/page-elements-slice.ts'),
+      ];
+      const serverContent = [
+        readFileOrEmpty(serverPath),
+        ...formatterModules.map(readFileOrEmpty),
+      ].join('\n');
       return findUnrenderedSliceFields(
         readFileOrEmpty(typesPath),
-        readFileOrEmpty(serverPath),
+        serverContent,
         typesPath,
         serverPath,
       );
