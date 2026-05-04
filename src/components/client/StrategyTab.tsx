@@ -880,7 +880,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               description="Add your first keyword above to start tracking and shaping recommendations."
             />
           ) : (
-            <div className="flex flex-col gap-1">
+            <div className="relative">
+              <div className="max-h-[420px] overflow-y-auto flex flex-col gap-1">
               {sortedConfirmed.map(row => {
                 const isOpen = openKeywordDrawer === row.normalized;
                 const isRemoving = removingKeyword === row.normalized;
@@ -938,6 +939,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 );
               })}
+              </div>
+              {sortedConfirmed.length > 6 && (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--surface-2)] to-transparent" />
+              )}
             </div>
           )}
         </div>
@@ -1113,12 +1118,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
           This is a planning-readiness score, not a grade. It shows how much clear SEO work is ready to review or move into production.
         </p>
-      </div>
-
-      <div ref={priorityKeywordsRef}>
-        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
-          {priorityKeywordsPanel}
-        </TierGate>
       </div>
 
       {/* ── RECOMMENDED NEXT STEPS ── */}
@@ -1771,6 +1770,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       </div>
       )}
+
+      {/* ── STRATEGY KEYWORDS ── */}
+      <div ref={priorityKeywordsRef}>
+        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
+          {priorityKeywordsPanel}
+        </TierGate>
+      </div>
 
       {/* ── PAGE KEYWORD MAP (advanced page detail) ── */}
       <div>
