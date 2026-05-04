@@ -2268,10 +2268,10 @@ Rules:
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
       strategy.contentGaps = [...strategy.contentGaps].sort(
         (a: StrategyContentGap, b: StrategyContentGap) => {
-          // Three buckets in descending order of priority:
-          // 1. Positive volume (>0) — enriched with confirmed demand
-          // 2. Unenriched (null/undefined) — not yet checked for demand, potential
-          // 3. Zero volume (=0) — enriched but no proven demand
+          // Bucket values (higher = sorted first, descending):
+          //   2 = Positive volume (>0) — enriched with confirmed demand
+          //   1 = Unenriched (null/undefined) — not yet checked, potential
+          //   0 = Zero volume — enriched but no proven demand
           const getBundle = (gap: StrategyContentGap) => {
             if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
             if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive bucket 2

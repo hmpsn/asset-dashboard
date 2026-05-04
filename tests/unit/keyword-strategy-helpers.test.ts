@@ -46,6 +46,8 @@ describe('content gap sort order', () => {
     ];
     const sorted = sortGaps(gaps);
     expect(sorted).toHaveLength(3);
+    expect(sorted[0].volume).toBe(500);    // positive first
+    expect(sorted[2].volume).toBe(0);     // zero last (not dropped)
   });
 
   it('sorts positive volume before unenriched before zero volume', () => {
