@@ -45,6 +45,16 @@ interface StrategyTabProps {
   hidePrices?: boolean;
 }
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]', 'area[href]', 'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])', 'select:not([disabled])',
+  'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])', '[contenteditable="true"]',
+].join(',');
+const getFocusable = (root: HTMLElement): HTMLElement[] =>
+  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    el => !el.hasAttribute('disabled') && el.tabIndex !== -1,
+  );
+
 const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : kd <= 80 ? 'text-accent-orange' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
@@ -258,21 +268,59 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     loadTrackedKeywords();
   }, [workspaceId, loadTrackedKeywords]);
 
+  // Capture previously focused element when drawer opens (open: null → string).
+  // Separate effect with [openKeywordDrawer] only so it doesn't re-run on
+  // unrelated state changes and overwrite the captured target.
+  useEffect(() => {
+    if (!openKeywordDrawer) return;
+    drawerPreviousFocusRef.current = (document.activeElement as HTMLElement | null) ?? null;
+  }, [openKeywordDrawer]);
+
+  // Escape + Tab trap while drawer is open.
   useEffect(() => {
     if (!openKeywordDrawer) return;
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        e.key === 'Escape' &&
-        !target.isContentEditable &&
-        target.tagName !== 'INPUT' &&
-        target.tagName !== 'TEXTAREA'
-      ) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
         setOpenKeywordDrawer(null);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusables = getFocusable(root);
+      if (focusables.length === 0) { e.preventDefault(); root.focus(); return; }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (active === first || !root.contains(active)) { e.preventDefault(); last.focus(); }
+      } else {
+        if (active === last) { e.preventDefault(); first.focus(); }
       }
     };
-    document.addEventListener('keydown', handler); // keydown-ok
+    document.addEventListener('keydown', handler); // keydown-ok — drawer dialog intentionally traps Escape + Tab
     return () => document.removeEventListener('keydown', handler);
+  }, [openKeywordDrawer]);
+
+  // Move focus to first focusable in drawer on open (deferred one frame for mount).
+  useEffect(() => {
+    if (!openKeywordDrawer) return;
+    const raf = requestAnimationFrame(() => {
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusables = getFocusable(root);
+      if (focusables.length > 0) focusables[0].focus();
+      else root.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [openKeywordDrawer]);
+
+  // Restore focus to the previously focused element when drawer closes.
+  useEffect(() => {
+    if (openKeywordDrawer) return;
+    const prev = drawerPreviousFocusRef.current;
+    if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus();
   }, [openKeywordDrawer]);
 
   const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
@@ -294,6 +342,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywordsRef = useRef<HTMLDivElement>(null);
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
+
+  // Refs for keyword drawer focus management
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerPreviousFocusRef = useRef<HTMLElement | null>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -1739,12 +1791,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               onClick={() => setOpenKeywordDrawer(null)}
               aria-hidden="true"
             />
-            {/* pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile */}
             <div
+              ref={drawerRef}
               role="dialog"
               aria-modal="true"
               aria-label={`Keyword details: ${drawerRow.label}`}
-              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none"
+              tabIndex={-1}
+              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none" // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile
             >
               {/* Drawer header */}
               <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
