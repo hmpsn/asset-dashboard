@@ -1849,7 +1849,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <div className="px-3 py-2.5">
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Volume</div>
                   <div className="t-stat-sm text-[var(--brand-text-bright)]">
-                    {drawerRow.volume != null
+                    {drawerRow.volume
                       ? drawerRow.volume >= 1000
                         ? `${(drawerRow.volume / 1000).toFixed(1)}k/mo`
                         : `${drawerRow.volume}/mo`
