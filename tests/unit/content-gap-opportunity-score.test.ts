@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { computeOpportunityScore } from '../../server/routes/keyword-strategy.js';
 
 describe('computeOpportunityScore', () => {
-  it('returns 0 for a gap with no data', () => {
-    expect(computeOpportunityScore({})).toBe(0);
+  it('returns undefined for a gap with no data', () => {
+    expect(computeOpportunityScore({})).toBeUndefined();
   });
 
   it('rewards rising trend', () => {

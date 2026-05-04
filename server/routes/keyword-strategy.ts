@@ -89,11 +89,11 @@ export function computeOpportunityScore(cg: {
   difficulty?: number;
   impressions?: number;
   trendDirection?: string;
-}): number {
+}): number | undefined {
   const hasData = (cg.volume != null && cg.volume > 0)
     || cg.difficulty != null
     || (cg.impressions != null && cg.impressions > 0);
-  if (!hasData) return 0;
+  if (!hasData) return undefined;
   const vol = Math.min((cg.volume ?? 0) / 10000, 1);
   const ease = 1 - (cg.difficulty ?? 50) / 100;
   const gscBonus = Math.min((cg.impressions ?? 0) / 2000, 0.5);
