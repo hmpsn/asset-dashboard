@@ -26,6 +26,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
+import { requireWorkspaceSiteAccess } from '../auth.js';
 
 const log = createLogger('misc');
 
@@ -41,7 +42,7 @@ router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, false);
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'asset',
     count: files.length,
@@ -59,7 +60,7 @@ router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) =
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, true);
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'meta',
     count: files.length,
@@ -94,7 +95,7 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
             trafficMap[path].impressions += p.impressions;
           } catch { /* skip malformed URLs */ }
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ } // url-fetch-ok
     }
 
     // Fetch GA4 top pages
@@ -112,14 +113,17 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
 
     res.json(trafficMap);
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error');
+    if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error'); // url-fetch-ok
     else log.debug({ err }, 'misc: audit-traffic endpoint failed — degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 // --- Smart Naming (AI Vision Enhanced) ---
-router.post('/api/smart-name', async (req, res) => {
+router.post('/api/smart-name', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { originalName, altText, pageTitle, contentType, imageUrl, siteId, assetId } = req.body;
   if (!originalName) return res.status(400).json({ error: 'originalName required' });
 
@@ -275,7 +279,7 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
   // Clean up temp file if still exists
   try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* ignore */ }
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'asset',
     count: 1,

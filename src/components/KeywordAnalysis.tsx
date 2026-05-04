@@ -87,16 +87,17 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`)
+    const workspaceParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${workspaceParam}`)
       .then(data => setPages(data))
       .catch(() => {
         // Fallback to static-only endpoint if all-pages not available
-        get<PageMeta[]>(`/api/webflow/pages/${siteId}`)
+        get<PageMeta[]>(`/api/webflow/pages/${siteId}${workspaceParam}`)
           .then(data => setPages(data))
           .catch(() => setPages([]));
       })
       .finally(() => setLoading(false));
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const analyzePage = async (page: PageMeta) => {
     setAnalyzing(prev => new Set(prev).add(page.id));
@@ -108,7 +109,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       try {
         const pagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : '';
         if (pagePath) {
-          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
           pageContent = result.text || '';
         }
       } catch (err) { console.error('KeywordAnalysis operation failed:', err); }

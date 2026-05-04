@@ -186,7 +186,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   const queryClient = useQueryClient();
   const cmsMappingsQuery = useQuery({
-    queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId),
+    queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId, workspaceId),
     queryFn: () => get<CmsMappingsResponse>(
       `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
     ),
@@ -219,7 +219,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     onMutate: () => setCmsMappingError(null),
     onSuccess: ({ collectionId, mapping }) => {
       queryClient.setQueryData<CmsMappingsResponse>(
-        queryKeys.admin.schemaCmsFieldMappings(siteId),
+        queryKeys.admin.schemaCmsFieldMappings(siteId, workspaceId),
         old => ({
           collections: (old?.collections ?? []).map(collection => (
             collection.collectionId === collectionId ? { ...collection, mapping } : collection
@@ -249,7 +249,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Load saved schema snapshot — React Query
-  const { data: snapshotData } = useSchemaSnapshot(siteId);
+  const { data: snapshotData } = useSchemaSnapshot(siteId, workspaceId);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   // Hydrate local state from snapshot query when it arrives
   useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
@@ -283,7 +283,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load all pages — React Query
-  const { data: fetchedPages = [] } = useWebflowPages(siteId);
+  const { data: fetchedPages = [] } = useWebflowPages(siteId, workspaceId);
   useEffect(() => {
     if (fetchedPages.length > 0 && availablePages.length === 0) {
       setAvailablePages(fetchedPages);
@@ -366,7 +366,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     if (availablePages.length > 0) { setShowPagePicker(true); return; }
     setLoadingPages(true);
     try {
-      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
+      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
       if (Array.isArray(pages)) {
         setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
           id: p._id || p.id || '',
@@ -385,7 +385,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setStarted(true);
     try {
       const pt = pageTypes[pageId];
-      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
+      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
       setData(prev => {
         if (!prev) return [result];
         const exists = prev.findIndex(p => p.pageId === pageId);
@@ -405,7 +405,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const regeneratePage = async (pageId: string) => {
     setRegenerating(prev => new Set(prev).add(pageId));
     try {
-      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
+      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId });
       setData(prev => {
         if (!prev) return prev;
         // Full replacement — preserve lastPublishedAt which comes from the
@@ -437,7 +437,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     try {
       const pageData = data?.find(p => p.pageId === pageId);
       const isHomepage = !pageData?.slug || pageData.slug === '/' || pageData.slug === 'index' || pageData.slug === 'home';
-      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
+      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, schema, publishAfter: true, isHomepage });
       if (result.delivery?.status === 'manual-required') {
         setManualDelivery(prev => ({ ...prev, [pageId]: result.delivery }));
         return;
@@ -563,7 +563,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     const websiteNode = wsNode || { '@type': 'WebSite', '@id': `${orgNode['url']}/#website`, 'url': orgNode['url'], 'name': orgNode['name'], 'publisher': { '@id': `${orgNode['url']}/#organization` } };
     setSavingTemplate(true);
     try {
-      await put(`/api/webflow/schema-template/${siteId}`, { organizationNode: orgNode, websiteNode });
+      await put(`/api/webflow/schema-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { organizationNode: orgNode, websiteNode });
       setTemplateSaved(true);
       setTimeout(() => setTemplateSaved(false), 3000);
     } catch (err) { console.error('SchemaSuggester operation failed:', err); }
@@ -576,7 +576,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setLoadingCmsPages(true);
     setCmsError(null);
     try {
-      const pages = await getSafe<CmsTemplatePage[]>(`/api/webflow/cms-template-pages/${siteId}`, []);
+      const pages = await getSafe<CmsTemplatePage[]>(`/api/webflow/cms-template-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
       if (Array.isArray(pages)) setCmsTemplatePages(pages);
       setShowCmsPanel(true);
     } catch { setCmsError('Failed to load CMS collections'); }
@@ -590,7 +590,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setCmsPublished(false);
     setCmsError(null);
     try {
-      const result = await post<CmsTemplateResult>(`/api/webflow/schema-cms-template/${siteId}`, { collectionId: page.collectionId });
+      const result = await post<CmsTemplateResult>(`/api/webflow/schema-cms-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { collectionId: page.collectionId });
       setCmsTemplateResult(result);
     } catch (err) {
       setCmsError(err instanceof Error ? err.message : 'Failed to generate CMS template schema');
@@ -603,7 +603,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setPublishingCmsTemplate(true);
     setCmsError(null);
     try {
-      await post(`/api/webflow/schema-cms-template/${siteId}/publish`, {
+      await post(`/api/webflow/schema-cms-template/${siteId}/publish${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, {
         pageId: cmsSelectedPage.pageId,
         templateString: cmsTemplateResult.templateString,
         publishAfter: true,
@@ -776,7 +776,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             </button>
           </div>
         </div>
-        <SchemaPlanPanel siteId={siteId} />
+        <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         {showBpCallout && (
           <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
             <AlertTriangle size={16} className="text-accent-warning flex-shrink-0 mt-0.5" />
@@ -1020,7 +1020,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         />
       )}
       {/* Schema site plan */}
-      <SchemaPlanPanel siteId={siteId} />
+      <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
 
       {showBpCallout && (
         <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
@@ -1313,7 +1313,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               onRetract={async (pageId: string) => {
                 setRetractingPages(prev => new Set(prev).add(pageId));
                 try {
-                  await schemaApi.retract(siteId, pageId);
+                  await schemaApi.retract(siteId, pageId, workspaceId);
                   setRetractedPages(prev => new Set(prev).add(pageId));
                   setPublished(prev => { const n = new Set(prev); n.delete(pageId); return n; });
                   setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });

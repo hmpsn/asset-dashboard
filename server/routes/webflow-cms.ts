@@ -21,12 +21,12 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-cms');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- CMS Collections ---
-router.get('/api/webflow/collections/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/collections/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const collections = await listCollections(req.params.siteId);
     res.json(collections);
@@ -36,9 +36,14 @@ router.get('/api/webflow/collections/:siteId', requireWorkspaceAccessFromQuery()
   }
 });
 
-router.get('/api/webflow/collections/:collectionId/schema', async (req, res) => {
+router.get('/api/webflow/collections/:collectionId/schema', requireWorkspaceSiteAccess({
+  workspace: { source: 'query', name: 'workspaceId' },
+  site: { source: 'query', name: 'siteId' },
+}), async (req, res) => {
   try {
-    const schema = await getCollectionSchema(req.params.collectionId);
+    const siteId = typeof req.query.siteId === 'string' ? req.query.siteId : undefined;
+    const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
+    const schema = await getCollectionSchema(req.params.collectionId, token);
     res.json(schema);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/collections/:collectionId/schema: programming error');
@@ -46,11 +51,16 @@ router.get('/api/webflow/collections/:collectionId/schema', async (req, res) => 
   }
 });
 
-router.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
+router.get('/api/webflow/collections/:collectionId/items', requireWorkspaceSiteAccess({
+  workspace: { source: 'query', name: 'workspaceId' },
+  site: { source: 'query', name: 'siteId' },
+}), async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 100;
   const offset = parseInt(req.query.offset as string) || 0;
   try {
-    const result = await listCollectionItems(req.params.collectionId, limit, offset);
+    const siteId = typeof req.query.siteId === 'string' ? req.query.siteId : undefined;
+    const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
+    const result = await listCollectionItems(req.params.collectionId, limit, offset, token);
     res.json(result);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/collections/:collectionId/items: programming error');
@@ -58,12 +68,16 @@ router.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
   }
 });
 
-router.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req, res) => {
+router.patch('/api/webflow/collections/:collectionId/items/:itemId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   // Resolve per-site token: workspaceId → workspace → siteId → token.
   // Without this, webflowFetch falls back to the global WEBFLOW_API_TOKEN env var,
   // which may belong to a different Webflow account → 404 on the collection/item.
   const ws = req.body.workspaceId ? getWorkspace(req.body.workspaceId) : undefined;
-  const token = ws?.webflowSiteId ? getTokenForSite(ws.webflowSiteId) || undefined : undefined;
+  const siteId = typeof req.body.siteId === 'string' ? req.body.siteId : ws?.webflowSiteId;
+  const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
   const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData, token);
   if (req.body.workspaceId) {
     updatePageState(req.body.workspaceId, req.params.itemId, { status: 'live', source: 'cms', updatedBy: 'admin' });
@@ -72,7 +86,7 @@ router.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req,
 });
 
 // --- CMS SEO Editor: list all collections with SEO-relevant fields and items ---
-router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const collections = await listCollections(req.params.siteId, token);
@@ -193,14 +207,18 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
 });
 
 // --- CMS SEO: Publish collection items after editing ---
-router.post('/api/webflow/collections/:collectionId/publish', async (req, res) => {
+router.post('/api/webflow/collections/:collectionId/publish', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   try {
     const { itemIds, workspaceId } = req.body;
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ error: 'itemIds array required' });
     }
     const ws = workspaceId ? getWorkspace(workspaceId) : undefined;
-    const token = ws?.webflowSiteId ? getTokenForSite(ws.webflowSiteId) || undefined : undefined;
+    const siteId = typeof req.body.siteId === 'string' ? req.body.siteId : ws?.webflowSiteId;
+    const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
     const result = await publishCollectionItems(req.params.collectionId, itemIds, token);
     res.json(result);
   } catch (err) {

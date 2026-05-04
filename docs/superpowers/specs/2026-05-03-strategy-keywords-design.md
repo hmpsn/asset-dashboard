@@ -1,7 +1,7 @@
 # Strategy Keywords — Component Redesign
 
-**Date:** 2026-05-03  
-**Status:** Approved  
+**Date:** 2026-05-03
+**Status:** Approved
 **Location:** `src/components/client/StrategyTab.tsx` (Strategy Keywords section)
 
 ---

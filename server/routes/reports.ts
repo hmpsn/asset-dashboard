@@ -3,13 +3,14 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess } from '../auth.js';
 const router = Router();
 
 import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { getDataDir } from '../data-dir.js';
 import { applySuppressionsToAudit } from '../helpers.js';
 import { triggerMonthlyReport } from '../monthly-report.js';
@@ -96,7 +97,10 @@ router.get('/api/sales-report/:id/html', (req, res) => {
 
 // --- Reports & Snapshots ---
 // Save audit as snapshot (run audit + save + extract logo)
-router.post('/api/reports/:siteId/save', async (req, res) => {
+router.post('/api/reports/:siteId/save', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   try {
     const { siteId } = req.params;
     const { siteName } = req.body;
@@ -116,7 +120,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
             logoUrl = (await extractSiteLogo(`https://${siteData.shortName}.webflow.io`)) || undefined;
           }
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'reports: POST /api/reports/:siteId/save: programming error'); /* logo extraction is best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'reports: POST /api/reports/:siteId/save: programming error'); /* logo extraction is best-effort */ } // url-fetch-ok
     }
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
@@ -127,7 +131,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
       addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${effectiveAudit.siteScore}`,
         `${effectiveAudit.totalPages} pages scanned, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
         { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
-      broadcastToWorkspace(auditWs.id, 'audit:complete', { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
+      broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {

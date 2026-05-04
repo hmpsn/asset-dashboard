@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
@@ -145,7 +145,7 @@ async function publishSchemaToCmsField(opts: {
   };
 }
 
-router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
@@ -169,7 +169,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
 });
 
 // Load previously saved schema results from disk, annotated with publish dates
-router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getSchemaSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
   // Annotate each page result with its last publish date (for stale schema detection)
@@ -182,7 +182,7 @@ router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQue
 
 // ── Page Type Persistence ──
 
-router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   res.json({ pageTypes: getPageTypes(req.params.siteId) });
 });
 
@@ -191,7 +191,7 @@ const pageTypeSchema = z.object({
   pageType: z.string().min(1),
 });
 
-router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), validate(pageTypeSchema), (req, res) => {
+router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(pageTypeSchema), (req, res) => {
   const { pageId, pageType } = req.body;
   savePageType(req.params.siteId, pageId, pageType);
   res.json({ ok: true });
@@ -199,7 +199,7 @@ router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQ
 
 // ── Collection-aware schema inventory and CMS delivery mapping ──
 
-router.get('/api/webflow/schema-site-inventory/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/schema-site-inventory/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const siteId = req.params.siteId;
     const token = getTokenForSite(siteId) || undefined;
@@ -225,7 +225,7 @@ router.get('/api/webflow/schema-site-inventory/:siteId', requireWorkspaceAccessF
   }
 });
 
-router.get('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const siteId = req.params.siteId;
     const token = getTokenForSite(siteId) || undefined;
@@ -311,7 +311,7 @@ function normalizeFieldMappings(raw: Record<string, string> | undefined): Partia
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAccessFromQuery(), validate(cmsFieldMappingSchema), (req, res) => {
+router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(cmsFieldMappingSchema), (req, res) => {
   const mapping = saveSchemaCmsFieldMapping({
     siteId: req.params.siteId,
     collectionId: req.body.collectionId,
@@ -342,7 +342,7 @@ router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAcc
   res.json(mapping);
 });
 
-router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, pageType } = req.body;
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
@@ -379,7 +379,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
 });
 
 // --- Publish Schema to Webflow Page ---
-router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, schema, publishAfter, skipValidation } = req.body;
   if (!pageId || !schema) return res.status(400).json({ error: 'pageId and schema required' });
 
@@ -521,7 +521,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 });
 
 // --- CMS Template Schema ---
-router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { collectionId } = req.body;
   if (!collectionId) return res.status(400).json({ error: 'collectionId required' });
   try {
@@ -537,7 +537,7 @@ router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceAccessFr
   }
 });
 
-router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, templateString, publishAfter } = req.body;
   if (!pageId || !templateString) return res.status(400).json({ error: 'pageId and templateString required' });
   try {
@@ -567,7 +567,7 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
 });
 
 // --- List CMS template pages (pages with collectionId) ---
-router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const siteId = req.params.siteId;
     const token = getTokenForSite(siteId) || undefined;
@@ -597,7 +597,7 @@ router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFrom
 // ── Site template endpoints ──
 
 // GET: retrieve the site template (auto-seeds from existing snapshot if needed)
-router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { ctx } = await buildSchemaContext(req.params.siteId);
     const template = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
@@ -613,7 +613,7 @@ router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PUT: replace the full site template (Organization + WebSite nodes)
-router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.put('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     if (!organizationNode || !websiteNode) {
@@ -630,7 +630,7 @@ router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PATCH: update specific fields on the template (e.g. logo URL)
-router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     // Auto-seed first if no template exists
@@ -651,7 +651,7 @@ router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQ
 // ── Schema Site Plan endpoints ──
 
 // POST: generate a new schema plan for the site
-router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { ctx } = await buildSchemaContext(req.params.siteId);
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
@@ -693,14 +693,14 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
 });
 
 // GET: retrieve the current plan for a site
-router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.json(null);
   res.json(plan);
 });
 
 // PUT: update page roles / canonical entities on the plan
-router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const { pageRoles, canonicalEntities } = req.body;
   if (!pageRoles) return res.status(400).json({ error: 'pageRoles required' });
   const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
@@ -709,7 +709,7 @@ router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery()
 });
 
 // POST: send plan preview to client for review (in dedicated Schema tab, not Inbox)
-router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const plan = getSchemaPlan(req.params.siteId);
     if (!plan) return res.status(404).json({ error: 'No plan found. Generate one first.' });
@@ -744,14 +744,14 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceA
 });
 
 // POST: mark plan as active (approved or admin-confirmed)
-router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
   res.json(plan);
 });
 
 // DELETE: retract (delete) the entire schema plan for a site
-router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   // Read plan first to grab the approval batch ID before deleting
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
@@ -774,7 +774,7 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuer
 });
 
 // DELETE: retract (remove) published schema from a specific page
-router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId, pageId } = req.params;
   try {
     const token = getTokenForSite(siteId) || undefined;
@@ -808,12 +808,12 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAcc
 
 // ── Schema Version History + Rollback ──
 
-router.get('/api/webflow/schema-history/:siteId/:pageId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-history/:siteId/:pageId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const history = getSchemaPublishHistory(req.params.siteId, req.params.pageId, 20);
   res.json({ history });
 });
 
-router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, historyId } = req.body;
   if (!pageId || !historyId) return res.status(400).json({ error: 'pageId and historyId required' });
   try {
@@ -901,7 +901,7 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
 
   const label = action === 'approve' ? 'approved' : 'requested changes on';
   addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
-  broadcastToWorkspace(ws.id, 'approval:update', { action: 'schema_plan_feedback', status: newStatus });
+  broadcastToWorkspace(ws.id, WS_EVENTS.APPROVAL_UPDATE, { action: 'schema_plan_feedback', status: newStatus });
   res.json(plan);
 });
 
@@ -932,7 +932,7 @@ const schemaConsistencyBody = z.object({
 });
 
 // Validate a single page schema against Google Rich Results rules
-router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
+router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
   try {
     const { pageId, schema } = req.body as { pageId: string; schema: Record<string, unknown> };
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
@@ -956,7 +956,7 @@ router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQu
 });
 
 // Batch validate all schemas for entity consistency across a workspace
-router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
+router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
   try {
     const { schemas } = req.body as { schemas: Array<{ pageId: string; schema: Record<string, unknown> }> };
     const result = validateEntityConsistency(schemas);
@@ -968,7 +968,7 @@ router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspace
 });
 
 // Get validation status for a single page
-router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
@@ -985,7 +985,7 @@ router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQ
 });
 
 // Get all validations for a workspace
-router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
@@ -999,7 +999,7 @@ router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceAccessFrom
 });
 
 // Delete a validation record
-router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });

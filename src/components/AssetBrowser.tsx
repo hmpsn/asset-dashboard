@@ -100,9 +100,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   }, [cmsImageData]);
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
-    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId), old => updater(old ?? []));
+    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId, workspaceId), old => updater(old ?? []));
   const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
-    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
+    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId, workspaceId), old => {
       if (!old) return old;
       return {
         ...old,
@@ -115,7 +115,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         },
       };
     });
-  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId) });
+  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId, workspaceId) });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortField>('createdOn');
@@ -316,6 +316,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         contentType: asset.contentType,
         imageUrl: asset.hostedUrl || asset.url,
         siteId,
+        workspaceId,
         assetId: asset.id,
       });
       if (data.fullName) {
@@ -357,6 +358,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           contentType: asset.contentType,
           imageUrl: asset.hostedUrl || asset.url,
           siteId,
+          workspaceId,
           assetId: asset.id,
         });
         if (data.fullName) {

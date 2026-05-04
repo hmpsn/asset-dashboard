@@ -291,11 +291,11 @@ export const redirects = {
   save: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/redirects/${siteId}`, body),
 
-  scan: (siteId: string) =>
-    get<unknown>(`/api/webflow/redirect-scan/${siteId}`),
+  scan: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/redirect-scan/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
-  snapshot: (siteId: string) =>
-    getOptional<unknown>(`/api/webflow/redirect-snapshot/${siteId}`),
+  snapshot: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/redirect-snapshot/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 };
 
 // ── Content subscriptions ──────────────────────────────────────

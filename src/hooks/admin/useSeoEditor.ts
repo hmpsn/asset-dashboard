@@ -21,11 +21,11 @@ export interface PageMeta {
   collectionId?: string;
 }
 
-export function useSeoEditor(siteId: string, _workspaceId?: string) {
+export function useSeoEditor(siteId: string, workspaceId?: string) {
   return useQuery({
-    queryKey: queryKeys.admin.seoEditor(siteId),
+    queryKey: queryKeys.admin.seoEditor(siteId, workspaceId),
     queryFn: async (): Promise<PageMeta[]> => {
-      const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
+      const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
       return Array.isArray(response) ? response : [];
     },
     staleTime: STALE_TIMES.FAST,

@@ -30,7 +30,7 @@ import {
   hasActiveJob,
 } from '../jobs.js';
 import { APP_PASSWORD } from '../middleware.js';
-import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
@@ -168,6 +168,14 @@ router.post('/api/jobs', async (req, res) => {
   const requestedWorkspaceId = params?.workspaceId;
   if (typeof requestedWorkspaceId === 'string' && !requestUserCanAccessWorkspace(req, requestedWorkspaceId)) {
     return sendWorkspaceAccessDenied(res);
+  }
+  const requestedSiteId = params?.siteId;
+  if (typeof requestedSiteId === 'string') {
+    if (typeof requestedWorkspaceId === 'string') {
+      if (!workspaceOwnsWebflowSite(requestedWorkspaceId, requestedSiteId)) return sendWorkspaceAccessDenied(res);
+    } else if (req.user && req.user.role !== 'owner') {
+      return sendWorkspaceAccessDenied(res);
+    }
   }
 
   try {

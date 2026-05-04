@@ -1,7 +1,7 @@
 # Strategy Keywords — Component Rebuild Pre-Plan Audit
 
-**Date:** 2026-05-03  
-**Spec:** docs/superpowers/specs/2026-05-03-strategy-keywords-design.md  
+**Date:** 2026-05-03
+**Spec:** docs/superpowers/specs/2026-05-03-strategy-keywords-design.md
 **Total findings:** Single file, ~565 lines touched (415 removed, ~150 state/function lines removed, ~250 new lines)
 
 ---

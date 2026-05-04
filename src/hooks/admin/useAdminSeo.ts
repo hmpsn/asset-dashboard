@@ -71,12 +71,12 @@ export interface SchemaSnapshot {
   createdAt: string | null;
 }
 
-export function useSchemaSnapshot(siteId: string) {
+export function useSchemaSnapshot(siteId: string, workspaceId?: string) {
   return useQuery<SchemaSnapshot | null>({
-    queryKey: queryKeys.admin.schemaSnapshot(siteId),
+    queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId),
     queryFn: async () => {
       try {
-        const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}`);
+        const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
         if (snapshot?.results?.length) {
           return { results: snapshot.results, createdAt: snapshot.createdAt ?? null };
         }
@@ -91,11 +91,11 @@ export function useSchemaSnapshot(siteId: string) {
 // ── Webflow pages list ──────────────────────────────────────────
 interface WebflowPage { id: string; title: string; slug: string }
 
-export function useWebflowPages(siteId: string) {
+export function useWebflowPages(siteId: string, workspaceId?: string) {
   return useQuery<WebflowPage[]>({
-    queryKey: queryKeys.admin.webflowPages(siteId),
+    queryKey: queryKeys.admin.webflowPages(siteId, workspaceId),
     queryFn: async () => {
-      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
+      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
       if (!Array.isArray(pages)) return [];
       return pages.map((p) => ({
         id: p._id || p.id || '',

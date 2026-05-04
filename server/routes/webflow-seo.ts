@@ -6,7 +6,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess, requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromBody, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
@@ -71,7 +71,7 @@ function enforceLimit(text: string, maxLen: number): string {
 }
 
 // --- SEO Audit ---
-router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     if (!token) {
@@ -309,7 +309,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
           }
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ } // url-fetch-ok
   }
 
   // Fetch page content server-side if not provided — extract headings + body text
@@ -547,7 +547,10 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
 });
 
 // --- Bulk AI SEO Fix ---
-router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { pages: rawPages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
   // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
   const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
@@ -661,7 +664,10 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 });
 
 // --- Bulk Pattern Apply (instant text transforms, no AI) ---
-router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { pages: rawPages, field, action, text: patternText } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
     field: 'title' | 'description';
@@ -722,7 +728,10 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
 });
 
 // --- Bulk AI Rewrite (generates 3 variations per page, persists to SQLite) ---
-router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { pages, field, workspaceId } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }>;
     field: 'title' | 'description' | 'both';
@@ -1046,7 +1055,7 @@ router.delete('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAcces
 });
 
 // --- Fetch page HTML body text (for keyword analysis) ---
-router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   const pagePath = req.query.path as string;
   if (!pagePath) return res.status(400).json({ error: 'path query param required' });
@@ -1089,7 +1098,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
 });
 
 // --- Per-Page SEO Copy Generator ---
-router.post('/api/webflow/seo-copy', async (req, res) => {
+router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { pagePath, pageTitle, currentSeoTitle, currentDescription, currentH1, pageContent, workspaceId } = req.body;
   if (!pagePath || !workspaceId) return res.status(400).json({ error: 'pagePath and workspaceId required' });
 

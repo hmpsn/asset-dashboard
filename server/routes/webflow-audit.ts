@@ -12,12 +12,12 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-audit');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- Asset Audit ---
-router.get('/api/webflow/audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/audit/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const [assets, usageMap] = await Promise.all([
@@ -145,7 +145,7 @@ router.get('/api/webflow/audit/:siteId', requireWorkspaceAccessFromQuery(), asyn
 });
 
 // --- Page Weight Dashboard ---
-router.get('/api/webflow/page-weight/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/page-weight/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const [assets, usageMap] = await Promise.all([
@@ -205,7 +205,7 @@ router.get('/api/webflow/page-weight/:siteId', requireWorkspaceAccessFromQuery()
 });
 
 // Load last saved page weight snapshot
-router.get('/api/webflow/page-weight-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/page-weight-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getPageWeight(req.params.siteId);
   res.json(snapshot);
 });

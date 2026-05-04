@@ -33,9 +33,10 @@ interface SiteDomainInfo {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
-export function LinkChecker({ siteId }: Props) {
+export function LinkChecker({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<LinkCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -47,18 +48,21 @@ export function LinkChecker({ siteId }: Props) {
   // Fetch available domains when site changes
   useEffect(() => {
     setDomains(null); setSelectedDomain('');
-    get<SiteDomainInfo>(`/api/webflow/link-check-domains/${siteId}`)
+    get<SiteDomainInfo>(`/api/webflow/link-check-domains/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`)
       .then(d => {
         setDomains(d);
         setSelectedDomain(d.defaultDomain || d.staging);
       })
       .catch((err) => { console.error('LinkChecker operation failed:', err); });
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const runCheck = () => {
     setLoading(true);
     setHasRun(true);
-    const domainParam = selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : '';
+    const params = new URLSearchParams();
+    if (selectedDomain) params.set('domain', selectedDomain);
+    if (workspaceId) params.set('workspaceId', workspaceId);
+    const domainParam = params.toString() ? `?${params.toString()}` : '';
     get<LinkCheckResult>(`/api/webflow/link-check/${siteId}${domainParam}`)
       .then(d => setData(d))
       .catch((err) => { console.error('LinkChecker operation failed:', err); })
@@ -69,11 +73,11 @@ export function LinkChecker({ siteId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setData(null); setHasRun(false);
-    getOptional<{ result?: LinkCheckResult }>(`/api/webflow/link-check-snapshot/${siteId}`)
+    getOptional<{ result?: LinkCheckResult }>(`/api/webflow/link-check-snapshot/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`)
       .then(snap => { if (!cancelled && snap?.result) { setData(snap.result); setHasRun(true); } })
       .catch((err) => { console.error('LinkChecker operation failed:', err); });
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const exportCsv = () => {
     if (!data) return;

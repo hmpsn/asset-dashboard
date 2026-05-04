@@ -64,8 +64,9 @@ export function useCmsEditor(siteId: string, workspaceId?: string) {
   return useQuery({
     queryKey: queryKeys.admin.cmsEditor(siteId, workspaceId),
     queryFn: async (): Promise<CmsEditorData> => {
+      const workspaceParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
       const [collectionsData, approvalBatchesData] = await Promise.all([
-        get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`).catch(() => []),
+        get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}${workspaceParam}`).catch(() => []),
         workspaceId ? getSafe<ApprovalBatch[]>(`/api/approvals/${workspaceId}`, []).catch(() => []) : []
       ]);
       
@@ -80,11 +81,11 @@ export function useCmsEditor(siteId: string, workspaceId?: string) {
   });
 }
 
-export function useCmsCollections(siteId: string) {
+export function useCmsCollections(siteId: string, workspaceId?: string) {
   return useQuery({
-    queryKey: queryKeys.admin.cmsCollections(siteId),
+    queryKey: queryKeys.admin.cmsCollections(siteId, workspaceId),
     queryFn: async (): Promise<CmsCollection[]> => {
-      const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`);
+      const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
       return data;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes

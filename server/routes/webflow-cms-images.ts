@@ -9,7 +9,7 @@ import { createLogger } from '../logger.js';
 import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '../../shared/types/cms-images.ts';
 import type * as WebflowClient from '../webflow-client.js';
 import { isProgrammingError } from '../errors.js';
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 
 const router = Router();
 const log = createLogger('webflow-cms-images');
@@ -69,7 +69,7 @@ async function fetchAssetMap(
  * - assets: per-asset CMS usage locations
  * - stats: totals for CMS images, missing alt text, and oversized images
  */
-router.get('/api/webflow/cms-images/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/cms-images/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { siteId } = req.params;
     const token = getTokenForSite(siteId) || undefined;

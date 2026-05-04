@@ -7,11 +7,11 @@ import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 
 /** All validation records for a site */
-export function useSchemaValidations(siteId: string | undefined) {
+export function useSchemaValidations(siteId: string | undefined, workspaceId?: string) {
   return useQuery<SchemaValidationRecord[]>({
-    queryKey: queryKeys.admin.schemaValidations(siteId ?? ''),
+    queryKey: queryKeys.admin.schemaValidations(siteId ?? '', workspaceId),
     queryFn: async () => {
-      const records = await schemaValidation.getAll(siteId!);
+      const records = await schemaValidation.getAll(siteId!, workspaceId);
       return Array.isArray(records) ? records : [];
     },
     enabled: !!siteId,
@@ -20,14 +20,14 @@ export function useSchemaValidations(siteId: string | undefined) {
 }
 
 /** Validate a single page's schema and invalidate the validations list */
-export function useValidateSchema(siteId: string | undefined) {
+export function useValidateSchema(siteId: string | undefined, workspaceId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { pageId: string; schema: Record<string, unknown> }) =>
-      schemaValidation.validate(siteId!, body),
+      schemaValidation.validate(siteId!, body, workspaceId),
     onSuccess: () => {
       if (siteId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaValidations(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaValidations(siteId, workspaceId) });
       }
     },
   });

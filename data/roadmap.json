@@ -337,8 +337,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 1",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Add a shared guard that proves a workspace owns the Webflow site before any token lookup or Webflow resource mutation. Patch Webflow assets/pages, CMS item update/publish, schema publish/retract, and organize routes. Include cross-workspace integration tests proving a scoped JWT cannot pair its own workspaceId with another workspace siteId/resource."
+          "status": "done",
+          "notes": "Added shared requireWorkspaceSiteAccess guard proving workspace -> Webflow site ownership before token lookup or resource mutation. Applied it to Webflow asset/page/publish routes, CMS collection item read/write/publish routes, organize/rename routes, schema site routes, Smart Name, SEO copy, and guarded Webflow job/content-publish surfaces. Threaded workspaceId through scoped admin callers and added cross-workspace JWT integration tests plus owned-site positive-path coverage for schema validation, Smart Name, and SEO copy.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-integration-test-db-isolation",

@@ -6,7 +6,7 @@ import { TabBar } from './ui';
 
 type PerfTab = 'weight' | 'speed';
 
-export function Performance({ siteId }: { siteId: string }) {
+export function Performance({ siteId, workspaceId }: { siteId: string; workspaceId?: string }) {
   const [tab, setTab] = useState<PerfTab>('weight');
 
   return (
@@ -19,8 +19,8 @@ export function Performance({ siteId }: { siteId: string }) {
         active={tab}
         onChange={id => setTab(id as PerfTab)}
       />
-      {tab === 'weight' && <PageWeight siteId={siteId} />}
-      {tab === 'speed' && <PageSpeedPanel siteId={siteId} />}
+      {tab === 'weight' && <PageWeight siteId={siteId} workspaceId={workspaceId} />}
+      {tab === 'speed' && <PageSpeedPanel siteId={siteId} workspaceId={workspaceId} />}
     </div>
   );
 }

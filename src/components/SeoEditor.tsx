@@ -352,6 +352,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     try {
       const data = await put<{ success?: boolean; error?: string }>(`/api/webflow/pages/${pageId}/seo`, {
         siteId,
+        workspaceId,
         seo: { title: edit.seoTitle, description: edit.seoDescription },
         openGraph: { title: edit.seoTitle, description: edit.seoDescription },
       });
@@ -507,7 +508,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const data = await post<{ success?: boolean }>(`/api/webflow/publish/${siteId}`);
+      const data = await post<{ success?: boolean }>(`/api/webflow/publish/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
       if (data.success) {
         setPublished(true);
         setTimeout(() => setPublished(false), 3000);
@@ -530,6 +531,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setBulkResults(null);
     try {
       const data = await post<{ results?: Array<{ applied: boolean }> }>(`/api/webflow/seo-bulk-fix/${siteId}`, {
+        workspaceId,
         field,
         pages: pagesNeedingFix.map(p => ({
           pageId: p.id,
@@ -540,7 +542,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
       const applied = data.results?.filter((r: { applied: boolean }) => r.applied).length || 0;
       setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
       setTimeout(() => setBulkResults(null), 5000);
     } catch (err) {
       console.error('SeoEditor operation failed:', err);
@@ -595,11 +597,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
       const data = await post<{ results: Array<{ pageId: string; newValue: string; applied: boolean }> }>(
         `/api/webflow/seo-pattern-apply/${siteId}`,
-        { pages: pagesPayload, field: bulkField, action: patternAction, text: patternText }
+        { workspaceId, pages: pagesPayload, field: bulkField, action: patternAction, text: patternText }
       );
       const applied = data.results?.filter(r => r.applied).length || 0;
       setBulkResults(`Pattern applied to ${applied}/${bulkPreview.length} pages.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
     } catch { setBulkResults('Pattern apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
   };
@@ -653,11 +655,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         const seoFields = bulkField === 'title'
           ? { seo: { title: item.newValue, description: edits[page.id]?.seoDescription || page.seo?.description || '' } }
           : { seo: { title: edits[page.id]?.seoTitle || page.seo?.title || '', description: item.newValue } };
-        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, ...seoFields, openGraph: seoFields.seo });
+        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, workspaceId, ...seoFields, openGraph: seoFields.seo });
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
       setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
     } catch { setBulkResults('Apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };
@@ -813,7 +815,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         )}
         <div className="flex-1" />
         <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) })}
+          onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) })}
           className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-accent-brand hover:bg-[var(--surface-3)] transition-colors"
           title="Refresh pages from Webflow"
         >
@@ -991,7 +993,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           suggestions={suggestionsData.suggestions}
           counts={suggestionsData.counts}
           onRefresh={() => refetchSuggestions()}
-          onApplied={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) })}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) })}
         />
       )}
 

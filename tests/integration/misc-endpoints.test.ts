@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
@@ -26,6 +26,8 @@ let testWsId = '';
 let otherWsId = '';
 let scopedUserId = '';
 let scopedUserToken = '';
+const ownedSiteId = 'site_guard_owned';
+const otherSiteId = 'site_guard_other';
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -33,6 +35,8 @@ beforeAll(async () => {
   testWsId = ws.id;
   const otherWs = createWorkspace('Misc Other Test Workspace');
   otherWsId = otherWs.id;
+  updateWorkspace(testWsId, { webflowSiteId: ownedSiteId, webflowToken: 'site-guard-owned-token' });
+  updateWorkspace(otherWsId, { webflowSiteId: otherSiteId, webflowToken: 'site-guard-other-token' });
   const scopedUser = await createUser(
     'misc-scoped-user@test.local',
     'ScopedPass1!',
@@ -219,8 +223,109 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     expect(res.status).toBe(403);
   });
 
+  it('rejects Webflow asset reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/assets/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow page SEO mutations when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/webflow/pages/page_guard_test/seo', {
+      method: 'PUT',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: otherSiteId, workspaceId: testWsId, seo: { title: 'Blocked' } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow organize routes when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/organize-preview/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects CMS item publish when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/webflow/collections/collection_guard_test/publish', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: otherSiteId, workspaceId: testWsId, itemIds: ['item_guard_test'] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects schema publish when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api(`/api/webflow/schema-publish/${otherSiteId}?workspaceId=${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageId: 'page_guard_test', schema: { '@context': 'https://schema.org', '@type': 'WebPage', name: 'Blocked' } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it('rejects CMS image scans when the workspace query is outside the JWT scope', async () => {
     const res = await api(`/api/webflow/cms-images/site_guard_test?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects alt text generation when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api(`/api/webflow/${testWsId}/generate-alt/asset_guard_test`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: 'https://example.com/image.jpg', siteId: otherSiteId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects background jobs when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/jobs', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'seo-audit', params: { workspaceId: testWsId, siteId: otherSiteId } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content publish settings reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/publish-collections/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows owned workspace-site pairs through the site guard before route validation', async () => {
+    const res = await api(`/api/webflow/schema-validations/${ownedSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+  });
+
+  it('allows smart-name for an owned site and then returns normal validation errors', async () => {
+    const res = await ctx.api('/api/smart-name', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: ownedSiteId, workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects smart-name when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/smart-name', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originalName: 'blocked.jpg', siteId: otherSiteId, workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows SEO copy generation for an owned workspace and then returns normal validation errors', async () => {
+    const res = await ctx.api('/api/webflow/seo-copy', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects SEO copy generation for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api('/api/webflow/seo-copy', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: otherWsId, pagePath: '/' }),
+    });
     expect(res.status).toBe(403);
   });
 

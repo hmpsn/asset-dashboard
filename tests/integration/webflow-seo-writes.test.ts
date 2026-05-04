@@ -180,10 +180,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
     // (env WEBFLOW_API_TOKEN is not set in test env)
     const orphanSiteId = 'orphan-site-no-token-xyz';
 
-    const { status, body } = await getJson(
-      baseUrl,
-      `/api/webflow/seo-audit/${orphanSiteId}?workspaceId=${ws.workspaceId}`,
-    );
+    const { status, body } = await getJson(baseUrl, `/api/webflow/seo-audit/${orphanSiteId}`);
 
     // FM-2: must return 500 with a descriptive message, NOT 200 with empty pages
     expect(status).toBe(500);

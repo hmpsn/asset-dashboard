@@ -85,7 +85,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const snapshot = await redirects.snapshot(siteId) as { result?: RedirectScanResult; createdAt?: string } | null;
+        const snapshot = await redirects.snapshot(siteId, workspaceId) as { result?: RedirectScanResult; createdAt?: string } | null;
         if (snapshot?.result) {
           setData(snapshot.result);
           setSnapshotDate(snapshot.createdAt ?? null);
@@ -105,14 +105,14 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         }
       } catch (err) { console.error('RedirectManager operation failed:', err); }
     })();
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const runScan = async () => {
     setLoading(true);
     setError(null);
     setRules([]);
     try {
-      const result = await redirects.scan(siteId) as RedirectScanResult & { error?: string };
+      const result = await redirects.scan(siteId, workspaceId) as RedirectScanResult & { error?: string };
       if (result.error) {
         setError(result.error);
       } else {

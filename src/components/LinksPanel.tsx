@@ -68,7 +68,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
       {activeTab === 'dead-links' && (
         <ErrorBoundary>
           <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
-            <LinkChecker siteId={siteId} />
+            <LinkChecker siteId={siteId} workspaceId={workspaceId} />
           </Suspense>
         </ErrorBoundary>
       )}

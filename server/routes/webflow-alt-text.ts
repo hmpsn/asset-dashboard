@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess } from '../auth.js';
 import { generateAltText } from '../alttext.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
@@ -35,7 +35,10 @@ const log = createLogger('webflow-alt-text');
 const router = Router();
 
 // --- AI Alt Text Generation for existing assets ---
-router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceAccess('workspaceId'), requireWorkspaceSiteAccess({
+  workspace: { source: 'params', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { imageUrl, siteId } = req.body;
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
@@ -135,7 +138,10 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
 });
 
 // --- Bulk AI Alt Text Generation (fetches context once) ---
-router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAccess('workspaceId'), requireWorkspaceSiteAccess({
+  workspace: { source: 'params', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { assets, siteId } = req.body as {
     assets: Array<{ assetId: string; imageUrl: string }>;
     siteId?: string;
@@ -356,7 +362,10 @@ async function repairCmsReferences(
 }
 
 // --- Image Compression ---
-router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAccess('workspaceId'), requireWorkspaceSiteAccess({
+  workspace: { source: 'params', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { imageUrl, siteId, altText, fileName, cmsUsages } = req.body as {
     imageUrl: string;
     siteId: string;
