@@ -294,7 +294,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywordsRef = useRef<HTMLDivElement>(null);
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
-  const keywordMapRef = useRef<HTMLDivElement>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -1603,7 +1602,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* ── PAGE KEYWORD MAP (advanced page detail) ── */}
-      <div ref={keywordMapRef}>
+      <div>
       <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
         {/* pr-check-disable-next-line -- Brand signature radius intentional */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
