@@ -33,4 +33,10 @@ describe('computeOpportunityScore', () => {
   it('caps at 100', () => {
     expect(computeOpportunityScore({ volume: 50000, difficulty: 5, impressions: 5000, trendDirection: 'rising' })).toBeLessThanOrEqual(100);
   });
+
+  it('returns a number when impressions alone is present (GSC without SEMRush data)', () => {
+    const score = computeOpportunityScore({ impressions: 500 });
+    expect(typeof score).toBe('number');
+    expect(score).toBeGreaterThan(0);
+  });
 });
