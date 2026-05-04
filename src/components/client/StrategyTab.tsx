@@ -908,6 +908,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   >
                     {/* Role indicator dot */}
                     <div
+                      aria-hidden="true"
                       className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${
                         row.role === 'content' ? 'bg-emerald-400' :
                         row.role === 'page' ? 'bg-blue-400' :
@@ -972,6 +973,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 >
                   {/* Opportunity strength accent */}
                   <div
+                    aria-hidden="true"
                     className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-400 rounded-l-[var(--radius-lg)]"
                     style={{ opacity: Math.max(0.2, Math.min(1, (row.opportunityScore ?? 0) / 100)) }}
                   />
