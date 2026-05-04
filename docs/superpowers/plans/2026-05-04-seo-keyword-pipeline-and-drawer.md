@@ -339,30 +339,18 @@ describe('POST /api/public/tracked-keywords/:workspaceId — background enrichme
 npx vitest run tests/integration/tracked-keywords-enrichment.test.ts --reporter=verbose
 ```
 
-- [ ] **Step 3: Add `'client_keyword_tracked'` to `ActivityType` in `server/activity-log.ts`**
+- [ ] **Step 3: Add provider import to public-content.ts**
 
-Open `server/activity-log.ts`. Find the `ActivityType` union (line ~18). Add the new value after `'client_keyword_feedback'`:
-
-```typescript
-// Before:
-| 'client_keyword_feedback'
-
-// After:
-| 'client_keyword_feedback'
-| 'client_keyword_tracked'
-```
-
-Do NOT add to `CLIENT_VISIBLE_TYPES` — this is an internal tracking event, not client-visible.
-
-- [ ] **Step 4: Add provider import to public-content.ts**
-
-At the top of `server/routes/public-content.ts`, add `getConfiguredProvider` after existing imports. `isProgrammingError` is already imported — do not add it again:
+At the top of `server/routes/public-content.ts`, add after the existing imports:
 
 ```typescript
 import { getConfiguredProvider } from '../seo-data-provider.js';
+import { isProgrammingError } from '../errors.js';
 ```
 
-- [ ] **Step 5: Make the POST handler async, add broadcast + activity + background enrichment**
+(Check if `isProgrammingError` is already imported — if so, skip that line.)
+
+- [ ] **Step 4: Make the POST handler async and add background enrichment**
 
 Replace the POST handler at lines 453–461 of `server/routes/public-content.ts`:
 
@@ -373,10 +361,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
-  const actor = getClientActor(req);
   const keywords = addTrackedKeyword(ws.id, keyword);
-  addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
   res.json({ keywords });
 
   // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
@@ -391,7 +376,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
 });
 ```
 
-- [ ] **Step 6: Typecheck**
+- [ ] **Step 5: Typecheck**
 
 ```bash
 npm run typecheck
@@ -399,7 +384,7 @@ npm run typecheck
 
 Expected: zero errors
 
-- [ ] **Step 7: Run the integration test**
+- [ ] **Step 6: Run the integration test**
 
 ```bash
 npx vitest run tests/integration/tracked-keywords-enrichment.test.ts --reporter=verbose
@@ -407,7 +392,7 @@ npx vitest run tests/integration/tracked-keywords-enrichment.test.ts --reporter=
 
 Expected: all tests pass
 
-- [ ] **Step 8: Run pr-check**
+- [ ] **Step 7: Run pr-check**
 
 ```bash
 npx tsx scripts/pr-check.ts
@@ -415,11 +400,11 @@ npx tsx scripts/pr-check.ts
 
 Expected: 0 errors
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add server/activity-log.ts server/routes/public-content.ts tests/integration/tracked-keywords-enrichment.test.ts
-git commit -m "feat(tracked-keywords): broadcast + activity + background DataForSEO enrichment on add"
+git add server/routes/public-content.ts tests/integration/tracked-keywords-enrichment.test.ts
+git commit -m "feat(tracked-keywords): background-enrich keyword via DataForSEO on add"
 ```
 
 ---
