@@ -50,4 +50,24 @@ describe('page-elements intelligence slice', () => {
     await expect(assemblePageElements('ws-1', '/about')).resolves.toBeUndefined();
     expect(getPageElementsMock).toHaveBeenCalledWith('ws-1', '/about');
   });
+
+  it('returns the persisted page element catalog when one exists', async () => {
+    const { assemblePageElements } = await import('../../server/intelligence/page-elements-slice.js');
+    const catalog = emptyCatalog();
+    getPageElementsMock.mockReturnValue({ pagePath: '/services', catalog });
+
+    await expect(assemblePageElements('ws-1', '/services')).resolves.toEqual({
+      pagePath: '/services',
+      catalog,
+    });
+  });
+
+  it('gracefully degrades when the page element store throws', async () => {
+    const { assemblePageElements } = await import('../../server/intelligence/page-elements-slice.js');
+    getPageElementsMock.mockImplementation(() => {
+      throw new Error('store unavailable');
+    });
+
+    await expect(assemblePageElements('ws-1', '/about')).resolves.toBeUndefined();
+  });
 });

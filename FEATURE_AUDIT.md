@@ -3371,7 +3371,7 @@ When the user asks to update this document with recent features, follow this pro
 
 **329 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **310**. Last updated: April 2026.
+Current feature count: **329**. Last updated: May 2026.
 
 ---
 

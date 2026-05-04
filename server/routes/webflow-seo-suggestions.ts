@@ -90,7 +90,8 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
     }
   }
 
-  // Mark applied suggestions
+  // Mark by result index, not pageId: title + description suggestions can share
+  // the same pageId, and each applied result must map back to its own row.
   const appliedIds = results
     .map((result, index) => result.applied ? toApply[index]?.id : undefined)
     .filter(Boolean) as string[];
