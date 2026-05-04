@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Send, MessageSquare, X, Lock, Loader2, Plus,
@@ -76,13 +76,17 @@ export function ClientChatWidget({
   // Bubble up the API surface whenever key values change
   const onApiChangeRef = useRef(onApiChange);
   onApiChangeRef.current = onApiChange;
+  const askAiRef = useRef(askAi);
+  askAiRef.current = askAi;
+  const openChat = useCallback(() => setChatOpen(true), [setChatOpen]);
+  const api = useMemo<ClientChatWidgetApi>(() => ({
+    openChat,
+    askAi: (question) => askAiRef.current(question),
+  }), [openChat]);
 
   useEffect(() => {
-    onApiChangeRef.current?.({
-      openChat: () => setChatOpen(true),
-      askAi,
-    });
-  }, [askAi, setChatOpen]);
+    onApiChangeRef.current?.(api);
+  }, [api]);
 
   // Bubble up expanded state for FeedbackWidget
   const onExpandedChangeRef = useRef(onExpandedChange);

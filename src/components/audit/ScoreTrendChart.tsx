@@ -41,13 +41,13 @@ export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
               <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
               <div className="px-3 py-1.5">
-                <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: sc }} />Score</span><span className="text-[var(--brand-text-bright)] font-medium">{s}/100</span></div>
+                <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: sc }} />Score</span><span className="text-[var(--brand-text-bright)] font-medium">{s}/100</span></div>
               </div>
             </div>
           );
         }} />
         {/* chart-hex-ok — #2ed9c3 is a bespoke teal for audit score trend line */}
-        <Area type="monotone" dataKey="score" stroke="#2ed9c3" strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3.5, fill: chartDotFill(), stroke: '#2ed9c3', strokeWidth: 2 }} activeDot={{ r: 4, fill: '#2ed9c3', stroke: chartDotStroke(), strokeWidth: 2 }} />
+        <Area type="monotone" dataKey="score" stroke="#2ed9c3" strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3.5, fill: chartDotFill(), stroke: '#2ed9c3', strokeWidth: 2 }} activeDot={{ r: 4, fill: '#2ed9c3', stroke: chartDotStroke(), strokeWidth: 2 }} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );

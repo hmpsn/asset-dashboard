@@ -90,8 +90,8 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
               </div>
             );
           }} />
-          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} /> {/* chart-hex-ok — cyan-400 for impressions axis contrast */}
-          <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={2} dot={false} />
+          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} isAnimationActive={false} /> {/* chart-hex-ok — cyan-400 for impressions axis contrast */}
+          <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
       <div className="flex justify-between t-micro text-[var(--brand-text-dim)] mt-1">

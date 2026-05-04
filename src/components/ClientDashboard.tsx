@@ -139,8 +139,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
   // ── UI-only state ──
   const clientNavigate = useNavigate();
+  const initialTabId = initialTab?.split('/')[0];
   const tab: ClientTab = (() => {
-    const t = initialTab;
+    const t = initialTabId;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
     if (t === 'brand') return brandTabEnabled ? 'brand' as ClientTab : 'overview';
     if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
@@ -581,7 +582,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}
         {tab === 'performance' && (
-          <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} />
+          <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
         )}
 
         {/* ════════════ SITE HEALTH TAB ════════════ */}

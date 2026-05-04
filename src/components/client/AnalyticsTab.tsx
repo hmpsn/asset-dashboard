@@ -7,7 +7,7 @@ import { StatCard, EmptyState, Icon } from '../ui';
 import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
-  XAxis, YAxis, Tooltip, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip,
 } from 'recharts';
 import SearchableSelect from '../SearchableSelect';
 import { OrganicInsight } from './DataSnapshots';
@@ -203,9 +203,9 @@ export function AnalyticsTab({
                   </div>
                 );
               }} />
-              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(45,212,191,0.3)" strokeWidth={1.5} fill="none" dot={false} />
-              <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} />
-              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(45,212,191,0.3)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
+              <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
+              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
@@ -222,15 +222,27 @@ export function AnalyticsTab({
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
                 const PIE_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber]; // chart-hex-ok — #14b8a6 is teal-500 for pie anchor
+                let cursor = 0;
+                const stops = ga4Devices.map((d, i) => {
+                  const start = cursor;
+                  const end = Math.min(100, cursor + d.percentage);
+                  cursor = end;
+                  return `${PIE_COLORS[i % PIE_COLORS.length]} ${start}% ${end}%`;
+                });
+                if (cursor < 100 && stops.length > 0) {
+                  stops[stops.length - 1] = stops[stops.length - 1].replace(/\d+(?:\.\d+)?%$/, '100%');
+                }
+                const gradient = stops.join(', ');
                 return (
                   <>
-                    <ResponsiveContainer width={128} height={128}>
-                      <PieChart>
-                        <Pie data={ga4Devices} dataKey="sessions" cx="50%" cy="50%" outerRadius={60} strokeWidth={0}>
-                          {ga4Devices.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} opacity={0.85} />)}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div
+                      role="img"
+                      aria-label={`Device sessions: ${ga4Devices.map(d => `${d.device} ${d.percentage}%`).join(', ')}`}
+                      className="w-32 h-32 rounded-[var(--radius-pill)] p-4"
+                      style={{ background: `conic-gradient(${gradient})` }}
+                    >
+                      <div className="w-full h-full rounded-[var(--radius-pill)] bg-[var(--surface-2)]" />
+                    </div>
                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                       {ga4Devices.map((d, i) => (
                         <span key={i} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
@@ -426,7 +438,7 @@ export function AnalyticsTab({
                       </div>
                     );
                   }} />
-                  <Area type="monotone" dataKey="eventCount" stroke={CHART_SERIES_COLORS.teal} strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: CHART_SERIES_COLORS.teal, opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+                  <Area type="monotone" dataKey="eventCount" stroke={CHART_SERIES_COLORS.teal} strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: CHART_SERIES_COLORS.teal, opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
                 </AreaChart>
               </ResponsiveContainer>
               <div className="flex items-center justify-between mt-2 t-caption-sm text-[var(--brand-text-muted)]">
