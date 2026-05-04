@@ -23,6 +23,17 @@ export type Page =
   | 'diagnostics';
 
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
+export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
+
+export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, ClientInboxAlias> = {
+  approvals: 'approvals',
+  requests: 'requests',
+  content: 'content',
+};
+
+export function isClientInboxAlias(tab: string | undefined): tab is ClientInboxAlias {
+  return !!tab && Object.prototype.hasOwnProperty.call(CLIENT_INBOX_ALIASES, tab);
+}
 
 /** Global tabs that don't belong to a specific workspace */
 export const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']);
@@ -38,5 +49,6 @@ export function adminPath(workspaceId: string, tab: Page = 'home'): string {
 export function clientPath(workspaceId: string, tab?: string, betaMode?: boolean): string {
   const prefix = betaMode ? '/client/beta' : '/client';
   if (!tab || tab === 'overview') return `${prefix}/${workspaceId}`;
+  if (isClientInboxAlias(tab)) return `${prefix}/${workspaceId}/inbox?tab=${CLIENT_INBOX_ALIASES[tab]}`;
   return `${prefix}/${workspaceId}/${tab}`;
 }
