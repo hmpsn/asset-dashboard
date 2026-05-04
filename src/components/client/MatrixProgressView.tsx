@@ -21,6 +21,7 @@ const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof
   keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-accent-info',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-accent-warning',  badgeColor: 'amber' },
   review:            { label: 'Your Review',   icon: Eye,          color: 'text-accent-info',   badgeColor: 'blue' },
+  flagged:           { label: 'Feedback Sent', icon: Flag,         color: 'text-accent-warning', badgeColor: 'amber' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-accent-brand',   badgeColor: 'teal' },
   draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-orange', badgeColor: 'orange' },
   published:         { label: 'Published',      icon: CheckCircle2, color: 'text-accent-success',  badgeColor: 'emerald' },

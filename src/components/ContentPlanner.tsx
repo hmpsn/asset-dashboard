@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
 import { SectionCard, Badge, EmptyState, PageHeader, Icon } from './ui';
 import { TemplateEditor, MatrixBuilder, MatrixGrid } from './matrix';
 import { contentTemplates, contentMatrices } from '../api/content';
+import { queryKeys } from '../lib/queryKeys';
 import type { ContentTemplate, ContentMatrix, MatrixCell } from './matrix';
 
 type View =
@@ -16,29 +18,33 @@ interface ContentPlannerProps {
 }
 
 export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
+  const queryClient = useQueryClient();
   const [view, setView] = useState<View>({ mode: 'list' });
-  const [templates, setTemplates] = useState<ContentTemplate[]>([]);
-  const [matrices, setMatrices] = useState<ContentMatrix[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [tpls, mtxs] = await Promise.all([
-        contentTemplates.list(workspaceId),
-        contentMatrices.list(workspaceId),
-      ]);
-      setTemplates(tpls);
-      setMatrices(mtxs);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load content planner data');
-    }
-    setLoading(false);
-  }, [workspaceId]);
+  const templatesQuery = useQuery({
+    queryKey: queryKeys.admin.contentTemplates(workspaceId),
+    queryFn: () => contentTemplates.list(workspaceId),
+    enabled: !!workspaceId,
+  });
 
-  useEffect(() => { loadData(); }, [workspaceId, loadData]);
+  const matricesQuery = useQuery({
+    queryKey: queryKeys.admin.contentMatrices(workspaceId),
+    queryFn: () => contentMatrices.list(workspaceId),
+    enabled: !!workspaceId,
+  });
+
+  const templates = templatesQuery.data ?? [];
+  const matrices = matricesQuery.data ?? [];
+  const loading = templatesQuery.isLoading || matricesQuery.isLoading;
+  const queryError = templatesQuery.error || matricesQuery.error;
+  const loadData = useCallback(async () => {
+    setError(null);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentTemplates(workspaceId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) }),
+    ]);
+  }, [queryClient, workspaceId]);
 
   // ── Template callbacks ──
 
@@ -91,24 +97,26 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       try {
         setError(null);
         await contentMatrices.sendSamples(workspaceId, view.matrixId, cellIds);
-        const updated = await contentMatrices.getById(workspaceId, view.matrixId);
-        setMatrices(prev => prev.map(m => m.id === view.matrixId ? updated : m));
+        await queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to send selected pages for review');
       }
     }
     // Other bulk actions will be wired to specific endpoints as they're implemented
-  }, [workspaceId, view]);
+  }, [workspaceId, view, queryClient]);
 
   const handleCellUpdate = useCallback(async (cellId: string, updates: Partial<MatrixCell>) => {
     if (view.mode !== 'matrix-grid') return;
     try {
       const updated = await contentMatrices.updateCell(workspaceId, view.matrixId, cellId, updates);
-      setMatrices(prev => prev.map(m => m.id === view.matrixId ? updated : m));
+      queryClient.setQueryData<ContentMatrix[]>(
+        queryKeys.admin.contentMatrices(workspaceId),
+        prev => (prev ?? []).map(m => m.id === view.matrixId ? updated : m),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update cell');
     }
-  }, [workspaceId, view]);
+  }, [workspaceId, view, queryClient]);
 
   // ── Render sub-views ──
 
@@ -173,12 +181,12 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     );
   }
 
-  if (error && !templates.length && !matrices.length) {
+  if ((error || queryError) && !templates.length && !matrices.length) {
     return (
       <EmptyState
         icon={AlertTriangle}
         title="Failed to load planner"
-        description={error}
+        description={error || (queryError instanceof Error ? queryError.message : 'Failed to load content planner data')}
         action={<button onClick={loadData} className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Retry</button>}
       />
     );

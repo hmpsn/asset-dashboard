@@ -196,6 +196,54 @@ describe('assemblePageProfile', () => {
     expect(result.pageProfile!.cwvStatus).toBe('good');
   });
 
+  it('does not let nested leaf slugs overmatch top-level audit/CWV page data', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    const reports = await import('../server/reports.js');
+    const performanceStore = await import('../server/performance-store.js');
+
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      webflowSiteId: 'site-1',
+      personas: [],
+    } as ReturnType<typeof workspaces.getWorkspace>);
+    vi.mocked(reports.getLatestSnapshot).mockReturnValueOnce({
+      audit: {
+        pages: [
+          {
+            pageId: 'page-services-seo',
+            slug: 'seo',
+            url: 'https://example.com/services/seo',
+            issues: [{ message: 'Nested page audit issue' }],
+          },
+          {
+            pageId: 'page-root-seo',
+            slug: 'seo',
+            url: 'https://example.com/seo?utm=1',
+            issues: [{ message: 'Root page audit issue' }],
+          },
+        ],
+      },
+    } as ReturnType<typeof reports.getLatestSnapshot>);
+    vi.mocked(performanceStore.getPageSpeed).mockReturnValueOnce({
+      result: {
+        pages: [
+          { slug: 'seo', url: 'https://example.com/services/seo', score: 94 },
+          { slug: 'seo', url: 'https://example.com/seo#top', score: 45 },
+        ],
+      },
+    } as ReturnType<typeof performanceStore.getPageSpeed>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/seo',
+    });
+
+    expect(result.pageProfile!.auditIssues).toContain('Root page audit issue');
+    expect(result.pageProfile!.auditIssues).not.toContain('Nested page audit issue');
+    expect(result.pageProfile!.cwvStatus).toBe('poor');
+  });
+
   it('matches schema validation status through snapshot URL/path identity for nested pages', async () => {
     const workspaces = await import('../server/workspaces.js');
     const schemaStore = await import('../server/schema-store.js');
@@ -232,6 +280,54 @@ describe('assemblePageProfile', () => {
     });
 
     expect(result.pageProfile!.schemaStatus).toBe('warnings');
+  });
+
+  it('does not let nested leaf slugs overmatch top-level schema status', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    const schemaStore = await import('../server/schema-store.js');
+    const schemaValidator = await import('../server/schema-validator.js');
+
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      webflowSiteId: 'site-1',
+      personas: [],
+    } as ReturnType<typeof workspaces.getWorkspace>);
+    vi.mocked(schemaStore.getSchemaSnapshot).mockReturnValueOnce({
+      siteId: 'site-1',
+      workspaceId: 'ws-1',
+      generatedAt: new Date().toISOString(),
+      results: [
+        {
+          pageId: 'page-services-seo',
+          pageTitle: 'SEO Services',
+          slug: 'seo',
+          url: 'https://example.com/services/seo',
+          existingSchemas: [],
+          suggestedSchemas: [],
+        },
+        {
+          pageId: 'page-root-seo',
+          pageTitle: 'SEO Root',
+          slug: 'seo',
+          url: 'https://example.com/seo?utm=1',
+          existingSchemas: [],
+          suggestedSchemas: [],
+        },
+      ],
+    } as ReturnType<typeof schemaStore.getSchemaSnapshot>);
+    vi.mocked(schemaValidator.getValidations).mockReturnValueOnce([
+      { pageId: 'page-services-seo', status: 'valid' },
+      { pageId: 'page-root-seo', status: 'errors' },
+    ] as ReturnType<typeof schemaValidator.getValidations>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/seo',
+    });
+
+    expect(result.pageProfile!.schemaStatus).toBe('errors');
+    expect(result.pageProfile!.schemaStatus).not.toBe('valid');
   });
 
   it('has all required shape fields', async () => {

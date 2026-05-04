@@ -42,7 +42,7 @@ const EMPTY_CHECKLIST: ReviewChecklistState = {
 };
 
 export interface ReviewChecklistProps {
-  postStatus: 'generating' | 'draft' | 'review' | 'approved';
+  postStatus: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   reviewChecklist: ReviewChecklistState | undefined;
   showChecklist: boolean;
   onToggleShowChecklist: () => void;

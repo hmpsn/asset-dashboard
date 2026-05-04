@@ -54,7 +54,7 @@ export interface MatrixDimension {
   values: string[];
 }
 
-export type MatrixCellStatus = 'planned' | 'keyword_validated' | 'brief_generated' | 'review' | 'approved' | 'draft' | 'published';
+export type MatrixCellStatus = 'planned' | 'keyword_validated' | 'brief_generated' | 'review' | 'flagged' | 'approved' | 'draft' | 'published';
 
 export interface StatusHistoryEntry {
   from: MatrixCellStatus;

@@ -138,6 +138,11 @@ describe('toAuditFindingPageId', () => {
       .toBe('/blog/my-post');
   });
 
+  it('prefers URL pathname over leaf slug for nested Webflow pages', () => {
+    expect(toAuditFindingPageId({ slug: 'seo', url: 'https://example.com/services/seo?utm=1#faq', pageId: 'uuid-abc' }))
+      .toBe('/services/seo');
+  });
+
   it('strips leading slash from slug to avoid // (defensive)', () => {
     expect(toAuditFindingPageId({ slug: '/about', url: 'https://example.com/about', pageId: 'uuid-abc' }))
       .toBe('/about');

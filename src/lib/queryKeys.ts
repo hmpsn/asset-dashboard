@@ -43,6 +43,8 @@ export const queryKeys = {
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,
     contentPipeline: (wsId: string) => ['content-pipeline', wsId] as const,
+    contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
+    contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
 
     // SEO / Audit

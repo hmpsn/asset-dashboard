@@ -326,83 +326,6 @@
       ]
     },
     {
-      "id": "sprint-deep-bug-remediation",
-      "name": "Deep Bug Remediation",
-      "hours": "24-40",
-      "rationale": "Follow-up queue from docs/superpowers/audits/2026-05-04-deep-bug-audit.md. Focuses on systemic correctness issues found after PR #440: workspace/resource scoping, test isolation, path identity joins, client contract drift, content invalidation, and AI provenance.",
-      "items": [
-        {
-          "id": "deep-audit-webflow-site-ownership-guard",
-          "title": "Security scoping PR 1 - Webflow/site ownership guard",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 1",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Added shared requireWorkspaceSiteAccess guard proving workspace -> Webflow site ownership before token lookup or resource mutation. Applied it to Webflow asset/page/publish routes, CMS collection item read/write/publish routes, organize/rename routes, schema site routes, Smart Name, SEO copy, and guarded Webflow job/content-publish surfaces. Threaded workspaceId through scoped admin callers and added cross-workspace JWT integration tests plus owned-site positive-path coverage for schema validation, Smart Name, and SEO copy.",
-          "shippedAt": "2026-05-04"
-        },
-        {
-          "id": "deep-audit-integration-test-db-isolation",
-          "title": "Test isolation - per-suite DB plus ROI page_keywords read path",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 2, 3, 16, 19",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Added per-worker isolated Vitest DATA_DIR setup before DB singleton import, made spawned integration servers inherit the worker DATA_DIR, shared awaited child-process shutdown across raw-spawn suites, and extended the port uniqueness meta-test to raw server PORT constants. ROI now reads normalized page_keywords rows as source of truth with legacy pageMap fallback, covered by a public ROI integration test that strips legacy pageMap.",
-          "shippedAt": "2026-05-04"
-        },
-        {
-          "id": "deep-audit-global-route-workspace-scoping",
-          "title": "Security scoping PR 2 - Google, reports, global lists, settings, billing, uploads",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 4-8",
-          "est": "5-8h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Hardened Google/GSC/GA admin data routes with workspace-site and GSC-property ownership checks, made global Google/settings writes require HMAC admin auth, filtered workspace list and overview responses for scoped JWT users, guarded audit report/snapshot/action routes by owning workspace, required workspace access before uploads, and added authenticated-actor-only billing management for passwordless portals. Added targeted scoped-JWT and passwordless-route regression tests across Google, reports, settings, billing, uploads, and workspace list/overview.",
-          "shippedAt": "2026-05-04"
-        },
-        {
-          "id": "deep-audit-page-identity-joins",
-          "title": "Page identity joins - normalize remaining page/profile/chat/recommendation lookups",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 9",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Replaced remaining fuzzy/raw page identity joins with exact shared identity helpers across admin chat pageMap lookup, workspace intelligence SEO-context/insights/page-profile joins, audit/CWV/schema/link/SEO edit/content-decay matching, and frontend recommendation filtering. Added frontend/server helper parity tests plus regression coverage for homepage identities, full URLs with query/hash, nested pages, and sibling leaf paths like /seo vs /services/seo.",
-          "shippedAt": "2026-05-04"
-        },
-        {
-          "id": "deep-audit-client-api-contract-drift",
-          "title": "Client API contract drift - trials, strategy enrichment, delivery links, priorities",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 10, 13-15",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Added contract/integration tests for each producer-consumer pair.",
-          "shippedAt": "2026-05-04"
-        },
-        {
-          "id": "deep-audit-content-data-flow-invalidation",
-          "title": "Content data flow - broadcasts, activity, and derived cache invalidation",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 12",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Introduce a coherent content-planning/content-updated event strategy for content-plan review, matrices, templates, briefs, post revert/delete, and publish flows. Invalidate admin content pipeline/calendar, client content plan, workspace home, intelligence, and ROI where applicable. Add activity entries for user-visible lifecycle actions and tests for broadcast-handler pairs."
-        },
-        {
-          "id": "deep-audit-ai-provenance-contracts",
-          "title": "AI provenance contracts - factual checklist, AEO citations, response parsing",
-          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 11, 17, 18",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Shipped 2026-05-04: provenance-sensitive post review checklist items are never auto-checked from AI-only review and are marked human-review required; AEO citation recommendations now require verified source evidence or carry a research-needed flag and are omitted from client handoff until verified; AEO effort values are normalized/validated to exact enum literals; rewrite-chat responses use BEGIN_REWRITE/END_REWRITE delimiters and editor apply/copy paths consume only the rewrite body. Added route, component, and unit coverage for the contracts.",
-          "shippedAt": "2026-05-04"
-        }
-      ]
-    },
-    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",
@@ -1108,6 +1031,85 @@
           "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
+    },
+    {
+      "id": "sprint-deep-bug-remediation",
+      "name": "✅ SHIPPED — Deep Bug Remediation",
+      "hours": "24-40",
+      "rationale": "Follow-up queue from docs/superpowers/audits/2026-05-04-deep-bug-audit.md. Focuses on systemic correctness issues found after PR #440: workspace/resource scoping, test isolation, path identity joins, client contract drift, content invalidation, and AI provenance.",
+      "items": [
+        {
+          "id": "deep-audit-webflow-site-ownership-guard",
+          "title": "Security scoping PR 1 - Webflow/site ownership guard",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 1",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Added shared requireWorkspaceSiteAccess guard proving workspace -> Webflow site ownership before token lookup or resource mutation. Applied it to Webflow asset/page/publish routes, CMS collection item read/write/publish routes, organize/rename routes, schema site routes, Smart Name, SEO copy, and guarded Webflow job/content-publish surfaces. Threaded workspaceId through scoped admin callers and added cross-workspace JWT integration tests plus owned-site positive-path coverage for schema validation, Smart Name, and SEO copy.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-integration-test-db-isolation",
+          "title": "Test isolation - per-suite DB plus ROI page_keywords read path",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 2, 3, 16, 19",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Added per-worker isolated Vitest DATA_DIR setup before DB singleton import, made spawned integration servers inherit the worker DATA_DIR, shared awaited child-process shutdown across raw-spawn suites, and extended the port uniqueness meta-test to raw server PORT constants. ROI now reads normalized page_keywords rows as source of truth with legacy pageMap fallback, covered by a public ROI integration test that strips legacy pageMap.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-global-route-workspace-scoping",
+          "title": "Security scoping PR 2 - Google, reports, global lists, settings, billing, uploads",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 4-8",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Hardened Google/GSC/GA admin data routes with workspace-site and GSC-property ownership checks, made global Google/settings writes require HMAC admin auth, filtered workspace list and overview responses for scoped JWT users, guarded audit report/snapshot/action routes by owning workspace, required workspace access before uploads, and added authenticated-actor-only billing management for passwordless portals. Added targeted scoped-JWT and passwordless-route regression tests across Google, reports, settings, billing, uploads, and workspace list/overview.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-page-identity-joins",
+          "title": "Page identity joins - normalize remaining page/profile/chat/recommendation lookups",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 9",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Replaced remaining fuzzy/raw page identity joins with exact shared identity helpers across admin chat pageMap lookup, workspace intelligence SEO-context/insights/page-profile joins, audit/CWV/schema/link/SEO edit/content-decay matching, and frontend recommendation filtering. Added frontend/server helper parity tests plus regression coverage for homepage identities, full URLs with query/hash, nested pages, and sibling leaf paths like /seo vs /services/seo.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-client-api-contract-drift",
+          "title": "Client API contract drift - trials, strategy enrichment, delivery links, priorities",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 10, 13-15",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Added contract/integration tests for each producer-consumer pair.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-content-data-flow-invalidation",
+          "title": "Content data flow - broadcasts, activity, and derived cache invalidation",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 12",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-04: added a centralized content:updated workspace event for content-planning/content-pipeline mutations and wired it through the shared WS invalidation bus. Content templates, matrices, content-plan review actions, briefs, post generation/regeneration/revert/delete, and publish-related handlers now refresh admin pipeline/calendar/home/intelligence/ROI plus client content plan/content request caches. Added user-visible activity entries for template/matrix/brief/post lifecycle actions, fixed read-before-delete for brief/post/template/matrix deletes, made client-flagged content-plan cells a real shared status, and added route coverage proving flagged cells stay visible and activity is recorded.",
+          "shippedAt": "2026-05-04"
+        },
+        {
+          "id": "deep-audit-ai-provenance-contracts",
+          "title": "AI provenance contracts - factual checklist, AEO citations, response parsing",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 11, 17, 18",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped 2026-05-04: provenance-sensitive post review checklist items are never auto-checked from AI-only review and are marked human-review required; AEO citation recommendations now require verified source evidence or carry a research-needed flag and are omitted from client handoff until verified; AEO effort values are normalized/validated to exact enum literals; rewrite-chat responses use BEGIN_REWRITE/END_REWRITE delimiters and editor apply/copy paths consume only the rewrite body. Added route, component, and unit coverage for the contracts.",
+          "shippedAt": "2026-05-04"
+        }
+      ],
+      "shippedAt": "2026-05-04"
     },
     {
       "id": "sprint-seo-tier2-capabilities",

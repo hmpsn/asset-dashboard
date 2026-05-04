@@ -4,7 +4,7 @@ import { EmptyState, MetricRing, Icon, PageHeader } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
-  Sparkles, X, Globe, Check,
+  Sparkles, X, Globe, Check, AlertTriangle,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
@@ -18,7 +18,7 @@ interface PostSummary {
   title: string;
   metaDescription: string;
   totalWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved';
+  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   publishedAt?: string;
   webflowItemId?: string;
   createdAt: string;
@@ -29,10 +29,11 @@ interface PostSummary {
 }
 
 type SortField = 'date' | 'title' | 'status' | 'words';
-type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved';
+type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved' | 'error';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string }> = {
   generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20' },
+  error: { icon: AlertTriangle, color: 'text-accent-danger', label: 'Failed', bg: 'bg-red-500/10 border-red-500/20' },
   draft: { icon: PenLine, color: 'text-accent-info', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20' },
   review: { icon: Eye, color: 'text-accent-cyan', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20' },
   approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20' },
@@ -107,7 +108,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
         case 'date': cmp = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
         case 'title': cmp = a.title.localeCompare(b.title); break;
         case 'status': {
-          const order = { generating: 0, draft: 1, review: 2, approved: 3 };
+          const order = { generating: 0, error: 1, draft: 2, review: 3, approved: 4 };
           cmp = (order[a.status] || 0) - (order[b.status] || 0);
           break;
         }
@@ -119,6 +120,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const statusCounts = {
     all: posts.length,
     generating: posts.filter(p => p.status === 'generating').length,
+    error: posts.filter(p => p.status === 'error').length,
     draft: posts.filter(p => p.status === 'draft').length,
     review: posts.filter(p => p.status === 'review').length,
     approved: posts.filter(p => p.status === 'approved').length,
@@ -163,8 +165,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       />
 
       {/* Header stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {(['draft', 'review', 'approved', 'generating'] as const).map(status => {
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {(['draft', 'review', 'approved', 'generating', 'error'] as const).map(status => {
           const cfg = STATUS_CONFIG[status];
           const StatusIcon = cfg.icon;
           return (

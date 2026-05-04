@@ -304,7 +304,7 @@ export function buildLlmsTxtIndex(input: IndexInput): string {
     const statusLabel: Record<string, string> = {
       planned: 'Planned', keyword_validated: 'Planned',
       brief_generated: 'Brief Ready', draft: 'In Draft',
-      review: 'In Review', approved: 'Approved',
+      review: 'In Review', flagged: 'Needs Review', approved: 'Approved',
       client_review: 'Client Review', in_progress: 'In Progress',
     };
 

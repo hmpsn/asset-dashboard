@@ -7,6 +7,7 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { findPageMapEntryByIdentity } from './helpers.js';
 import type { PageSeoResult } from './audit-page.js';
 
 const log = createLogger('seo-audit-ai-recs');
@@ -92,7 +93,7 @@ export async function generateAiRecommendations(opts: AiRecsOpts): Promise<void>
           // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
           const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
           if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {
-            const kw = seoCtx.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePath.toLowerCase());
+            const kw = findPageMapEntryByIdentity(seoCtx.strategy.pageMap, pagePath);
             if (kw) seoCtx.pageKeywords = kw;
           }
           const pageProfileIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['pageProfile'] as const, pagePath });

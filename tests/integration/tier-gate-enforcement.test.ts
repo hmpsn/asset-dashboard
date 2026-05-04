@@ -322,6 +322,16 @@ describe('GET /api/public/intelligence/:workspaceId — tier-gated slices', () =
     expect('siteHealthSummary' in body).toBe(false);
   });
 
+  it('trial workspace: free base tier resolves to growth intelligence access', async () => {
+    const res = await api(`/api/public/intelligence/${trialWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workspaceId).toBe(trialWs.workspaceId);
+    expect(body.tier).toBe('growth');
+    expect('learningHighlights' in body).toBe(true);
+    expect('siteHealthSummary' in body).toBe(false);
+  });
+
   it('premium tier: returns all slices including siteHealthSummary', async () => {
     const res = await api(`/api/public/intelligence/${premiumWs.workspaceId}`);
     expect(res.status).toBe(200);

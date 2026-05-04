@@ -653,7 +653,7 @@ describe('Generated Post — invalid transitions blocked', () => {
   });
 
   /** Insert a fresh post at a given starting status. */
-  function seedPost(suffix: string, status: 'generating' | 'draft' | 'review' | 'approved'): string {
+  function seedPost(suffix: string, status: 'generating' | 'draft' | 'review' | 'approved' | 'error'): string {
     const postId = `post-inv-${suffix}-${Date.now()}`;
     const now = new Date().toISOString();
     db.prepare(`
@@ -678,6 +678,18 @@ describe('Generated Post — invalid transitions blocked', () => {
     expect(() =>
       updatePostField(workspaceId, postId, { status: 'review' }),
     ).toThrow(InvalidTransitionError);
+  });
+
+  it('transitions generating → error', () => {
+    const postId = seedPost('gen-to-error', 'generating');
+    const updated = updatePostField(workspaceId, postId, { status: 'error' });
+    expect(updated!.status).toBe('error');
+  });
+
+  it('transitions error → draft for recovery', () => {
+    const postId = seedPost('error-to-draft', 'error');
+    const updated = updatePostField(workspaceId, postId, { status: 'draft' });
+    expect(updated!.status).toBe('draft');
   });
 
   it('blocks draft → approved (must go through review)', () => {
@@ -740,7 +752,7 @@ describe('Generated Post — invalid transitions blocked', () => {
 
   it('listable posts in workspace all have valid statuses', () => {
     const posts = listPosts(workspaceId);
-    const validStatuses = new Set(['generating', 'draft', 'review', 'approved']);
+    const validStatuses = new Set(['generating', 'draft', 'review', 'approved', 'error']);
     expect(posts.length > 0 && posts.every(p => validStatuses.has(p.status))).toBe(true);
   });
 });

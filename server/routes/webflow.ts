@@ -28,6 +28,8 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow');
 
 import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { verifyAdminToken } from '../middleware.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { isProgrammingError } from '../errors.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 const router = Router();
@@ -38,7 +40,11 @@ router.get('/api/queue', (_req, res) => {
 });
 
 // Webflow sites
-router.get('/api/webflow/sites', async (req, res) => {
+router.get('/api/webflow/sites', requireAdminAuth, async (req, res) => {
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (req.user && !verifyAdminToken(adminToken)) {
+    return res.status(401).json({ error: 'Admin authentication required' });
+  }
   try {
     const tokenParam = req.query.token as string | undefined;
     const sites = await listSites(tokenParam || undefined);

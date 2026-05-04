@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
@@ -307,6 +307,22 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     expect(res.status).toBe(403);
   });
 
+  it('rejects workspace integration relinking by scoped users', async () => {
+    const res = await ctx.api(`/api/workspaces/${testWsId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webflowSiteId: otherSiteId, gscPropertyUrl: 'https://other.example.com/' }),
+    });
+    expect(res.status).toBe(403);
+    expect(getWorkspace(testWsId)?.webflowSiteId).toBe(ownedSiteId);
+    expect(getWorkspace(testWsId)?.gscPropertyUrl).toBe('https://owned.example.com/');
+  });
+
+  it('rejects global Webflow site listing for scoped JWT users', async () => {
+    const res = await api('/api/webflow/sites', { headers: scopedHeaders() });
+    expect(res.status).toBe(401);
+  });
+
   it('rejects Webflow page SEO mutations when a scoped user pairs their workspace with another site', async () => {
     const res = await ctx.api('/api/webflow/pages/page_guard_test/seo', {
       method: 'PUT',
@@ -370,6 +386,33 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
   it('allows owned workspace-site pairs through the site guard before route validation', async () => {
     const res = await api(`/api/webflow/schema-validations/${ownedSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
     expect(res.status).toBe(200);
+  });
+
+  it('rejects pending schema reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/pending-schemas/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects SEMRush workspace routes outside the JWT scope', async () => {
+    const headers = scopedHeaders();
+    const checks = await Promise.all([
+      api(`/api/semrush/competitive-intel/${otherWsId}?competitors=example.com`, { headers }),
+      api(`/api/semrush/discover-competitors/${otherWsId}`, { headers }),
+      ctx.api(`/api/semrush/competitors/${otherWsId}`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains: ['example.com'] }),
+      }),
+      ctx.api(`/api/semrush/cache/${otherWsId}`, { method: 'DELETE', headers }),
+      api(`/api/semrush/clear-cache/${otherWsId}`, { headers }),
+      api(`/api/semrush/diagnose/${otherWsId}`, { headers }),
+    ]);
+    expect(checks.map(res => res.status)).toEqual([403, 403, 403, 403, 403, 403]);
+  });
+
+  it('rejects backlink reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/backlinks/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
   });
 
   it('allows smart-name for an owned site and then returns normal validation errors', async () => {

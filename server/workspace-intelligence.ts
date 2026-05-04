@@ -2677,7 +2677,9 @@ async function assemblePageProfile(
     const snapshot = ws?.webflowSiteId ? getSchemaSnapshot(ws.webflowSiteId) : null;
     // Nested Webflow pages can share leaf slugs, so the URL branch is the authoritative
     // identity match when a page lives below a parent path.
-    const resolvedPageId = snapshot?.results.find(r => matchPageIdentity(r.slug, pagePath) || matchPageIdentity(r.url, pagePath))?.pageId
+    const resolvedPageId = snapshot?.results.find(r =>
+      r.url ? matchPageIdentity(r.url, pagePath) : matchPageIdentity(r.slug, pagePath)
+    )?.pageId
       ?? toCmsPageId(pagePath);
     const pageValidation = validations.find(v => v.pageId === resolvedPageId);
     if (pageValidation) {
@@ -2835,9 +2837,7 @@ async function assemblePageProfile(
         const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
         const pages = result.pages ?? [];
         const pageData = pages.find(p =>
-          (p.url ? matchPageIdentity(p.url, pagePath) : false)
-          // Bare slugs only identify top-level pages; nested pages rely on URL matching.
-          || (p.slug ? matchPageIdentity(p.slug, pagePath) : false)
+          p.url ? matchPageIdentity(p.url, pagePath) : !!p.slug && matchPageIdentity(p.slug, pagePath)
         );
         if (pageData?.score != null) {
           cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';

@@ -197,6 +197,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_UPDATED]: () => {
+      refetchClient('content', `/api/public/content-requests/${workspaceId}`);
+      refetchClient('content-plan', `/api/public/content-plan/${workspaceId}`);
+      refetchClient('intelligence', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'post:updated': () => refetchClient('post-preview', ''),

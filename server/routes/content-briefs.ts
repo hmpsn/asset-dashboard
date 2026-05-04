@@ -22,6 +22,7 @@ import {
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
@@ -37,6 +38,10 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('content-briefs');
+
+function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+}
 
 // --- Content Briefs ---
 // List all briefs for a workspace
@@ -74,6 +79,14 @@ router.get('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('
 router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const updated = updateBrief(req.params.workspaceId, req.params.briefId, req.body);
   if (!updated) return res.status(404).json({ error: 'Brief not found' });
+  addActivity(
+    req.params.workspaceId,
+    'content_updated',
+    `Updated content brief "${updated.suggestedTitle || updated.targetKeyword}"`,
+    undefined,
+    { briefId: updated.id, action: 'brief_updated' },
+  );
+  notifyContentUpdated(req.params.workspaceId, { briefId: updated.id, action: 'brief_updated' });
   res.json(updated);
 });
 
@@ -209,6 +222,14 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       log.warn({ err, keyword: targetKeyword }, 'Failed to record outcome action for brief creation');
     }
 
+    addActivity(
+      req.params.workspaceId,
+      'brief_generated',
+      `Generated content brief for "${brief.targetKeyword}"`,
+      brief.suggestedTitle,
+      { briefId: brief.id, action: 'brief_generated' },
+    );
+    notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, action: 'brief_generated' });
     res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
@@ -223,6 +244,18 @@ router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorks
     const existing = getBrief(req.params.workspaceId, req.params.briefId);
     if (!existing) return res.status(404).json({ error: 'Brief not found' });
     const newBrief = await regenerateBrief(req.params.workspaceId, existing, feedback);
+    addActivity(
+      req.params.workspaceId,
+      'brief_generated',
+      `Regenerated content brief for "${existing.targetKeyword}"`,
+      `New brief: ${newBrief.suggestedTitle}`,
+      { briefId: newBrief.id, previousBriefId: existing.id, action: 'brief_regenerated' },
+    );
+    notifyContentUpdated(req.params.workspaceId, {
+      briefId: newBrief.id,
+      previousBriefId: existing.id,
+      action: 'brief_regenerated',
+    });
     log.info(`REGENERATED brief ${req.params.briefId} -> ${newBrief.id} for "${existing.targetKeyword}"`);
     res.json(newBrief);
   } catch (err) {
@@ -236,6 +269,14 @@ router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requ
     const { feedback } = req.body || {};
     const result = await regenerateOutline(req.params.workspaceId, req.params.briefId, feedback);
     if (!result) return res.status(404).json({ error: 'Brief not found' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Regenerated outline for "${result.suggestedTitle || result.targetKeyword}"`,
+      undefined,
+      { briefId: result.id, action: 'brief_outline_regenerated' },
+    );
+    notifyContentUpdated(req.params.workspaceId, { briefId: result.id, action: 'brief_outline_regenerated' });
     log.info(`REGENERATED OUTLINE for brief ${req.params.briefId} in workspace ${req.params.workspaceId}`);
     res.json(result);
   } catch (err) {
@@ -281,6 +322,14 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
   });
 
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id });
+  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' });
+  addActivity(
+    req.params.workspaceId,
+    'brief_generated',
+    `Sent brief "${brief.suggestedTitle}" to client`,
+    `Keyword: ${brief.targetKeyword}`,
+    { briefId: brief.id, requestId: request.id, action: 'brief_sent_to_client' },
+  );
 
   // Send email notification
   if (ws?.clientEmail) {
@@ -302,7 +351,17 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
 
 // Delete a brief
 router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const existing = getBrief(req.params.workspaceId, req.params.briefId);
+  if (!existing) return res.status(404).json({ error: 'Brief not found' });
   deleteBrief(req.params.workspaceId, req.params.briefId);
+  addActivity(
+    req.params.workspaceId,
+    'content_updated',
+    `Deleted content brief "${existing.suggestedTitle || existing.targetKeyword}"`,
+    undefined,
+    { briefId: existing.id, action: 'brief_deleted' },
+  );
+  notifyContentUpdated(req.params.workspaceId, { briefId: existing.id, action: 'brief_deleted', deleted: true });
   res.json({ ok: true });
 });
 
