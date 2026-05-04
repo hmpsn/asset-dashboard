@@ -612,13 +612,15 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.info({ workspaceId, stripePaymentIntentId: intent.id }, 'payment_intent.succeeded replay ignored — payment already paid');
         return;
       }
-      if (payment) {
-        updatePayment(workspaceId, payment.id, {
-          status: 'paid',
-          stripePaymentIntentId: intent.id,
-          paidAt: new Date().toISOString(),
-        });
+      if (!payment) {
+        log.error({ workspaceId, stripePaymentIntentId: intent.id }, 'payment_intent.succeeded missing pending payment record — skipping fulfillment for manual reconciliation');
+        return;
       }
+      updatePayment(workspaceId, payment.id, {
+        status: 'paid',
+        stripePaymentIntentId: intent.id,
+        paidAt: new Date().toISOString(),
+      });
 
       const productType = intent.metadata?.productType || 'unknown';
       const contentRequestId = intent.metadata?.contentRequestId;

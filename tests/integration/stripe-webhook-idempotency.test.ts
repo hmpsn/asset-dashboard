@@ -329,6 +329,24 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
     expect(payment!.status).toBe('paid');
   });
 
+  it('payment_intent.succeeded without a pending payment skips side effects', async () => {
+    const event = createWebhookEvent('payment_intent.succeeded', {
+      id: 'pi_test_missing_payment',
+      metadata: {
+        workspaceId: ws.workspaceId,
+        productType: 'fix_meta',
+      },
+      amount: 25000,
+    });
+
+    await handleWebhookEvent(event as never);
+    await handleWebhookEvent(createDuplicateWebhookEvent(event) as never);
+
+    expect(countPayments(ws.workspaceId)).toBe(0);
+    expect(countActivities(ws.workspaceId, 'payment_received')).toBe(0);
+    expect(countWorkOrders(ws.workspaceId)).toBe(0);
+  });
+
   // ── subscription.deleted replayed ──
 
   it('subscription.deleted replayed — workspace stays at free (no crash)', async () => {
