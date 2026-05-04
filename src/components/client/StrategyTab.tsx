@@ -420,6 +420,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
 
+  // Gradient fade — ref and state; effect wired below after sortedConfirmed is defined
+  const kwListScrollRef = useRef<HTMLDivElement>(null);
+  const [kwListOverflows, setKwListOverflows] = useState(false);
+
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerPreviousFocusRef = useRef<HTMLElement | null>(null);
@@ -806,6 +810,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     (a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0)
   );
 
+  // Show gradient only when the list actually overflows the 420px cap
+  useEffect(() => {
+    const el = kwListScrollRef.current;
+    if (!el) return;
+    setKwListOverflows(el.scrollHeight > el.clientHeight);
+  }, [sortedConfirmed]);
+
   const priorityKeywordsPanel = (
     // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
@@ -880,7 +891,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             />
           ) : (
             <div className="relative">
-              <div className="max-h-[420px] overflow-y-auto flex flex-col gap-1">
+              <div ref={kwListScrollRef} className="max-h-[420px] overflow-y-auto flex flex-col gap-1">
               {sortedConfirmed.map(row => {
                 const isOpen = openKeywordDrawer === row.normalized;
                 const isRemoving = removingKeyword === row.normalized;
@@ -939,7 +950,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 );
               })}
               </div>
-              {sortedConfirmed.length > 8 && (
+              {kwListOverflows && (
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--surface-2)] to-transparent" />
               )}
             </div>
@@ -1937,7 +1948,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       </div>
                       <div className="flex items-center justify-between py-1.5 border-b border-[var(--brand-border)]/40">
                         <span className="t-caption text-[var(--brand-text-muted)]">Competition</span>
-                        <span className="t-caption font-medium text-[var(--brand-text)]">{kdFraming(drawerRow.difficulty) ?? 'Gathering…'}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)]">{kdFraming(drawerRow.difficulty ?? undefined) ?? 'Gathering…'}</span>
                       </div>
                       <div className="flex items-center justify-between py-1.5">
                         <span className="t-caption text-[var(--brand-text-muted)]">Momentum</span>
