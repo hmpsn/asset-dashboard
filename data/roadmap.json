@@ -540,14 +540,14 @@
         },
         {
           "id": "schema-entity-graph-workstream-c",
-          "title": "Schema Workstream C \u2014 Entity Graph Hub Dispatch",
+          "title": "Schema Workstream C — Entity Graph Hub Dispatch",
           "source": "claude/schema-v2-brainstorm branch",
           "est": "1d",
           "priority": "P0",
           "sprint": "J",
           "status": "done",
           "shippedAt": "2026-04-30",
-          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex → Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex → Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex → CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
         },
         {
           "id": "schema-semantic-extraction",
@@ -1662,6 +1662,15 @@
           "notes": "Shipped — Analytics Hub redesign. InsightCards prominent on Overview tab, queries/pages tables in Search Performance detail tab, annotations as timeline markers on chart + CRUD section. Replaced separate SearchConsole + GoogleAnalytics pages with unified AnalyticsHub.",
           "status": "done",
           "shippedAt": "2026-03"
+        },
+        {
+          "id": "strategy-keywords-rebuild",
+          "title": "Strategy Keywords — Two-zone flat list + keyword detail drawer",
+          "source": "UX_REBUILD May 2026",
+          "est": "4h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped — Replaced sortable 7-column table with accordion expand with a two-zone flat list (confirmed above, suggestions below) and a slide-in detail drawer. Suggestion rows use blue-tinted styling (bg-blue-950/60 border border-blue-900/50). Drawer shows metrics strip, AI rationale, signals chips, next move with CTA. Mobile renders as bottom sheet. Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD coloring: ≤29=emerald, 30–49=amber, ≥50=red. Trend coloring: rising=emerald-400, declining=red-400, stable=muted. No sort controls."
         }
       ],
       "shippedAt": "2026-03-19"
