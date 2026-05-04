@@ -379,6 +379,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     setAltError(null);
     const jobId = await startJob('bulk-compress', {
       siteId,
+      workspaceId,
       assets: toCompress.map(a => ({
         assetId: a.id,
         imageUrl: a.hostedUrl || a.url,
@@ -546,9 +547,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             <div className="text-sm text-teal-200">
               Generating alt text... {bulkProgress.done}/{bulkProgress.total}
             </div>
-            <div className="mt-1.5 h-1.5 bg-teal-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-teal-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
               />
             </div>
@@ -580,9 +581,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             <div className="text-sm text-cyan-200">
               Renaming assets... {bulkRenameProgress.done}/{bulkRenameProgress.total}
             </div>
-            <div className="mt-1.5 h-1.5 bg-cyan-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-cyan-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                className="h-full bg-cyan-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkRenameProgress.done / bulkRenameProgress.total) * 100}%` }}
               />
             </div>
@@ -599,9 +600,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
               Compressing assets... {bulkCompressProgress.done}/{bulkCompressProgress.total}
               {bulkCompressProgress.saved > 0 && <span className="text-orange-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>}
             </div>
-            <div className="mt-1.5 h-1.5 bg-orange-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-orange-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                className="h-full bg-orange-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkCompressProgress.done / bulkCompressProgress.total) * 100}%` }}
               />
             </div>

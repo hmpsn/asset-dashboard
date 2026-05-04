@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **106** — 85 error, 21 warn.
+Total rules: **107** — 85 error, 22 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -117,18 +117,19 @@ advisory but tracked.
 | 7 | TabBar component without ?tab= deep-link support | warn | custom | `src/components/` | `tab-deeplink-ok` | A ?tab= URL that the target component ignores is a silent navigation bug — the user sees the default tab instead of the requested one. |
 | 8 | Missing broadcastToWorkspace after DB write in route handler | warn | custom | `server/routes/` | `// broadcast-ok` | Route handlers that write to the DB without broadcasting leave connected clients with stale data until they manually refresh. |
 | 9 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
-| 10 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
-| 11 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
-| 12 | Hand-rolled gradient CTA button | warn | custom | `src/` | — | Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline. |
-| 13 | Arbitrary pixel text-size (use .t-* utility) | warn | pattern | `src/` | `// arbitrary-text-ok` | Inline pixel text-sizes drift line-height and font-family because Tailwind only sets the size — the matching leading and font-family come from the .t-* utility wrapper. |
-| 14 | Raw text-zinc-N (use --brand-text-* token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires every text color to flow through the --brand-text-* token system. Raw text-zinc-N is dark-only and produces invisible-on-light bugs. |
-| 15 | Raw bg-zinc-N (use --surface-* token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs. |
-| 16 | Raw border-zinc-N (use --brand-border token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode. |
-| 17 | Inline asymmetric border-radius (use --radius-signature token) | warn | pattern | `src/` | `// asymmetric-radius-ok` | Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep. |
-| 18 | Raw rounded-* literal (use --radius-* token) | warn | pattern | `src/` | `// rounded-literal-ok` | Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep. |
-| 19 | Trend icon import outside TrendBadge | warn | pattern | `src/` | `// trend-icon-ok` | Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites. |
-| 20 | Hand-rolled fixed inset-0 outside overlay | warn | pattern | `src/` | `// fixed-inset-ok` | Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these. |
-| 21 | Raw hex chart color in component (use CHART_SERIES_COLORS) | warn | pattern | `src/components/` | `chart-hex-ok` | Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place. |
+| 10 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
+| 11 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
+| 12 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
+| 13 | Hand-rolled gradient CTA button | warn | custom | `src/` | — | Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline. |
+| 14 | Arbitrary pixel text-size (use .t-* utility) | warn | pattern | `src/` | `// arbitrary-text-ok` | Inline pixel text-sizes drift line-height and font-family because Tailwind only sets the size — the matching leading and font-family come from the .t-* utility wrapper. |
+| 15 | Raw text-zinc-N (use --brand-text-* token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires every text color to flow through the --brand-text-* token system. Raw text-zinc-N is dark-only and produces invisible-on-light bugs. |
+| 16 | Raw bg-zinc-N (use --surface-* token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs. |
+| 17 | Raw border-zinc-N (use --brand-border token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode. |
+| 18 | Inline asymmetric border-radius (use --radius-signature token) | warn | pattern | `src/` | `// asymmetric-radius-ok` | Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep. |
+| 19 | Raw rounded-* literal (use --radius-* token) | warn | pattern | `src/` | `// rounded-literal-ok` | Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep. |
+| 20 | Trend icon import outside TrendBadge | warn | pattern | `src/` | `// trend-icon-ok` | Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites. |
+| 21 | Hand-rolled fixed inset-0 outside overlay | warn | pattern | `src/` | `// fixed-inset-ok` | Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these. |
+| 22 | Raw hex chart color in component (use CHART_SERIES_COLORS) | warn | pattern | `src/components/` | `chart-hex-ok` | Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place. |
 
 ---
 

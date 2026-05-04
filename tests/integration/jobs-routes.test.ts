@@ -104,6 +104,49 @@ describe('Jobs — scoped JWT workspace guards', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it('rejects clearing completed jobs for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/jobs/completed?workspaceId=${otherWsId}`, {
+      method: 'DELETE',
+      headers: scopedHeaders(),
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Jobs — completed clear scope', () => {
+  it('clears completed jobs for only the requested workspace', async () => {
+    clearCompletedJobs();
+    const workspaceJob = createJob('tenancy-regression', { workspaceId: testWsId, message: 'workspace done' });
+    const otherJob = createJob('tenancy-regression', { workspaceId: otherWsId, message: 'other done' });
+    const globalJob = createJob('tenancy-regression', { message: 'global done' });
+    updateJob(workspaceJob.id, { status: 'done' });
+    updateJob(otherJob.id, { status: 'done' });
+    updateJob(globalJob.id, { status: 'done' });
+
+    const res = await del(`/api/jobs/completed?workspaceId=${testWsId}`);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ cleared: 1 });
+
+    expect(await api(`/api/jobs/${workspaceJob.id}`)).toHaveProperty('status', 404);
+    expect(await api(`/api/jobs/${otherJob.id}`)).toHaveProperty('status', 200);
+    expect(await api(`/api/jobs/${globalJob.id}`)).toHaveProperty('status', 200);
+  });
+
+  it('clears completed global jobs without deleting workspace jobs', async () => {
+    clearCompletedJobs();
+    const workspaceJob = createJob('tenancy-regression', { workspaceId: testWsId, message: 'workspace done' });
+    const globalJob = createJob('tenancy-regression', { message: 'global done' });
+    updateJob(workspaceJob.id, { status: 'done' });
+    updateJob(globalJob.id, { status: 'done' });
+
+    const res = await del('/api/jobs/completed?scope=global');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ cleared: 1 });
+
+    expect(await api(`/api/jobs/${workspaceJob.id}`)).toHaveProperty('status', 200);
+    expect(await api(`/api/jobs/${globalJob.id}`)).toHaveProperty('status', 404);
+  });
 });
 
 describe('Jobs — creation validation', () => {

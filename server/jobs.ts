@@ -4,12 +4,13 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { getBackgroundJobLabel, type BackgroundJobType } from '../shared/types/background-jobs.js';
 
 
 const log = createLogger('jobs');
 export interface Job {
   id: string;
-  type: string;
+  type: BackgroundJobType | string;
   status: 'pending' | 'running' | 'done' | 'error' | 'cancelled';
   progress?: number;
   total?: number;
@@ -47,6 +48,22 @@ const stmts = createStmtCache(() => ({
   `),
   // ws-scope-ok — jobs.id is a randomUUID() (122-bit entropy, globally unique).
   delete: db.prepare(`DELETE FROM jobs WHERE id = ?`),
+  // ws-scope-ok — owner-only maintenance endpoint and test cleanup intentionally clear all terminal jobs.
+  deleteCompletedAll: db.prepare(`
+    DELETE FROM jobs
+    WHERE status IN ('done', 'error', 'cancelled')
+  `),
+  deleteCompletedWorkspace: db.prepare(`
+    DELETE FROM jobs
+    WHERE workspace_id = ?
+      AND status IN ('done', 'error', 'cancelled')
+  `),
+  // ws-scope-ok — explicitly scoped to jobs with no workspace owner.
+  deleteCompletedGlobal: db.prepare(`
+    DELETE FROM jobs
+    WHERE workspace_id IS NULL
+      AND status IN ('done', 'error', 'cancelled')
+  `),
 }));
 
 // ── Row ↔ Job mapping ──
@@ -151,7 +168,7 @@ export function initJobs(broadcast: BroadcastFn) {
   loadJobsFromDb();
 }
 
-export function createJob(type: string, opts?: { message?: string; total?: number; workspaceId?: string }): Job {
+export function createJob(type: BackgroundJobType | string, opts?: { message?: string; total?: number; workspaceId?: string }): Job {
   pruneOldJobs();
   const now = new Date().toISOString();
   const job: Job = {
@@ -160,7 +177,7 @@ export function createJob(type: string, opts?: { message?: string; total?: numbe
     status: 'pending',
     progress: 0,
     total: opts?.total,
-    message: opts?.message || `Starting ${type}...`,
+    message: opts?.message || `Starting ${getBackgroundJobLabel(type)}...`,
     createdAt: now,
     updatedAt: now,
     workspaceId: opts?.workspaceId,
@@ -254,17 +271,32 @@ export function hasActiveJob(type: string, workspaceId?: string): Job | undefine
   return undefined;
 }
 
-/** Delete all completed (done/error/cancelled) jobs from memory and SQLite. */
-export function clearCompletedJobs(): number {
-  let count = 0;
+interface ClearCompletedJobsOptions {
+  workspaceId?: string;
+  globalOnly?: boolean;
+}
+
+/** Delete completed (done/error/cancelled) jobs from memory and SQLite. */
+export function clearCompletedJobs(options: ClearCompletedJobsOptions = {}): number {
+  let changes = 0;
+  if (options.workspaceId) {
+    changes = stmts().deleteCompletedWorkspace.run(options.workspaceId).changes;
+  } else if (options.globalOnly) {
+    changes = stmts().deleteCompletedGlobal.run().changes;
+  } else {
+    changes = stmts().deleteCompletedAll.run().changes;
+  }
+
   for (const [id, job] of jobs) {
-    if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+    const matchesScope =
+      options.workspaceId ? job.workspaceId === options.workspaceId :
+      options.globalOnly ? !job.workspaceId :
+      true;
+    if (matchesScope && (job.status === 'done' || job.status === 'error' || job.status === 'cancelled')) {
       jobs.delete(id);
-      try { stmts().delete.run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/clearCompletedJobs: programming error'); /* best effort */ }
-      count++;
     }
   }
-  return count;
+  return changes;
 }
 
 /** Mark all active (running/pending) jobs as interrupted (called during graceful shutdown). */

@@ -26,3 +26,4 @@ export type * from './narrative.ts';
 export type * from './cms-images.ts';
 export type * from './page-join.ts';
 export type * from './briefing.ts';
+export * from './background-jobs.ts';
