@@ -258,6 +258,23 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     loadTrackedKeywords();
   }, [workspaceId, loadTrackedKeywords]);
 
+  useEffect(() => {
+    if (!openKeywordDrawer) return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        e.key === 'Escape' &&
+        !target.isContentEditable &&
+        target.tagName !== 'INPUT' &&
+        target.tagName !== 'TEXTAREA'
+      ) {
+        setOpenKeywordDrawer(null);
+      }
+    };
+    document.addEventListener('keydown', handler); // keydown-ok
+    return () => document.removeEventListener('keydown', handler);
+  }, [openKeywordDrawer]);
+
   const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
     if (!workspaceId) return;
     setSavingPriorities(true);
@@ -645,6 +662,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
     if (row.difficulty != null) parts.push(`KD ${row.difficulty}`);
     return parts.join(' · ');
+  };
+
+  const roleBadgeClass = (role: StrategyKeywordRole): string => {
+    switch (role) {
+      case 'content':  return 'border-emerald-500/20 bg-emerald-500/8 text-accent-success';
+      case 'page':     return 'border-blue-500/20 bg-blue-500/10 text-accent-info';
+      case 'strategy': return 'border-teal-500/20 bg-teal-500/8 text-accent-brand';
+      case 'idea':     return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]';
+    }
   };
 
   const sortedConfirmed = [...strategyKeywordRows].sort(
@@ -1659,6 +1685,204 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
             )}
           </div>
+        );
+      })()}
+
+      {/* Keyword detail drawer */}
+      {openKeywordDrawer && (() => {
+        const allRows: StrategyKeywordTableRow[] = [...sortedConfirmed, ...keywordIdeaRows];
+        const drawerRow = allRows.find(r => r.normalized === openKeywordDrawer);
+        if (!drawerRow) return null;
+        const isConfirmed = drawerRow.status === 'client' || drawerRow.status === 'strategy';
+        const isRemoving = removingKeyword === drawerRow.normalized;
+        const kdColorClass =
+          drawerRow.difficulty == null  ? 'text-[var(--brand-text-muted)]'
+          : drawerRow.difficulty < 30   ? 'text-emerald-400'
+          : drawerRow.difficulty < 50   ? 'text-amber-400'
+          : 'text-red-400';
+        const trendIcon =
+          drawerRow.trendDirection === 'rising'    ? '↑'
+          : drawerRow.trendDirection === 'declining' ? '↓'
+          : drawerRow.trendDirection === 'stable'    ? '→'
+          : '—';
+        const trendColorClass =
+          drawerRow.trendDirection === 'rising'    ? 'text-emerald-400'
+          : drawerRow.trendDirection === 'declining' ? 'text-red-400'
+          : 'text-[var(--brand-text-muted)]';
+        return (
+          <>
+            <div
+              className={"fixed inset-0 z-[var(--z-modal-backdrop)]" // fixed-inset-ok — keyword detail drawer backdrop
+              }
+              onClick={() => setOpenKeywordDrawer(null)}
+              aria-hidden="true"
+            />
+            {/* pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile */}
+            <div
+              role="dialog"
+              aria-label={`Keyword details: ${drawerRow.label}`}
+              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none"
+            >
+              {/* Drawer header */}
+              <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
+                <div className="min-w-0">
+                  <div className="t-page font-semibold text-[var(--brand-text-bright)] leading-snug break-words">
+                    {drawerRow.label}
+                  </div>
+                  <span className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleBadgeClass(drawerRow.role)}`}>
+                    {drawerRow.roleLabel}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close keyword detail"
+                  className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+                  onClick={() => setOpenKeywordDrawer(null)}
+                >
+                  <Icon as={X} size="sm" />
+                </button>
+              </div>
+
+              {/* Metrics strip */}
+              <div className="grid grid-cols-3 divide-x divide-[var(--brand-border)] border-b border-[var(--brand-border)] flex-shrink-0">
+                <div className="px-3 py-2.5">
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Volume</div>
+                  <div className="t-stat-sm text-[var(--brand-text-bright)]">
+                    {drawerRow.volume != null
+                      ? drawerRow.volume >= 1000
+                        ? `${(drawerRow.volume / 1000).toFixed(1)}k/mo`
+                        : `${drawerRow.volume}/mo`
+                      : '—'}
+                  </div>
+                </div>
+                <div className="px-3 py-2.5">
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Difficulty</div>
+                  <div className={`t-stat-sm ${kdColorClass}`}>
+                    {drawerRow.difficulty != null ? `KD ${drawerRow.difficulty}` : '—'}
+                  </div>
+                </div>
+                <div className="px-3 py-2.5">
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Trend</div>
+                  <div className={`t-stat-sm ${trendColorClass}`}>
+                    {drawerRow.trendDirection != null
+                      ? `${trendIcon} ${drawerRow.trendDirection}`
+                      : trendIcon}
+                  </div>
+                </div>
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
+
+                {/* Why it's in the strategy */}
+                <div>
+                  <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">
+                    Why it's in the strategy
+                  </div>
+                  <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">
+                    {drawerRow.rationale ?? drawerRow.opportunityDetail}
+                  </p>
+                </div>
+
+                {/* Signals */}
+                {drawerRow.contextSources.length > 0 && (
+                  <div>
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">
+                      Signals
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {drawerRow.contextSources.map(src => (
+                        <span
+                          key={src}
+                          className="px-2 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption text-[var(--brand-text-muted)]"
+                        >
+                          {src}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Next move */}
+                <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-3">
+                  <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">
+                    Next move
+                  </div>
+                  <p className="t-body text-[var(--brand-text)] leading-relaxed mb-3">
+                    {drawerRow.nextMoveDetail}
+                  </p>
+                  {drawerRow.role === 'content' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        onTabChange?.('content');
+                        setOpenKeywordDrawer(null);
+                      }}
+                    >
+                      Request content
+                    </Button>
+                  )}
+                  {(drawerRow.role === 'page' || drawerRow.role === 'strategy') && drawerRow.pagePath && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        onTabChange?.('pages');
+                        setOpenKeywordDrawer(null);
+                      }}
+                    >
+                      Go to page
+                    </Button>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 border-t border-[var(--brand-border)] flex-shrink-0">
+                {isConfirmed ? (
+                  <button
+                    type="button"
+                    className="t-caption text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-50"
+                    disabled={isRemoving}
+                    onClick={() => {
+                      void removePriorityKeyword(drawerRow);
+                      setOpenKeywordDrawer(null);
+                    }}
+                  >
+                    {isRemoving ? 'Removing...' : 'Remove from strategy'}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={addingKeyword}
+                      disabled={addingKeyword}
+                      onClick={() => {
+                        void addStrategyKeyword(drawerRow.label);
+                        setOpenKeywordDrawer(null);
+                      }}
+                    >
+                      Add to strategy
+                    </Button>
+                    <button
+                      type="button"
+                      className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      onClick={() => {
+                        void submitFeedback(drawerRow.label, 'declined', 'suggestion');
+                        setOpenKeywordDrawer(null);
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </>
         );
       })()}
 
