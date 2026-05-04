@@ -379,11 +379,9 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  // Timeout bumped to 60s: the OpenAI SDK retries the fake key through several
-  // auth-failure backoffs before surfacing the error, and the original 30s
-  // boundary was brushing right up against the deadline (observed 29951ms in
-  // one run, 30004ms in the next). Same rationale applies to the shape test
-  // below — both hit the same retry path.
+  // Timeout stays generous for slower CI machines, but the server now inherits
+  // an empty OPENAI_API_KEY so the fallback path uses the synchronous missing-key
+  // guard instead of retrying a fake provider key.
   it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 60_000 }, async () => {
     // generateBatchRecommendations catches OpenAI errors per-page and sets a
     // meaningful fallback string — it never throws. The route returns 200 with
