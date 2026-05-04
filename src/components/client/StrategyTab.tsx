@@ -906,9 +906,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       }
                     }}
                   >
+                    {/* Role indicator dot */}
+                    <div
+                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1 ${
+                        row.role === 'content' ? 'bg-emerald-400' :
+                        row.role === 'page' ? 'bg-blue-400' :
+                        row.role === 'strategy' ? 'bg-teal-400' :
+                        'bg-[var(--brand-text-muted)]'
+                      }`}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
-                      <div className="t-caption text-[var(--brand-text-muted)] truncate">{roleSubLabel(row)}</div>
+                      <div className="t-caption text-[var(--brand-text-muted)] truncate">
+                        {roleSubLabel(row)}{row.enrichmentStatus === 'unenriched' ? ' · data pending' : ''}
+                      </div>
                     </div>
                     {isOpen ? (
                       <span className="text-teal-400 t-caption flex-shrink-0 select-none">→</span>
@@ -950,7 +961,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   key={row.normalized}
                   role="button"
                   tabIndex={0}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-500/5 border border-blue-500/20 cursor-pointer hover:border-blue-500/30 transition-colors"
+                  className="relative overflow-hidden flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-500/5 border border-blue-500/20 cursor-pointer hover:border-blue-500/30 transition-colors"
                   onClick={() => { if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -959,6 +970,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                 >
+                  {/* Opportunity strength accent */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-400 rounded-l-[var(--radius-lg)]"
+                    style={{ opacity: Math.max(0.2, Math.min(1, (row.opportunityScore ?? 0) / 100)) }}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
                     {((row.volume != null && row.volume > 0) || (row.difficulty != null && row.difficulty > 0)) && (
