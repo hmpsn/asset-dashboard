@@ -182,6 +182,32 @@ describe('Content Matrices — CRUD', () => {
     expect(detail.cells.map((c: { id: string }) => c.id)).toEqual([firstCellId]);
   });
 
+  it('client flagging a content-plan cell keeps it visible and records activity', async () => {
+    const invalidFlagRes = await postJson(`/api/public/content-plan/${testWsId}/${matrixId}/cells/${firstCellId}/flag`, {
+      comment: '   ',
+    });
+    expect(invalidFlagRes.status).toBe(400);
+
+    const flagRes = await postJson(`/api/public/content-plan/${testWsId}/${matrixId}/cells/${firstCellId}/flag`, {
+      comment: 'Please adjust this planned page before production.',
+    });
+    expect(flagRes.status).toBe(200);
+
+    const detailRes = await api(`/api/public/content-plan/${testWsId}/${matrixId}`);
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.cells[0]).toMatchObject({
+      id: firstCellId,
+      status: 'flagged',
+      clientFlag: 'Please adjust this planned page before production.',
+    });
+
+    const activityRes = await api(`/api/public/activity/${testWsId}?limit=5`);
+    expect(activityRes.status).toBe(200);
+    const activity = await activityRes.json();
+    expect(activity.some((entry: { title?: string }) => entry.title?.includes('Client flagged content plan page'))).toBe(true);
+  });
+
   it('DELETE removes the matrix', async () => {
     const res = await del(`/api/content-matrices/${testWsId}/${matrixId}`);
     expect(res.status).toBe(200);

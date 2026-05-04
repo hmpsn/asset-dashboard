@@ -17,6 +17,7 @@ export const WS_EVENTS = {
   REQUEST_UPDATE: 'request:update',
   CONTENT_REQUEST_CREATED: 'content-request:created',
   CONTENT_REQUEST_UPDATE: 'content-request:update',
+  CONTENT_UPDATED: 'content:updated',
   ACTIVITY_NEW: 'activity:new',
   FEEDBACK_NEW: 'feedback:new',
   FEEDBACK_UPDATE: 'feedback:update',

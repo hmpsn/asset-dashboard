@@ -91,6 +91,7 @@ function computeStats(cells: MatrixCell[]): ContentMatrix['stats'] {
         stats.drafted++;
         break;
       case 'review':
+      case 'flagged':
       case 'approved':
         stats.reviewed++;
         break;

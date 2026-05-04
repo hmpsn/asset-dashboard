@@ -48,6 +48,10 @@ import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
 
+function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-posts', ...payload });
+}
+
 function markProvenanceItemsForHumanReview(
   review: Record<string, AIReviewResult>,
 ): Record<string, AIReviewResult> {
@@ -117,15 +121,40 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
       updatedAt: new Date().toISOString(),
     };
     savePost(req.params.workspaceId, skeleton);
+    notifyContentUpdated(req.params.workspaceId, { postId, briefId: brief.id, action: 'post_generation_started' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId, status: skeleton.status });
 
     // Return skeleton to client immediately
     res.json(skeleton);
 
     // Generate in background — pass skeleton's postId so it updates the same post
-    generatePost(req.params.workspaceId, brief, postId).then(() => {
+    generatePost(req.params.workspaceId, brief, postId).then((generated) => {
       addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
+      notifyContentUpdated(req.params.workspaceId, { postId: generated.id, briefId: brief.id, action: 'post_generated' });
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: generated.id, status: generated.status });
     }).catch(err => {
       log.error({ err: err }, `Generation failed for ${req.params.workspaceId}:`);
+      const failed = getPost(req.params.workspaceId, postId);
+      if (failed) {
+        const message = err instanceof Error ? err.message : 'Generation failed';
+        failed.status = 'error';
+        failed.unificationStatus = 'failed';
+        failed.unificationNote = message;
+        failed.updatedAt = new Date().toISOString();
+        failed.sections = failed.sections.map(section =>
+          section.status === 'done' ? section : { ...section, status: 'error', error: message },
+        );
+        savePost(req.params.workspaceId, failed);
+        addActivity(
+          req.params.workspaceId,
+          'content_updated',
+          `Content generation failed for "${brief.targetKeyword}"`,
+          message,
+          { postId: failed.id, briefId: brief.id, action: 'post_generation_failed' },
+        );
+        notifyContentUpdated(req.params.workspaceId, { postId: failed.id, briefId: brief.id, action: 'post_generation_failed', status: failed.status });
+        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: failed.id, status: failed.status });
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });
@@ -146,6 +175,19 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requir
   try {
     const updated = await regenerateSection(req.params.workspaceId, req.params.postId, sectionIndex, brief);
     if (!updated) return res.status(404).json({ error: 'Section not found' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Regenerated section ${sectionIndex + 1} for "${updated.title}"`,
+      undefined,
+      { postId: updated.id, sectionIndex, action: 'post_section_regenerated' },
+    );
+    notifyContentUpdated(req.params.workspaceId, {
+      postId: updated.id,
+      sectionIndex,
+      action: 'post_section_regenerated',
+    });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Regeneration failed' });
@@ -169,7 +211,7 @@ const updatePostSchema = z.object({
   conclusion: z.string().optional(),
   seoTitle: z.string().max(200).optional(),
   seoMetaDescription: z.string().max(500).optional(),
-  status: z.enum(['generating', 'draft', 'review', 'approved']).optional(),
+  status: z.enum(['generating', 'draft', 'review', 'approved', 'error']).optional(),
   voiceScore: z.number().min(0).max(100).optional(),
   voiceFeedback: z.string().optional(),
   webflowItemId: z.string().optional(),
@@ -617,7 +659,19 @@ router.get('/api/content-posts/:workspaceId/:postId/versions/:versionId', requir
 router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const reverted = revertToVersion(req.params.workspaceId, req.params.postId, req.params.versionId);
   if (!reverted) return res.status(404).json({ error: 'Post or version not found' });
-  addActivity(req.params.workspaceId, 'post_reverted', `Reverted "${reverted.title}" to a previous version`);
+  addActivity(
+    req.params.workspaceId,
+    'post_reverted',
+    `Reverted "${reverted.title}" to a previous version`,
+    undefined,
+    { postId: reverted.id, versionId: req.params.versionId, action: 'post_reverted' },
+  );
+  notifyContentUpdated(req.params.workspaceId, {
+    postId: reverted.id,
+    versionId: req.params.versionId,
+    action: 'post_reverted',
+  });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: reverted.id });
   res.json(reverted);
 });
 
@@ -646,7 +700,18 @@ router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorksp
 
 // Delete a post
 router.delete('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const existing = getPost(req.params.workspaceId, req.params.postId);
+  if (!existing) return res.status(404).json({ error: 'Post not found' });
   deletePost(req.params.workspaceId, req.params.postId);
+  addActivity(
+    req.params.workspaceId,
+    'content_updated',
+    `Deleted post "${existing.title}"`,
+    undefined,
+    { postId: existing.id, action: 'post_deleted' },
+  );
+  notifyContentUpdated(req.params.workspaceId, { postId: existing.id, action: 'post_deleted', deleted: true });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: existing.id, deleted: true });
   res.json({ ok: true });
 });
 

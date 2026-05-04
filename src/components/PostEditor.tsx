@@ -45,7 +45,7 @@ interface GeneratedPost {
   targetWordCount?: number;
   seoTitle?: string;
   seoMetaDescription?: string;
-  status: 'generating' | 'draft' | 'review' | 'approved';
+  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
@@ -77,6 +77,7 @@ interface PostEditorProps {
 function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   const cfg: Record<string, { color: string; label: string }> = {
     generating: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Generating...' },
+    error: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'Failed' },
     draft: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Draft' },
     review: { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', label: 'In Review' },
     approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', label: 'Approved' },
@@ -443,7 +444,19 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       )}
 
       {/* Review Checklist + Status controls */}
-      {!isGenerating && post.status !== 'approved' && (
+      {post.status === 'error' && (
+        <SectionCard className="!border-red-500/20">
+          <div className="flex items-start gap-2">
+            <Icon as={AlertTriangle} size="md" className="text-red-400 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-300">Generation failed</p>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-1">{post.unificationNote || 'The post could not be generated. Review the section errors below before retrying.'}</p>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {!isGenerating && post.status !== 'approved' && post.status !== 'error' && (
         <ReviewChecklist
           postStatus={post.status}
           reviewChecklist={post.reviewChecklist}

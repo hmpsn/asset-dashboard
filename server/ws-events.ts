@@ -27,6 +27,9 @@ export const WS_EVENTS = {
   CONTENT_REQUEST_CREATED: 'content-request:created',
   CONTENT_REQUEST_UPDATE: 'content-request:update',
 
+  // Content pipeline / planner
+  CONTENT_UPDATED: 'content:updated',
+
   // Activity feed (auto-broadcast via initActivityBroadcast)
   ACTIVITY_NEW: 'activity:new',
 

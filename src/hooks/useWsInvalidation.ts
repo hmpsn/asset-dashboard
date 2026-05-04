@@ -46,13 +46,35 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
+    [WS_EVENTS.CONTENT_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.postsDetailAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentTemplates(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
     },
     [WS_EVENTS.ACTIVITY_NEW]: () => {
       if (!workspaceId) return;
@@ -88,7 +110,11 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.postsDetailAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
     },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
@@ -269,6 +295,10 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (payload?.postId) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, payload.postId) });
       }
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     // ── Client Briefing v2 ──────────────────────────────────────────────
     // Both events refresh the admin review queue. The cron generates +

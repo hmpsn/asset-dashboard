@@ -226,6 +226,7 @@ export function useClientData(workspaceId: string) {
       clientActions: queryKeys.client.clientActions(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
+      'content-plan': queryKeys.client.contentPlan(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
       annotations: queryKeys.client.annotations(workspaceId),

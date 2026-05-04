@@ -122,7 +122,7 @@ export interface GeneratedPost {
   seoMetaDescription?: string; // SEO meta description (150-160 chars)
   totalWordCount: number;
   targetWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved';
+  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
@@ -268,6 +268,7 @@ export type MatrixCellStatus =
   | 'brief_generated'
   | 'draft'
   | 'review'
+  | 'flagged'
   | 'approved'
   | 'published';
 

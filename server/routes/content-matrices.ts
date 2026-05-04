@@ -14,10 +14,17 @@ import { getKeywordRecommendations } from '../keyword-recommendations.js';
 import { detectMatrixCannibalization, checkKeywordCannibalization } from '../cannibalization-detection.js';
 import { createLogger } from '../logger.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
+import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('routes:content-matrices');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
+
+function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
+}
 
 // List all matrices for a workspace
 router.get('/api/content-matrices/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -56,6 +63,14 @@ router.post('/api/content-matrices/:workspaceId', requireWorkspaceAccess('worksp
       urlPattern: urlPattern || '',
       keywordPattern: keywordPattern || '',
     });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Created content matrix "${matrix.name}"`,
+      `${matrix.cells.length} planned page${matrix.cells.length === 1 ? '' : 's'}`,
+      { matrixId: matrix.id, action: 'matrix_created' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, { matrixId: matrix.id, action: 'matrix_created' });
     res.status(201).json(matrix);
   } catch (err) {
     log.error({ err }, 'Failed to create matrix');
@@ -68,6 +83,14 @@ router.put('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAcces
   try {
     const updated = updateMatrix(req.params.workspaceId, req.params.matrixId, req.body);
     if (!updated) return res.status(404).json({ error: 'Matrix not found' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Updated content matrix "${updated.name}"`,
+      undefined,
+      { matrixId: updated.id, action: 'matrix_updated' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, { matrixId: updated.id, action: 'matrix_updated' });
     res.json(updated);
   } catch (err) {
     log.error({ err }, 'Failed to update matrix');
@@ -85,6 +108,23 @@ router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requi
       req.body,
     );
     if (!updated) return res.status(404).json({ error: 'Matrix or cell not found' });
+    const cell = updated.cells.find(c => c.id === req.params.cellId);
+    const statusChanged = typeof req.body.status === 'string';
+    if (statusChanged || req.body.clientFlag || req.body.keywordValidation) {
+      addActivity(
+        req.params.workspaceId,
+        'content_updated',
+        `Updated content plan page "${cell?.targetKeyword || req.params.cellId}"`,
+        statusChanged ? `Status: ${req.body.status}` : undefined,
+        { matrixId: updated.id, cellId: req.params.cellId, action: 'matrix_cell_updated', status: cell?.status },
+      );
+    }
+    notifyContentPlanUpdated(req.params.workspaceId, {
+      matrixId: updated.id,
+      cellId: req.params.cellId,
+      action: 'matrix_cell_updated',
+      status: cell?.status,
+    });
     res.json(updated);
 
     // Regenerate llms.txt when a cell is marked published (new content is live)
@@ -163,8 +203,18 @@ router.post('/api/content-matrices/:workspaceId/check-cannibalization', requireW
 // Delete a matrix
 router.delete('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
+    const existing = getMatrix(req.params.workspaceId, req.params.matrixId);
+    if (!existing) return res.status(404).json({ error: 'Matrix not found' });
     const deleted = deleteMatrix(req.params.workspaceId, req.params.matrixId);
     if (!deleted) return res.status(404).json({ error: 'Matrix not found' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Deleted content matrix "${existing.name}"`,
+      `${existing.cells.length} planned page${existing.cells.length === 1 ? '' : 's'} removed`,
+      { matrixId: existing.id, action: 'matrix_deleted' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, { matrixId: existing.id, action: 'matrix_deleted', deleted: true });
     res.json({ ok: true });
   } catch (err) {
     log.error({ err }, 'Failed to delete matrix');

@@ -19,7 +19,7 @@ interface CalendarPost {
   briefId: string;
   targetKeyword: string;
   title: string;
-  status: 'generating' | 'draft' | 'review' | 'approved';
+  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   totalWordCount: number;
   publishedAt?: string;
   createdAt: string;

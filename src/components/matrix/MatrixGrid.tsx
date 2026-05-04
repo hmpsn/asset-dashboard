@@ -20,12 +20,13 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; bg: string; t
   keyword_validated:   { label: 'Keyword Optimized', bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20',  icon: '◐' },
   brief_generated:    { label: 'Brief Generated',   bg: 'bg-amber-500/10',   text: 'text-amber-400',  border: 'border-amber-500/20', icon: '◑' },
   review:             { label: 'Client Review',     bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20', icon: '◑' },
+  flagged:            { label: 'Client Flagged',    bg: 'bg-amber-500/10',   text: 'text-amber-400',  border: 'border-amber-500/20', icon: '!' },
   approved:           { label: 'Approved',           bg: 'bg-teal-500/10',   text: 'text-teal-400',   border: 'border-teal-500/20',  icon: '✓' },
   draft:              { label: 'Draft',              bg: 'bg-orange-500/10',  text: 'text-orange-400', border: 'border-orange-500/20', icon: '◐' },
   published:          { label: 'Published',          bg: 'bg-emerald-500/10',   text: 'text-emerald-400',  border: 'border-emerald-500/20', icon: '●' },
 };
 
-const ALL_STATUSES: MatrixCell['status'][] = ['planned', 'keyword_validated', 'brief_generated', 'review', 'approved', 'draft', 'published'];
+const ALL_STATUSES: MatrixCell['status'][] = ['planned', 'keyword_validated', 'brief_generated', 'review', 'flagged', 'approved', 'draft', 'published'];
 
 type SortKey = 'status' | 'volume' | 'difficulty' | 'alphabetical';
 
@@ -171,9 +172,9 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
           <span className="text-xs text-[var(--brand-text)]">{progressPercent}% complete</span>
           <span className="t-caption text-[var(--brand-text-muted)]">{completedCount}/{matrix.cells.length} pages</span>
         </div>
-        <div className="w-full h-2 bg-[var(--surface-1)] rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -189,7 +190,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
             >
               <Filter className="w-3 h-3" /> Filter
-              {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
+              {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
             </button>
             {showFilter && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">

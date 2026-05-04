@@ -16,13 +16,19 @@ import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
+import { validate, z } from '../middleware/validate.js';
 import type { ContentMatrix, MatrixCell } from '../../shared/types/content.ts';
 
 const log = createLogger('routes:content-plan-review');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
-const CLIENT_VISIBLE_CELL_STATUSES = new Set(['review', 'approved', 'published']);
+function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
+}
+
+const CLIENT_VISIBLE_CELL_STATUSES = new Set(['review', 'flagged', 'approved', 'published']);
 
 function clientVisibleCells(cells: MatrixCell[]): MatrixCell[] {
   return cells.filter(c => CLIENT_VISIBLE_CELL_STATUSES.has(c.status));
@@ -37,7 +43,7 @@ function serializeClientMatrix(matrix: ContentMatrix, cells: MatrixCell[], extra
       planned: 0,
       briefGenerated: 0,
       drafted: 0,
-      reviewed: cells.filter(c => c.status === 'review' || c.status === 'approved').length,
+      reviewed: cells.filter(c => c.status === 'review' || c.status === 'flagged' || c.status === 'approved').length,
       published: cells.filter(c => c.status === 'published').length,
     },
     dimensions: matrix.dimensions.map(d => ({ name: d.variableName, values: d.values })),
@@ -47,6 +53,8 @@ function serializeClientMatrix(matrix: ContentMatrix, cells: MatrixCell[], extra
       plannedUrl: c.plannedUrl,
       status: c.status,
       variableValues: c.variableValues,
+      clientFlag: c.clientFlag,
+      clientFlaggedAt: c.clientFlaggedAt,
       hasBrief: !!c.briefId,
       hasPost: !!c.postId,
     })),
@@ -108,9 +116,11 @@ router.get('/api/public/content-plan/:workspaceId/:matrixId', (req, res) => {
  * POST /api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag
  * Client flags a specific cell for changes with a comment.
  */
-router.post('/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag', (req, res) => {
+router.post(
+  '/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag',
+  validate(z.object({ comment: z.string().trim().min(1, 'comment is required').max(2000) })),
+  (req, res) => {
   const { comment } = req.body;
-  if (!comment) return res.status(400).json({ error: 'comment is required' });
 
   try {
     const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
@@ -122,10 +132,23 @@ router.post('/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag'
       req.params.workspaceId,
       req.params.matrixId,
       req.params.cellId,
-      { clientFlag: comment, clientFlaggedAt: new Date().toISOString() },
+      { status: 'flagged', clientFlag: comment, clientFlaggedAt: new Date().toISOString() },
     );
     if (!updated) return res.status(404).json({ error: 'Cell not found' });
 
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Client flagged content plan page "${cell.targetKeyword}"`,
+      comment,
+      { matrixId: matrix.id, cellId: cell.id, action: 'matrix_cell_flagged' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, {
+      matrixId: matrix.id,
+      cellId: cell.id,
+      action: 'matrix_cell_flagged',
+      status: 'flagged',
+    });
     log.info({ workspaceId: req.params.workspaceId, matrixId: req.params.matrixId, cellId: req.params.cellId }, 'Client flagged cell');
     res.json({ ok: true });
   } catch (err) {
@@ -181,6 +204,19 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', req
     );
 
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Sent content plan template "${template.name}" for client review`,
+      `Matrix: ${matrix.name}`,
+      { matrixId: matrix.id, templateId: template.id, batchId: batch.id, action: 'template_review_sent' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, {
+      matrixId: matrix.id,
+      templateId: template.id,
+      batchId: batch.id,
+      action: 'template_review_sent',
+    });
     log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id }, 'Template sent for client review');
     res.json({ batchId: batch.id, batch });
   } catch (err) {
@@ -235,6 +271,19 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWork
     }
 
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Sent ${selectedCells.length} content plan sample${selectedCells.length === 1 ? '' : 's'} for client review`,
+      `Matrix: ${matrix.name}`,
+      { matrixId: matrix.id, batchId: batch.id, cellIds, action: 'sample_review_sent' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, {
+      matrixId: matrix.id,
+      batchId: batch.id,
+      cellIds,
+      action: 'sample_review_sent',
+    });
     log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id, cellCount: selectedCells.length }, 'Samples sent for client review');
     res.json({ batchId: batch.id, batch, cellsSent: selectedCells.length });
   } catch (err) {
@@ -262,6 +311,18 @@ router.post('/api/content-plan/:workspaceId/:matrixId/batch-approve', requireWor
       approvedCount++;
     }
 
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Approved ${approvedCount} content plan page${approvedCount === 1 ? '' : 's'}`,
+      `Matrix: ${matrix.name}`,
+      { matrixId: matrix.id, approvedCount, action: 'matrix_batch_approved' },
+    );
+    notifyContentPlanUpdated(req.params.workspaceId, {
+      matrixId: matrix.id,
+      approvedCount,
+      action: 'matrix_batch_approved',
+    });
     log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, approvedCount }, 'Batch approved remaining cells');
     res.json({ ok: true, approvedCount, totalCells: matrix.cells.length });
   } catch (err) {
