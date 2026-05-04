@@ -1720,8 +1720,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             {/* pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile */}
             <div
               role="dialog"
+              aria-modal="true"
               aria-label={`Keyword details: ${drawerRow.label}`}
-              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none"
+              className="fixed inset-x-0 bottom-0 h-[65vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none"
             >
               {/* Drawer header */}
               <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
@@ -1828,7 +1829,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       variant="secondary"
                       size="sm"
                       onClick={() => {
-                        onTabChange?.('pages');
+                        onTabChange?.('health');
                         setOpenKeywordDrawer(null);
                       }}
                     >
