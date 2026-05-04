@@ -9,8 +9,10 @@ import multer from 'multer';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getUploadRoot } from './data-dir.js';
 import { verifyClientToken, getSafeClientUser } from './client-users.js';
-import { verifyToken as verifyJwtToken } from './auth.js';
+import { requestUserCanAccessWorkspace, verifyToken as verifyJwtToken } from './auth.js';
 import { getUserById } from './users.js';
+
+export { requestUserCanAccessWorkspace } from './auth.js';
 
 // ── Rate Limiting ──
 
@@ -167,13 +169,8 @@ export function verifyClientUserTokenForWorkspace(workspaceId: string, token: st
   return !!user && user.workspaceId === workspaceId;
 }
 
-export function requestUserCanAccessWorkspace(req: express.Request, workspaceId: string): boolean {
-  if (!req.user) return true;
-  if (req.user.role === 'owner') return true;
-  return !!req.user.workspaceIds?.includes(workspaceId);
-}
-
 export function internalJwtCanAccessWorkspace(req: express.Request, workspaceId: string): boolean {
+  if (req.user) return requestUserCanAccessWorkspace(req, workspaceId);
   const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
   if (!token) return false;
   const payload = verifyJwtToken(token);
