@@ -51,7 +51,9 @@ export function PerformanceTab(props: PerformanceTabProps) {
   const hasSearch = !!props.overview;
   const hasAnalytics = !!props.ga4Overview;
   const searchExpected = !!props.ws.gscPropertyUrl;
-  const [subTab, setSubTab] = useState<'search' | 'analytics'>(props.initialSubTab || 'search');
+  const [subTab, setSubTab] = useState<'search' | 'analytics'>(
+    props.initialSubTab || (hasSearch ? 'search' : (hasAnalytics && !searchExpected ? 'analytics' : 'search'))
+  );
 
   useEffect(() => {
     if (props.initialSubTab === 'analytics' && hasAnalytics && subTab !== 'analytics') {
@@ -69,7 +71,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
     if (subTab === 'analytics' && !hasAnalytics && hasSearch) {
       setSubTab('search');
     }
-  }, [props.initialSubTab, hasAnalytics, hasSearch, searchExpected, subTab]);
+  }, [props.initialSubTab, hasAnalytics, hasSearch, searchExpected]);
 
   return (
     <>

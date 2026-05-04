@@ -223,12 +223,16 @@ export function AnalyticsTab({
               {(() => {
                 const PIE_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber]; // chart-hex-ok — #14b8a6 is teal-500 for pie anchor
                 let cursor = 0;
-                const gradient = ga4Devices.map((d, i) => {
+                const stops = ga4Devices.map((d, i) => {
                   const start = cursor;
                   const end = Math.min(100, cursor + d.percentage);
                   cursor = end;
                   return `${PIE_COLORS[i % PIE_COLORS.length]} ${start}% ${end}%`;
-                }).join(', ');
+                });
+                if (cursor < 100 && stops.length > 0) {
+                  stops[stops.length - 1] = stops[stops.length - 1].replace(/\d+(?:\.\d+)?%$/, '100%');
+                }
+                const gradient = stops.join(', ');
                 return (
                   <>
                     <div
