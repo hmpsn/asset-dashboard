@@ -87,6 +87,22 @@ describe('E2E: Content request lifecycle', () => {
     const body = await res.json();
     expect(body.status).toBe('delivered');
     expect(body.deliveryUrl).toBe('https://example.com/blog/e2e-test');
+    expect(body.deliveryNotes).toBe('Blog post published successfully');
+
+    const publicRes = await api(`/api/public/content-requests/${testWsId}`);
+    expect(publicRes.status).toBe(200);
+    const publicBody = await publicRes.json() as Array<{
+      id: string;
+      deliveryUrl?: string;
+      deliveryNotes?: string;
+      briefId?: string;
+      postId?: string;
+      status: string;
+    }>;
+    const publicEntry = publicBody.find(r => r.id === requestId);
+    expect(publicEntry).toBeDefined();
+    expect(publicEntry!.deliveryUrl).toBe('https://example.com/blog/e2e-test');
+    expect(publicEntry!.deliveryNotes).toBe('Blog post published successfully');
   });
 
   it('Step 5: Content performance endpoint returns valid response', async () => {

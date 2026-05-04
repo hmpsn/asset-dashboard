@@ -13,7 +13,7 @@ import {
   checkChatRateLimit,
 } from '../chat-memory.js';
 import { getUsageSummary } from '../usage-tracking.js';
-import { getWorkspace } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 
 // --- Chat Session CRUD ---
 router.get('/api/public/chat-sessions/:workspaceId', (req, res) => {
@@ -45,7 +45,7 @@ router.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async
 router.get('/api/public/chat-usage/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const tier = ws.tier || 'free';
+  const tier = computeEffectiveTier(ws);
   const rl = checkChatRateLimit(ws.id, tier);
   res.json({ ...rl, tier });
 });
@@ -54,7 +54,7 @@ router.get('/api/public/chat-usage/:workspaceId', (req, res) => {
 router.get('/api/public/usage/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const tier = ws.tier || 'free';
+  const tier = computeEffectiveTier(ws);
   res.json({ tier, usage: getUsageSummary(ws.id, tier) });
 });
 

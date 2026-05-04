@@ -196,21 +196,36 @@ describe('GET /api/public/content-requests/:wsId — postId serialization', () =
 
     // Setup: requested-status request with no post
     const earlyReq = await createRequest('GET Test Early', `get-early-${Date.now()}`);
+    updateContentRequest(testWsId, earlyReq.id, {
+      deliveryUrl: 'https://example.com/delivery/early',
+      deliveryNotes: 'Early delivery note',
+    });
 
     // List via public endpoint
     const res = await api(`/api/public/content-requests/${testWsId}`);
     expect(res.status).toBe(200);
-    const list = await res.json() as Array<{ id: string; status: string; postId?: string; clientFeedback?: string }>;
+    const list = await res.json() as Array<{
+      id: string;
+      status: string;
+      postId?: string;
+      deliveryUrl?: string;
+      deliveryNotes?: string;
+      clientFeedback?: string;
+    }>;
 
     const readyEntry = list.find(r => r.id === ready.id);
     expect(readyEntry).toBeDefined();
     expect(readyEntry!.postId).toBe(post.id);
     expect(readyEntry!.status).toBe('post_review');
     expect(readyEntry!.clientFeedback).toBeUndefined();
+    expect(readyEntry!.deliveryUrl).toBeUndefined();
+    expect(readyEntry!.deliveryNotes).toBeUndefined();
 
     const earlyEntry = list.find(r => r.id === earlyReq.id);
     expect(earlyEntry).toBeDefined();
     expect(earlyEntry!.postId).toBeUndefined();
+    expect(earlyEntry!.deliveryUrl).toBeUndefined();
+    expect(earlyEntry!.deliveryNotes).toBeUndefined();
   });
 });
 

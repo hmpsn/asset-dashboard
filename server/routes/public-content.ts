@@ -28,6 +28,7 @@ import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
+import { computeOpportunityScore } from './keyword-strategy.js';
 import {
   createContentRequestSchema,
   submitContentRequestSchema,
@@ -116,6 +117,11 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       volume: g.volume,
       difficulty: g.difficulty,
       impressions: g.impressions,
+      trendDirection: g.trendDirection,
+      serpFeatures: g.serpFeatures,
+      competitorProof: g.competitorProof,
+      questionKeywords: g.questionKeywords,
+      opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
     })),
     quickWins: (strategy.quickWins || []).map(q => ({
       pagePath: q.pagePath,
@@ -181,6 +187,8 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     priority: r.priority, status: r.status, source: r.source,
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
+    deliveryUrl: ['delivered', 'published'].includes(r.status) ? r.deliveryUrl : undefined,
+    deliveryNotes: ['delivered', 'published'].includes(r.status) ? r.deliveryNotes : undefined,
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond

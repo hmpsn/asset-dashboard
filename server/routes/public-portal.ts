@@ -25,7 +25,7 @@ import { computeOpportunityScore } from './keyword-strategy.js';
 import type { BriefingRecommendation } from '../../shared/types/briefing.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
-import { parseJsonFallback } from '../db/json-validation.js';
+import { parseJsonSafeArray } from '../db/json-validation.js';
 import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
@@ -33,6 +33,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import { clientBusinessPrioritySchema } from '../schemas/client-business-priorities.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-portal');
@@ -210,7 +211,7 @@ router.get('/api/public/tier/:id', (req, res) => {
   res.json({
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free' && trialDaysRemaining > 0,
+    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
     trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
   });
@@ -489,7 +490,19 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
   const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
   if (!row) return res.json({ priorities: [], updatedAt: null });
 
-  const priorities = parseJsonFallback(row.priorities, []);
+  const priorities = parseJsonSafeArray(
+    row.priorities,
+    clientBusinessPrioritySchema,
+    { workspaceId: wsId, field: 'priorities', table: 'client_business_priorities' },
+  ).map(priority => {
+    if (typeof priority === 'string') {
+      return { text: priority.trim(), category: 'other' };
+    }
+    return {
+      text: priority.text.trim(),
+      category: priority.category?.trim() || 'other',
+    };
+  }).filter(priority => priority.text.length > 0);
   res.json({ priorities, updatedAt: row.updated_at });
 });
 

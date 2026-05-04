@@ -377,8 +377,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 10, 13-15",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Add contract/integration tests for each producer-consumer pair."
+          "status": "done",
+          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Added contract/integration tests for each producer-consumer pair.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-content-data-flow-invalidation",

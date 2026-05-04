@@ -23,16 +23,20 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
+import { addMessage } from '../../server/chat-memory.js';
 
 const ctx = createTestContext(13312);
-const { api } = ctx;
+const { api, postJson } = ctx;
 
 let freeWs: SeededFullWorkspace;
 let growthWs: SeededFullWorkspace;
 let premiumWs: SeededFullWorkspace;
 let trialWs: SeededFullWorkspace;
+let previousOpenAiKey: string | undefined;
 
 beforeAll(async () => {
+  previousOpenAiKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = '';
   await ctx.startServer();
 
   // clientPassword: '' ensures the client-session middleware passes through
@@ -61,6 +65,11 @@ afterAll(async () => {
   tryCleanup(premiumWs);
   tryCleanup(trialWs);
   await ctx.stopServer();
+  if (previousOpenAiKey === undefined) {
+    delete process.env.OPENAI_API_KEY;
+  } else {
+    process.env.OPENAI_API_KEY = previousOpenAiKey;
+  }
 });
 
 // ── Usage endpoint: per-feature limits differ by tier ─────────────────────────
@@ -83,6 +92,17 @@ describe('GET /api/public/usage/:workspaceId — tier-differentiated limits', ()
 
   it('growth tier: ai_chats limit is 50, strategy_generations limit is 3', async () => {
     const res = await api(`/api/public/usage/${growthWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tier).toBe('growth');
+    expect(body.usage.ai_chats.limit).toBe(50);
+    expect(body.usage.ai_chats.remaining).toBe(50);
+    expect(body.usage.strategy_generations.limit).toBe(3);
+    expect(body.usage.strategy_generations.remaining).toBe(3);
+  });
+
+  it('trial workspace: free base tier resolves to growth limits', async () => {
+    const res = await api(`/api/public/usage/${trialWs.workspaceId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.tier).toBe('growth');
@@ -137,6 +157,16 @@ describe('GET /api/public/chat-usage/:workspaceId — chat tier gating', () => {
     expect(body.remaining).toBeNull();
   });
 
+  it('trial workspace: free base tier resolves to growth chat access', async () => {
+    const res = await api(`/api/public/chat-usage/${trialWs.workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tier).toBe('growth');
+    expect(body.allowed).toBe(true);
+    expect(body.limit).toBeNull();
+    expect(body.remaining).toBeNull();
+  });
+
   it('premium tier: returns allowed=true with unlimited (Infinity)', async () => {
     const res = await api(`/api/public/chat-usage/${premiumWs.workspaceId}`);
     expect(res.status).toBe(200);
@@ -150,6 +180,21 @@ describe('GET /api/public/chat-usage/:workspaceId — chat tier gating', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Workspace not found');
+  });
+});
+
+describe('POST /api/public/search-chat/:workspaceId — trial tier rate gate', () => {
+  it('trial workspace bypasses free conversation cap before AI configuration check', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      addMessage(trialWs.workspaceId, `trial-rate-test-${i}`, 'client', 'user', 'hello');
+    }
+
+    const res = await postJson(`/api/public/search-chat/${trialWs.workspaceId}`, {
+      question: 'What changed this month?',
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('AI not configured');
   });
 });
 
