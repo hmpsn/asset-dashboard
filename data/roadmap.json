@@ -396,8 +396,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 11, 17, 18",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Stop AI-only auto-checking of factual/no-hallucination checklist items, constrain AEO citation recommendations to verified source evidence or mark them research-needed, fix AEO effort enum prompt/schema validation, and make rewrite apply paths consume structured or delimited rewrite-only content. Add tests around factual review behavior and prompt-render contracts."
+          "status": "done",
+          "notes": "Shipped 2026-05-04: provenance-sensitive post review checklist items are never auto-checked from AI-only review and are marked human-review required; AEO citation recommendations now require verified source evidence or carry a research-needed flag and are omitted from client handoff until verified; AEO effort values are normalized/validated to exact enum literals; rewrite-chat responses use BEGIN_REWRITE/END_REWRITE delimiters and editor apply/copy paths consume only the rewrite body. Added route, component, and unit coverage for the contracts.",
+          "shippedAt": "2026-05-04"
         }
       ]
     },

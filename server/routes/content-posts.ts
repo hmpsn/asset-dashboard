@@ -41,12 +41,29 @@ import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
-import type { AiFixResult, IssueKey } from '../../shared/types/content.js';
-import { ISSUE_KEYS } from '../../shared/types/content.js';
+import type { AIReviewResult, AiFixResult, IssueKey } from '../../shared/types/content.js';
+import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
+
+function markProvenanceItemsForHumanReview(
+  review: Record<string, AIReviewResult>,
+): Record<string, AIReviewResult> {
+  const next = { ...review };
+  for (const key of PROVENANCE_SENSITIVE_REVIEW_KEYS) {
+    const existing = next[key];
+    next[key] = {
+      pass: false,
+      reason: existing?.reason
+        ? `${existing.reason} Human verification is required before this checklist item can be checked.`
+        : 'Human verification is required before this checklist item can be checked.',
+      humanReviewRequired: true,
+    };
+  }
+  return next;
+}
 
 // --- Content Post Generator (#194) ---
 
@@ -340,7 +357,9 @@ router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspac
   res.send(html);
 });
 
-// AI auto-review checklist — runs AI against post content to pre-check each item
+// AI auto-review checklist — runs AI against post content to pre-check objective items.
+// Provenance-sensitive items are surfaced for human review only; the model does not
+// have verified source evidence for factual accuracy or hallucination clearance.
 router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -362,12 +381,14 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
 
   const prompt = `You are a content quality reviewer. Analyze this blog post and evaluate each checklist item.
 ${fullContext}
-Return a JSON object with these keys, each with a boolean "pass" and a brief "reason" string:
+Return a JSON object with these keys, each with a boolean "pass" and a brief "reason" string.
+For "factual_accuracy" and "no_hallucinations", do NOT mark pass=true. You may identify claims
+that need verification, but those items require human review against source material.
 
-1. "factual_accuracy" — Does the content appear factually accurate? Flag any suspicious claims, made-up statistics, or unverifiable statements.
+1. "factual_accuracy" — Identify suspicious claims, statistics, or unverifiable statements for human source checking. Always return pass=false.
 2. "brand_voice" — Does the content match a professional ${ws?.name ? `brand voice for "${ws.name}"` : 'business brand voice'}? Is the tone consistent?
 3. "internal_links" — Does the content include internal links (href attributes pointing to site pages)?
-4. "no_hallucinations" — Are there any signs of AI hallucination? Made-up studies, fake quotes, invented statistics, or fabricated expert names?
+4. "no_hallucinations" — Identify possible made-up studies, fake quotes, invented statistics, or fabricated expert names for human source checking. Always return pass=false.
 5. "meta_optimized" — Is the meta title "${post.seoTitle || post.title}" (${(post.seoTitle || post.title).length} chars) and meta description "${post.seoMetaDescription || post.metaDescription}" (${(post.seoMetaDescription || post.metaDescription).length} chars) well-optimized? Title should be 50-60 chars, description 150-160 chars, both should include the target keyword "${post.targetKeyword}".
 6. "word_count_target" — The post is ${post.totalWordCount} words. The target was ${post.targetWordCount} words. Is it within 15% of the target?
 
@@ -376,10 +397,10 @@ ${contentSnippet}
 
 Return ONLY valid JSON like:
 {
-  "factual_accuracy": { "pass": true, "reason": "..." },
+  "factual_accuracy": { "pass": false, "reason": "Human source review required: ..." },
   "brand_voice": { "pass": true, "reason": "..." },
   "internal_links": { "pass": false, "reason": "..." },
-  "no_hallucinations": { "pass": true, "reason": "..." },
+  "no_hallucinations": { "pass": false, "reason": "Human source review required: ..." },
   "meta_optimized": { "pass": false, "reason": "..." },
   "word_count_target": { "pass": true, "reason": "..." }
 }`;
@@ -394,13 +415,13 @@ Return ONLY valid JSON like:
       workspaceId: req.params.workspaceId,
     });
 
-    const parsed = parseAIJson<Record<string, { pass: boolean; reason: string }>>(result.text);
+    const parsed = parseAIJson<Record<string, AIReviewResult>>(result.text);
     if (!parsed) {
       return res.status(500).json({ error: 'Failed to parse AI review response' });
     }
 
     log.info(`AI review completed for post ${post.id}`);
-    res.json({ review: parsed });
+    res.json({ review: markProvenanceItemsForHumanReview(parsed) });
   } catch (err) {
     log.error({ err }, 'AI review failed');
     const msg = err instanceof Error ? err.message : String(err);

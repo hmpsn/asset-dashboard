@@ -8,17 +8,22 @@ import {
   Sparkles, Loader2,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
+import {
+  type AIReviewResult,
+  PROVENANCE_SENSITIVE_REVIEW_KEYS,
+  type ReviewChecklistKey,
+} from '../../../shared/types/content';
 
-interface ReviewChecklistState {
-  factual_accuracy: boolean;
-  brand_voice: boolean;
-  internal_links: boolean;
-  no_hallucinations: boolean;
-  meta_optimized: boolean;
-  word_count_target: boolean;
+type ReviewChecklistState = Record<ReviewChecklistKey, boolean>;
+
+const provenanceSensitiveKeys = new Set<ReviewChecklistKey>(PROVENANCE_SENSITIVE_REVIEW_KEYS);
+
+interface ChecklistItem {
+  key: ReviewChecklistKey;
+  label: string;
 }
 
-export const CHECKLIST_ITEMS: { key: keyof ReviewChecklistState; label: string }[] = [
+export const CHECKLIST_ITEMS: ChecklistItem[] = [
   { key: 'factual_accuracy', label: 'Factual accuracy verified' },
   { key: 'brand_voice', label: 'Brand voice match confirmed' },
   { key: 'internal_links', label: 'Internal links verified and working' },
@@ -36,17 +41,12 @@ const EMPTY_CHECKLIST: ReviewChecklistState = {
   word_count_target: false,
 };
 
-export interface AIReviewResult {
-  pass: boolean;
-  reason: string;
-}
-
 export interface ReviewChecklistProps {
   postStatus: 'generating' | 'draft' | 'review' | 'approved';
   reviewChecklist: ReviewChecklistState | undefined;
   showChecklist: boolean;
   onToggleShowChecklist: () => void;
-  onToggleItem: (key: keyof ReviewChecklistState) => void;
+  onToggleItem: (key: ReviewChecklistKey) => void;
   onChangeStatus: (status: string) => void;
   onRunAIReview?: () => Promise<Record<string, AIReviewResult> | null>;
   onRequestFix?: (issueKey: string, reason: string) => Promise<void>;
@@ -81,9 +81,17 @@ export function ReviewChecklist({
       const results = await onRunAIReview();
       if (results) {
         setAiResults(results);
-        // Auto-check items that passed
+        // Auto-check objective items that passed. Provenance-sensitive checks need
+        // human source verification even when AI finds no obvious issues.
         for (const item of CHECKLIST_ITEMS) {
-          if (results[item.key]?.pass && !checklist[item.key]) {
+          const result = results[item.key];
+          if (
+            result?.pass &&
+            !result.humanReviewRequired &&
+            // Defense-in-depth: server sets humanReviewRequired, client Set guards regressions.
+            !provenanceSensitiveKeys.has(item.key) &&
+            !checklist[item.key]
+          ) {
             onToggleItem(item.key);
           }
         }
@@ -134,17 +142,17 @@ export function ReviewChecklist({
                       {item.label}
                     </span>
                     {aiResults?.[item.key] && (
-                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-amber-500/8 text-amber-400/80 border border-amber-500/20'}`} /* arbitrary-text-ok */>
-                        {aiResults[item.key].pass ? 'AI: Pass' : 'AI: Review'}
+                      <span className={`ml-auto t-caption-sm px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-amber-500/8 text-amber-400/80 border border-amber-500/20'}`}>
+                        {aiResults[item.key].humanReviewRequired ? 'Human review' : aiResults[item.key].pass ? 'AI: Pass' : 'AI: Review'}
                       </span>
                     )}
                   </button>
                   {aiResults?.[item.key] && (
-                    <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded text-[10px] leading-relaxed ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
+                    <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded t-caption-sm ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
                     </div>
                   )}
-                  {aiResults?.[item.key] && !aiResults[item.key].pass && onRequestFix && (
+                  {aiResults?.[item.key] && !aiResults[item.key].pass && !aiResults[item.key].humanReviewRequired && onRequestFix && (
                     <div className="ml-8 mr-2 mb-1">
                       <button
                         onClick={() => handleFixThis(item.key, aiResults![item.key].reason)}
