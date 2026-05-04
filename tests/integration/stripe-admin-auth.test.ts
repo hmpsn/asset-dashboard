@@ -28,6 +28,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
+import { stopChildProcess } from './helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -35,7 +36,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const TEST_APP_PASSWORD = 'test-stripe-admin-pw-54321';
 const TEST_JWT_SECRET = 'test-stripe-admin-jwt-secret-abcdef';
 
-const GATED_PORT = 13320;
+const GATED_PORT = 13344;
 const GATED_BASE = `http://localhost:${GATED_PORT}`;
 
 let gatedProc: ChildProcess | null = null;
@@ -86,9 +87,10 @@ async function startGatedServer(): Promise<void> {
   });
 }
 
-function stopGatedServer(): void {
-  gatedProc?.kill('SIGTERM');
+async function stopGatedServer(): Promise<void> {
+  const child = gatedProc;
   gatedProc = null;
+  await stopChildProcess(child);
 }
 
 async function gatedFetch(
@@ -143,8 +145,8 @@ describe('Integration — Stripe config endpoints require HMAC admin auth', () =
     await startGatedServer();
   }, 25_000);
 
-  afterAll(() => {
-    stopGatedServer();
+  afterAll(async () => {
+    await stopGatedServer();
     if (testUserId) deleteUser(testUserId);
   });
 

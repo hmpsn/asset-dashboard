@@ -1,6 +1,5 @@
 /**
- * Meta-test: every `createTestContext(<port>)` call across the test tree
- * must use a unique port number.
+ * Meta-test: every integration server port across the test tree must be unique.
  *
  * Round 2 Task P3.1 of the 2026-04-10 pr-check audit. CLAUDE.md requires
  * each integration test file using `createTestContext()` to allocate a
@@ -52,14 +51,15 @@ function walkTestFiles(dir: string): string[] {
   return results;
 }
 
-describe('Meta: createTestContext() port uniqueness', () => {
-  it('every literal port passed to createTestContext() is unique across the test tree', () => {
+describe('Meta: integration server port uniqueness', () => {
+  it('every literal integration server port is unique across the test tree', () => {
     const root = repoRoot();
     const testDir = path.join(root, 'tests');
     const files = walkTestFiles(testDir);
 
     // Map port → list of files that claim it. Duplicates produce a
-    // list longer than one.
+    // list longer than one. Claims include createTestContext(...) ports and
+    // raw server/index.ts spawn helpers that bind their own PORT constants.
     const portClaims = new Map<number, string[]>();
     // Track files that call createTestContext with a first argument we
     // cannot resolve to a number. Local numeric consts like `const PORT = 13322`
@@ -94,7 +94,16 @@ describe('Meta: createTestContext() port uniqueness', () => {
         resolvedCount += 1;
         if (!Number.isFinite(port)) continue;
         if (!portClaims.has(port)) portClaims.set(port, []);
-        portClaims.get(port)!.push(rel);
+        portClaims.get(port)!.push(`${rel}:createTestContext`);
+      }
+
+      if (src.includes('server/index.ts')) {
+        for (const [name, port] of numericConsts) {
+          if (!/PORT/i.test(name)) continue;
+          if (!Number.isFinite(port)) continue;
+          if (!portClaims.has(port)) portClaims.set(port, []);
+          portClaims.get(port)!.push(`${rel}:${name}`);
+        }
       }
       // If the file calls createTestContext at all but no literal was
       // parsed, note it. This is informational, not a hard failure.
@@ -115,10 +124,10 @@ describe('Meta: createTestContext() port uniqueness', () => {
         })
         .join('\n\n');
       throw new Error(
-        `createTestContext() port collisions detected:\n\n${report}\n\n` +
-        `Each integration test file must bind to a unique port. Check the ` +
-        `current range with \`grep -r 'createTestContext(' tests/\` and pick ` +
-        `the next free integer.`,
+        `Integration server port collisions detected:\n\n${report}\n\n` +
+        `Each integration test file must bind to a unique port. Check both ` +
+        `createTestContext(...) calls and raw server/index.ts PORT constants ` +
+        `before picking the next free integer.`,
       );
     }
 

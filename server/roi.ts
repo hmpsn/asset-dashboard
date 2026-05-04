@@ -1,6 +1,7 @@
 /**
  * ROI calculations — organic traffic value, ad spend equivalent, content ROI.
- * Uses GSC clicks × CPC from keyword strategy pageMap.
+ * Uses GSC clicks × CPC from normalized page_keywords rows, with legacy
+ * keyword strategy pageMap fallback for older data.
  */
 
 import db from './db/index.js';
@@ -10,6 +11,7 @@ import { listContentRequests } from './content-requests.js';
 import { listMatrices } from './content-matrices.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { listPageKeywords } from './page-keywords.js';
 
 
 const log = createLogger('roi');
@@ -130,16 +132,17 @@ export interface ContentItemROI {
 
 /**
  * Compute ROI data for a workspace.
- * Pulls keyword strategy pageMap (with clicks, CPC) from workspace config.
+ * Pulls normalized page_keywords rows (with clicks, CPC) for the workspace,
+ * falling back to legacy keywordStrategy.pageMap when rows have not migrated.
  */
 export function computeROI(workspaceId: string): ROIData | null {
   const ws = getWorkspace(workspaceId);
   if (!ws) return null;
 
-  const strategy = ws.keywordStrategy;
-  if (!strategy || !strategy.pageMap || strategy.pageMap.length === 0) return null;
-
-  const pages = strategy.pageMap;
+  const pageKeywordRows = listPageKeywords(workspaceId);
+  const legacyPageMap = ws.keywordStrategy?.pageMap ?? [];
+  const pages = pageKeywordRows.length > 0 ? pageKeywordRows : legacyPageMap;
+  if (pages.length === 0) return null;
 
   // Build page breakdown
   const pageBreakdown: PageROI[] = [];

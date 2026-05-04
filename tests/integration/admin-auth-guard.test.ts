@@ -36,6 +36,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { stopChildProcess } from './helpers.js';
 
 // ─── Unit imports (in-process) ───
 import { signAdminToken, verifyAdminToken } from '../../server/middleware.js';
@@ -53,7 +54,7 @@ const TEST_APP_PASSWORD = 'test-admin-secret-pw-12345';
 // which disables the gate. This standalone helper spawns a second server
 // instance with a real password so we can exercise the gate logic end-to-end.
 
-const GATED_PORT = 13313;
+const GATED_PORT = 13342;
 const GATED_BASE = `http://localhost:${GATED_PORT}`;
 
 let gatedProc: ChildProcess | null = null;
@@ -101,9 +102,10 @@ async function startGatedServer(): Promise<void> {
   });
 }
 
-function stopGatedServer(): void {
-  gatedProc?.kill('SIGTERM');
+async function stopGatedServer(): Promise<void> {
+  const child = gatedProc;
   gatedProc = null;
+  await stopChildProcess(child);
 }
 
 /** Make a request to the gated server with explicit headers. */
@@ -350,8 +352,8 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
     await startGatedServer();
   }, 25_000);
 
-  afterAll(() => {
-    stopGatedServer();
+  afterAll(async () => {
+    await stopGatedServer();
   });
 
   // ── Requests that should be BLOCKED (401) ──
@@ -525,7 +527,7 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
 // are accessible without any auth header. This is the development default.
 
 describe('Integration — ungated server (APP_PASSWORD empty) baseline', () => {
-  const UNGATED_PORT = 13314;
+  const UNGATED_PORT = 13343;
   const UNGATED_BASE = `http://localhost:${UNGATED_PORT}`;
   let ungatedProc: ChildProcess | null = null;
 
@@ -570,9 +572,10 @@ describe('Integration — ungated server (APP_PASSWORD empty) baseline', () => {
     });
   }, 25_000);
 
-  afterAll(() => {
-    ungatedProc?.kill('SIGTERM');
+  afterAll(async () => {
+    const child = ungatedProc;
     ungatedProc = null;
+    await stopChildProcess(child);
   });
 
   async function ungatedFetch(urlPath: string, opts: RequestInit = {}): Promise<Response> {

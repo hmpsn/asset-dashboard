@@ -8,6 +8,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ensureIsolatedTestDataDir } from '../test-data-dir.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -36,6 +37,7 @@ export interface TestContext {
  */
 export function createTestContext(port: number): TestContext {
   const BASE = `http://localhost:${port}`;
+  const dataDir = process.env.DATA_DIR ?? ensureIsolatedTestDataDir();
   let proc: ChildProcess | null = null;
   const cookieJar: Record<string, string> = {};
   let authToken = '';
@@ -75,6 +77,7 @@ export function createTestContext(port: number): TestContext {
         // open file descriptor limits when multiple test servers run concurrently.
         NODE_ENV: 'test',
         APP_PASSWORD: '',
+        DATA_DIR: dataDir,
       },
       stdio: 'pipe',
     });
@@ -118,32 +121,7 @@ export function createTestContext(port: number): TestContext {
     if (!child) return;
     if (child.exitCode !== null || child.signalCode !== null) return;
 
-    await new Promise<void>((resolve) => {
-      let settled = false;
-      let gracefulTimer: ReturnType<typeof setTimeout> | undefined;
-      let forceTimer: ReturnType<typeof setTimeout> | undefined;
-
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        if (gracefulTimer) clearTimeout(gracefulTimer);
-        if (forceTimer) clearTimeout(forceTimer);
-        child.off('exit', finish);
-        child.off('error', finish);
-        resolve();
-      };
-
-      child.once('exit', finish);
-      child.once('error', finish);
-      gracefulTimer = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          child.kill('SIGKILL');
-        }
-      }, 5_000);
-      forceTimer = setTimeout(finish, 8_000);
-
-      if (!child.kill('SIGTERM')) finish();
-    });
+    await stopChildProcess(child);
   }
 
   function clearCookies(): void {
@@ -244,6 +222,38 @@ export function createTestContext(port: number): TestContext {
     authPatchJson,
     authDel,
   };
+}
+
+export async function stopChildProcess(child: ChildProcess | null): Promise<void> {
+  if (!child) return;
+  if (child.exitCode !== null || child.signalCode !== null) return;
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    let gracefulTimer: ReturnType<typeof setTimeout> | undefined;
+    let forceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (gracefulTimer) clearTimeout(gracefulTimer);
+      if (forceTimer) clearTimeout(forceTimer);
+      child.off('exit', finish);
+      child.off('error', finish);
+      resolve();
+    };
+
+    child.once('exit', finish);
+    child.once('error', finish);
+    gracefulTimer = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+      }
+    }, 5_000);
+    forceTimer = setTimeout(finish, 8_000);
+
+    if (!child.kill('SIGTERM')) finish();
+  });
 }
 
 // ─── Server readiness helper ──────────────────────────────────────────────────
