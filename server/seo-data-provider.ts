@@ -140,8 +140,8 @@ export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider
     const p = providers.get(preferred);
     if (p?.isConfigured()) return p;
   }
-  // Fall back to any configured provider (prefer semrush for backwards compat)
-  for (const name of ['semrush', 'dataforseo'] as ProviderName[]) {
+  // Fall back to any configured provider (DataForSEO is now the primary provider)
+  for (const name of ['dataforseo', 'semrush'] as ProviderName[]) {
     const p = providers.get(name);
     if (p?.isConfigured()) return p;
   }
