@@ -1,5 +1,8 @@
 /**
  * public-portal routes — extracted from server/index.ts
+ *
+ * @reads workspaces, snapshots, keyword_feedback, client_business_priorities, content_gap_votes, copy_sections, briefing_store, recommendations, stripe_products, search_console, google_analytics
+ * @writes workspaces, keyword_feedback, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
  */
 import { Router } from 'express';
 

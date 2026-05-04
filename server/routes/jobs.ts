@@ -1,5 +1,8 @@
 /**
  * jobs routes — extracted from server/index.ts
+ *
+ * @reads jobs, workspaces, snapshots, schema_snapshots, recommendations, workspace_pages, page_keywords, google_analytics, search_console, webflow_api
+ * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, seo_changes, usage_tracking, activities
  */
 import { Router } from 'express';
 

@@ -1,5 +1,8 @@
 /**
  * public-analytics routes — extracted from server/index.ts
+ *
+ * @reads analytics_insights, search_console, google_analytics, chat_memory, workspaces, snapshots, workspace_intelligence, studio_config
+ * @writes chat_memory, activities
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';

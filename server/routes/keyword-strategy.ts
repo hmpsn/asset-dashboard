@@ -1,5 +1,8 @@
 /**
  * keyword-strategy routes — extracted from server/index.ts
+ *
+ * @reads workspaces, page_keywords, strategy_history, keyword_feedback, snapshots, search_console, google_analytics, seo_provider, workspace_intelligence, workspace_pages, analytics_insights
+ * @writes page_keywords, strategy_history, keyword_feedback, tracked_keywords, workspaces, usage_tracking, intelligence_cache
  */
 import { Router } from 'express';
 

@@ -4398,6 +4398,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)
     'useWorkspaceEvents handler for centralized event',
+    // Bug guardrail sweep (2026-05-03)
+    'Route read/write contract annotations',
     // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
     'roadmap.json item ID uniqueness',
     // Design-system enforcement rules (Phase 1, PR #277)
@@ -4726,6 +4728,40 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
+  it('flags a raw string handler for a centralized event', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        "    'activity:new': () => {",
+        '      // duplicate invalidation with no WS_EVENTS import',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('suppresses a raw string handler with inline // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        "    'activity:new': () => {}, // ws-invalidation-ok — client route local refresh",
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
   it('suppresses with inline // ws-invalidation-ok hatch', () => {
     const file = write(
       uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
@@ -4787,6 +4823,159 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
         '    [WS_EVENTS.STRATEGY_UPDATED]: () => {},',
         '  });',
         '});',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Route read/write contract annotations', () => {
+  const RULE = 'Route read/write contract annotations';
+
+  it('flags a required high-churn route file with no contract tags', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "import { Router } from 'express';",
+        'const router = Router();',
+        "router.get('/:workspaceId', (_req, res) => res.json({ ok: true }));",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits.map((hit) => hit.text).sort()).toEqual([
+      'missing @reads contract',
+      'missing @writes contract',
+    ]);
+  });
+
+  it('accepts a required route file with well-formed @reads and @writes tags', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * Route contract:',
+        ' * @reads: workspaces, page_keywords',
+        ' * @writes: page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags malformed contract values', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads TODO',
+        ' * @writes page_keywords?',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].text).toContain('malformed route contract value');
+  });
+
+  it('flags empty contract values', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads',
+        ' * @writes page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('<empty>');
+  });
+
+  it('accepts none as an explicit empty-side contract value', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads workspaces',
+        ' * @writes none',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('requires contract tags near the top of the route file', () => {
+    const filler = Array.from({ length: 42 }, (_, index) => `// filler ${index}`);
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "import { Router } from 'express';",
+        ...filler,
+        '/* @reads workspaces */',
+        '/* @writes page_keywords */',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map((hit) => hit.text).sort()).toEqual([
+      'missing @reads contract',
+      'missing @writes contract',
+    ]);
+  });
+
+  it('does not treat @readsOnly as a valid contract tag', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @readsOnly cached helper docs',
+        ' * @writes page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map((hit) => hit.text)).toEqual(['missing @reads contract']);
+  });
+
+  it('does NOT require contracts for route files outside the initial enforced set', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/small-route.ts'),
+      lines(
+        "import { Router } from 'express';",
+        'const router = Router();',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('still validates malformed tags in non-required route files', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/small-route.ts'),
+      lines(
+        '/**',
+        ' * @reads TODO',
+        ' * @writes none',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('TODO');
+  });
+
+  it('suppresses with file-level // route-contract-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '// route-contract-ok — generated route file scheduled for deletion',
+        "import { Router } from 'express';",
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);

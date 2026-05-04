@@ -1,5 +1,8 @@
 /**
  * webflow-schema routes — extracted from server/index.ts
+ *
+ * @reads workspaces, schema_snapshots, schema_templates, schema_plans, schema_validations, schema_publish_history, schema_cms_field_mappings, workspace_pages, pending_schemas, webflow_api
+ * @writes schema_snapshots, schema_templates, schema_plans, schema_validations, schema_publish_history, schema_cms_field_mappings, pending_schemas, approvals, outcome_actions, seo_changes, activities
  */
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
