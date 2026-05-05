@@ -1,7 +1,7 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
-import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
+import type { LatestRank, RankHistoryEntry } from '../components/client/types';
 import { readNdjsonStream, readSseStream } from './streamUtils';
 
 const workspaceQuery = (workspaceId?: string) => workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';

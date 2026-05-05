@@ -308,7 +308,7 @@ Each intelligence slice is a "column" of the platform brain. Files can appear un
 | Hook | File | API Endpoint |
 |------|------|-------------|
 | `useClientAuth()` | `hooks/useClientAuth.ts` | `/api/public/auth/:wsId` |
-| `useClientData()` | `hooks/useClientData.ts` | Aggregates all client data |
+| `useClientSearch()` / `useClientGA4()` / `useClient*()` | `hooks/client/` | Client portal React Query data domains |
 | `useChat()` | `hooks/useChat.ts` | `/api/public/search-chat/:wsId` |
 
 ---

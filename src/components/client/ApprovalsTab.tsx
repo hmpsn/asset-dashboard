@@ -5,8 +5,7 @@ import {
 import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier, Icon, Button, ClickableRow, SectionCard } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
-import type { ApprovalBatch, ApprovalItem } from './types';
-import type { ApprovalPageKeyword } from '../../hooks/useClientData';
+import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
 import { findPageMapEntryBySlug } from '../../lib/pathUtils';
 
