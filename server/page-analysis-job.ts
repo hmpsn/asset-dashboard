@@ -106,6 +106,11 @@ export async function runPageAnalysisJob({
   token,
   forceRefresh = false,
 }: RunPageAnalysisJobOptions): Promise<void> {
+  let analyzed = 0;
+  let skippedFetch = 0;
+  let failed = 0;
+  let queuedTotal = 0;
+
   try {
     updateJob(jobId, { status: 'running', message: 'Discovering pages...' });
 
@@ -141,6 +146,17 @@ export async function runPageAnalysisJob({
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'page-analysis-job: programming error'); /* CMS discovery failed — continue with static pages */ }
     }
 
+    if (pages.length === 0) {
+      updateJob(jobId, {
+        status: 'done',
+        message: 'No pages were discovered for analysis. Sync Webflow pages or check the site connection.',
+        progress: 0,
+        total: 0,
+        result: { analyzed: 0, skipped: 0, skippedFetch: 0, failed: 0, total: 0 },
+      });
+      return;
+    }
+
     // 2. Skip already-analyzed pages (unless forceRefresh)
     let toAnalyze: PageItem[];
     if (forceRefresh) {
@@ -158,11 +174,18 @@ export async function runPageAnalysisJob({
     }
 
     const total = toAnalyze.length;
+    queuedTotal = total;
     log.info({ total, skipped: pages.length - total, forceRefresh }, 'Page analysis: starting');
     updateJob(jobId, { message: forceRefresh ? `Re-analyzing all ${total} pages...` : `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
 
     if (total === 0) {
-      updateJob(jobId, { status: 'done', message: `All ${pages.length} pages already analyzed`, progress: pages.length, total: pages.length });
+      updateJob(jobId, {
+        status: 'done',
+        message: `All ${pages.length} pages already analyzed`,
+        progress: pages.length,
+        total: pages.length,
+        result: { analyzed: 0, skipped: pages.length, skippedFetch: 0, failed: 0, total: pages.length },
+      });
       return;
     }
 
@@ -171,7 +194,12 @@ export async function runPageAnalysisJob({
     let done = 0;
     const openaiKey = process.env.OPENAI_API_KEY;
     if (!openaiKey) {
-      updateJob(jobId, { status: 'error', error: 'OPENAI_API_KEY not configured' });
+      updateJob(jobId, {
+        status: 'error',
+        error: 'OPENAI_API_KEY not configured',
+        message: 'Page analysis needs an OpenAI API key before it can run.',
+        result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
+      });
       return;
     }
 
@@ -209,6 +237,11 @@ export async function runPageAnalysisJob({
               const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS, signal: AbortSignal.timeout(10_000) });
               if (r.ok) { html = await r.text(); break; }
             } catch { /* try next */ }
+          }
+          if (!html) {
+            skippedFetch += 1;
+            log.warn({ page: page.path, attemptedUrls: urls }, 'Page analysis skipped because no usable HTML content was available');
+            return;
           }
 
           // Extract title, meta desc, body text
@@ -276,6 +309,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           applyBulkKeywordGuards(analysis, semrushBlock);
           batchResults.push({ page, analysis });
         } catch (err) {
+          failed += 1;
           log.warn({ err, page: page.path }, 'Page analysis failed for individual page');
         }
       }));
@@ -316,22 +350,39 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           };
         });
         upsertPageKeywordsBatch(workspaceId, entries);
+        analyzed += entries.length;
         log.info({ batchSize: entries.length, totalPages: countPageKeywords(workspaceId), withScores: countAnalyzedPages(workspaceId) }, 'Page analysis: batch persisted');
       }
 
       done += batch.length;
-      updateJob(jobId, { progress: Math.min(done, total), message: `Analyzed ${Math.min(done, total)}/${total} pages...` });
+      const skipped = skippedFetch + failed;
+      const suffix = skipped > 0 ? ` (${skipped} skipped)` : '';
+      updateJob(jobId, { progress: Math.min(done, total), message: `Analyzed ${analyzed}/${total} pages${suffix}...` });
 
       // Rate limit between batches
       if (i + BATCH < toAnalyze.length) await new Promise(r => setTimeout(r, 1500));
     }
 
     if (isJobCancelled(jobId)) {
-      updateJob(jobId, { status: 'cancelled', message: `Cancelled — ${done} of ${total} pages analyzed` });
+      updateJob(jobId, {
+        status: 'cancelled',
+        message: `Cancelled — ${analyzed} of ${total} pages analyzed`,
+        result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total },
+      });
     } else {
-      updateJob(jobId, { status: 'done', progress: total, total, message: `Done — ${total} pages analyzed` });
+      const skipped = skippedFetch + failed;
+      const message = skipped > 0
+        ? `Done — ${analyzed}/${total} pages analyzed (${skipped} skipped)`
+        : `Done — ${analyzed} pages analyzed`;
+      updateJob(jobId, {
+        status: 'done',
+        progress: total,
+        total,
+        message,
+        result: { analyzed, skipped, skippedFetch, failed, total },
+      });
     }
-    addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${done} pages`, `${pages.length} total pages, ${total} analyzed`);
+    addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     // Bridge #5: bulk page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
       clearSeoContextCache(workspaceId);
@@ -342,7 +393,12 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
   } catch (err) {
     log.error({ err, jobId }, 'Page analysis job failed');
     if (!isJobCancelled(jobId)) {
-      updateJob(jobId, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
+      updateJob(jobId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        message: 'Page analysis failed',
+        result: { analyzed, skipped: skippedFetch + failed, skippedFetch, failed, total: queuedTotal },
+      });
     }
   } finally {
     unregisterAbort(jobId);
