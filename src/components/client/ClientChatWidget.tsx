@@ -117,7 +117,7 @@ export function ClientChatWidget({
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
             <div className="flex items-center gap-2">
               <Icon as={Sparkles} size="md" className="text-accent-brand" />
-              <span className="t-body font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
+              <span className="t-ui font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
                 <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left
@@ -226,7 +226,7 @@ export function ClientChatWidget({
                       ))}
                     </div>
                     <div className="pt-3 border-t border-[var(--brand-border)]/50">
-                      <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">New to SEO? Ask the AI</p>
+                      <p className="t-label text-[var(--brand-text-muted)] mb-2">New to SEO? Ask the AI</p>
                       {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
                         <ClickableRow
                           key={`learn-${i}`}
@@ -282,7 +282,7 @@ export function ClientChatWidget({
                     {/* Show quick questions as follow-ups after proactive greeting */}
                     {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && !chatLoading && (
                       <div className="space-y-1.5 pt-1">
-                        <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Ask a follow-up</p>
+                        <p className="t-label text-[var(--brand-text-muted)]">Ask a follow-up</p>
                         {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
                           <ClickableRow
                             key={i}
@@ -292,7 +292,7 @@ export function ClientChatWidget({
                             {q}
                           </ClickableRow>
                         ))}
-                        <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mt-3">New to SEO?</p>
+                        <p className="t-label text-[var(--brand-text-muted)] mt-3">New to SEO?</p>
                         {LEARN_SEO_QUESTIONS.slice(0, 2).map((q, i) => (
                           <ClickableRow
                             key={`learn-${i}`}

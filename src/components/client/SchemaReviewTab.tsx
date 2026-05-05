@@ -175,7 +175,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Icon as={Globe} size="md" className="text-accent-brand" />
-              <span className="t-body font-medium text-[var(--brand-text)]">Your Schema Plan</span>
+              <span className="t-ui font-medium text-[var(--brand-text-bright)]">Your Schema Plan</span>
               {statusBadge(plan.status)}
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -289,14 +289,14 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy
                   </button>
                   <button
                     onClick={() => setShowFeedback(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border-strong)] transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-strong)] transition-colors"
                   >
                     <Icon as={MessageSquare} size="md" /> Request Changes
                   </button>
@@ -338,7 +338,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Icon as={Globe} size="md" className="text-accent-brand" />
-              <span className="t-body font-medium text-[var(--brand-text)]">Schema Analysis</span>
+              <span className="t-ui font-medium text-[var(--brand-text-bright)]">Schema Analysis</span>
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {snapshot.pageCount} pages analyzed · {new Date(snapshot.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

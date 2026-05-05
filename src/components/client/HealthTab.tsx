@@ -230,7 +230,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="flex items-center gap-4">
               <div className={`t-stat-lg ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
-                <div className="t-body font-medium text-[var(--brand-text)]">Your site's health</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Your site's health</div>
                 <div className="t-body text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
@@ -452,7 +452,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs}E</span>}
                             {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns}W</span>}
-                            <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                            <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                             <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                           </div>
                         </ClickableRow>
@@ -636,7 +636,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs} err</span>}
                       {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns} warn</span>}
-                      <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                      <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </ClickableRow>
@@ -784,7 +784,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         <ClickableRow onClick={() => toggleSection('history')} className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <Icon as={BarChart3} size="md" className="text-[var(--brand-text-muted)]" />
-            <span className="t-body font-medium text-[var(--brand-text)]">History &amp; Details</span>
+            <span className="t-ui font-medium text-[var(--brand-text-bright)]">History &amp; Details</span>
           </div>
           <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
         </ClickableRow>
@@ -793,13 +793,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* Score History */}
             {auditDetail.scoreHistory.length >= 2 && (
               <div className="pt-4">
-                <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Score History</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-2">Score History</div>
                 <ScoreHistoryChart history={auditDetail.scoreHistory} />
               </div>
             )}
             {/* Category Breakdown */}
             <div>
-              <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Issues by Category</div>
+              <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
                   const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
@@ -829,7 +829,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>
-          <div className="t-body font-medium text-[var(--brand-text)]">Site Health Score</div>
+          <div className="t-ui font-medium text-[var(--brand-text-bright)]">Site Health Score</div>
           <div className="t-caption text-[var(--brand-text-muted)]">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
           <div className="flex gap-3 mt-2"><span className="t-caption text-accent-danger">{audit.errors} errors</span><span className="t-caption text-accent-warning">{audit.warnings} warnings</span></div>
         </div>

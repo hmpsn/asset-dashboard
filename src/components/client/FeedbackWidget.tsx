@@ -142,7 +142,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
         <div className="flex items-center gap-2">
           <Icon as={MessageSquarePlus} size="md" className="text-accent-brand" />
-          <span className="t-body font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
+          <span className="t-ui font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
           <span className="t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-teal-500/20">beta</span>
         </div>
         <div className="flex items-center gap-1">
@@ -165,7 +165,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
               <div className="w-12 h-12 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
                 <Icon as={CheckCircle2} size="xl" className="text-accent-success" />
               </div>
-              <p className="t-body font-medium text-[var(--brand-text-bright)]">Thank you!</p>
+              <p className="t-ui font-medium text-[var(--brand-text-bright)]">Thank you!</p>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Your feedback has been submitted.</p>
             </div>
           ) : (

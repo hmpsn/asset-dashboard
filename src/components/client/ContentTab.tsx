@@ -150,7 +150,7 @@ export function ContentTab({
         <div className="grid grid-cols-4 gap-3">
           {stats.map(s => (
             <div key={s.label} className={`${s.bg} border ${s.border} rounded-[var(--radius-lg)] px-3 py-2 text-center`}>
-              <div className={`t-stat-sm ${s.color} tabular-nums`}>{s.value}</div>
+              <div className={`t-stat-sm ${s.color}`}>{s.value}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">{s.label}</div>
             </div>
           ))}
@@ -308,7 +308,7 @@ export function ContentTab({
                     {/* — Strategic Overview — */}
                     {brief.executiveSummary && (
                       <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
-                        <div className="t-caption-sm text-accent-brand font-medium tracking-wider mb-1.5">Strategic Overview</div>
+                        <div className="t-label text-accent-brand mb-1.5">Strategic Overview</div>
                         <div className="t-body text-[var(--brand-text)] leading-relaxed">{brief.executiveSummary}</div>
                       </div>
                     )}
@@ -317,7 +317,7 @@ export function ContentTab({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Word Count</div>
-                        <div className="t-body font-bold text-accent-brand">{brief.wordCountTarget?.toLocaleString()}</div>
+                        <div className="t-stat-sm text-accent-brand">{brief.wordCountTarget?.toLocaleString()}</div>
                       </div>
                       <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Search Intent</div>
@@ -332,7 +332,7 @@ export function ContentTab({
                       {brief.difficultyScore != null && (
                         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Difficulty</div>
-                          <div className={`t-body font-bold ${brief.difficultyScore <= 30 ? 'text-accent-success' : brief.difficultyScore <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>{brief.difficultyScore}/100</div>
+                          <div className={`t-stat-sm ${brief.difficultyScore <= 30 ? 'text-accent-success' : brief.difficultyScore <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>{brief.difficultyScore}/100</div>
                         </div>
                       )}
                     </div>
@@ -347,7 +347,7 @@ export function ContentTab({
 
                     {/* — Content Direction — */}
                     <div className="space-y-3">
-                      <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Direction</div>
+                      <div className="t-label text-[var(--brand-text-muted)] flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Direction</div>
                       <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Suggested Title</div>
                         <div className="t-body text-accent-brand font-medium">{brief.suggestedTitle}</div>
@@ -385,12 +385,12 @@ export function ContentTab({
                     {/* — Detailed Outline — */}
                     {brief.outline?.length > 0 && (
                       <div className="space-y-3">
-                        <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Outline</div>
+                        <div className="t-label text-[var(--brand-text-muted)] flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Outline</div>
                         <div className="space-y-2">
                           {brief.outline.map((s: { heading: string; notes: string; wordCount?: number; keywords?: string[] }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center justify-between">
-                                <div className="t-ui font-medium text-[var(--brand-text-bright)]">H2: {s.heading}</div>
+                                <div className="t-body font-medium text-[var(--brand-text-bright)]">H2: {s.heading}</div>
                                 {s.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.wordCount} words</span>}
                               </div>
                               <div className="t-body text-[var(--brand-text-muted)] mt-1.5 leading-relaxed">{s.notes}</div>
@@ -465,7 +465,7 @@ export function ContentTab({
                     {/* — E-E-A-T Guidance — */}
                     {brief.eeatGuidance && (
                       <div className="space-y-3">
-                        <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">E-E-A-T Signals</div>
+                        <div className="t-label text-[var(--brand-text-muted)] flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">E-E-A-T Signals</div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {[
                             { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-accent-info' },
@@ -485,7 +485,7 @@ export function ContentTab({
                     {/* — Content Checklist — */}
                     {brief.contentChecklist && brief.contentChecklist.length > 0 && (
                       <div className="space-y-3">
-                        <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Checklist</div>
+                        <div className="t-label text-[var(--brand-text-muted)] flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Checklist</div>
                         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
                           {brief.contentChecklist.map((item: string, i: number) => (
                             <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
@@ -500,7 +500,7 @@ export function ContentTab({
                     {/* — Schema Markup — */}
                     {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
                       <div className="space-y-3">
-                        <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Schema Markup</div>
+                        <div className="t-label text-[var(--brand-text-muted)] flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Schema Markup</div>
                         <div className="space-y-2">
                           {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
@@ -579,36 +579,36 @@ export function ContentTab({
                     <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 p-5 space-y-2" style={{ borderRadius: 'var(--radius-signature)' }}>
                       <div className="flex items-center gap-2 mb-1">
                         <Icon as={BarChart3} size="md" className="text-accent-info" />
-                        <span className="t-caption-sm text-accent-info font-medium tracking-wider">Content Performance</span>
+                        <span className="t-label text-accent-info">Content Performance</span>
                         {perf.daysSincePublish > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{perf.daysSincePublish}d since publish</span>}
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {gsc && <>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={MousePointerClick} size="sm" /> Clicks</div>
-                            <div className="t-body font-bold text-accent-brand tabular-nums">{gsc.clicks.toLocaleString()}</div>
+                            <div className="t-stat-sm text-accent-brand">{gsc.clicks.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={Eye} size="sm" /> Impressions</div>
-                            <div className="t-body font-bold text-accent-info tabular-nums">{gsc.impressions.toLocaleString()}</div>
+                            <div className="t-stat-sm text-accent-info">{gsc.impressions.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={ArrowUpRight} size="sm" /> CTR</div>
-                            <div className="t-body font-bold text-[var(--brand-text)] tabular-nums">{gsc.ctr}%</div>
+                            <div className="t-stat-sm text-[var(--brand-text)]">{gsc.ctr}%</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] mb-0.5"><Icon as={TrendingUp} size="sm" /> Avg Position</div>
-                            <div className={`t-body font-bold tabular-nums ${gsc.position <= 10 ? 'text-accent-success' : gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>{gsc.position}</div>
+                            <div className={`t-stat-sm ${gsc.position <= 10 ? 'text-accent-success' : gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>{gsc.position}</div>
                           </div>
                         </>}
                         {ga4 && !gsc && <>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Sessions</div>
-                            <div className="t-body font-bold text-accent-brand tabular-nums">{ga4.sessions.toLocaleString()}</div>
+                            <div className="t-stat-sm text-accent-brand">{ga4.sessions.toLocaleString()}</div>
                           </div>
                           <div className="bg-[var(--surface-1)]/60 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Users</div>
-                            <div className="t-body font-bold text-accent-info tabular-nums">{ga4.users.toLocaleString()}</div>
+                            <div className="t-stat-sm text-accent-info">{ga4.users.toLocaleString()}</div>
                           </div>
                         </>}
                       </div>

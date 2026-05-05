@@ -88,7 +88,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
                   <Icon className="w-4 h-4 text-[var(--brand-text)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="t-body font-medium text-[var(--brand-text-bright)]">{product.label}</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">{product.label}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">
                     {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     {order.pageIds.length > 0 && ` · ${order.pageIds.length} page${order.pageIds.length !== 1 ? 's' : ''}`}
