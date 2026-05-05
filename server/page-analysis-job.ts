@@ -127,7 +127,8 @@ export async function runPageAnalysisJob({
     if (baseUrl) {
       try {
         const staticPaths = buildStaticPathSet(published);
-        const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
+        // Keep parity with /api/webflow/all-pages so background analysis covers the same CMS corpus the UI can display.
+        const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 500);
         for (const cms of cmsUrls) {
           pages.push({
             id: toCmsPageId(cms.path),

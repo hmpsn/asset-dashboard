@@ -215,6 +215,35 @@ describe('Jobs — creation validation', () => {
     expect(body.error).toBe('workspaceId required');
   });
 
+  it('POST /api/jobs with page-analysis without params returns 400', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'page-analysis',
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('siteId and workspaceId required');
+  });
+
+  it('POST /api/jobs with page-analysis without siteId returns 400', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'page-analysis',
+      params: { workspaceId: testWsId },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('siteId and workspaceId required');
+  });
+
+  it('POST /api/jobs with page-analysis without workspaceId returns 400', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'page-analysis',
+      params: { siteId: 'wf-site-jobs-test' },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('siteId and workspaceId required');
+  });
+
   it('POST /api/jobs with keyword-strategy requires a linked Webflow site', async () => {
     const res = await postJson('/api/jobs', {
       type: 'keyword-strategy',
@@ -245,4 +274,5 @@ describe('Jobs — creation validation', () => {
       jobId: firstBody.jobId,
     });
   });
+
 });

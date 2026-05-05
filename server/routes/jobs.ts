@@ -137,7 +137,7 @@ router.delete('/api/jobs/:id', (req, res) => {
 });
 
 router.post('/api/jobs', async (req, res) => {
-  const { type, params } = req.body as { type: string; params: Record<string, unknown> };
+  const { type, params = {} } = req.body as { type: string; params?: Record<string, unknown> };
   if (!type) return res.status(400).json({ error: 'type required' });
   const requestedWorkspaceId = params?.workspaceId;
   if (typeof requestedWorkspaceId === 'string' && !requestUserCanAccessWorkspace(req, requestedWorkspaceId)) {
