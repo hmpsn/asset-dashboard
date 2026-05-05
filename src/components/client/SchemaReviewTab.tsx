@@ -3,7 +3,8 @@
  * Simplified view of the admin's SchemaSuggester: shows page roles,
  * schema types, and lets clients approve or request changes at the plan level.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional, post } from '../../api/client';
 import { EmptyState, Icon} from '../ui';
 import {
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_CLIENT_DESC } from '../../../shared/types/schema-plan';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface SchemaSnapshotPage {
   pageId: string;
@@ -54,34 +56,27 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
 const DEFAULT_ROLE_COLOR = 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30';
 
 export function SchemaReviewTab({ workspaceId, setToast }: Props) {
-  const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
-  const [snapshot, setSnapshot] = useState<SchemaSnapshotSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const [planData, snapData] = await Promise.all([
-          getOptional<SchemaSitePlan>(`/api/public/schema-plan/${workspaceId}`),
-          getOptional<SchemaSnapshotSummary>(`/api/public/schema-snapshot/${workspaceId}`),
-        ]);
-        if (!cancelled) {
-          setPlan(planData ?? null);
-          setSnapshot(snapData ?? null);
-        }
-      } catch (err) {
-        console.error('SchemaReviewTab load error:', err);
-      }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [workspaceId]);
+  const planQuery = useQuery({
+    queryKey: queryKeys.client.schemaPlan(workspaceId),
+    queryFn: () => getOptional<SchemaSitePlan>(`/api/public/schema-plan/${workspaceId}`),
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+  });
+  const snapshotQuery = useQuery({
+    queryKey: queryKeys.client.schemaSnapshot(workspaceId),
+    queryFn: () => getOptional<SchemaSnapshotSummary>(`/api/public/schema-snapshot/${workspaceId}`),
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+  });
+  const plan = planQuery.data ?? null;
+  const snapshot = snapshotQuery.data ?? null;
+  const loading = planQuery.isLoading || snapshotQuery.isLoading;
 
   const handleFeedback = async (action: 'approve' | 'request_changes') => {
     setSubmitting(true);
@@ -90,7 +85,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
         action,
         note: feedbackNote.trim() || undefined,
       });
-      setPlan(result);
+      queryClient.setQueryData(queryKeys.client.schemaPlan(workspaceId), result);
       setShowFeedback(false);
       setFeedbackNote('');
       setToast({

@@ -30,6 +30,7 @@ export const WS_EVENTS = {
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
   SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
+  SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated',
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
   OUTCOME_SCORED: 'outcome:scored',
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
