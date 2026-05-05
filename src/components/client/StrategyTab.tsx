@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
@@ -162,9 +163,30 @@ const SIGNAL_LABELS: Record<string, string> = {
   'Competitor gap': "Competitors rank here — you don't yet",
 };
 
+const STRATEGY_TAB_SECTION_MAP = {
+  'content-gaps': 'new-content',
+  'quick-wins': 'optimize-existing',
+  'page-keyword-map': 'page-keyword-map',
+  'business-priorities': 'business-priorities',
+} as const;
+
+type StrategyDeepLinkTab = keyof typeof STRATEGY_TAB_SECTION_MAP;
+
+function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkTab {
+  return value != null && Object.prototype.hasOwnProperty.call(STRATEGY_TAB_SECTION_MAP, value);
+}
+
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['new-content', 'optimize-existing']));
+  const [searchParams] = useSearchParams();
+  const initialDeepLinkTab = searchParams.get('tab');
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    const initial = new Set(['new-content', 'optimize-existing']);
+    if (isStrategyDeepLinkTab(initialDeepLinkTab)) {
+      initial.add(STRATEGY_TAB_SECTION_MAP[initialDeepLinkTab]);
+    }
+    return initial;
+  });
 
   // ── Keyword Feedback State ──
   const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined' | 'requested'>>(new Map());
@@ -422,11 +444,36 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const kwListScrollRef = useRef<HTMLDivElement>(null);
   const [kwListOverflows, setKwListOverflows] = useState(false);
+  // effect-layout-ok — overflow measurement depends on rendered DOM dimensions.
   useEffect(() => {
     const el = kwListScrollRef.current;
     if (!el) return;
     setKwListOverflows(el.scrollHeight > el.clientHeight);
   });
+
+  // effect-layout-ok — section expansion is initialized synchronously; this handles same-page URL changes and post-mount scrolling.
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (!isStrategyDeepLinkTab(tab)) return;
+
+    const section = STRATEGY_TAB_SECTION_MAP[tab];
+    setExpandedSections(prev => {
+      if (prev.has(section)) return prev;
+      const next = new Set(prev);
+      next.add(section);
+      return next;
+    });
+
+    const refs: Record<StrategyDeepLinkTab, React.RefObject<HTMLDivElement | null>> = {
+      'content-gaps': newContentRef,
+      'quick-wins': optimizeExistingRef,
+      'page-keyword-map': priorityKeywordsRef,
+      'business-priorities': priorityKeywordsRef,
+    };
+    window.setTimeout(() => {
+      refs[tab].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, [searchParams]);
 
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -913,7 +960,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     {/* Role indicator dot */}
                     <div
                       aria-hidden="true"
-                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${
+                      className={`w-1.5 h-1.5 rounded-[var(--radius-pill)] flex-shrink-0 mt-0.5 ${
                         row.role === 'content' ? 'bg-emerald-400' :
                         row.role === 'page' ? 'bg-blue-400' :
                         row.role === 'strategy' ? 'bg-teal-400' :
@@ -1930,7 +1977,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 {/* Opportunity section — plain English */}
                 {unenriched ? (
                   <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] px-3 py-3 flex items-start gap-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" /> {/* rounded-literal-ok — circle dot indicator */}
+                    <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] mt-1.5 animate-pulse flex-shrink-0" />
                     <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed">
                       We're collecting search data for this keyword. Volume and competition metrics will appear within 24 hours.
                     </p>
