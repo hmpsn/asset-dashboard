@@ -7,6 +7,7 @@ import webflowOrganizeRoutes from '../routes/webflow-organize.js';
 import webflowCmsRoutes from '../routes/webflow-cms.js';
 import webflowCmsImagesRoutes from '../routes/webflow-cms-images.js';
 import webflowSeoPageToolsRoutes from '../routes/webflow-seo-page-tools.js';
+import webflowSeoRewriteRoutes from '../routes/webflow-seo-rewrite.js';
 import webflowSeoRoutes from '../routes/webflow-seo.js';
 import webflowSeoSuggestionsRoutes from '../routes/webflow-seo-suggestions.js';
 import webflowSchemaRoutes from '../routes/webflow-schema.js';
@@ -22,6 +23,7 @@ export function registerWebflowRoutes(app: Express): void {
   app.use(webflowCmsRoutes);
   app.use(webflowCmsImagesRoutes);
   app.use(webflowSeoPageToolsRoutes);
+  app.use(webflowSeoRewriteRoutes);
   app.use(webflowSeoSuggestionsRoutes);
   app.use(webflowSeoRoutes);
   app.use(webflowSchemaRoutes);
