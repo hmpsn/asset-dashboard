@@ -140,8 +140,8 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
   const inputCls = 'w-full bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] px-3.5 py-2.5 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all';
   const textareaCls = `${inputCls} resize-none`;
-  const labelCls = 'block t-caption font-medium text-[var(--brand-text)] mb-1.5';
-  const hintCls = 't-caption-sm text-[var(--brand-text-muted)] mt-1';
+  const labelCls = 'block t-label text-[var(--brand-text)] mb-1.5';
+  const hintCls = 't-caption text-[var(--brand-text-muted)] mt-1';
 
   return (
     /* z-index-ok — onboarding overlay above modal scale */
@@ -206,9 +206,9 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Building2 className="w-5 h-5 text-accent-brand" />
-                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">About Your Business</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">About Your Business</h3>
               </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Tell us about what you do so our content reflects your expertise.</p>
+              <p className="t-body text-[var(--brand-text-muted)] -mt-2 mb-3">Tell us about what you do so our content reflects your expertise.</p>
 
               <div>
                 <label className={labelCls}>Business Name</label>
@@ -260,9 +260,9 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Users className="w-5 h-5 text-accent-brand" />
-                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Your Target Audience</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Your Target Audience</h3>
               </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Understanding your audience helps us write content that converts.</p>
+              <p className="t-body text-[var(--brand-text-muted)] -mt-2 mb-3">Understanding your audience helps us write content that converts.</p>
 
               <div>
                 <label className={labelCls}>Who is your primary customer?</label>
@@ -315,9 +315,9 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Palette className="w-5 h-5 text-accent-brand" />
-                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Brand Voice & Tone</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Brand Voice & Tone</h3>
               </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">How should content sound? Pick traits that match your brand.</p>
+              <p className="t-body text-[var(--brand-text-muted)] -mt-2 mb-3">How should content sound? Pick traits that match your brand.</p>
 
               <div>
                 <label className={labelCls}>Brand personality (select all that apply)</label>
@@ -369,9 +369,9 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Target className="w-5 h-5 text-accent-brand" />
-                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Competitor Landscape</h3>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Competitor Landscape</h3>
               </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Knowing your competition helps us find content gaps and differentiate.</p>
+              <p className="t-body text-[var(--brand-text-muted)] -mt-2 mb-3">Knowing your competition helps us find content gaps and differentiate.</p>
 
               <div>
                 <label className={labelCls}>Who are your main competitors?</label>
@@ -407,8 +407,8 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 text-accent-success" />
                 </div>
-                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Here&apos;s a summary. You can go back to edit any section.</p>
+                <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
+                <p className="t-body text-[var(--brand-text-muted)] mt-1">Here&apos;s a summary. You can go back to edit any section.</p>
               </div>
 
               {/* Summary cards */}
@@ -439,7 +439,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
               </div>
 
               <div className="bg-teal-500/5 border border-teal-500/15 px-4 py-3 mt-4" style={{ borderRadius: 'var(--radius-signature)' }}>
-                <p className="t-caption-sm text-accent-brand leading-relaxed">
+                <p className="t-body text-accent-brand leading-relaxed">
                   <strong className="text-accent-brand">What happens next:</strong> Your answers will be used to create audience personas, enrich your brand voice, and build a knowledge base — making every piece of content we generate more accurate and on-brand.
                 </p>
               </div>

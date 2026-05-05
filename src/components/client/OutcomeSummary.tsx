@@ -199,14 +199,15 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
 
   return (
     <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard>
-        <div className="flex items-center gap-2 mb-4">
-          <Icon as={Trophy} size="md" className="text-accent-brand" />
-          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Your results</h3>
-          <span className="t-caption text-[var(--brand-text-muted)] ml-auto flex items-center gap-1">
+      <SectionCard
+        title="Your results"
+        titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
+        action={
+          <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
             <Icon as={Clock} size="sm" /> Measured over 90 days
           </span>
-        </div>
+        }
+      >
 
         {isLoading && (
           <div className="space-y-3">

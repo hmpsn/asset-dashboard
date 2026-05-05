@@ -54,20 +54,16 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
   const totalDevClicks = devices.reduce((s, d) => s + d.clicks, 0) || 1;
 
   return (
-    // pr-check-disable-next-line -- SearchSnapshot is a top-level client data card intentionally using brand signature shape
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[var(--radius-md)] bg-blue-500/15 flex items-center justify-center">
-            <Icon as={Globe} size="md" className="text-accent-info" />
-          </div>
-          <span className="t-caption font-medium text-[var(--brand-text-bright)]">Google Search</span>
-        </div>
+    <SectionCard
+      title="Google Search"
+      titleIcon={<Icon as={Globe} size="md" className="text-accent-info" />}
+      action={
         <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
           View details <Icon as={ArrowRight} size="sm" />
         </button>
-      </div>
+      }
+    >
+      <div className="space-y-4">
 
       {/* Key metrics with comparison */}
       <div className="grid grid-cols-2 gap-3">
@@ -147,7 +143,8 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -167,20 +164,16 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
   const retSeg = newVsReturning.find(s => s.segment === 'returning');
 
   return (
-    // pr-check-disable-next-line -- AnalyticsSnapshot is a top-level client data card intentionally using brand signature shape
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[var(--radius-md)] bg-teal-500/15 flex items-center justify-center">
-            <Icon as={Users} size="md" className="text-accent-brand" />
-          </div>
-          <span className="t-caption font-medium text-[var(--brand-text-bright)]">Website Visitors</span>
-        </div>
+    <SectionCard
+      title="Website Visitors"
+      titleIcon={<Icon as={Users} size="md" className="text-accent-brand" />}
+      action={
         <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
           View details <Icon as={ArrowRight} size="sm" />
         </button>
-      </div>
+      }
+    >
+      <div className="space-y-4">
 
       {/* Key metrics with comparison */}
       <div className="grid grid-cols-3 gap-3">
@@ -251,7 +244,8 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </SectionCard>
   );
 }
 

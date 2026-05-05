@@ -227,7 +227,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* Content pricing section */}
       {(briefPrice != null || fullPostPrice != null) && (
         <SectionCard title="Content Services" titleIcon={<Icon as={FileText} size="lg" className="text-accent-brand" />}>
-          <p className="t-caption text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {briefPrice != null && (
@@ -239,7 +239,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </div>
                   <span className="t-stat-sm text-accent-brand">{fmtPrice(briefPrice)}</span>
                 </div>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
+                <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
               </div>
             )}
             {fullPostPrice != null && (
@@ -251,7 +251,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </div>
                   <span className="t-stat-sm text-accent-brand">{fmtPrice(fullPostPrice)}</span>
                 </div>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
+                <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
               </div>
             )}
           </div>
@@ -269,7 +269,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* Content subscription packages */}
       {subData && subData.plans.length > 0 && (
         <SectionCard title="Monthly Content Packages" titleIcon={<Icon as={RefreshCw} size="lg" className="text-accent-brand" />}>
-          <p className="t-caption text-[var(--brand-text-muted)] mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
 
           {/* Active subscription banner */}
           {subData.subscription && (
@@ -315,7 +315,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               {subData.plans.map(plan => (
                 <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)] hover:border-[var(--brand-border-hover)] transition-colors">
                   <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
-                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
+                  <p className="t-body text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
                     <span className="t-stat text-accent-brand">${plan.priceUsd}</span>
                     <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
@@ -345,7 +345,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
             </div>
             <div className="flex-1">
               <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">See the dollar value of your organic traffic</h3>
-              <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed mb-3">
+              <p className="t-body text-[var(--brand-text-muted)] leading-relaxed mb-3">
                 The ROI Dashboard shows what your organic search traffic would cost if you bought it through Google Ads. Growth plan clients see their traffic value, page-by-page breakdown, and content investment returns.
               </p>
               <div className="grid grid-cols-3 gap-3 mb-3">

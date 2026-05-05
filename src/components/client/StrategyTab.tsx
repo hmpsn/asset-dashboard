@@ -6,7 +6,7 @@ import {
   MessageCircle, BarChart3, Eye, AlertTriangle,
   ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Trash2, Briefcase,
 } from 'lucide-react';
-import { TierGate, EmptyState, Skeleton, type Tier, Icon, Button } from '../ui';
+import { TierGate, EmptyState, Skeleton, type Tier, Icon, Button, PageHeader, SectionCard } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
@@ -862,24 +862,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   );
 
   const priorityKeywordsPanel = (
-    // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-[var(--brand-border)]">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center flex-shrink-0">
-            <Icon as={Target} size="md" className="text-accent-brand" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="t-h3 text-[var(--brand-text)]">Strategy Keywords</h3>
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">
-              {strategyKeywords.length} keyword{strategyKeywords.length === 1 ? '' : 's'} guiding tracking and recommendations
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <SectionCard
+      title="Strategy Keywords"
+      titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
+      titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keyword{strategyKeywords.length === 1 ? '' : 's'} guiding tracking and recommendations</span>}
+      noPadding
+    >
       {/* Add keyword form */}
       {workspaceId && (
         <div className="px-4 py-3 border-b border-[var(--brand-border)]">
@@ -1074,23 +1062,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             </div>
           )}
         </div>
-
       </div>
-    </div>
+    </SectionCard>
   );
 
 
   return (
     <div className="space-y-8">
       {/* Header + Strategy Snapshot */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="t-h2 text-[var(--brand-text)]">SEO Strategy</h2>
-          <p className="t-body text-[var(--brand-text-muted)] mt-1">
-            A focused view of what to create, what to improve, and which keywords guide the strategy.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="SEO Strategy"
+        subtitle="A focused view of what to create, what to improve, and which keywords guide the strategy."
+      />
 
       {/* Unvalidated strategy note */}
       {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
@@ -1103,8 +1086,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* Strategy Snapshot */}
-      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <SectionCard>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
@@ -1172,61 +1154,67 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
           This is a planning-readiness score, not a grade. It shows how much clear SEO work is ready to review or move into production.
         </p>
-      </div>
+      </SectionCard>
 
       {/* ── RECOMMENDED NEXT STEPS ── */}
       <div className="space-y-3">
         <div>
           <h3 className="t-h3 text-[var(--brand-text)]">Recommended Next Steps</h3>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Start here. These are the clearest places to review, request, or give direction.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mt-1">Start here. These are the clearest places to review, request, or give direction.</p>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                <Icon as={FileText} size="lg" className="text-accent-brand" />
+          <SectionCard variant="subtle">
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                  <Icon as={FileText} size="lg" className="text-accent-brand" />
+                </div>
+                <div className="min-w-0">
+                  <div className="t-body font-medium text-[var(--brand-text)]">Review new content ideas</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className="t-body font-medium text-[var(--brand-text)]">Review new content ideas</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
-              </div>
+              <Button variant="secondary" size="sm" onClick={() => scrollToSection('new-content', newContentRef)} className="self-start">
+                Review Ideas
+              </Button>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => scrollToSection('new-content', newContentRef)} className="self-start">
-              Review Ideas
-            </Button>
-          </div>
+          </SectionCard>
 
         {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                <Icon as={Zap} size="lg" className="text-accent-warning" />
+          <SectionCard variant="subtle">
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <Icon as={Zap} size="lg" className="text-accent-warning" />
+                </div>
+                <div className="min-w-0">
+                  <div className="t-body font-medium text-[var(--brand-text)]">Improve existing pages</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className="t-body font-medium text-[var(--brand-text)]">Improve existing pages</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
-              </div>
+              <Button variant="secondary" size="sm" onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)} className="self-start">
+                Review Pages
+              </Button>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)} className="self-start">
-              Review Pages
-            </Button>
-          </div>
+          </SectionCard>
         )}
 
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <Icon as={Target} size="lg" className="text-accent-info" />
+          <SectionCard variant="subtle">
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Icon as={Target} size="lg" className="text-accent-info" />
+                </div>
+                <div className="min-w-0">
+                  <div className="t-body font-medium text-[var(--brand-text)]">Guide strategy keywords</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords shaping the strategy</div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className="t-body font-medium text-[var(--brand-text)]">Guide strategy keywords</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords shaping the strategy</div>
-              </div>
+              <Button variant="secondary" size="sm" onClick={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="self-start">
+                Manage Keywords
+              </Button>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="self-start">
-              Manage Keywords
-            </Button>
-          </div>
+          </SectionCard>
         </div>
       </div>
 
@@ -1249,8 +1237,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* ── GUIDE THIS STRATEGY (client driver's seat) ── */}
-      {workspaceId && prioritiesLoaded && ( // pr-check-disable-next-line -- Brand signature radius intentional
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      {workspaceId && prioritiesLoaded && (
+        <SectionCard noPadding>
           <button
             onClick={() => toggleSection('business-priorities')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -1273,7 +1261,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('business-priorities') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
+              <p className="t-body text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
                 Share business goals and priorities that should shape future strategy recommendations. Keywords are managed in the Strategy Keywords section.
               </p>
 
@@ -1350,14 +1338,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               )}
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* ── CREATE CONTENT (Strong recommendations + keyword ideas) ── */}
       <div ref={newContentRef}>
         <TierGate tier={effectiveTier} required="growth" feature="Create Content" teaser={`${newContentTopicCount} content ideas identified - upgrade to unlock recommendations`}>
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <SectionCard noPadding>
           <button
             onClick={() => toggleSection('new-content')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -1379,7 +1366,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('new-content') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
+              <p className="t-body text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
                 Clear new-page recommendations come first. Noisier keyword ideas are separated below so they can be reviewed without feeling like automatic recommendations.
               </p>
 
@@ -1648,15 +1635,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               )}
             </div>
           )}
-        </div>
+        </SectionCard>
         </TierGate>
       </div>
 
       {/* ── IMPROVE PAGES (Quick Wins + Growth Opportunities merged) ── */}
       {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
       <div ref={optimizeExistingRef}>
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <SectionCard noPadding>
           <button
             onClick={() => toggleSection('optimize-existing')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -1821,7 +1807,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               })()}
             </div>
           )}
-        </div>
+        </SectionCard>
       </div>
       )}
 
@@ -1835,8 +1821,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── PAGE KEYWORD MAP (advanced page detail) ── */}
       <div>
       <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <SectionCard noPadding>
           <button
             onClick={() => toggleSection('page-keyword-map')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -1869,7 +1854,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             />
             </>
           )}
-        </div>
+        </SectionCard>
       </TierGate>
       </div>
 
@@ -1877,8 +1862,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {(() => {
         const declined = [...keywordFeedback.entries()].filter(([, s]) => s === 'declined');
         if (declined.length === 0) return null;
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        return (
+          <SectionCard noPadding>
             <button
               onClick={() => toggleSection('declined-keywords')}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -1914,7 +1899,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
         );
       })()}
 

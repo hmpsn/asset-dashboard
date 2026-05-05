@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, ArrowUp, Minus, LayoutList, Layers } from 'lucide-react';
-import { MetricRing, Icon, Button, IconButton, ClickableRow } from '../ui';
+import { MetricRing, Icon, Button, IconButton, ClickableRow, SectionCard } from '../ui';
 import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
@@ -225,13 +225,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           : score >= 50
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        return (
+          <SectionCard>
             <div className="flex items-center gap-4">
               <div className={`t-stat-lg ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
                 <div className="t-body font-medium text-[var(--brand-text)]">Your site's health</div>
-                <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
+                <div className="t-body text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
                 <div className={`t-caption ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-accent-success' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]'}`}>
@@ -252,7 +252,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 className={`transition-colors ${severityFilter === 'warning' ? 'text-accent-warning font-medium' : 'text-accent-warning hover:text-accent-warning'}`}
               >{auditDetail.audit.warnings} warnings</button>
             </div>
-          </div>
+          </SectionCard>
         );
       })()}
 
@@ -329,18 +329,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
           );
         };
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Icon as={Globe} size="md" className="text-accent-brand" />
-              <span className="t-body font-medium text-[var(--brand-text)]">Page Speed &amp; Core Web Vitals</span>
-              <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">Google uses these to rank your site</span>
-            </div>
+        return (
+          <SectionCard
+            title="Page Speed & Core Web Vitals"
+            titleIcon={<Icon as={Globe} size="md" className="text-accent-brand" />}
+            titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">Google uses these to rank your site</span>}
+          >
             <div className="flex gap-4 flex-wrap">
               {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
               {auditDetail.audit.cwvSummary!.desktop && renderStrategy('Desktop', auditDetail.audit.cwvSummary!.desktop)}
             </div>
-          </div>
+          </SectionCard>
         );
       })()}
 
@@ -384,13 +383,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* Two-column layout: Fix List | Page Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-              {/* Fix These First */}
-              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2">
-                  <Icon as={AlertTriangle} size="md" className="text-accent-danger" />
-                  <span className="t-body font-medium text-[var(--brand-text)]">Fix these first</span>
-                </div>
+              <SectionCard
+                title="Fix these first"
+                titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-danger" />}
+                noPadding
+              >
                 <div className="divide-y divide-[var(--brand-border)]/50">
                   {prioritized.length === 0 ? (
                     <div className="px-4 py-6 text-center">
@@ -430,18 +427,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     })
                   )}
                 </div>
-              </div>
+              </SectionCard>
 
-              {/* Page Cards */}
-              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
-                    <span className="t-body font-medium text-[var(--brand-text)]">Pages needing attention</span>
-                  </div>
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>
-                </div>
+              <SectionCard
+                title="Pages needing attention"
+                titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
+                action={<span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>}
+              >
                 <div className="grid grid-cols-1 gap-3">
                   {sortedPages.map(page => {
                     const errs = page.issues.filter(i => i.severity === 'error').length;
@@ -522,7 +514,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 >
                   View all {auditDetail.audit.totalPages} pages
                 </Button>
-              </div>
+              </SectionCard>
             </div>
           </>
         );
@@ -532,20 +524,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {actionPlanSlot}
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
-      {auditDetail.audit.siteWideIssues.length > 0 && ( // pr-check-disable-next-line -- Brand signature radius intentional
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center">
-                <Icon as={Info} size="md" className="text-accent-warning" />
-              </div>
-              <div>
-                <div className="t-body font-medium text-[var(--brand-text)]">Site-Wide Issues</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
-              </div>
+      {auditDetail.audit.siteWideIssues.length > 0 && (
+        <SectionCard
+          title="Site-Wide Issues"
+          titleIcon={
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center">
+              <Icon as={Info} size="md" className="text-accent-warning" />
             </div>
-          </div>
-          
+          }
+          titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</span>}
+          noPadding
+        >
           <div className="p-3">
             <div className="flex flex-wrap gap-3">
               {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
@@ -581,13 +570,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
             )}
           </div>
-        </div>
+        </SectionCard>
       )}
-
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <SectionCard noPadding>
           <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-[var(--surface-1)]/50">
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
@@ -789,12 +776,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
             );
           })()}
-        </div>
+        </SectionCard>
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <SectionCard noPadding>
         <ClickableRow onClick={() => toggleSection('history')} className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <Icon as={BarChart3} size="md" className="text-[var(--brand-text-muted)]" />
@@ -833,12 +819,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 
-  if (audit) return ( // pr-check-disable-next-line -- Brand signature radius intentional
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+  if (audit) return (
+    <SectionCard noPadding>
+      <div className="p-6">
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>
@@ -847,7 +834,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           <div className="flex gap-3 mt-2"><span className="t-caption text-accent-danger">{audit.errors} errors</span><span className="t-caption text-accent-warning">{audit.warnings} warnings</span></div>
         </div>
       </div>
-    </div>
+      </div>
+    </SectionCard>
   );
 
   return (
