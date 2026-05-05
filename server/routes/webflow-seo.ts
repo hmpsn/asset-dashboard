@@ -31,15 +31,14 @@ import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage, toAuditFindingPageId, normalizePath } from '../helpers.js';
+import { stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage, normalizePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, hasActiveJob, registerAbort } from '../jobs.js';
 import { validate, z } from '../middleware/validate.js';
-import { fireBridge } from '../bridge-infrastructure.js';
 import { seoBulkAcceptFixSchema, seoBulkAnalyzePageSchema, seoBulkRewritePageSchema } from '../schemas/seo-bulk-jobs.js';
+import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import { runSeoBulkAcceptFixesJob } from '../webflow-seo-bulk-accept-fixes-job.js';
 import { runSeoBulkAnalyzeJob } from '../webflow-seo-bulk-analyze-job.js';
 import { runSeoBulkRewriteJob } from '../webflow-seo-bulk-rewrite-job.js';
@@ -83,138 +82,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceSiteAccessFromQuery
     const auditWsId = req.query.workspaceId as string | undefined;
     const auditWs = auditWsId ? getWorkspace(auditWsId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (auditWs) {
-      for (const page of result.pages) {
-        if (page.issues.length > 0) {
-          updatePageState(auditWs.id, page.pageId, { status: 'issue-detected', source: 'audit', slug: page.slug, auditIssues: page.issues.map((i: { check: string }) => i.check), updatedBy: 'system' });
-        }
-      }
-
-      // Apply suppressions to get effective audit (matches scheduled-audits pattern)
-      const effectiveAudit = auditWs.auditSuppressions?.length
-        ? applySuppressionsToAudit(result, auditWs.auditSuppressions)
-        : result;
-
-      // ── Auto-resolve audit_finding insights for pages that are now clean ──
-      // When an on-demand audit re-runs and a page no longer has critical/warning
-      // issues, resolve its audit_finding insight. Same pattern as scheduled-audits
-      // bridge-audit-auto-resolve.
-      fireBridge('bridge-audit-auto-resolve', auditWs.id, async () => {
-        const { getInsights: fetchAll, resolveInsight: resolve }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
-        const autoResolvableSources = new Set(['bridge-audit-page-health', 'bridge-audit-site-health']);
-        const allInsights = fetchAll(auditWs.id);
-        const auditFindings = allInsights.filter(
-          i => i.insightType === 'audit_finding'
-            && i.resolutionStatus !== 'resolved'
-            && i.bridgeSource != null
-            && autoResolvableSources.has(i.bridgeSource),
-        );
-        if (auditFindings.length === 0) return { modified: 0 };
-
-        // Build set of page IDs that still have critical/warning issues
-        const pagesWithIssues = new Set<string>();
-        for (const page of effectiveAudit.pages) {
-          if (page.issues?.some((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning')) {
-            pagesWithIssues.add(toAuditFindingPageId(page));
-          }
-        }
-
-        let resolved = 0;
-        for (const insight of auditFindings) {
-          const data = (insight.data ?? {}) as Record<string, unknown>;
-          if (data.scope === 'page' && insight.pageId && !pagesWithIssues.has(insight.pageId)) {
-            // Page is now clean — auto-resolve
-            resolve(insight.id, auditWs.id, 'resolved', 'Auto-resolved: page passed audit with no critical/warning issues', 'bridge-audit-auto-resolve');
-            resolved++;
-          } else if (data.scope === 'site' && !insight.pageId && effectiveAudit.siteScore >= 70) {
-            // Site score is healthy — auto-resolve site-level insight
-            resolve(insight.id, auditWs.id, 'resolved', `Auto-resolved: site health score improved to ${effectiveAudit.siteScore}/100`, 'bridge-audit-auto-resolve');
-            resolved++;
-          }
-        }
-        if (resolved > 0) {
-          log.info({ workspaceId: auditWs.id, resolved }, 'Auto-resolved audit_finding insights for clean pages/site (on-demand audit)');
-        }
-        return { modified: resolved };
-      });
-
-      // ── Bridge: Audit → audit_finding insights for pages with critical/warning issues ──
-      fireBridge('bridge-audit-page-health', auditWs.id, async () => {
-        const { upsertInsight: upsert, getInsight }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
-
-        // Map critical/warning audit issues to audit_finding insights
-        const criticalPages = effectiveAudit.pages
-          .filter((p: { issues?: Array<{ severity: string }> }) => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
-
-        let modified = 0;
-        for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
-          const pageIssues = page.issues?.filter((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning') ?? [];
-          if (pageIssues.length === 0) continue;
-
-          const isCritical = pageIssues.some((i: { severity: string }) => i.severity === 'error');
-          const baseScore = isCritical ? 80 : 50;
-
-          // Base-score setter pattern — mirror of scheduled-audits.ts bridge-audit-page-health.
-          // upsertInsight replaces `data` on conflict, so we must read-before-write to
-          // avoid clobbering _scoreAdjustments written by other bridges (e.g. anomaly boosts).
-          const existing = getInsight(auditWs.id, toAuditFindingPageId(page), 'audit_finding');
-          if (existing && existing.resolutionStatus !== 'resolved' &&
-              existing.data?.issueCount === pageIssues.length &&
-              existing.data?.issueMessages === pageIssues.map((i: { message: string }) => i.message).join('; ')) {
-            // No content change since last write — skip to avoid bumping updated_at unnecessarily.
-            continue;
-          }
-          const prevAdj = existing?.data?._scoreAdjustments as Record<string, number> | undefined;
-          const totalDelta = prevAdj
-            ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
-            : 0;
-
-          upsert({
-            workspaceId: auditWs.id,
-            insightType: 'audit_finding',
-            pageId: toAuditFindingPageId(page),
-            pageTitle: page.page,
-            severity: isCritical ? 'critical' : 'warning',
-            data: {
-              scope: 'page',
-              issueCount: pageIssues.length,
-              issueMessages: pageIssues.map((i: { message: string }) => i.message).join('; '),
-              source: 'bridge_12_audit_page_health',
-              ...(prevAdj ? { _originalBaseScore: baseScore, _scoreAdjustments: prevAdj } : {}),
-            },
-            impactScore: prevAdj ? Math.max(0, Math.min(100, baseScore + totalDelta)) : baseScore,
-            bridgeSource: 'bridge-audit-page-health',
-          });
-          modified++;
-        }
-
-        return { modified };
-      });
-
-      // ── Bridge #15: Audit → site-level audit_finding insight ──
-      fireBridge('bridge-audit-site-health', auditWs.id, async () => {
-        const { upsertInsight: upsert }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
-        const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
-        const score = effectiveAudit.siteScore;
-        if (totalIssues > 0 && score < 70) {
-          upsert({
-            workspaceId: auditWs.id,
-            insightType: 'audit_finding',
-            pageId: null,
-            severity: score < 50 ? 'critical' : 'warning',
-            data: {
-              scope: 'site',
-              issueCount: totalIssues,
-              issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
-              siteScore: score,
-              source: 'bridge_15_audit_site_health',
-            },
-            impactScore: Math.max(0, 100 - score),
-            bridgeSource: 'bridge-audit-site-health',
-          });
-          return { modified: 1 };
-        }
-        return { modified: 0 };
-      });
+      handleOnDemandSeoAuditResult(auditWs, result);
     }
     res.json(result);
   } catch (err) {
