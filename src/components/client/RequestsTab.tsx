@@ -148,7 +148,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             {newReqFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {newReqFiles.map((f, i) => (
-                  <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded px-2 py-1 text-[var(--brand-text)]">
+                  <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-sm)] px-2 py-1 text-[var(--brand-text)]">
                     <Icon as={Paperclip} size="xs" />{f.name}
                     <IconButton icon={X} label={`Remove ${f.name}`} size="sm" onClick={() => setNewReqFiles(prev => prev.filter((_, j) => j !== i))} />
                   </span>
@@ -219,12 +219,12 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="t-body font-medium text-[var(--brand-text)] truncate">{req.title}</span>
-                        <span className={`t-caption-sm px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
+                        <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
                           {statusLabels[req.status] || req.status}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
-                        <span className="px-1.5 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-muted)]">{catLabels[req.category] || req.category}</span>
+                        <span className="px-1.5 py-0.5 bg-[var(--surface-3)] rounded-[var(--radius-sm)] text-[var(--brand-text-muted)]">{catLabels[req.category] || req.category}</span>
                         {req.submittedBy && <span className="text-[var(--brand-text-muted)]">by {req.submittedBy}</span>}
                         <span>{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         {teamNotes > 0 && <span className="text-accent-brand">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
@@ -295,7 +295,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                         {noteFiles.length > 0 && expandedRequest === req.id && (
                           <div className="flex flex-wrap gap-1.5">
                             {noteFiles.map((f, i) => (
-                              <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded px-2 py-1 text-[var(--brand-text)]">
+                              <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-sm)] px-2 py-1 text-[var(--brand-text)]">
                                 <Icon as={Paperclip} size="xs" />{f.name}
                                 <IconButton icon={X} label={`Remove ${f.name}`} size="sm" onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} />
                               </span>

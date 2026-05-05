@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional, post } from '../../api/client';
-import { EmptyState, Icon} from '../ui';
+import { Button, EmptyState, Icon} from '../ui';
 import {
   Loader2, CheckCircle, Globe, ChevronDown, ChevronRight,
   MessageSquare, Sparkles, Shield,
@@ -39,16 +39,16 @@ interface Props {
 const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   homepage: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
   pillar: 'bg-teal-500/15 text-accent-brand border-teal-500/30',
-  service: 'bg-sky-500/15 text-accent-info border-sky-500/30',
+  service: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   audience: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  'lead-gen': 'bg-orange-500/15 text-accent-orange border-orange-500/30',
-  blog: 'bg-cyan-500/15 text-accent-cyan border-cyan-500/30',
+  'lead-gen': 'bg-teal-500/15 text-accent-brand border-teal-500/30',
+  blog: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   about: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
   contact: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
   location: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
   product: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
-  partnership: 'bg-yellow-500/15 text-accent-warning border-yellow-500/30',
-  faq: 'bg-cyan-500/15 text-accent-cyan border-cyan-500/30',
+  partnership: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
+  faq: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   'case-study': 'bg-blue-500/15 text-accent-info border-blue-500/30',
   comparison: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
   generic: 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30',
@@ -215,7 +215,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                       {isExpanded
                         ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                         : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}>
                         {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role}
                       </span>
                       <span className="t-caption text-[var(--brand-text-muted)] flex-1 min-w-0 truncate">{desc}</span>
@@ -267,14 +267,15 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                     className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
                   />
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => handleFeedback('request_changes')}
                       disabled={submitting}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] t-caption font-medium bg-amber-600/20 hover:bg-amber-600/30 text-accent-warning border border-amber-500/30 transition-colors disabled:opacity-50"
+                      variant="secondary"
+                      icon={submitting ? Loader2 : MessageSquare}
+                      className={`${submitting ? '[&_svg]:animate-spin ' : ''}border-amber-500/30 text-accent-warning hover:bg-amber-500/10`}
                     >
-                      {submitting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={MessageSquare} size="sm" />}
                       Send Feedback
-                    </button>
+                    </Button>
                     <button
                       onClick={() => { setShowFeedback(false); setFeedbackNote(''); }}
                       className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
@@ -288,7 +289,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy
@@ -352,12 +353,12 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   {page.existingSchemas.length > 0 && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 text-accent-success border border-emerald-500/20">
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-accent-success border border-emerald-500/20">
                       {page.existingSchemas.length} live
                     </span>
                   )}
                   {page.schemaTypes.map(t => (
-                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-mono">
+                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-mono">
                       {t}
                     </span>
                   ))}

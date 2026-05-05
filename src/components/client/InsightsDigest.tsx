@@ -529,7 +529,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">
                 <Icon as={InsightIcon} size="md" className={c.text} />
-                <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
+                <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${c.badge}`}>
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
@@ -544,7 +544,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
               {insight.detail && insight.detail.length > 0 && (
                 <div className="space-y-1 mb-2">
                   {insight.detail.map((item, i) => (
-                    <div key={i} className="t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)] text-[var(--brand-text)] truncate">
+                    <div key={i} className="t-caption-sm py-1 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)] truncate">
                       {item}
                     </div>
                   ))}
@@ -658,7 +658,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
             <span className={`t-body font-bold ${m.color}`}>{m.value}</span>
           </div>
           {m.change != null && m.change !== 0 && (
-            <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${
+            <span className={`t-caption font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${
               m.change > 0 ? 'bg-emerald-500/10 text-accent-success' : 'bg-red-500/10 text-accent-danger'
             }`}>
               {m.changeLabel || pct(m.change)}

@@ -298,7 +298,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
                 <span className="t-caption font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
-                <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
+                <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">
                 {[
@@ -450,8 +450,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                             <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
-                            {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
+                            {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs}E</span>}
+                            {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns}W</span>}
                             <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
                             <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                           </div>
@@ -634,8 +634,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                      {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
+                      {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs} err</span>}
+                      {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns} warn</span>}
                       <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
@@ -749,7 +749,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
+                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-sm)] ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
                           <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         </div>
                       </ClickableRow>

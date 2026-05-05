@@ -206,9 +206,9 @@ export function AnalyticsTab({
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
-            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
-            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-teal-400 inline-block" /> Users</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-blue-400 inline-block" /> Sessions</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-teal-400/40 inline-block" /> Pageviews</span>
           </div>
         </ChartCard>
 

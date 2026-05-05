@@ -411,7 +411,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   return (
     <div className="space-y-4">
       {mutationError && (
-        <div className="flex items-center gap-2 t-caption text-accent-danger bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+        <div className="flex items-center gap-2 t-caption text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] px-3 py-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{mutationError}</span>
         </div>
@@ -474,7 +474,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
 
       {/* Copy text */}
       {section.generatedCopy && (
-        <div className="t-body text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-3)]/30 rounded p-3">
+        <div className="t-body text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-3)]/30 rounded-[var(--radius-sm)] p-3">
           {section.generatedCopy}
         </div>
       )}
@@ -491,7 +491,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
         <div className="space-y-2">
           <span className="t-caption font-medium text-[var(--brand-text-muted)]">Your previous suggestions</span>
           {section.clientSuggestions.map((s, i) => (
-            <div key={i} className="t-caption bg-[var(--surface-3)]/50 rounded p-2 space-y-1">
+            <div key={i} className="t-caption bg-[var(--surface-3)]/50 rounded-[var(--radius-sm)] p-2 space-y-1">
               <div className="flex items-center gap-1.5">
                 <MessageSquare className="w-3 h-3 text-[var(--brand-text-muted)]" />
                 <span className="text-[var(--brand-text)]">
@@ -526,7 +526,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
           </Button>
           <button
             onClick={() => setShowSuggestForm(!showSuggestForm)}
-            className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
+            className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             <MessageSquare className="w-3 h-3" />
             Suggest Changes
@@ -553,7 +553,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             onChange={e => setSuggestedText(e.target.value)}
             placeholder="Type your suggested version here..."
             rows={4}
-            className="w-full t-body bg-[var(--surface-3)] border border-[var(--brand-border)] rounded p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
+            className="w-full t-body bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
           />
           <div className="flex items-center gap-2">
             <Button

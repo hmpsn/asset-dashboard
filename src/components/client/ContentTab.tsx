@@ -257,22 +257,22 @@ export function ContentTab({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="t-body font-semibold text-[var(--brand-text)]">{req.topic}</span>
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-teal-500/10 text-accent-brand border-teal-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]'}`}>
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-teal-500/10 text-accent-brand border-teal-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]'}`}>
                       {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
                     </span>
                     {req.pageType && req.pageType !== 'blog' && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{req.pageType}</span>
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{req.pageType}</span>
                     )}
-                    {req.upgradedAt && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 text-accent-success border border-emerald-500/20 font-medium">Upgraded</span>}
+                    {req.upgradedAt && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-accent-success border border-emerald-500/20 font-medium">Upgraded</span>}
                   </div>
                   <div className="t-caption text-accent-brand mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {req.source === 'client' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20">You submitted</span>}
-                  {req.status === 'pending_payment' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 text-accent-warning border border-amber-500/20 animate-pulse">Awaiting Payment</span>}
-                  {req.status === 'changes_requested' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-orange-500/10 text-accent-orange border border-orange-500/20">Changes Requested</span>}
-                  {req.status === 'client_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
-                  {req.status === 'post_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                  {req.source === 'client' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20">You submitted</span>}
+                  {req.status === 'pending_payment' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 text-accent-warning border border-amber-500/20 animate-pulse">Awaiting Payment</span>}
+                  {req.status === 'changes_requested' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-orange-500/10 text-accent-orange border border-orange-500/20">Changes Requested</span>}
+                  {req.status === 'client_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                  {req.status === 'post_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
                   {isExpanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
                 </div>
               </div>
@@ -375,7 +375,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Calls to Action</div>
                           <div className="space-y-1">{brief.ctaRecommendations.map((cta: string, i: number) => (
                             <div key={i} className="t-body text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
-                              <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                              <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
                             </div>
                           ))}</div>
                         </div>
@@ -391,11 +391,11 @@ export function ContentTab({
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center justify-between">
                                 <div className="t-caption font-medium text-[var(--brand-text)]">H2: {s.heading}</div>
-                                {s.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.wordCount} words</span>}
+                                {s.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.wordCount} words</span>}
                               </div>
                               <div className="t-body text-[var(--brand-text-muted)] mt-1.5 leading-relaxed">{s.notes}</div>
                               {s.keywords && s.keywords.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand">{kw}</span>)}</div>
+                                <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand">{kw}</span>)}</div>
                               )}
                             </div>
                           ))}
@@ -455,7 +455,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Internal Links to Include</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.internalLinkSuggestions.map((link: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-accent-info">/{link}</span>
+                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-accent-info">/{link}</span>
                             ))}
                           </div>
                         </div>
@@ -489,7 +489,7 @@ export function ContentTab({
                         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
                           {brief.contentChecklist.map((item: string, i: number) => (
                             <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
-                              <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border-strong)] flex-shrink-0" />
+                              <div className="w-4 h-4 mt-0.5 rounded-[var(--radius-sm)] border border-[var(--brand-border-strong)] flex-shrink-0" />
                               <span className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{item}</span>
                             </div>
                           ))}
@@ -505,7 +505,7 @@ export function ContentTab({
                           {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan font-medium">{schema.type}</span>
+                                <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">{schema.type}</span>
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{schema.notes}</div>
                             </div>
@@ -530,10 +530,10 @@ export function ContentTab({
                     <TierGate tier={effectiveTier} required="growth" feature="Brief Review Actions" compact className="mt-1"><span /></TierGate>
                   ) : (
                   <div className="flex items-center gap-2 pt-1">
-                    <Button variant="secondary" icon={Check} onClick={() => approveBrief(req.id)} className="border-emerald-500/30 text-accent-success hover:bg-emerald-500/10">
+                    <Button variant="primary" icon={Check} onClick={() => approveBrief(req.id)}>
                       Approve Brief
                     </Button>
-                    <Button variant="secondary" icon={Edit3} onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="border-orange-500/30 text-accent-orange hover:bg-orange-500/10">
+                    <Button variant="secondary" icon={Edit3} onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10">
                       Request Changes
                     </Button>
                     <Button variant="danger" icon={X} onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }}>
@@ -653,7 +653,7 @@ export function ContentTab({
                         variant="secondary"
                         onClick={() => requestChanges(req.id)}
                         disabled={!feedbackText.trim()}
-                        className="border-orange-500/30 text-accent-orange hover:bg-orange-500/10"
+                        className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
                       >
                         Submit Feedback
                       </Button>

@@ -3,7 +3,7 @@ import {
   Download, FileDown, Flag, Eye, CheckCircle2,
   Clock, FileText, PenTool,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader } from '../ui';
+import { SectionCard, Badge, PageHeader, Button } from '../ui';
 import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/overlay/Modal';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
@@ -23,7 +23,7 @@ const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof
   review:            { label: 'Your Review',   icon: Eye,          color: 'text-accent-info',   badgeColor: 'blue' },
   flagged:           { label: 'Feedback Sent', icon: Flag,         color: 'text-accent-warning', badgeColor: 'amber' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-accent-brand',   badgeColor: 'teal' },
-  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-orange', badgeColor: 'orange' },
+  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-brand', badgeColor: 'teal' },
   published:         { label: 'Published',      icon: CheckCircle2, color: 'text-accent-success',  badgeColor: 'emerald' },
 };
 
@@ -74,13 +74,16 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
                 className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={() => { if (flagComment.trim()) { onFlag(flagComment.trim()); setFlagComment(''); setShowFlagForm(false); } }}
                   disabled={!flagComment.trim()}
-                  className="px-3 py-1.5 rounded-[var(--radius-md)] bg-amber-600/20 border border-amber-500/30 t-caption text-accent-warning hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  icon={Flag}
+                  className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
                 >
                   Submit Flag
-                </button>
+                </Button>
                 <button
                   onClick={() => { setShowFlagForm(false); setFlagComment(''); }}
                   className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
@@ -173,7 +176,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{matrix.stats.planned} planned</span>
           <span className="t-caption-sm text-accent-warning">{matrix.stats.briefGenerated} briefs</span>
           {reviewCount > 0 && <span className="t-caption-sm text-accent-info">{reviewCount} awaiting review</span>}
-          <span className="t-caption-sm text-accent-orange">{matrix.stats.drafted} drafts</span>
+          <span className="t-caption-sm text-accent-brand">{matrix.stats.drafted} drafts</span>
           <span className="t-caption-sm text-accent-success">{publishedCount} published</span>
         </div>
       </div>

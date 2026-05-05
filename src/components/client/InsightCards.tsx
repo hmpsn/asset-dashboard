@@ -481,7 +481,7 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
             <p className="text-[var(--brand-text-bright)] font-medium">"{data.keyword}"</p>
             <div className="flex items-center gap-2">
               {data.volume != null && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded t-caption bg-blue-500/10 text-accent-info">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-sm)] t-caption bg-blue-500/10 text-accent-info">
                   {Number(data.volume).toLocaleString()} searches/mo
                 </span>
               )}

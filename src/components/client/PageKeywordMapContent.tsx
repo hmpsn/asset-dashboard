@@ -362,7 +362,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   <button
                                     onClick={() => onApproveKeyword(kw, 'page_map')}
                                     disabled={loading}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-success bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                                   >
                                     <Icon as={ThumbsUp} size="sm" /> Yes
                                   </button>

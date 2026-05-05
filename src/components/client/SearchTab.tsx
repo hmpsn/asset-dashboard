@@ -74,7 +74,7 @@ export function SearchTab({
     insights.lowHanging.length > 0 ? { icon: Target, color: 'amber', title: 'Low-Hanging Fruit', count: insights.lowHanging.length, desc: 'Ranking 5-20 with impressions — push to page 1', items: insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` })) } : null,
     insights.topPerformers.length > 0 ? { icon: Shield, color: 'emerald', title: 'Top Performers', count: insights.topPerformers.length, desc: 'Top 3 with real clicks — protect these', items: insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` })) } : null,
     insights.ctrOpps.length > 0 ? { icon: TrendingDown, color: 'red', title: 'CTR Opportunities', count: insights.ctrOpps.length, desc: 'Page 1 but CTR under 3%', items: insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` })) } : null,
-    insights.highImpLowClick.length > 0 ? { icon: AlertTriangle, color: 'orange', title: 'Visibility Without Clicks', count: insights.highImpLowClick.length, desc: '100+ impressions, under 5 clicks', items: insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` })) } : null,
+    insights.highImpLowClick.length > 0 ? { icon: AlertTriangle, color: 'amber', title: 'Visibility Without Clicks', count: insights.highImpLowClick.length, desc: '100+ impressions, under 5 clicks', items: insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` })) } : null,
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
@@ -149,7 +149,7 @@ export function SearchTab({
 
     {/* Annotations (read-only, managed from admin) */}
     {annotations.length > 0 && (
-      <SectionCard title="Timeline Annotations" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
+      <SectionCard title="Timeline Annotations" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
         <div className="space-y-1.5">
           {annotations.map(ann => (
             <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50">

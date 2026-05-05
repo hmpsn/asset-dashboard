@@ -213,7 +213,7 @@ export function ApprovalsTab({
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className={`px-1.5 py-0.5 rounded t-caption-sm font-semibold ${
+                <span className={`px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-semibold ${
                   batchFilter === tab.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
                 }`}>
                   {tab.count}
@@ -282,8 +282,8 @@ export function ApprovalsTab({
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">/{first.pageSlug}</span>
                         <StatusBadge status={pageState?.status} />
                         <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>
-                        {pagePending > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-accent-warning">{pagePending} pending</span>}
-                        {pageApprovedCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{pageApprovedCount} approved</span>}
+                        {pagePending > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{pagePending} pending</span>}
+                        {pageApprovedCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{pageApprovedCount} approved</span>}
                       </ClickableRow>
 
                       {/* Page items (collapsible) */}
@@ -293,11 +293,10 @@ export function ApprovalsTab({
                           {pagePending > 1 && effectiveTier !== 'free' && (
                             <div className="px-5 pb-2">
                               <Button
-                                variant="secondary"
+                                variant="primary"
                                 size="sm"
                                 icon={Check}
                                 onClick={() => approveAllForPage(batch.id, pageItems)}
-                                className="border-emerald-500/30 text-accent-success hover:bg-emerald-500/10"
                               >
                                 Approve all {pagePending} for this page
                               </Button>
@@ -333,9 +332,9 @@ export function ApprovalsTab({
                               <div key={item.id} className="px-5 py-3 ml-4 border-l-2 border-[var(--brand-border)]">
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">{fieldLabel}</span>
-                                  <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${statusColors[item.status || 'pending']}`}>{item.status || 'pending'}</span>
+                                  <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${statusColors[item.status || 'pending']}`}>{item.status || 'pending'}</span>
                                   {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
-                                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{t}</span>
+                                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">{t}</span>
                                   ))}
                                   {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
                                     // item.pageSlug is a bare slug; use suffix fallback for nested pages
@@ -345,11 +344,11 @@ export function ApprovalsTab({
                                     return (
                                       <>
                                         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">targeting:</span>
-                                        <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">
+                                        <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">
                                           {kw.primaryKeyword}
                                         </span>
                                         {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                          <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)]/60 border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]">
+                                          <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/60 border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]">
                                             {kw2}
                                           </span>
                                         ))}
@@ -445,11 +444,10 @@ export function ApprovalsTab({
                                   ) : (
                                   <div className="flex items-center gap-2 mt-3">
                                     <Button
-                                      variant="secondary"
+                                      variant="primary"
                                       size="sm"
                                       icon={Check}
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
-                                      className="border-emerald-500/30 text-accent-success hover:bg-emerald-500/10"
                                     >
                                       Approve
                                     </Button>
@@ -570,11 +568,10 @@ export function ApprovalsTab({
               <div className="flex items-center gap-2">
                 {batchPending > 0 && effectiveTier !== 'free' && (
                   <Button
-                    variant="secondary"
+                    variant="primary"
                     size="sm"
                     icon={Check}
                     onClick={() => approveAllInBatch(batch)}
-                    className="border-emerald-500/30 text-accent-success hover:bg-emerald-500/10"
                   >
                     Approve All ({batchPending})
                   </Button>

@@ -37,8 +37,6 @@ const kdColor = (kd?: number) =>
     ? 'text-accent-success'
     : kd <= 60
     ? 'text-accent-warning'
-    : kd <= 80
-    ? 'text-accent-orange'
     : 'text-accent-danger';
 
 const intentColor = (intent?: string): string => {
@@ -113,12 +111,12 @@ export function RecommendedForYou({
                     {rec.intent}
                   </span>
                   <span
-                    className={`t-caption-sm font-medium px-1.5 py-0.5 rounded border ${prioColor}`}
+                    className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${prioColor}`}
                   >
                     {rec.priority}
                   </span>
                   {rec.suggestedPageType && rec.suggestedPageType !== 'blog' && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">
                       {rec.suggestedPageType}
                     </span>
                   )}
@@ -232,8 +230,8 @@ export function RecommendedForYou({
                   </div>
                 )}
                 {rec.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-orange font-medium">
-                    <Icon as={Swords} size="sm" className="text-accent-orange" />
+                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-warning font-medium">
+                    <Icon as={Swords} size="sm" className="text-accent-warning" />
                     {rec.competitorProof}
                   </span>
                 )}

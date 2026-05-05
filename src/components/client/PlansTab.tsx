@@ -281,7 +281,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <span className="t-body font-medium text-[var(--brand-text)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium ${
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${
                       subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-accent-success' :
                       subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-accent-danger' :
                       'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'

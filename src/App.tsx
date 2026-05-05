@@ -67,7 +67,7 @@ const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingB
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
 function ChunkFallback() {
-  return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
+  return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
 }
 
 // Not lazy-loaded — the redirect fires immediately so a lazy chunk would add
@@ -159,7 +159,7 @@ function AdminApp() {
   };
 
   if (auth.checking) {
-    return <div className={`flex items-center justify-center h-screen bg-[var(--surface-1)] ${theme === 'light' ? 'dashboard-light' : ''}`}><div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
+    return <div className={`flex items-center justify-center h-screen bg-[var(--surface-1)] ${theme === 'light' ? 'dashboard-light' : ''}`}><div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
   }
   if (auth.required && !auth.authenticated) {
     return <div className={theme === 'light' ? 'dashboard-light' : ''}><LoginScreen onLogin={auth.login} /></div>;
@@ -391,8 +391,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           <div className="w-12 h-12 rounded-[var(--radius-xl)] flex items-center justify-center bg-[var(--surface-2)]">
             <Globe className="w-5 h-5 text-[var(--brand-text-muted)]" />
           </div>
-          <p className="text-sm text-[var(--brand-text-muted)]">Link a Webflow site to use this tool</p>
-          <button onClick={() => navigate('/settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-500/10 text-teal-400">Go to Settings</button>
+          <p className="t-caption text-[var(--brand-text-muted)]">Link a Webflow site to use this tool</p>
+          <button onClick={() => navigate('/settings')} className="mt-3 t-caption-sm font-medium px-3 py-1.5 rounded-[var(--radius-lg)] transition-colors bg-teal-500/10 text-accent-brand">Go to Settings</button>
         </div>
       );
     }
@@ -498,7 +498,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           pendingContentRequests={pendingContentRequests}
         />
         {clipboardStatus && (
-          <div className="flex items-center gap-1.5 px-5 py-1.5 text-[11px] font-medium bg-teal-500/10 text-teal-400 border-b border-zinc-800">
+          <div className="flex items-center gap-1.5 px-5 py-1.5 t-caption-sm font-medium bg-teal-500/10 text-accent-brand border-b border-[var(--brand-border)]">
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
@@ -512,11 +512,11 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                   className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border transition-all hover:border-amber-400/40"
                   style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
                 >
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 rounded-[var(--radius-lg)] bg-amber-500/15 flex items-center justify-center flex-shrink-0">
                     <Clipboard className="w-3.5 h-3.5 text-amber-400" />
                   </div>
                   <div className="text-left flex-1">
-                    <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
+                    <span className="t-caption-sm font-medium text-accent-warning">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">from client portal</span>
                   </div>
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">View →</span>
