@@ -9,6 +9,12 @@ import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 
 const log = createLogger('copy-intelligence');
+const INTELLIGENCE_PATTERN_TYPES = new Set<IntelligencePatternType>([
+  'terminology',
+  'tone',
+  'structure',
+  'keyword_usage',
+]);
 
 // ── Statement cache ──
 
@@ -70,6 +76,10 @@ function rowToPattern(row: CopyIntelligenceRow): CopyIntelligencePattern {
     active: Boolean(row.active),
     createdAt: row.created_at,
   };
+}
+
+function isIntelligencePatternType(value: unknown): value is IntelligencePatternType {
+  return typeof value === 'string' && INTELLIGENCE_PATTERN_TYPES.has(value as IntelligencePatternType);
 }
 
 // ── Public API ──
@@ -294,6 +304,6 @@ Return only valid JSON, no markdown.`;
   }
 
   return extracted
-    .filter(p => p.patternType && p.pattern)
+    .filter(p => isIntelligencePatternType(p.patternType) && typeof p.pattern === 'string' && p.pattern.length > 0)
     .map(p => addPattern(wsId, { patternType: p.patternType, pattern: p.pattern, source: 'extracted' }));
 }
