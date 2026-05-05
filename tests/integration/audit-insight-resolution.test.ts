@@ -3,7 +3,7 @@
  *
  * Verifies that when an audit re-runs and a previously-detected finding is no longer
  * present, the corresponding audit_finding insight gets auto-resolved. Tests the logic
- * implemented in server/routes/webflow-seo.ts (bridge-audit-auto-resolve callback).
+ * implemented in server/webflow-seo-audit-bridges.ts (bridge-audit-auto-resolve callback).
  *
  * Port: 13320
  */

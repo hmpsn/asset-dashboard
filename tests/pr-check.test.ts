@@ -3911,7 +3911,7 @@ describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(
 
   it('flags bare `/${page.slug}` template literal', () => {
     const file = write(
-      uniqPath('rule-bare-slug', 'server/webflow-seo.ts'),
+      uniqPath('rule-bare-slug', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'export function getPagePath(page: { slug: string }) {',
         '  const pagePath = `/${page.slug}`;',
@@ -4023,7 +4023,7 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
 
   it('flags `resolvePagePath(page) || undefined`', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'const basePath = resolvePagePath(page) || undefined;',
       )
@@ -4045,7 +4045,7 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
 
   it('does NOT flag `tryResolvePagePath(page)` (the correct API)', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'const basePath = tryResolvePagePath(page);',
       )

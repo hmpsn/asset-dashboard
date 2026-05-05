@@ -211,7 +211,7 @@ It is called from 16+ locations on any mutation that changes workspace intellige
 - Voice calibration updates (`routes/voice-calibration.ts`)
 - Brand identity / brandscript saves (`routes/brand-identity.ts`, `routes/brandscript.ts`)
 - Copy pipeline writes (`routes/copy-pipeline.ts`)
-- SEO edit application (`routes/webflow-seo.ts`)
+- SEO edit application (`routes/webflow-seo-apply.ts`)
 - Workspace settings updates (`routes/workspaces.ts`)
 - Discovery ingestion completions (`routes/discovery-ingestion.ts`)
 - Churn signal detection (`churn-signals.ts`)

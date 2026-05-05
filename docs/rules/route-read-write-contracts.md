@@ -17,7 +17,8 @@ The first enforced set is the ten highest-churn route files from git history:
 
 - `server/routes/keyword-strategy.ts`
 - `server/routes/jobs.ts`
-- `server/routes/webflow-seo.ts`
+- `server/routes/webflow-seo-audit.ts`
+- `server/routes/webflow-seo-jobs.ts`
 - `server/routes/webflow-schema.ts`
 - `server/routes/workspaces.ts`
 - `server/routes/public-portal.ts`

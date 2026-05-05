@@ -1,58 +1,24 @@
 /**
- * webflow-seo routes — extracted from server/index.ts
+ * Webflow SEO background job start routes.
  *
- * @reads workspaces, webflow_api
- * @writes seo_suggestions, jobs
+ * @reads workspaces, jobs, webflow_api
+ * @writes jobs
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
-const router = Router();
-
-import { runSeoAudit } from '../seo-audit.js';
-import {
-  listWorkspaces,
-  getWorkspace,
-  getTokenForSite,
-} from '../workspaces.js';
-import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { createJob, hasActiveJob, registerAbort } from '../jobs.js';
 import { validate, z } from '../middleware/validate.js';
 import { seoBulkAcceptFixSchema, seoBulkAnalyzePageSchema, seoBulkRewritePageSchema } from '../schemas/seo-bulk-jobs.js';
-import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import { runSeoBulkAcceptFixesJob } from '../webflow-seo-bulk-accept-fixes-job.js';
 import { runSeoBulkAnalyzeJob } from '../webflow-seo-bulk-analyze-job.js';
 import { runSeoBulkRewriteJob } from '../webflow-seo-bulk-rewrite-job.js';
+import {
+  getTokenForSite,
+  getWorkspace,
+} from '../workspaces.js';
 
-const log = createLogger('webflow-seo');
-
-// --- SEO Audit ---
-router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
-  try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
-    if (!token) {
-      log.error({ detail: req.params.siteId }, 'SEO audit: No token available for site');
-      return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
-    }
-    const skipLinkCheck = req.query.skipLinkCheck === 'true';
-    const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined, skipLinkCheck);
-    // Auto-flag pages with issues for edit tracking
-    const auditWsId = req.query.workspaceId as string | undefined;
-    const auditWs = auditWsId ? getWorkspace(auditWsId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
-    if (auditWs) {
-      handleOnDemandSeoAuditResult(auditWs, result);
-    }
-    res.json(result);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error({ detail: msg }, 'SEO audit error');
-    res.status(500).json({ error: `SEO audit failed: ${msg}` });
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════════
-// Bulk background job endpoints — run server-side with WS progress
-// ═══════════════════════════════════════════════════════════════════
+const router = Router();
 
 const bulkAnalyzeSchema = z.object({
   pages: z.array(seoBulkAnalyzePageSchema).min(1).max(500),
@@ -86,8 +52,6 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
     signal: ac.signal,
   });
 });
-
-// ── Bulk AI Rewrite (background job) ──
 
 const bulkRewriteSchema = z.object({
   siteId: z.string().min(1),
@@ -126,8 +90,6 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
     signal: ac.signal,
   });
 });
-
-// ── Bulk Accept Fixes (background job — SeoAudit accept-all) ──
 
 const bulkAcceptFixesSchema = z.object({
   siteId: z.string().min(1),

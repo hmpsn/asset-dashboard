@@ -458,7 +458,7 @@ router.post('/api/jobs', async (req, res) => {
         // Callers MUST include `publishedPath` on each page for nested Webflow pages —
         // without it, tryResolvePagePath falls back to `/${slug}` which is wrong for
         // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
-        // in routes/webflow-seo.ts accepts publishedPath; any frontend caller of this
+        // in routes/webflow-seo-apply.ts accepts publishedPath; any frontend caller of this
         // job type must mirror that contract.
         const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
         if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
