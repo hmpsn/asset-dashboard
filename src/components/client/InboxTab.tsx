@@ -214,7 +214,7 @@ export function InboxTab({
               <Icon as={Send} size="md" className="text-accent-brand" />
               <span className="t-body font-medium text-[var(--brand-text)]">{filter === 'all' ? 'Client Actions' : 'Action Items'}</span>
               {filter !== 'all' && (
-                <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingClientActions.length}</span>
+                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingClientActions.length}</span>
               )}
             </div>
           )}

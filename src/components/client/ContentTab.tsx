@@ -505,7 +505,7 @@ export function ContentTab({
                           {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan font-medium">{schema.type}</span>
+                                <span className="t-caption-sm px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">{schema.type}</span>
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{schema.notes}</div>
                             </div>
@@ -530,10 +530,10 @@ export function ContentTab({
                     <TierGate tier={effectiveTier} required="growth" feature="Brief Review Actions" compact className="mt-1"><span /></TierGate>
                   ) : (
                   <div className="flex items-center gap-2 pt-1">
-                    <Button variant="secondary" icon={Check} onClick={() => approveBrief(req.id)} className="border-emerald-500/30 text-accent-success hover:bg-emerald-500/10">
+                    <Button variant="primary" icon={Check} onClick={() => approveBrief(req.id)}>
                       Approve Brief
                     </Button>
-                    <Button variant="secondary" icon={Edit3} onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }} className="border-orange-500/30 text-accent-orange hover:bg-orange-500/10">
+                    <Button variant="secondary" icon={Edit3} onClick={() => { setFeedbackReqId(req.id); setFeedbackText(''); }}>
                       Request Changes
                     </Button>
                     <Button variant="danger" icon={X} onClick={() => { setDeclineReqId(req.id); setDeclineReason(''); }}>
@@ -650,10 +650,9 @@ export function ContentTab({
                     <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
                     <div className="flex items-center gap-2">
                       <Button
-                        variant="secondary"
+                        variant="primary"
                         onClick={() => requestChanges(req.id)}
                         disabled={!feedbackText.trim()}
-                        className="border-orange-500/30 text-accent-orange hover:bg-orange-500/10"
                       >
                         Submit Feedback
                       </Button>

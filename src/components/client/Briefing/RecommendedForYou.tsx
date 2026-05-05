@@ -38,7 +38,7 @@ const kdColor = (kd?: number) =>
     : kd <= 60
     ? 'text-accent-warning'
     : kd <= 80
-    ? 'text-accent-orange'
+    ? 'text-accent-warning'
     : 'text-accent-danger';
 
 const intentColor = (intent?: string): string => {
@@ -232,8 +232,8 @@ export function RecommendedForYou({
                   </div>
                 )}
                 {rec.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-orange font-medium">
-                    <Icon as={Swords} size="sm" className="text-accent-orange" />
+                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-warning font-medium">
+                    <Icon as={Swords} size="sm" className="text-accent-warning" />
                     {rec.competitorProof}
                   </span>
                 )}

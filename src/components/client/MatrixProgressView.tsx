@@ -23,7 +23,7 @@ const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof
   review:            { label: 'Your Review',   icon: Eye,          color: 'text-accent-info',   badgeColor: 'blue' },
   flagged:           { label: 'Feedback Sent', icon: Flag,         color: 'text-accent-warning', badgeColor: 'amber' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-accent-brand',   badgeColor: 'teal' },
-  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-orange', badgeColor: 'orange' },
+  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-brand', badgeColor: 'teal' },
   published:         { label: 'Published',      icon: CheckCircle2, color: 'text-accent-success',  badgeColor: 'emerald' },
 };
 
@@ -173,7 +173,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{matrix.stats.planned} planned</span>
           <span className="t-caption-sm text-accent-warning">{matrix.stats.briefGenerated} briefs</span>
           {reviewCount > 0 && <span className="t-caption-sm text-accent-info">{reviewCount} awaiting review</span>}
-          <span className="t-caption-sm text-accent-orange">{matrix.stats.drafted} drafts</span>
+          <span className="t-caption-sm text-accent-brand">{matrix.stats.drafted} drafts</span>
           <span className="t-caption-sm text-accent-success">{publishedCount} published</span>
         </div>
       </div>

@@ -39,16 +39,16 @@ interface Props {
 const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   homepage: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
   pillar: 'bg-teal-500/15 text-accent-brand border-teal-500/30',
-  service: 'bg-sky-500/15 text-accent-info border-sky-500/30',
+  service: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   audience: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  'lead-gen': 'bg-orange-500/15 text-accent-orange border-orange-500/30',
-  blog: 'bg-cyan-500/15 text-accent-cyan border-cyan-500/30',
+  'lead-gen': 'bg-teal-500/15 text-accent-brand border-teal-500/30',
+  blog: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   about: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
   contact: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
   location: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
   product: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
-  partnership: 'bg-yellow-500/15 text-accent-warning border-yellow-500/30',
-  faq: 'bg-cyan-500/15 text-accent-cyan border-cyan-500/30',
+  partnership: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
+  faq: 'bg-blue-500/15 text-accent-info border-blue-500/30',
   'case-study': 'bg-blue-500/15 text-accent-info border-blue-500/30',
   comparison: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
   generic: 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30',
@@ -288,7 +288,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy

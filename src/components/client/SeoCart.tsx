@@ -150,7 +150,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
           <div className="border-t border-[var(--brand-border)] px-5 py-4 space-y-3">
             {/* Premium upgrade nudge */}
             {showPremiumNudge && (
-              <div className="px-3 py-2.5 rounded-[var(--radius-xl)] bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20">
+              <div className="px-3 py-2.5 rounded-[var(--radius-xl)] bg-gradient-to-r from-amber-500/5 to-amber-500/10 border border-amber-500/20">
                 <div className="flex items-start gap-2">
                   <Crown className="w-4 h-4 text-accent-warning mt-0.5 flex-shrink-0" />
                   <div>

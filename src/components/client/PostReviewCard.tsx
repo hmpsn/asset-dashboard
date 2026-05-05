@@ -30,6 +30,16 @@ interface PostReviewCardProps {
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
+const richTextPreviewClass = [
+  't-body text-[var(--brand-text)] leading-7 max-w-none',
+  '[&_p]:mb-3 [&_p:last-child]:mb-0',
+  '[&_a]:text-accent-brand [&_a]:underline [&_a]:underline-offset-2',
+  '[&_strong]:font-semibold [&_strong]:text-[var(--brand-text-bright)]',
+  '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5',
+  '[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5',
+  '[&_li]:mb-1.5',
+].join(' ');
+
 export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
   // ALL hooks must be declared before any early returns (Rules of Hooks).
   const queryClient = useQueryClient();
@@ -196,7 +206,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/60 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold leading-snug text-[var(--brand-text-bright)]">{post.title}</h3>
+            <h3 className="t-body font-semibold leading-snug text-[var(--brand-text-bright)]">{post.title}</h3>
             {post.metaDescription && (
               <p className="t-caption text-[var(--brand-text)] mt-1 italic leading-relaxed">{post.metaDescription}</p>
             )}
@@ -223,7 +233,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
                   updateLocalPost({ title: e.target.value });
                   scheduleTitleSave(e.target.value);
                 }}
-                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
               />
             </label>
             <label className="block">
@@ -305,7 +315,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
+            className={richTextPreviewClass}
             dangerouslySetInnerHTML={{ __html: post.introduction }}
           />
         )}
@@ -337,7 +347,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
                     updateLocalSection(section.index, { heading: e.target.value });
                     scheduleSectionHeadingSave(e.target.value);
                   }}
-                  className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+                  className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
                 />
               </label>
               <RichTextEditor
@@ -369,7 +379,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             </div>
           ) : (
             <div
-              className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
+              className={richTextPreviewClass}
               dangerouslySetInnerHTML={{ __html: section.content }}
             />
           )}
@@ -422,7 +432,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
+            className={richTextPreviewClass}
             dangerouslySetInnerHTML={{ __html: post.conclusion }}
           />
         )}

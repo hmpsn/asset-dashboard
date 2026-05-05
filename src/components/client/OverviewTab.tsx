@@ -266,7 +266,7 @@ export function OverviewTab({
       
       if (audit && audit.siteScore < 80) {
         return (
-          <div className="bg-gradient-to-r from-amber-600/10 via-[var(--surface-2)] to-orange-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="bg-gradient-to-r from-amber-600/10 via-[var(--surface-2)] to-amber-600/5 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-amber-500/15 flex items-center justify-center">
@@ -291,7 +291,7 @@ export function OverviewTab({
       
       if (overview && overview.totalClicks < 100) {
         return (
-          <div className="bg-gradient-to-r from-blue-600/10 via-[var(--surface-2)] to-cyan-600/10 border border-blue-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="bg-gradient-to-r from-blue-600/10 via-[var(--surface-2)] to-blue-600/5 border border-blue-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/15 flex items-center justify-center">

@@ -56,7 +56,7 @@ const getFocusable = (root: HTMLElement): HTMLElement[] =>
     el => !el.hasAttribute('disabled') && el.tabIndex !== -1,
   );
 
-const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : kd <= 80 ? 'text-accent-orange' : 'text-accent-danger';
+const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 80 ? 'text-accent-warning' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
 const intentColor = (intent?: string) => {
@@ -64,7 +64,7 @@ const intentColor = (intent?: string) => {
     case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
     case 'informational': return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
     case 'transactional': return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
-    case 'navigational': return 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20';
+    case 'navigational': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
     default: return 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/10 border-[var(--brand-border)]/20';
   }
 };
@@ -1454,7 +1454,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             );
                           })}
                           {gap.competitorProof && (
-                            <span className="t-caption-sm text-accent-orange font-medium">{gap.competitorProof}</span>
+                            <span className="t-caption-sm text-accent-warning font-medium">{gap.competitorProof}</span>
                           )}
                         </div>
                       )}
@@ -1581,7 +1581,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon as={Target} size="md" className="text-accent-orange" />
+                    <Icon as={Target} size="md" className="text-accent-warning" />
                     <span className="t-caption font-medium text-[var(--brand-text)]">Review Keyword Ideas</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.keywordGaps.length})</span>
                   </div>
