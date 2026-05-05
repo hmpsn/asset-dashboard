@@ -268,6 +268,10 @@ export function registerAbort(jobId: string): AbortController {
   return ac;
 }
 
+export function unregisterAbort(jobId: string): void {
+  abortControllers.delete(jobId);
+}
+
 export function cancelJob(id: string): Job | undefined {
   const ac = abortControllers.get(id);
   if (ac) { ac.abort(); abortControllers.delete(id); }

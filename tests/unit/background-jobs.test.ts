@@ -32,6 +32,7 @@ describe('background job metadata', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
     expect(getBackgroundJobLabel('future-job')).toBe('future-job');
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR)).toBe(true);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(true);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
     expect(isBackgroundJobCancellable('future-job')).toBe(true);

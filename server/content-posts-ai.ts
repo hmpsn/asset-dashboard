@@ -58,6 +58,8 @@ export async function callCreativeAI(opts: {
    * strip markdown code fences from the returned text. Defaults to false.
    */
   json?: boolean;
+  /** Optional caller cancellation signal. */
+  signal?: AbortSignal;
 }): Promise<string> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
   const temperature = opts.temperature ?? CLAUDE_TEMP;
@@ -80,11 +82,13 @@ export async function callCreativeAI(opts: {
         workspaceId,
         maxRetries: 3,      // patient retries — quality over speed
         timeoutMs: 90_000,
+        signal: opts.signal,
       });
       log.info(`[${feature}] Generated with Claude`);
       const text = result.text.trim();
       return json ? stripCodeFence(text) : text;
     } catch (err) {
+      if (opts.signal?.aborted) throw err;
       log.info(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
   }
@@ -97,6 +101,7 @@ export async function callCreativeAI(opts: {
     temperature,
     feature,
     workspaceId,
+    signal: opts.signal,
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
   log.info(`[${feature}] Generated with GPT`);
@@ -124,6 +129,10 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
   pillar: 'You are an authority content strategist creating comprehensive hub pages that establish topical authority and drive organic traffic.',
   resource: 'You are an educational content writer creating actionable guides and resources that establish thought leadership.',
 };
+
+interface ContentAIGenerationOptions {
+  signal?: AbortSignal;
+}
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
   blog: `- Open with a specific, concrete scenario, bold claim, or unexpected angle — NOT a generic stat question
@@ -274,6 +283,7 @@ export async function generateIntroduction(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const totalBudget = brief.wordCountTarget || 1800;
   const pageType = brief.pageType || 'blog';
@@ -325,6 +335,7 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     maxTokens: 600,
     feature: 'content-post-intro',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -337,6 +348,7 @@ export async function generateSection(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const sectionTarget = section.wordCount || 300;
   const totalBudget = brief.wordCountTarget || 1800;
@@ -412,6 +424,7 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     maxTokens: Math.max(800, sectionTarget * 2),
     feature: 'content-post-section',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -421,6 +434,7 @@ export async function generateConclusion(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
@@ -467,6 +481,7 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     maxTokens: 800,
     feature: 'content-post-conclusion',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -496,6 +511,7 @@ export async function generateSeoMeta(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ seoTitle: string; seoMetaDescription: string } | null> {
   const introPlain = stripHtml(post.introduction).slice(0, 500);
   const sectionHeadings = post.sections.map(s => s.heading).join(', ');
@@ -539,6 +555,7 @@ Return valid JSON only:
       temperature: 0.5,
       feature: 'content-post-seo-meta',
       workspaceId,
+      signal: options.signal,
     });
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
@@ -561,6 +578,7 @@ export async function unifyPost(
   brief: ContentBrief,
   voiceCtx: string,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
@@ -641,6 +659,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     feature: 'content-post-unify',
     workspaceId,
     json: true,
+    signal: options.signal,
   });
 
   try {

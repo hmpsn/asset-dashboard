@@ -9,8 +9,10 @@ import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
 import { stripCodeFences } from './helpers.js';
+import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 
 const log = createLogger('openai');
+const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
 
 // --- Token / Cost Tracking (persisted to disk) ---
 
@@ -229,6 +231,8 @@ interface OpenAIChatOptions {
   maxRetries?: number;
   /** Timeout per request in ms (default 60000) */
   timeoutMs?: number;
+  /** Optional caller cancellation signal. Composed with timeoutMs. */
+  signal?: AbortSignal;
 }
 
 interface OpenAIChatResult {
@@ -253,7 +257,13 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     workspaceId,
     maxRetries = 3,
     timeoutMs = 60_000,
+    signal,
   } = opts;
+
+  if (signal) {
+    // Cancellable requests are per-job work; sharing a deduped promise would let one job abort another.
+    return executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal });
+  }
 
   // Create deduplication key from request parameters
   const { AIRequestDeduplicator }: typeof AiDeduplication = await import('./ai-deduplication.js'); // dynamic-import-ok
@@ -273,7 +283,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
   return aiDeduplicator.deduplicate(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs }),
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal }),
     {
       cacheTtlMs: 5 * 60 * 1000, // 5 minutes
       skipCache: shouldSkipCache,
@@ -298,6 +308,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     workspaceId,
     maxRetries = 3,
     timeoutMs = 60_000,
+    signal,
   } = opts;
 
   const body = JSON.stringify({
@@ -311,6 +322,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   const callStartMs = Date.now();
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -318,7 +330,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
           'Content-Type': 'application/json',
         },
         body,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: composeTimeoutSignal(timeoutMs, signal),
       });
 
       if (!res.ok) {
@@ -337,7 +349,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfterMs) waitMs = Math.max(parseInt(retryAfterMs, 10) + 500, waitMs);
           log.info(`[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(r => setTimeout(r, waitMs));
+          await abortableDelay(waitMs, signal, AI_REQUEST_CANCELLED_MESSAGE);
           continue;
         }
         throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 300)}`);
@@ -359,15 +371,16 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
+      if (signal?.aborted) throw err;
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
         log.info(`[${feature}] OpenAI timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
         continue;
       }
       if (attempt === maxRetries) throw err;
       // Generic retry for network errors
       log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);
     }
   }
   throw new Error(`[${feature}] OpenAI call failed after ${maxRetries} retries`);

@@ -6,8 +6,10 @@
 
 import { logTokenUsage } from './openai-helpers.js';
 import { createLogger } from './logger.js';
+import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 
 const log = createLogger('anthropic');
+const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -28,6 +30,8 @@ interface AnthropicChatOptions {
   maxRetries?: number;
   /** Timeout per request in ms (default 90000) */
   timeoutMs?: number;
+  /** Optional caller cancellation signal. Composed with timeoutMs. */
+  signal?: AbortSignal;
 }
 
 interface AnthropicChatResult {
@@ -55,6 +59,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
     workspaceId,
     maxRetries = 3,
     timeoutMs = 90_000,
+    signal,
   } = opts;
 
   const bodyObj: Record<string, unknown> = {
@@ -69,6 +74,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -77,7 +83,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
           'Content-Type': 'application/json',
         },
         body,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: composeTimeoutSignal(timeoutMs, signal),
       });
 
       if (!res.ok) {
@@ -89,7 +95,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfter) waitMs = Math.max(parseInt(retryAfter, 10) * 1000 + 500, waitMs);
           log.info(`[${feature}] Anthropic ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(r => setTimeout(r, waitMs));
+          await abortableDelay(waitMs, signal, AI_REQUEST_CANCELLED_MESSAGE);
           continue;
         }
         throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 300)}`);
@@ -110,14 +116,15 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
+      if (signal?.aborted) throw err;
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
         log.info(`[${feature}] Anthropic timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
         continue;
       }
       if (attempt === maxRetries) throw err;
       log.info(`[${feature}] Anthropic error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);
     }
   }
   throw new Error(`[${feature}] Anthropic call failed after ${maxRetries} retries`);
