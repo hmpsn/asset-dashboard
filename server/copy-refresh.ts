@@ -10,7 +10,8 @@
 import { listBlueprints } from './page-strategy.js';
 import { getSectionsForEntry } from './copy-review.js';
 import { loadDecayAnalysis } from './content-decay.js';
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callAI } from './ai.js';
+import { parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
@@ -206,7 +207,7 @@ Return a JSON object with a "suggestions" array. Each item must have:
 Prioritize sections that are most likely contributing to the decline (outdated info, weak CTAs, poor keyword targeting).`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,

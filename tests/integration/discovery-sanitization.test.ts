@@ -8,7 +8,7 @@
  * - Oversized text is rejected with 400 (app-layer Zod) or 413 (DB trigger).
  *
  * Architecture note: the injection-envelope tests call processSource() directly
- * in-process so that vi.mock() can intercept the callOpenAI call. The size-cap
+ * in-process so that vi.mock() can intercept callAI's delegated OpenAI call. The size-cap
  * tests use createTestContext (child process) because they exercise the HTTP
  * validation layer (Zod .max + DB trigger).
  */
@@ -96,7 +96,7 @@ describe('discovery ingestion — prompt-injection defense (I12)', () => {
       ],
     });
 
-    // Add and process source directly (in-process so vi.mock intercepts callOpenAI)
+    // Add and process source directly (in-process so vi.mock intercepts callAI's delegated OpenAI call)
     const source = addSource(inProcessWsId, 'test-injection.txt', 'brand_doc', rawContent);
     await processSource(inProcessWsId, source.id);
 

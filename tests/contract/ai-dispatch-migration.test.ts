@@ -15,6 +15,8 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
 const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/brandscript.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-intelligence.ts', aiImport: "from './ai.js'" },
+  { path: 'server/copy-refresh.ts', aiImport: "from './ai.js'" },
+  { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
 ];
 
 describe('AI dispatch migration', () => {
@@ -35,8 +37,9 @@ describe('AI dispatch migration', () => {
       expect(source, file.path).toContain(file.aiImport);
       expect(source, file.path).toContain('callAI({');
       expect(source, file.path).toContain("responseFormat: { type: 'json_object' }");
-      expect(source, file.path).not.toContain("from './openai-helpers.js'");
-      expect(source, file.path).not.toContain("from '../openai-helpers.js'");
+      expect(source, file.path).not.toMatch(
+        /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
+      );
       expect(source, file.path).not.toContain('callOpenAI({');
     }
   });
