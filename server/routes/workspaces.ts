@@ -25,7 +25,8 @@ import {
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
 import { applySuppressionsToAudit } from '../helpers.js';
-import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
+import { parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import { invalidatePageCache } from '../workspace-data.js';
@@ -251,7 +252,10 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
           }
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: PATCH /api/workspaces/:id: programming error'); /* best-effort live domain resolution */ }
+    } catch (err) {
+      // url-fetch-ok: best-effort live domain resolution
+      if (isProgrammingError(err)) log.warn({ err }, 'workspaces: PATCH /api/workspaces/:id: programming error');
+    }
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
@@ -337,17 +341,14 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     if (bizContext) contextParts.push(`Business context: ${bizContext}`);
     if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
 
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
       feature: 'intelligence-profile-autofill',
       workspaceId: ws.id,
       temperature: 0.3,  // low temperature for consistent JSON output
       maxTokens: 300,    // response is a small JSON object
+      system: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
-        },
         {
           role: 'user',
           content: `Based on this website context, suggest a business intelligence profile:\n\n${contextParts.join('\n\n')}\n\nRespond with JSON: {"industry": "string", "goals": ["string", ...], "targetAudience": "string"}`,
