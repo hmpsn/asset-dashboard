@@ -2,7 +2,7 @@
 // Extracted from seo-audit.ts for modularity.
 // Note: mutates results[].issues[].suggestedFix in-place — no DB writes.
 
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -143,7 +143,7 @@ ${auditBrandName ? `- The brand name is "${auditBrandName}" — use this exact n
 Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
-          const aiResult = await callOpenAI({
+          const aiResult = await callAI({
             model: 'gpt-4.1-mini',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.6,

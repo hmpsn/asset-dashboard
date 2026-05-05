@@ -509,7 +509,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. server/ai.ts callAI exists, but many server modules and high-churn routes still import callOpenAI directly. First conservative slice migrated chat memory summaries, meeting briefs, and monthly digest summaries to callAI while preserving OpenAI model choices. Continue migrating general generation paths and keep intentional provider-specific exceptions documented."
+          "notes": "Verified still valid on origin/staging eb0a5832. server/ai.ts callAI exists, but many server modules and high-churn routes still import callOpenAI directly. First conservative slice migrated chat memory summaries, meeting briefs, and monthly digest summaries to callAI while preserving OpenAI model choices. Second plain-text slice migrates content decay recommendations, internal link suggestions, SEO audit metadata recommendations, rewrite chat, and Webflow keyword analysis. Continue migrating general generation paths and keep intentional provider-specific exceptions documented; JSON-mode callers that require responseFormat need a separate dispatcher-contract slice."
         },
         {
           "id": "platform-consolidation-seo-provider-boundary",
