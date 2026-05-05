@@ -41,4 +41,29 @@ describe('callAI', () => {
       messages: [{ role: 'user', content: 'Return JSON.' }],
     }));
   });
+
+  it('injects OpenAI system prompts while preserving JSON response format', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: '{"ok":true}',
+      promptTokens: 12,
+      completionTokens: 3,
+      totalTokens: 15,
+    });
+
+    await callAI({
+      model: 'gpt-4.1-mini',
+      system: 'Return only valid JSON.',
+      messages: [{ role: 'user', content: 'Classify this note.' }],
+      feature: 'unit-test-system-json',
+      responseFormat: { type: 'json_object' },
+    });
+
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      responseFormat: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Return only valid JSON.' },
+        { role: 'user', content: 'Classify this note.' },
+      ],
+    }));
+  });
 });

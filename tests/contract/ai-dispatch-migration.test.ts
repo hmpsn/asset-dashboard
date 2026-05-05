@@ -17,6 +17,7 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/copy-intelligence.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-refresh.ts', aiImport: "from './ai.js'" },
   { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
+  { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'" },
 ];
 
 describe('AI dispatch migration', () => {
@@ -37,6 +38,7 @@ describe('AI dispatch migration', () => {
       expect(source, file.path).toContain(file.aiImport);
       expect(source, file.path).toContain('callAI({');
       expect(source, file.path).toContain("responseFormat: { type: 'json_object' }");
+      // Parsing helpers may still live in openai-helpers; migrated files must not import the provider call.
       expect(source, file.path).not.toMatch(
         /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
       );
