@@ -38,7 +38,7 @@ import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
 import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId, normalizePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
-import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
+import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort, unregisterAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate, z } from '../middleware/validate.js';
@@ -1216,6 +1216,8 @@ IMPORTANT: Return ONLY valid JSON.`;
         operation: 'bulk-analyze',
         error: String(err),
       });
+    } finally {
+      unregisterAbort(job.id);
     }
   })();
 });
@@ -1507,6 +1509,8 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
         operation: 'bulk-rewrite',
         error: String(err),
       });
+    } finally {
+      unregisterAbort(job.id);
     }
   })();
 });
@@ -1657,6 +1661,8 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('w
         operation: 'bulk-accept-fixes',
         error: String(err),
       });
+    } finally {
+      unregisterAbort(job.id);
     }
   })();
 });

@@ -36,11 +36,16 @@ Long-running admin generation routes must:
 5. Add activity and broadcast domain events when generated data changes. When a
    shared generation service is used by both direct and background paths, log
    activity in that shared service so both paths stay in parity.
-6. Register abort handling when the UI offers cancellation.
+6. Register abort handling when the UI offers cancellation, and unregister it
+   from the worker `finally` block once the job reaches a terminal state.
 
 On server restart, persisted `pending` or `running` jobs must be marked `error`
 with a visible restart-interruption message. Jobs cannot silently remain active
 after their worker process is gone.
+
+Cancellation must remain observable after `cancelJob()` is called. Workers that
+poll `isJobCancelled(jobId)` must continue to see `true` even if their abort
+controller has already been unregistered during cleanup.
 
 ## Frontend Contract
 
