@@ -1,8 +1,8 @@
 /**
  * jobs routes — extracted from server/index.ts
  *
- * @reads jobs, workspaces, snapshots, schema_snapshots, recommendations, workspace_pages, page_keywords, google_analytics, search_console, webflow_api
- * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, seo_changes, usage_tracking, activities
+ * @reads jobs, workspaces, snapshots, schema_snapshots, recommendations, workspace_pages, page_keywords, google_analytics, search_console, webflow_api, content_briefs
+ * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, seo_changes, usage_tracking, activities, content_posts
  */
 import { Router } from 'express';
 
@@ -33,6 +33,11 @@ import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
+import { getBrief } from '../content-brief.js';
+import {
+  createContentPostGenerationJob,
+  runContentPostGenerationJob,
+} from '../content-posts.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
@@ -68,6 +73,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
@@ -623,6 +629,29 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Sales report failed' });
           }
         })();
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
+        if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        if (!briefId) return res.status(400).json({ error: 'briefId required' });
+        const activePostJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, wsId);
+        if (activePostJob) return res.status(409).json({ error: 'Content post generation is already running for this workspace', jobId: activePostJob.id });
+        const ws = getWorkspace(wsId);
+        if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+        const brief = getBrief(wsId, briefId);
+        if (!brief) return res.status(404).json({ error: 'Brief not found' });
+
+        const started = createContentPostGenerationJob(wsId, brief);
+        res.json({ jobId: started.jobId, postId: started.postId, post: started.post });
+        runContentPostGenerationJob({
+          workspaceId: wsId,
+          brief,
+          postId: started.postId,
+          jobId: started.jobId,
+        });
         break;
       }
 
