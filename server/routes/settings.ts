@@ -45,7 +45,16 @@ router.patch('/api/studio-config', requireAdminAuth, (req, res) => {
     clearBookingUrl();
   } else {
     // Basic URL validation — must be http(s)
-    try { new URL(bookingUrl); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(bookingUrl);
+    } catch (err) {
+      void err;
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
     setBookingUrl(bookingUrl);
   }
   res.json({ ok: true, bookingUrl: bookingUrl || null });
