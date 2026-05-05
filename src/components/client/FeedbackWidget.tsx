@@ -143,7 +143,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
         <div className="flex items-center gap-2">
           <Icon as={MessageSquarePlus} size="md" className="text-accent-brand" />
           <span className="t-body font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
-          <span className="t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">beta</span>
+          <span className="t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-teal-500/20">beta</span>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -264,7 +264,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                         {hasTeamReply && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400 flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', statusCfg.bg, statusCfg.color)}>{statusCfg.label}</span>
+                        <span className={cn('t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium', statusCfg.bg, statusCfg.color)}>{statusCfg.label}</span>
                         <span className="t-micro text-[var(--brand-text-muted)]">{new Date(item.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>

@@ -104,7 +104,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
               {order.pageIds.length > 0 && order.status !== 'completed' && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {order.pageIds.slice(0, 5).map(p => (
-                    <span key={p} className="t-micro px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)]">{p}</span>
+                    <span key={p} className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)]">{p}</span>
                   ))}
                   {order.pageIds.length > 5 && (
                     <span className="t-micro text-[var(--brand-text-muted)]">+{order.pageIds.length - 5} more</span>

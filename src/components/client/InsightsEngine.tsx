@@ -13,6 +13,7 @@ import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet
 import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
+import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -270,7 +271,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                   {rec.affectedPages.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1 mt-1.5">
                       {rec.affectedPages.slice(0, 3).map((slug, i) => (
-                        <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)] truncate max-w-[180px]">
+                        <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)] truncate max-w-[180px]">
                           /{slug}
                         </span>
                       ))}
@@ -421,19 +422,19 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                               <span className={`t-caption font-medium ${isCompleted ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'}`}>
                                 {rec.title}
                               </span>
-                              <span className={`t-caption-sm px-1.5 py-0.5 rounded ${impactBadge.bg} ${impactBadge.color}`}>
+                              <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] ${impactBadge.bg} ${impactBadge.color}`}>
                                 {impactBadge.label}
                               </span>
                               <span className={`t-caption-sm ${effortBadge.color}`}>
                                 {effortBadge.label}
                               </span>
                               {rec.status === 'in_progress' && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">
                                   In Progress
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
                                   <Icon as={CheckCircle2} size="sm" /> Done
                                 </span>
                               )}
@@ -469,7 +470,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 <div className="t-caption-sm text-[var(--brand-text-muted)] tracking-wider mb-1.5">Affected Pages</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {rec.affectedPages.slice(0, 8).map((slug, i) => (
-                                    <span key={i} className="t-caption px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]">
+                                    <span key={i} className="t-caption px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]">
                                       /{slug}
                                     </span>
                                   ))}
@@ -512,61 +513,62 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                               {isPremium ? (
                                 <>
                                   {rec.status === 'pending' && (
-                                    <button
+                                    <Button
                                       onClick={() => handleStatusUpdate(rec.id, 'in_progress')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+                                      size="sm"
+                                      icon={ArrowUpRight}
                                     >
-                                      <Icon as={ArrowUpRight} size="sm" />
                                       Start Working On This
-                                    </button>
+                                    </Button>
                                   )}
                                   {rec.status === 'in_progress' && (
-                                    <button
+                                    <Button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                      size="sm"
+                                      icon={CheckCircle2}
                                     >
-                                      <Icon as={CheckCircle2} size="sm" />
                                       Mark Complete
-                                    </button>
+                                    </Button>
                                   )}
                                 </>
                               ) : (
                                 <>
                                   {/* Growth/Free: purchase CTA or action guidance */}
                                   {rec.productType && rec.productPrice && !inCart ? (
-                                    <button
+                                    <Button
                                       onClick={() => cart?.addItem({
                                         productType: rec.productType as ProductType,
                                         displayName: rec.title,
                                         priceUsd: rec.productPrice!,
                                         quantity: 1,
                                       })}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+                                      size="sm"
+                                      icon={ShoppingCart}
                                     >
-                                      <Icon as={ShoppingCart} size="sm" />
                                       Let Us Fix This — {fmt(rec.productPrice)}
-                                    </button>
+                                    </Button>
                                   ) : inCart ? (
                                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                                       <Icon as={ShoppingCart} size="sm" />
                                       In Cart
                                     </span>
                                   ) : rec.status === 'pending' ? (
-                                    <button
+                                    <Button
                                       onClick={() => handleStatusUpdate(rec.id, 'in_progress')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
+                                      variant="secondary"
+                                      size="sm"
+                                      icon={ArrowUpRight}
                                     >
-                                      <Icon as={ArrowUpRight} size="sm" />
                                       I'll Handle This
-                                    </button>
+                                    </Button>
                                   ) : rec.status === 'in_progress' ? (
-                                    <button
+                                    <Button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                      size="sm"
+                                      icon={CheckCircle2}
                                     >
-                                      <Icon as={CheckCircle2} size="sm" />
                                       Mark Done
-                                    </button>
+                                    </Button>
                                   ) : null}
 
                                   {/* Premium upsell for high-value items */}

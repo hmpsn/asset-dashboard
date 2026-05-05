@@ -56,7 +56,7 @@ const getFocusable = (root: HTMLElement): HTMLElement[] =>
     el => !el.hasAttribute('disabled') && el.tabIndex !== -1,
   );
 
-const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 80 ? 'text-accent-warning' : 'text-accent-danger';
+const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
 const intentColor = (intent?: string) => {
@@ -1486,7 +1486,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               <button
                                 onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
                                 disabled={loading}
-                                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-success bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                               >
                                 <Icon as={ThumbsUp} size="sm" /> Relevant
                               </button>

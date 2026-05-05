@@ -1,6 +1,7 @@
 import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { SectionCard } from '../ui/SectionCard';
 import { chartDotStroke, CHART_SERIES_COLORS, scoreColor } from '../ui/constants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,8 +54,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="t-caption-sm text-accent-info">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="t-caption-sm text-accent-brand">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-blue-400" /><span className="t-caption-sm text-accent-info">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-teal-400" /><span className="t-caption-sm text-accent-brand">Impressions</span></div>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -146,7 +147,7 @@ export function RenderMarkdown({ text }: { text: string }) {
      .replace(/https?:\/\/\S+/g, '')
      .replace(/\*\*(.+?)\*\*/g, '<b class="text-[var(--brand-text-bright)]">$1</b>')
      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-[var(--brand-text)]">$1</em>')
-     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text)] t-caption-sm">$1</code>');
+     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded-[var(--radius-sm)] text-[var(--brand-text)] t-caption-sm">$1</code>');
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
   const elements: React.ReactElement[] = [];
@@ -301,12 +302,11 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   const colorMap: Record<string, { text: string }> = {
     amber: { text: 'text-accent-warning' }, emerald: { text: 'text-accent-success' },
     teal: { text: 'text-accent-brand' }, blue: { text: 'text-accent-info' },
-    red: { text: 'text-accent-danger' }, orange: { text: 'text-accent-orange' },
+    red: { text: 'text-accent-danger' },
   };
   const c = colorMap[color] || colorMap.amber;
-  // pr-check-disable-next-line -- InsightCard uses brand signature radius as a standalone card surface
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+    <SectionCard>
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
         <span className={`t-caption font-medium ${c.text}`}>{title}</span>
@@ -315,7 +315,7 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{desc}</p>
       <div className="space-y-1.5">
         {items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)]/30">
+          <div key={i} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
             <span className="text-[var(--brand-text)] truncate mr-2">{item.label}</span>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[var(--brand-text-muted)]">{item.sub}</span>
@@ -324,6 +324,6 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
           </div>
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }

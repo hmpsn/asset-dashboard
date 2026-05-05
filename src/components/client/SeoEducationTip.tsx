@@ -103,7 +103,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
               </button>
             </div>
           </div>
-          <button onClick={dismiss} className="p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-colors flex-shrink-0">
+          <button onClick={dismiss} className="p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-colors flex-shrink-0">
             <Icon as={X} size="md" />
           </button>
         </div>

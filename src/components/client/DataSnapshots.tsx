@@ -125,7 +125,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
             {devices.map((d, i) => {
               const pct = (d.clicks / totalDevClicks) * 100;
               const colors = ['bg-blue-500', 'bg-teal-500', 'bg-amber-500'];
-              return <div key={i} className={`h-full ${colors[i % colors.length]} first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct}%` }} />;
+              return <div key={i} className={`h-full ${colors[i % colors.length]} first:rounded-l-[var(--radius-pill)] last:rounded-r-[var(--radius-pill)]`} style={{ width: `${pct}%` }} />;
             })}
           </div>
           <div className="flex items-center gap-3 mt-1.5">
@@ -213,8 +213,8 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">New vs returning visitors</div>
           <div className="flex items-center gap-1.5 h-3 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)]">
-            <div className="h-full bg-teal-500 rounded-l-full" style={{ width: `${newSeg.percentage}%` }} />
-            <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
+            <div className="h-full bg-teal-500 rounded-l-[var(--radius-pill)]" style={{ width: `${newSeg.percentage}%` }} />
+            <div className="h-full bg-blue-500 rounded-r-[var(--radius-pill)]" style={{ width: `${retSeg.percentage}%` }} />
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <span className="flex items-center gap-1 t-caption-sm text-accent-brand">
@@ -292,7 +292,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
         <div className="mt-4">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Share of total traffic from organic search</div>
           <div className="h-3 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)] flex">
-            <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${organic.shareOfTotalUsers}%` }} />
+            <div className="h-full bg-emerald-500 rounded-l-[var(--radius-pill)] transition-all" style={{ width: `${organic.shareOfTotalUsers}%` }} />
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="t-caption-sm text-accent-success">Organic {organic.shareOfTotalUsers}%</span>
@@ -318,8 +318,8 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
               </div>
             </div>
             <div className="h-4 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)] flex">
-              <div className="h-full bg-teal-500 rounded-l-full" style={{ width: `${newSeg.percentage}%` }} />
-              <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
+              <div className="h-full bg-teal-500 rounded-l-[var(--radius-pill)]" style={{ width: `${newSeg.percentage}%` }} />
+              <div className="h-full bg-blue-500 rounded-r-[var(--radius-pill)]" style={{ width: `${retSeg.percentage}%` }} />
             </div>
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">

@@ -278,9 +278,8 @@ export function OverviewTab({
                 </div>
               </div>
               <Button
-                variant="secondary"
+                variant="primary"
                 onClick={() => navigate(clientPath(workspaceId, 'health', betaMode))}
-                className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
               >
                 View Issues
               </Button>
@@ -303,9 +302,8 @@ export function OverviewTab({
                 </div>
               </div>
               <Button
-                variant="secondary"
+                variant="primary"
                 onClick={() => navigate(clientPath(workspaceId, 'search', betaMode))}
-                className="border-blue-500/30 text-accent-info hover:bg-blue-500/10"
               >
                 Find Keywords
               </Button>
@@ -420,7 +418,7 @@ export function OverviewTab({
                 <ClickableRow
                   key={i}
                   onClick={() => { onOpenChat(); setTimeout(() => onAskAi(q), 100); }}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-teal-500/5 border border-transparent hover:border-teal-500/15 t-caption-sm text-accent-brand hover:text-accent-brand"
                 >
                   💡 {q}
                 </ClickableRow>
@@ -485,7 +483,7 @@ export function OverviewTab({
                         <div className="w-[11px] h-[11px] rounded-[var(--radius-pill)] border-2 flex-shrink-0 mt-1 z-[var(--z-sticky)]" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="t-caption-sm font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
+                            <span className="t-caption-sm font-medium px-1 py-0.5 rounded-[var(--radius-sm)]" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>
                             <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                           </div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-1">{entry.type === 'audit_completed' && audit ? entry.title.replace(/score \d+/, `score ${audit.siteScore}`) : entry.title}</div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Inbox, ClipboardCheck, MessageSquare, FileText, PenLine, Layers, Flag, ExternalLink, Send, Check, X } from 'lucide-react';
-import { EmptyState, Icon} from '../ui';
+import { Button, EmptyState, Icon} from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
@@ -225,7 +225,7 @@ export function InboxTab({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="t-caption font-semibold text-[var(--brand-text)]">{action.title}</span>
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded border bg-teal-500/10 border-teal-500/20 text-accent-brand">{action.sourceType.replaceAll('_', ' ')}</span>
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border bg-teal-500/10 border-teal-500/20 text-accent-brand">{action.sourceType.replaceAll('_', ' ')}</span>
                     </div>
                     <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{action.summary}</p>
                     {action.clientNote && (
@@ -259,13 +259,16 @@ export function InboxTab({
                       className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-dim)] focus:border-amber-500/50 focus:outline-none resize-y"
                     />
                     <div className="mt-2 flex items-center gap-2">
-                      <button
+                      <Button
                         onClick={() => changeRequestNote.trim() && respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim())}
                         disabled={!changeRequestNote.trim()}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-lg)] bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white t-caption-sm font-medium transition-colors"
+                        variant="secondary"
+                        size="sm"
+                        icon={Send}
+                        className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
                       >
-                        <Icon as={X} size="sm" /> Send Feedback
-                      </button>
+                        Send Feedback
+                      </Button>
                       <button
                         onClick={() => { setChangeRequestAction(null); setChangeRequestNote(''); }}
                         className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] t-caption-sm font-medium hover:bg-[var(--brand-border-hover)] transition-colors"
@@ -366,7 +369,7 @@ export function InboxTab({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
-                          <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${
+                          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
                             isFlagged
                               ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
                               : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
