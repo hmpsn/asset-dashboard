@@ -5,7 +5,7 @@ import { isProgrammingError } from './errors.js';
 import { applyBulkKeywordGuards, stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { getPageKeyword, upsertPageKeyword } from './page-keywords.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import {
@@ -103,12 +103,10 @@ Provide your analysis as a JSON object:
 
 IMPORTANT: Return ONLY valid JSON.`;
 
-        const aiResult = await callOpenAI({
+        const aiResult = await callAI({
           model: 'gpt-4.1-mini',
-          messages: [
-            { role: 'system', content: 'You are an expert SEO keyword analyst. Return valid JSON only.' },
-            { role: 'user', content: prompt },
-          ],
+          system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
+          messages: [{ role: 'user', content: prompt }],
           maxTokens: 600,
           temperature: 0.3,
           feature: 'bulk-page-analysis',
