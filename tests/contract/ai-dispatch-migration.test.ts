@@ -12,6 +12,7 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/webflow-seo-bulk-analyze-job.ts', aiImport: "from './ai.js'" },
   { path: 'server/llms-txt-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/rewrite-chat.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/google.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-seo-page-tools.ts', aiImport: "from '../ai.js'" },
 ];
