@@ -12,12 +12,29 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
 ];
 
+const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
+  { path: 'server/brandscript.ts', aiImport: "from './ai.js'" },
+  { path: 'server/copy-intelligence.ts', aiImport: "from './ai.js'" },
+];
+
 describe('AI dispatch migration', () => {
   it('keeps migrated general generation paths on callAI', () => {
     for (const file of migratedGeneralGenerationFiles) {
       const source = readFileSync(file.path, 'utf-8');
       expect(source, file.path).toContain(file.aiImport);
       expect(source, file.path).toContain('callAI({');
+      expect(source, file.path).not.toContain("from './openai-helpers.js'");
+      expect(source, file.path).not.toContain("from '../openai-helpers.js'");
+      expect(source, file.path).not.toContain('callOpenAI({');
+    }
+  });
+
+  it('keeps migrated JSON-mode generation paths on callAI responseFormat', () => {
+    for (const file of migratedJsonGenerationFiles) {
+      const source = readFileSync(file.path, 'utf-8');
+      expect(source, file.path).toContain(file.aiImport);
+      expect(source, file.path).toContain('callAI({');
+      expect(source, file.path).toContain("responseFormat: { type: 'json_object' }");
       expect(source, file.path).not.toContain("from './openai-helpers.js'");
       expect(source, file.path).not.toContain("from '../openai-helpers.js'");
       expect(source, file.path).not.toContain('callOpenAI({');

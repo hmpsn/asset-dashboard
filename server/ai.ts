@@ -28,6 +28,8 @@ export interface AICallOptions {
   workspaceId?: string;
   /** Optional request timeout. */
   timeoutMs?: number;
+  /** OpenAI-only structured response mode. */
+  responseFormat?: { type: 'json_object' };
 }
 
 export interface AICallResult {
@@ -72,6 +74,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     feature: rest.feature,
     workspaceId: rest.workspaceId,
     timeoutMs: rest.timeoutMs,
+    responseFormat: rest.responseFormat,
   });
 
   return {
