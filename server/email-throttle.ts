@@ -102,7 +102,7 @@ const stmts = createStmtCache(() => ({
   ),
   countGlobal: db.prepare<[recipient: string]>(
     `SELECT COUNT(*) as cnt FROM email_sends
-     WHERE recipient = ? AND category NOT IN ('transactional','internal')
+     WHERE recipient = ? AND category NOT IN ('transactional','internal','report')
      AND sent_at >= datetime('now', '-1 day')`,
   ),
   lastSend: db.prepare<[recipient: string, category: string]>(
