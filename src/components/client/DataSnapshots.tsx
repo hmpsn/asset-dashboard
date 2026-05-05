@@ -324,11 +324,11 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">New bounce rate</div>
-                <div className={`t-body font-bold ${newSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{newSeg.bounceRate}%</div>
+                <div className={`t-stat-sm ${newSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{newSeg.bounceRate}%</div>
               </div>
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Returning bounce rate</div>
-                <div className={`t-body font-bold ${retSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{retSeg.bounceRate}%</div>
+                <div className={`t-stat-sm ${retSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{retSeg.bounceRate}%</div>
               </div>
             </div>
           </SectionCard>

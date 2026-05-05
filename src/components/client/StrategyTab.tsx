@@ -906,7 +906,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
         {/* Confirmed zone */}
         <div>
-          <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
+          <div className="t-label text-[var(--brand-text-muted)] mb-2">
             In strategy · {sortedConfirmed.length}
           </div>
           {trackedKeywordsLoading && sortedConfirmed.length === 0 ? (
@@ -991,7 +991,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
         {/* Suggestions zone */}
         <div>
-          <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
+          <div className="t-label text-[var(--brand-text-muted)] mb-2">
             Suggestions · {keywordIdeaRows.length}
           </div>
           {keywordIdeaRows.length === 0 ? (
@@ -1094,7 +1094,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {healthScore}<span className="t-caption-sm text-[var(--brand-text-muted)]">/100</span>
             </div>
             <div>
-              <div className="t-caption-sm font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">Strategy Snapshot</div>
+              <div className="t-label text-[var(--brand-text-muted)]">Strategy Snapshot</div>
               <div className="t-body font-medium text-[var(--brand-text)]">
                 {healthScore >= 80 ? 'Strong action plan' : healthScore >= 60 ? 'Good opportunity mix' : 'Building your strategy'}
               </div>
@@ -1106,19 +1106,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[560px]">
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Create content</div>
-              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{contentGapsFound}</div>
+              <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentGapsFound}</div>
             </div>
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Improve pages</div>
-              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
+              <div className="t-stat-sm text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
             </div>
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Ranking coverage</div>
-              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
+              <div className="t-stat-sm text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
             </div>
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Strategy keywords</div>
-              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{strategyKeywords.length}</div>
+              <div className="t-stat-sm text-[var(--brand-text-bright)]">{strategyKeywords.length}</div>
             </div>
           </div>
         </div>
@@ -1170,7 +1170,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <Icon as={FileText} size="lg" className="text-accent-brand" />
                 </div>
                 <div className="min-w-0">
-                  <div className="t-body font-medium text-[var(--brand-text)]">Review new content ideas</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Review new content ideas</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
                 </div>
               </div>
@@ -1188,7 +1188,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <Icon as={Zap} size="lg" className="text-accent-warning" />
                 </div>
                 <div className="min-w-0">
-                  <div className="t-body font-medium text-[var(--brand-text)]">Improve existing pages</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Improve existing pages</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
                 </div>
               </div>
@@ -1206,7 +1206,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <Icon as={Target} size="lg" className="text-accent-info" />
                 </div>
                 <div className="min-w-0">
-                  <div className="t-body font-medium text-[var(--brand-text)]">Guide strategy keywords</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide strategy keywords</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords shaping the strategy</div>
                 </div>
               </div>
@@ -1248,7 +1248,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Briefcase} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Guide This Strategy</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide This Strategy</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">
                   {priorities.length > 0
                     ? `${priorities.length} business ${priorities.length === 1 ? 'priority' : 'priorities'} saved`
@@ -1354,7 +1354,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={FileText} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Create Content</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Create Content</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strong ideas · {keywordGapCount} review candidates</div>
               </div>
             </div>
@@ -1652,7 +1652,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Zap} size="md" className="text-accent-warning" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Improve Pages</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Improve Pages</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{quickWinsAvailable + pagesWithGrowthOpps} improvements across your site</div>
               </div>
             </div>
@@ -1831,7 +1831,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Layers} size="md" className="text-accent-info" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Page Keyword Map</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Page Keyword Map</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyData.pageMap.length} pages mapped · advanced page-to-keyword detail</div>
               </div>
             </div>
@@ -1873,7 +1873,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <Icon as={Ban} size="md" className="text-accent-danger" />
                 </div>
                 <div className="text-left">
-                  <div className="t-body font-medium text-[var(--brand-text)]">Not Relevant Keywords</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Not Relevant Keywords</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">{declined.length} keywords excluded from future strategies</div>
                 </div>
               </div>

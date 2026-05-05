@@ -278,7 +278,7 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="w-4 h-4 text-[var(--brand-text)] shrink-0" />
           <div className="min-w-0">
-            <span className="t-body font-medium text-[var(--brand-text-bright)] block truncate">{entry.name}</span>
+            <span className="t-ui font-medium text-[var(--brand-text-bright)] block truncate">{entry.name}</span>
             <span className="t-caption text-[var(--brand-text-muted)]">{pageLabel}</span>
           </div>
         </div>

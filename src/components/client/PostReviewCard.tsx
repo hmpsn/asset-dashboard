@@ -325,7 +325,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       {post.sections.map(section => (
         <div key={section.index} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
+            <span className="t-body font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <Button
                 onClick={async () => { await flushSectionHeading(); await flushSection(); setEditingSection(section.index); }}

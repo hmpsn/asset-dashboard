@@ -70,7 +70,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-accent-brand" />
-            <span className="t-body font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
+            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">({items.length} item{items.length !== 1 ? 's' : ''})</span>
           </div>
           <IconButton icon={X} label="Close cart" size="sm" onClick={closeCart} />
@@ -89,7 +89,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
               <div key={item.productType} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="t-body font-medium text-[var(--brand-text-bright)]">{item.displayName}</div>
+                    <div className="t-ui font-medium text-[var(--brand-text-bright)]">{item.displayName}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {item.isFlat ? 'Full site' : `${fmt(item.priceUsd)}/page`}
                     </div>

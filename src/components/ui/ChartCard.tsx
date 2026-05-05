@@ -19,14 +19,15 @@ export function ChartCard({ title, titleIcon, trend, trendProps, action, childre
 
   return (
     <div
-      className={`bg-[var(--surface-2)] border border-zinc-800 transition-colors duration-200 ${className ?? ''}`}
-      style={{ borderRadius: '10px 24px 10px 24px' }}
+      className={`bg-[var(--surface-2)] border border-[var(--brand-border)] transition-colors duration-200 ${className ?? ''}`}
+      // pr-check-disable-next-line -- ChartCard is a UI primitive sharing SectionCard's brand card radius.
+      style={{ borderRadius: 'var(--radius-signature-lg)' }}
     >
       {hasHeader && (
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
             {titleIcon}
-            {title && <span className="text-sm font-semibold text-zinc-200">{title}</span>}
+            {title && <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{title}</span>}
             {trend !== undefined && <TrendBadge value={trend} {...trendProps} />}
           </div>
           {action}

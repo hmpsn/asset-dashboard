@@ -137,7 +137,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                 <div className="flex items-center gap-3 min-w-0">
                   <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <div className="min-w-0">
-                    <span className="t-body font-medium text-[var(--brand-text)] group-hover:text-[var(--brand-text-bright)] transition-colors truncate block">
+                    <span className="t-ui font-medium text-[var(--brand-text-bright)] transition-colors truncate block">
                       {plan.name}
                     </span>
                     <span className="t-caption text-[var(--brand-text-muted)]">

@@ -226,7 +226,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Lightbulb} size="md" className="text-accent-warning" />
-            <span className="t-body font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
+            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
             <span className="t-caption text-[var(--brand-text-muted)] ml-auto">{activeCount} active · {completedCount} completed</span>
           </div>
           {data.summary.trafficAtRisk > 0 && (
@@ -320,7 +320,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       <div className="px-5 py-4 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2">
           <Icon as={Lightbulb} size="md" className="text-accent-warning" />
-          <span className="t-body font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
+          <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
           <div className="ml-auto flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">{activeCount} active · {completedCount} done</span>
             <button

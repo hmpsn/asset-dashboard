@@ -171,7 +171,7 @@ export function SearchTab({
       >
         {showRawData ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         <Icon as={Table2} size="md" className="text-[var(--brand-text-muted)]" />
-        <span className="t-body font-medium text-[var(--brand-text)]">Raw Data</span>
+        <span className="t-ui font-medium text-[var(--brand-text-bright)]">Raw Data</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
       </ClickableRow>
       {showRawData && (
@@ -179,7 +179,7 @@ export function SearchTab({
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
               <button key={st} type="button" onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-3 py-1.5 rounded-[var(--radius-md)] t-ui font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
               >{st === 'queries' ? 'Queries' : 'Pages'}</button>
             ))}
           </div>

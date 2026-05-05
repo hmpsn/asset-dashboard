@@ -443,7 +443,7 @@ export function AnalyticsTab({
       <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-accent-brand" />
-          <span className="t-body font-medium text-[var(--brand-text-muted)]">Event Explorer</span>
+          <span className="t-ui font-medium text-[var(--brand-text-bright)]">Event Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
       </button>
@@ -483,10 +483,10 @@ export function AnalyticsTab({
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-[var(--brand-border)]">
-                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Event</th>
-                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Page</th>
-                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3 text-right">Count</th>
-                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 text-right">Users</th>
+                    <th className="t-label text-[var(--brand-text-muted)] py-2 pr-3">Event</th>
+                    <th className="t-label text-[var(--brand-text-muted)] py-2 pr-3">Page</th>
+                    <th className="t-label text-[var(--brand-text-muted)] py-2 pr-3 text-right">Count</th>
+                    <th className="t-label text-[var(--brand-text-muted)] py-2 text-right">Users</th>
                   </tr>
                 </thead>
                 <tbody>

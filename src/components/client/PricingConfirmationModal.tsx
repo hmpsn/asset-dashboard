@@ -104,7 +104,7 @@ export function PricingConfirmationModal({
                     <Target className="w-3 h-3 text-accent-brand" />
                     <span className="t-micro text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Topic</span>
                   </div>
-                  <div className="t-ui text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
+                  <div className="t-body text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
                   <div className="t-caption-sm mt-1 text-accent-brand">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>

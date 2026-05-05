@@ -153,12 +153,12 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           return (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-[var(--surface-2)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
               {isCurrent && (
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] t-label border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                   {isTrial ? 'Current Trial' : 'Current Plan'}
                 </div>
               )}
               <div className="pt-2">
-                <h3 className={`t-body font-semibold ${plan.color}`}>{plan.name}</h3>
+                <h3 className={`t-ui font-semibold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
                   <span className={`t-stat ${plan.color}`}>{plan.price}</span>
                   {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
@@ -167,7 +167,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="space-y-3">
                   {plan.featureGroups.map((group, gi) => (
                     <div key={gi}>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">{group.category}</div>
+                      <div className="t-label text-[var(--brand-text-muted)] mb-1.5">{group.category}</div>
                       {group.features.map((f, fi) => (
                         <div key={fi} className="flex items-center gap-2 py-0.5">
                           {f.included ? (
@@ -235,7 +235,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon as={FileText} size="md" className="text-accent-brand" />
-                    <span className="t-body font-semibold text-[var(--brand-text)]">Content Brief</span>
+                    <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Content Brief</span>
                   </div>
                   <span className="t-stat-sm text-accent-brand">{fmtPrice(briefPrice)}</span>
                 </div>
@@ -247,7 +247,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon as={Sparkles} size="md" className="text-accent-brand" />
-                    <span className="t-body font-semibold text-[var(--brand-text)]">Full Blog Post</span>
+                    <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Full Blog Post</span>
                   </div>
                   <span className="t-stat-sm text-accent-brand">{fmtPrice(fullPostPrice)}</span>
                 </div>
@@ -278,7 +278,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div>
                   <div className="flex items-center gap-2">
                     <Icon as={CheckCircle2} size="md" className="text-accent-brand" />
-                    <span className="t-body font-medium text-[var(--brand-text)]">
+                    <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
                     <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${
