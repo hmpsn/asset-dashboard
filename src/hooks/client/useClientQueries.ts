@@ -6,12 +6,10 @@ import type { ClientAction } from '../../../shared/types/client-actions';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
+  ActivityLogItem, RankHistoryEntry, LatestRank,
+  AnnotationItem, AnomalyItem, ContentPlanReviewCell, ApprovalPageKeyword,
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
-import type {
-  ActivityLogItem, RankHistoryEntry, LatestRank,
-  AnnotationItem, AnomalyItem, ContentPlanReviewCell,
-} from '../useClientData';
 
 // ── Activity ──────────────────────────────────────────────────────
 export function useClientActivity(wsId: string, enabled: boolean) {
@@ -128,9 +126,6 @@ export function useClientStrategy(wsId: string, enabled: boolean) {
     enabled,
   });
 }
-
-// ── Page Keywords (approval card context, not gated on seoClientView) ──
-export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
 
 export function useClientPageKeywords(wsId: string, enabled: boolean) {
   return useQuery({
