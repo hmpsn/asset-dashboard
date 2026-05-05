@@ -374,7 +374,6 @@
 - `POST` `/api/stripe/config/products` params() [auth, db, payment]
 - `DELETE` `/api/stripe/config` params() [auth, db, payment]
 - `GET` `/api/stripe/publishable-key` params() [auth, db, payment]
-- `POST` `/api/stripe/create-payment-intent` params() [auth, db, payment]
 - `POST` `/api/stripe/create-checkout` params() [auth, db, payment]
 - `POST` `/api/stripe/cart-checkout` params() [auth, db, payment]
 - `POST` `/api/public/upgrade-checkout/:workspaceId` params(workspaceId) [auth, db, payment]

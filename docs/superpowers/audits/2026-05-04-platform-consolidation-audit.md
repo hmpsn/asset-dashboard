@@ -15,7 +15,6 @@ No stash contained the missing platform-consolidation audit/roadmap work. The ne
 | Finding | Staging verification |
 | --- | --- |
 | Admin generation should run in background jobs | Partially covered. `server/routes/jobs.ts` supports `seo-audit`, `keyword-strategy`, `schema-generator`, `page-analysis`, `bulk-alt`, `bulk-seo-fix`, `compress`, `bulk-compress`, `sales-report`, and `deep-diagnostic`. Still valid because content brief generation, content post generation, post section regeneration, content-plan/matrix bulk actions, AEO/page rewrites, and brand/page deliverables are not consistently routed through the shared job system. |
-| Billing split | Still valid. PaymentIntent/Stripe Elements still exists alongside Checkout in `server/routes/stripe.ts`, `server/stripe.ts`, `src/hooks/usePayments.ts`, `src/components/StripePaymentForm.tsx`, and Stripe tests. |
 | Client data migration | Still valid. `src/hooks/useClientData.ts` remains a React Query compatibility facade with legacy local state, compatibility setters, no-op setters, and query-cache bridging. |
 | Deep-link tab contract | Still valid. `InsightsBriefingPage.tsx` still sends `?tab=content-gaps`; `StrategyTab.tsx` still does not read `useSearchParams` or `searchParams.get('tab')`. |
 | Keyword strategy SSE duplication | Still valid. `KeywordStrategy.tsx` still hand-parses the keyword strategy SSE stream while `src/api/seo.ts` exposes `streamKeywordStrategy()`. |
@@ -28,6 +27,7 @@ No stash contained the missing platform-consolidation audit/roadmap work. The ne
 - `workspace-intelligence.ts` now includes newer `pageElements` slice work, so any future slice split must preserve that behavior and its tests.
 - `server/routes/jobs.ts` already has useful background job coverage. The roadmap should not describe this as missing wholesale; it should describe it as uneven coverage and drift prevention.
 - The newest staging commit fixed client legacy route aliases, but it did not fix the `?tab=content-gaps` receiving-side contract.
+- The billing split was resolved in `codex/billing-checkout-only`: client purchases now use hosted Stripe Checkout only, while PaymentIntent webhook handling remains for Checkout reconciliation/failure compatibility.
 
 ## Roadmap Direction
 
@@ -36,7 +36,7 @@ Keep the consolidation sprint, but make background generation the first workstre
 1. Define the background-generation contract for all admin AI/generation flows.
 2. Normalize the admin job UX so progress survives remounts and uses one surface.
 3. Add guardrails so future long-running admin generation does not drift back into synchronous endpoints.
-4. Continue the original consolidation items: billing, client data, deep links, SSE helper, AI dispatch, provider boundary, and monolith splits.
+4. Continue the original consolidation items: client data, deep links, SSE helper, AI dispatch, provider boundary, and monolith splits.
 
 ## Phase 0 Baseline - Background Generation
 

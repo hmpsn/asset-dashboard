@@ -23,7 +23,6 @@ import {
   isStripeConfigured,
   createCheckoutSession,
   createCartCheckoutSession,
-  createPaymentIntentForProduct,
   createBillingPortalSession,
   cancelSubscription,
   getProductConfig,
@@ -89,35 +88,10 @@ router.delete('/api/stripe/config', requireAdminAuth, (_req, res) => {
   res.json({ ok: true });
 });
 
-// Publishable key (safe for frontend — needed for Stripe Elements)
+// Publishable key (safe for frontend; retained for config/status compatibility)
 router.get('/api/stripe/publishable-key', (_req, res) => {
   const pk = getStripePublishableKey();
   res.json({ publishableKey: pk || null });
-});
-
-// Create a PaymentIntent (for Stripe Elements inline form)
-router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, res) => {
-  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
-  const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
-  if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
-  if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
-
-  try {
-    const result = await createPaymentIntentForProduct({
-      workspaceId,
-      productType: sanitizeString(productType, 50) as import('../payments.js').ProductType,
-      contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
-      topic: topic ? sanitizeString(topic, 200) : undefined,
-      targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
-    });
-    res.json(result);
-  } catch (err) {
-    log.error({ err: err }, 'PaymentIntent error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create payment intent' });
-  }
 });
 
 // --- Stripe Payments ---

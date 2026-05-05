@@ -39,7 +39,7 @@ vi.mock('../../server/stripe-config.js', () => ({
 // ---------------------------------------------------------------------------
 
 import { handleWebhookEvent, initStripeBroadcast } from '../../server/stripe.js';
-import { createPayment, listPaymentsBySession, getPaymentBySession } from '../../server/payments.js';
+import { createPayment, listPaymentsBySession, getPaymentByPaymentIntent, getPaymentBySession } from '../../server/payments.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,8 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
 
     createPayment(ws.workspaceId, {
       workspaceId: ws.workspaceId,
-      stripeSessionId: piId,
+      stripeSessionId: 'cs_test_idemp_pi',
+      stripePaymentIntentId: piId,
       productType: 'brief_blog',
       amount: 12500,
       currency: 'usd',
@@ -325,7 +326,7 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
 
     // Only one payment, updated to paid
     expect(countPayments(ws.workspaceId)).toBe(1);
-    const payment = getPaymentBySession(ws.workspaceId, piId);
+    const payment = getPaymentByPaymentIntent(ws.workspaceId, piId);
     expect(payment!.status).toBe('paid');
   });
 

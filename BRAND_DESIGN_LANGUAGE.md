@@ -434,18 +434,17 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 - `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
 - `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
 
-### Stripe Payment (`StripePaymentForm.tsx`)
+### Stripe Checkout
 
 | Element | Color |
 |---------|-------|
-| Header gradient | `from-teal-600/15 via-emerald-600/10` |
-| Decorative glow | `bg-teal-500` |
+| Confirmation modal CTA | `from-teal-600 to-emerald-600` |
 | Price text | `text-teal-300` |
 | Keyword text | `text-teal-400/80` |
-| Submit button | `from-teal-600 to-emerald-600` |
-| Success state | `bg-teal-500/15 ring-teal-500/30`, `text-teal-400` |
+| Billing settings status | teal for configured actions, emerald for success |
+| Checkout redirect errors | red error copy with retry |
 
-> **All client-facing payment UI is teal.** The `accentColor` prop still exists in the interface for backward compat but is no longer branched on.
+> **All client-facing payment UI is teal.** Payments use Stripe Checkout redirects; the retired Stripe Elements form/modal should not be reintroduced.
 
 ---
 
@@ -566,7 +565,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/AdminChat.tsx` | Admin AI chat (purple accent) |
 | `src/components/KeywordStrategy.tsx` | SEO strategy + content gaps |
 | `src/components/ContentBriefs.tsx` | Admin content brief management |
-| `src/components/StripePaymentForm.tsx` | Stripe payment UI (teal unified) |
+| `src/components/StripeSettings.tsx` | Stripe Checkout configuration |
 | `src/components/WorkspaceOverview.tsx` | Admin workspace grid |
 | `src/components/WorkspaceSettings.tsx` | Admin workspace config |
 
@@ -649,7 +648,7 @@ When shipping UI changes that affect color or design patterns:
 | Date | Change |
 |------|--------|
 | 2025-03-07 | Initial creation: unified violet→teal, blue CTA→teal, simplified payment modal, removed client page-type selectors, cleaned content cards, hidden bundles |
-| 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed StripePaymentForm, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
+| 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed the historical Stripe payment form, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
 | 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` with dual Y-axes, annotation markers, click-to-annotate. Merged SearchConsole + GoogleAnalytics into `AnalyticsHub`. |
 | 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
 | 2026-03-28 | **Visual Polish** (10 refinements): Asymmetric card radius (SectionCard `10px 24px`, StatCard `6px 12px`), MetricRing outward glow + charge-up animation, noise overlay on body, ScannerReveal page transitions, spacing variation (`space-y-8` between sections), removed uppercase from section headings, StatCard `size="hero"` prop, stagger-fade entrance animations, interactive card hover (teal left-border accent), status color muting (`emerald-400/80`, `amber-400/80`, `red-400/80`, bg at `/8` opacity). Updated: SectionCard, StatCard, MetricRing, Skeleton, TierGate, Badge, statusConfig, ~60 consumer files. |

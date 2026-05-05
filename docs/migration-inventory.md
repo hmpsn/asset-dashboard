@@ -385,7 +385,6 @@ workspace selector, feature-flag settings.
 
 **Files:**
 - `src/components/RevenueDashboard.tsx`
-- `src/components/StripePaymentForm.tsx`
 - `src/components/StripeSettings.tsx`
 - `src/components/SettingsPanel.tsx`
 - `src/components/WorkspaceSettings.tsx`

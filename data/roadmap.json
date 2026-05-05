@@ -30,8 +30,8 @@
           "source": "Phase 5 Phase 2 follow-up — PR #314",
           "est": "10-15m",
           "priority": "P1",
-          "notes": "Phase 2 token sweep PR #314 touched StripePaymentForm.tsx + StripePaymentModal.tsx + inner PaymentFormInner. Devin caught the always-dark constraint (Stripe Elements is hardcoded to theme: 'night') and the changes were reverted to hardcoded zinc shades with a comment block warning future migrations. Reverts are clean on main, but a real test-mode checkout flow visually confirming no regressions (light mode + dark mode side-by-side) was deferred from the original ship cycle. Use Stripe test card 4242 4242 4242 4242 — confirm modal renders correctly, payment intent succeeds, success state matches prior look. Risk if skipped: low (code-level diff confirms no theme-token references remain).",
-          "status": "pending"
+          "notes": "Superseded 2026-05-04 by platform-consolidation-billing-checkout-only. The inline Stripe Elements payment modal and StripePaymentForm were removed; client purchases now redirect to hosted Stripe Checkout, so there is no in-app Elements modal to visually QA.",
+          "status": "done"
         },
         {
           "id": 625,
@@ -387,9 +387,9 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. PaymentIntent/Stripe Elements still exists alongside Checkout in server/routes/stripe.ts, server/stripe.ts, src/hooks/usePayments.ts, src/components/StripePaymentForm.tsx, and Stripe tests. Retire the inline PaymentIntent purchase path and make Checkout the only client purchase architecture."
+          "notes": "Completed 2026-05-04 in codex/billing-checkout-only. Removed the legacy /api/stripe/create-payment-intent endpoint, deleted the Stripe Elements payment form, simplified client purchases to always create Stripe Checkout sessions, and updated Stripe tests/mocks so Checkout remains the only client purchase architecture. Webhook PaymentIntent handling remains only for Stripe Checkout reconciliation and failure events; the payment_intent.succeeded handler now also finds Checkout-reconciled records by stripePaymentIntentId to avoid false missing-payment errors after hosted Checkout completion."
         },
         {
           "id": "platform-consolidation-client-data-react-query",
@@ -2054,7 +2054,7 @@
           "source": "FEATURE_AUDIT",
           "est": "2h",
           "priority": "P3",
-          "notes": "Shipped — Lucide tree-shaking verified (individual icon code-splitting). Added manualChunks in vite.config.ts: react-vendor (React/ReactDOM/Router) + stripe (lazy). Lazy-loaded StripePaymentForm in ClientDashboard. Main bundle split 366→188 kB + 190 kB react-vendor. ClientDashboard 379→359 kB. Stripe 13 kB lazy chunk.",
+          "notes": "Shipped — Lucide tree-shaking verified (individual icon code-splitting). Added manualChunks in vite.config.ts: react-vendor (React/ReactDOM/Router) + stripe (lazy). The former lazy StripePaymentForm chunk was later removed when billing consolidated on hosted Stripe Checkout. Main bundle split 366→188 kB + 190 kB react-vendor; Checkout now keeps payment UI hosted by Stripe.",
           "status": "done",
           "shippedAt": "2026-03-15"
         }

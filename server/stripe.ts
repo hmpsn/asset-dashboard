@@ -307,16 +307,6 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
   return { sessionId: session.id, url: session.url! };
 }
 
-// --- Payment Intent (for Stripe Elements inline form) ---
-
-export interface PaymentIntentParams {
-  workspaceId: string;
-  productType: ProductType;
-  contentRequestId?: string;
-  topic?: string;
-  targetKeyword?: string;
-}
-
 async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise<string> {
   const ws = getWorkspace(workspaceId);
   if (ws?.stripeCustomerId) {
@@ -339,51 +329,6 @@ async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise
   // Persist the customer ID on the workspace
   updateWorkspace(workspaceId, { stripeCustomerId: customer.id });
   return customer.id;
-}
-
-export async function createPaymentIntentForProduct(params: PaymentIntentParams): Promise<{ clientSecret: string; paymentIntentId: string; amount: number }> {
-  const stripe = getStripe();
-  if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
-
-  const config = getProductConfig(params.productType);
-  if (!config) throw new Error(`Unknown product type: ${params.productType}`);
-  if (params.productType === 'post_polished') validatePostPolishedUpgrade(params.workspaceId, params.contentRequestId);
-
-  const amountCents = config.priceUsd * 100;
-
-  // Get or create a Stripe Customer so payment methods are saved
-  const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
-
-  const metadata: Record<string, string> = {
-    workspaceId: params.workspaceId,
-    productType: params.productType,
-  };
-  if (params.contentRequestId) metadata.contentRequestId = params.contentRequestId;
-  if (params.topic) metadata.topic = params.topic;
-  if (params.targetKeyword) metadata.targetKeyword = params.targetKeyword;
-
-  const intent = await stripe.paymentIntents.create({
-    amount: amountCents,
-    currency: 'usd',
-    customer: customerId,
-    setup_future_usage: 'off_session',
-    metadata,
-    automatic_payment_methods: { enabled: true },
-  });
-
-  // Create pending payment record
-  createPayment(params.workspaceId, {
-    workspaceId: params.workspaceId,
-    stripeSessionId: intent.id, // store PI id in session field for lookup
-    productType: params.productType,
-    amount: amountCents,
-    currency: 'usd',
-    status: 'pending',
-    contentRequestId: params.contentRequestId,
-    metadata,
-  });
-
-  return { clientSecret: intent.client_secret!, paymentIntentId: intent.id, amount: amountCents };
 }
 
 // --- Startup: clear stale test-mode customer IDs when using live keys ---
@@ -606,8 +551,10 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      // Find payment record (we stored the PI id in stripeSessionId field)
-      const payment = getPaymentBySession(workspaceId, intent.id);
+      // Direct legacy PaymentIntent records used the PI id as stripeSessionId.
+      // Checkout records keep the Checkout session id separately and store the
+      // PI id once checkout.session.completed has reconciled the session.
+      const payment = getPaymentBySession(workspaceId, intent.id) ?? getPaymentByPaymentIntent(workspaceId, intent.id);
       if (payment?.status === 'paid') {
         log.info({ workspaceId, stripePaymentIntentId: intent.id }, 'payment_intent.succeeded replay ignored — payment already paid');
         return;

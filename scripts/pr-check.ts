@@ -4537,8 +4537,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',                  // Button primitive owns its own zinc shades for variants
-      'src/components/StripePaymentForm.tsx',           // Stripe Elements is theme:'night' — must stay dark regardless of theme
-      'src/components/StripePaymentModal.tsx',          // Stripe modal must be ALWAYS DARK
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use text-[var(--brand-text)], text-[var(--brand-text-bright)], or text-[var(--brand-text-muted)] instead of text-zinc-N. Raw zinc shades do not theme-switch in light mode. Add // raw-zinc-ok inline if dark-only is intentional (e.g. always-dark surfaces like Stripe Elements).',
@@ -4555,8 +4553,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',
-      'src/components/StripePaymentForm.tsx',
-      'src/components/StripePaymentModal.tsx',
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use bg-[var(--surface-1)], bg-[var(--surface-2)], or bg-[var(--surface-3)] instead of bg-zinc-N. Raw zinc backgrounds do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
@@ -4573,8 +4569,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',
-      'src/components/StripePaymentForm.tsx',
-      'src/components/StripePaymentModal.tsx',
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use border-[var(--brand-border)] or border-[var(--brand-border-hover)] instead of border-zinc-N. Raw zinc borders do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',

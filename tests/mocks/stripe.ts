@@ -10,7 +10,6 @@ const DEFAULT_PAYMENT_INTENT = 'pi_test_xyz789';
 const DEFAULT_SUBSCRIPTION_ID = 'sub_test_def456';
 const DEFAULT_PORTAL_URL = 'https://billing.stripe.com/test_portal';
 const DEFAULT_CUSTOMER_ID = 'cus_test_ghi012';
-const DEFAULT_CLIENT_SECRET = 'pi_test_xyz789_secret_abc';
 
 // ---------------------------------------------------------------------------
 // Mock Stripe SDK method stubs
@@ -22,7 +21,6 @@ const mockState = vi.hoisted(() => ({
   mockSubscriptionsUpdate: vi.fn(),
   mockCustomersCreate: vi.fn(),
   mockCustomersRetrieve: vi.fn(),
-  mockPaymentIntentsCreate: vi.fn(),
   mockWebhooksConstructEvent: vi.fn(),
   webhookEventCounter: 0,
 }));
@@ -32,7 +30,6 @@ export const mockBillingPortalSessionsCreate = mockState.mockBillingPortalSessio
 export const mockSubscriptionsUpdate = mockState.mockSubscriptionsUpdate;
 export const mockCustomersCreate = mockState.mockCustomersCreate;
 export const mockCustomersRetrieve = mockState.mockCustomersRetrieve;
-export const mockPaymentIntentsCreate = mockState.mockPaymentIntentsCreate;
 export const mockWebhooksConstructEvent = mockState.mockWebhooksConstructEvent;
 
 /**
@@ -51,7 +48,6 @@ export const mockStripeInstance = {
     create: mockCustomersCreate,
     retrieve: mockCustomersRetrieve,
   },
-  paymentIntents: { create: mockPaymentIntentsCreate },
   webhooks: { constructEvent: mockWebhooksConstructEvent },
 };
 
@@ -132,17 +128,6 @@ export function mockCustomerRetrieveNotFound(): void {
   mockCustomersRetrieve.mockRejectedValue(new Error('No such customer'));
 }
 
-/** Configure `stripe.paymentIntents.create()` with sensible defaults. */
-export function mockPaymentIntentCreate(
-  intentData?: Partial<{ id: string; client_secret: string; amount: number }>,
-): void {
-  mockPaymentIntentsCreate.mockResolvedValue({
-    id: intentData?.id ?? DEFAULT_PAYMENT_INTENT,
-    client_secret: intentData?.client_secret ?? DEFAULT_CLIENT_SECRET,
-    amount: intentData?.amount ?? 12500,
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Webhook event helpers
 // ---------------------------------------------------------------------------
@@ -182,7 +167,6 @@ export function resetStripeMocks(): void {
   mockSubscriptionsUpdate.mockReset();
   mockCustomersCreate.mockReset();
   mockCustomersRetrieve.mockReset();
-  mockPaymentIntentsCreate.mockReset();
   mockWebhooksConstructEvent.mockReset();
   mockState.webhookEventCounter = 0;
 }

@@ -1,15 +1,10 @@
-import { Suspense } from 'react';
-import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import {
   Loader2, X, Target, Sparkles, FileText, Shield, Lock, Check,
 } from 'lucide-react';
-import { getSafe } from '../../api/client';
 import { STUDIO_NAME } from '../../constants';
 import { Button, IconButton } from '../ui';
 import type { PricingModalData, StripePaymentData } from '../../hooks/usePayments';
 import type { WorkspaceInfo, ClientContentRequest } from './types';
-
-const LazyStripePaymentModal = lazyWithRetry(() => import('../StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 
 interface Props {
   /** @deprecated Kept for call-site compat; no longer gates rendering. */
@@ -23,7 +18,9 @@ interface Props {
   fullPostPrice: number | null;
   fmtPrice: (n: number) => string;
   contentPricing: WorkspaceInfo['contentPricing'] | undefined;
+  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
   stripePayment: StripePaymentData | null;
+  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
   setStripePayment: React.Dispatch<React.SetStateAction<StripePaymentData | null>>;
   workspaceId: string;
   setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
@@ -42,13 +39,8 @@ export function PricingConfirmationModal({
   fullPostPrice,
   fmtPrice,
   contentPricing,
-  stripePayment,
-  setStripePayment,
-  workspaceId,
-  setContentRequests,
-  setToast,
 }: Props) {
-  if (!pricingModal && !stripePayment) return null;
+  if (!pricingModal) return null;
   const isExternal = billingMode === 'external';
 
   return (
@@ -191,36 +183,6 @@ export function PricingConfirmationModal({
           </div>
         );
       })()}
-
-      {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
-      {stripePayment && (
-        <Suspense fallback={(
-          <div
-            className={
-              'fixed inset-0 bg-black/60 z-[var(--z-modal)] flex items-center justify-center' // fixed-inset-ok -- Stripe lazy-load fallback mirrors the payment overlay while SDK code loads.
-            }
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
-          </div>
-        )}>
-          <LazyStripePaymentModal
-            clientSecret={stripePayment.clientSecret}
-            publishableKey={stripePayment.publishableKey}
-            amount={stripePayment.amount}
-            productName={stripePayment.productName}
-            topic={stripePayment.topic}
-            targetKeyword={stripePayment.targetKeyword}
-            isFull={stripePayment.isFull}
-            onSuccess={() => {
-              setStripePayment(null);
-              setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-              // Refresh content requests
-              getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('PricingConfirmationModal operation failed:', err); });
-            }}
-            onClose={() => setStripePayment(null)}
-          />
-        </Suspense>
-      )}
     </>
   );
 }

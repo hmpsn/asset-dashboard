@@ -8,7 +8,7 @@
  * - GET /api/stripe/publishable-key
  * - GET /api/stripe/products
  * - POST /api/stripe/create-checkout (validation only — Stripe not configured)
- * - POST /api/stripe/create-payment-intent (validation only)
+ * - POST /api/stripe/create-payment-intent (retired legacy endpoint)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -94,12 +94,12 @@ describe('Stripe Checkout — validation without Stripe configured', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  it('POST /api/stripe/create-payment-intent without Stripe returns 503 or 400', async () => {
+  it('POST /api/stripe/create-payment-intent is retired', async () => {
     const res = await postJson('/api/stripe/create-payment-intent', {
       workspaceId: 'ws_test',
       productType: 'brief_blog',
     });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBe(404);
   });
 
   it('POST /api/stripe/cart-checkout without required fields returns 400', async () => {

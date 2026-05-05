@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { post, get, getSafe } from '../api/client';
+import { post, getSafe } from '../api/client';
 import type { WorkspaceInfo, ClientContentRequest } from '../components/client/types';
 import { STUDIO_NAME } from '../constants';
 
@@ -18,15 +18,7 @@ export interface PricingModalData {
   targetPageSlug?: string;
 }
 
-export interface StripePaymentData {
-  clientSecret: string;
-  publishableKey: string;
-  amount: number;
-  productName: string;
-  topic: string;
-  targetKeyword: string;
-  isFull: boolean;
-}
+export type StripePaymentData = null;
 
 export interface PricingData {
   products: Record<string, { displayName: string; price: number; category: string; enabled: boolean }>;
@@ -61,13 +53,13 @@ export function usePayments(
   const [pricingModal, setPricingModal] = useState<PricingModalData | null>(null);
   const [pricingConfirming, setPricingConfirming] = useState(false);
   const [pricingData, setPricingData] = useState<PricingData | null>(null);
-  const [stripePayment, setStripePayment] = useState<StripePaymentData | null>(null);
+  const [stripePayment, setStripePayment] = useState<StripePaymentData>(null);
 
   const confirmPricingAndSubmit = useCallback(async () => {
     if (!pricingModal) return;
     setPricingConfirming(true);
     try {
-      // --- Stripe Elements inline payment (when configured AND workspace bills on-platform) ---
+      // --- Stripe Checkout (when configured AND workspace bills on-platform) ---
       // External-billing workspaces fall through to the direct-submit path below.
       if (ws?.stripeEnabled && ws?.billingMode !== 'external') {
         let contentRequestId: string | undefined;
@@ -82,25 +74,10 @@ export function usePayments(
         }
 
         const productType = pricingModal.serviceType === 'full_post' ? 'post_polished' : 'brief_blog';
-
-        const { publishableKey } = await get<{ publishableKey: string }>('/api/stripe/publishable-key');
-
-        if (publishableKey) {
-          const { clientSecret, amount } = await post<{ clientSecret: string; amount: number }>('/api/stripe/create-payment-intent', { workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword });
-          const isFull = pricingModal.serviceType === 'full_post';
-          const productName = isFull ? (ws?.contentPricing?.fullPostLabel || 'Full Blog Post') : (ws?.contentPricing?.briefLabel || 'Content Brief');
-
-          setPricingModal(null);
-          setPricingConfirming(false);
-          setStripePayment({ clientSecret, publishableKey, amount, productName, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword, isFull });
-          return;
-        }
-
-        const { url } = await post<{ url: string }>('/api/stripe/create-checkout', { workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword });
-        if (url) {
-          window.location.href = url;
-          return;
-        }
+        const { url } = await post<{ url?: string }>('/api/stripe/create-checkout', { workspaceId, productType, contentRequestId, topic: pricingModal.topic, targetKeyword: pricingModal.targetKeyword });
+        if (!url) throw new Error('Failed to start checkout. Please try again.');
+        window.location.href = url;
+        return;
       }
 
       // --- Fallback: direct submit (no Stripe) ---
