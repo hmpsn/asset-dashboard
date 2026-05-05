@@ -26,6 +26,8 @@ export interface AICallOptions {
   feature: string;
   /** Workspace ID for cost attribution. */
   workspaceId?: string;
+  /** Optional request timeout. */
+  timeoutMs?: number;
 }
 
 export interface AICallResult {
@@ -49,6 +51,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       temperature: rest.temperature,
       feature: rest.feature,
       workspaceId: rest.workspaceId,
+      timeoutMs: rest.timeoutMs,
     });
     return {
       text: result.text,
@@ -68,6 +71,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     temperature: rest.temperature,
     feature: rest.feature,
     workspaceId: rest.workspaceId,
+    timeoutMs: rest.timeoutMs,
   });
 
   return {

@@ -60,6 +60,10 @@ import {
   getBrandName,
 } from '../workspaces.js';
 import { runPageAnalysisJob } from '../page-analysis-job.js';
+import {
+  startWorkspaceContextGenerationJob,
+  workspaceContextJobErrorResponse,
+} from '../workspace-context-generation-job.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { getInsights } from '../analytics-insights-store.js';
@@ -595,6 +599,20 @@ router.post('/api/jobs', async (req, res) => {
           postId: started.postId,
           jobId: started.jobId,
         });
+        break;
+      }
+
+      case BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION:
+      case BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION:
+      case BACKGROUND_JOB_TYPES.PERSONA_GENERATION: {
+        const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
+        try {
+          const started = startWorkspaceContextGenerationJob(type, wsId);
+          res.json(started);
+        } catch (err) {
+          const response = workspaceContextJobErrorResponse(err);
+          res.status(response.status).json(response.body);
+        }
         break;
       }
 

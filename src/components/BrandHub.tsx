@@ -8,7 +8,10 @@ import {
 import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, ConfirmDialog } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { queryKeys } from '../lib/queryKeys';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import type { AudiencePersona } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
@@ -16,17 +19,6 @@ import { IdentityTab } from './brand/IdentityTab';
 import { PageStrategyTab } from './brand/PageStrategyTab';
 import { BlueprintDetail } from './brand/BlueprintDetail';
 import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
-
-interface AudiencePersona {
-  id: string;
-  name: string;
-  description: string;
-  painPoints: string[];
-  goals: string[];
-  objections: string[];
-  preferredContentFormat?: string;
-  buyingStage?: 'awareness' | 'consideration' | 'decision';
-}
 
 interface WorkspaceData {
   id: string;
@@ -43,9 +35,26 @@ interface Props {
 
 type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity';
 
+function contextJobStorageKey(workspaceId: string, type: string): string {
+  return `brand-hub:${workspaceId}:${type}:jobId`;
+}
+
+function readStoredContextJobId(workspaceId: string, type: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem(contextJobStorageKey(workspaceId, type));
+}
+
+function storeContextJobId(workspaceId: string, type: string, jobId: string | null): void {
+  if (typeof window === 'undefined') return;
+  const key = contextJobStorageKey(workspaceId, type);
+  if (jobId) window.sessionStorage.setItem(key, jobId);
+  else window.sessionStorage.removeItem(key);
+}
+
 export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
 
   // Active tab
   const [activeTab, setActiveTab] = useState<BrandHubTab>('overview');
@@ -68,7 +77,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   // Brand Voice state
   const [brandVoice, setBrandVoice] = useState('');
   const [savingBrandVoice, setSavingBrandVoice] = useState(false);
-  const [generatingBrandVoice, setGeneratingBrandVoice] = useState(false);
+  const [startingBrandVoiceJob, setStartingBrandVoiceJob] = useState(false);
+  const [lastBrandVoiceJobId, setLastBrandVoiceJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION)
+  );
 
   // Sync brand voice textarea from loaded workspace once
   useEffect(() => {
@@ -78,7 +90,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Knowledge Base state
   const [kbDraft, setKbDraft] = useState<string | null>(null);
-  const [generatingKB, setGeneratingKB] = useState(false);
+  const [startingKbJob, setStartingKbJob] = useState(false);
+  const [lastKbJobId, setLastKbJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION)
+  );
 
   // Personas state
   const [showPersonas, setShowPersonas] = useState(false);
@@ -86,7 +101,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [savingPersonas, setSavingPersonas] = useState(false);
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
-  const [generatingPersonas, setGeneratingPersonas] = useState(false);
+  const [startingPersonasJob, setStartingPersonasJob] = useState(false);
+  const [lastPersonasJobId, setLastPersonasJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION)
+  );
   const [confirmDeletePersona, setConfirmDeletePersona] = useState<AudiencePersona | null>(null);
 
   // Brand voice error + completion state
@@ -95,6 +113,116 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Page Strategy state
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
+
+  const activeBrandVoiceJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, workspaceId });
+  const activeKbJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, workspaceId });
+  const activePersonasJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.PERSONA_GENERATION, workspaceId });
+  const completedBrandVoiceJob = lastBrandVoiceJobId ? jobs.find(job => job.id === lastBrandVoiceJobId) : undefined;
+  const completedKbJob = lastKbJobId ? jobs.find(job => job.id === lastKbJobId) : undefined;
+  const completedPersonasJob = lastPersonasJobId ? jobs.find(job => job.id === lastPersonasJobId) : undefined;
+  const generatingBrandVoice = startingBrandVoiceJob || Boolean(activeBrandVoiceJob);
+  const generatingKB = startingKbJob || Boolean(activeKbJob);
+  const generatingPersonas = startingPersonasJob || Boolean(activePersonasJob);
+
+  // effect-layout-ok: route changes swap the workspace whose draft job IDs we should recover.
+  useEffect(() => {
+    setLastBrandVoiceJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION));
+    setLastKbJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION));
+    setLastPersonasJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION));
+  }, [workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeBrandVoiceJob && !lastBrandVoiceJobId) {
+      setLastBrandVoiceJobId(activeBrandVoiceJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, activeBrandVoiceJob.id);
+    }
+  }, [activeBrandVoiceJob, lastBrandVoiceJobId, workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeKbJob && !lastKbJobId) {
+      setLastKbJobId(activeKbJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, activeKbJob.id);
+    }
+  }, [activeKbJob, lastKbJobId, workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activePersonasJob && !lastPersonasJobId) {
+      setLastPersonasJobId(activePersonasJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, activePersonasJob.id);
+    }
+  }, [activePersonasJob, lastPersonasJobId, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedBrandVoiceJob) return;
+    if (completedBrandVoiceJob.status === 'done') {
+      const result = completedBrandVoiceJob.result as { kind?: string; brandVoice?: string; pagesScraped?: number } | undefined;
+      if (result?.kind === 'brandVoice' && typeof result.brandVoice === 'string') {
+        setBrandVoice(result.brandVoice);
+        toast(`Brand voice generated from ${result.pagesScraped ?? 0} pages — review and save`);
+        setShowNextSteps(true);
+      }
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    } else if (completedBrandVoiceJob.status === 'error') {
+      const message = completedBrandVoiceJob.error || completedBrandVoiceJob.message || 'Brand voice generation failed';
+      toast(message, 'error');
+      setBrandVoiceError(message);
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    } else if (completedBrandVoiceJob.status === 'cancelled') {
+      toast('Brand voice generation was cancelled', 'error');
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    }
+  }, [completedBrandVoiceJob, toast, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedKbJob) return;
+    if (completedKbJob.status === 'done') {
+      const result = completedKbJob.result as { kind?: string; knowledgeBase?: string; pagesScraped?: number } | undefined;
+      if (result?.kind === 'knowledgeBase' && typeof result.knowledgeBase === 'string') {
+        setKbDraft(result.knowledgeBase);
+        toast(`Knowledge base generated from ${result.pagesScraped ?? 0} pages — review and save`);
+      }
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    } else if (completedKbJob.status === 'error') {
+      toast(completedKbJob.error || completedKbJob.message || 'Knowledge base generation failed', 'error');
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    } else if (completedKbJob.status === 'cancelled') {
+      toast('Knowledge base generation was cancelled', 'error');
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    }
+  }, [completedKbJob, toast, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedPersonasJob) return;
+    if (completedPersonasJob.status === 'done') {
+      const result = completedPersonasJob.result as { kind?: string; personas?: AudiencePersona[]; pagesScraped?: number } | undefined;
+      if (result?.kind === 'personas' && Array.isArray(result.personas)) {
+        setLocalPersonas(result.personas);
+        toast(`${result.personas.length} personas generated from ${result.pagesScraped ?? 0} pages — review and save`);
+      }
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    } else if (completedPersonasJob.status === 'error') {
+      toast(completedPersonasJob.error || completedPersonasJob.message || 'Persona generation failed', 'error');
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    } else if (completedPersonasJob.status === 'cancelled') {
+      toast('Persona generation was cancelled', 'error');
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    }
+  }, [completedPersonasJob, toast, workspaceId]);
 
   const saveBrandVoiceHandler = async () => {
     setSavingBrandVoice(true);
@@ -106,19 +234,26 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   };
 
   const generateBrandVoiceHandler = async () => {
-    setGeneratingBrandVoice(true);
+    if (generatingBrandVoice) return;
+    setStartingBrandVoiceJob(true);
     setBrandVoiceError(null);
     setShowNextSteps(false);
     try {
-      const data = await workspaces.generateBrandVoice(workspaceId) as { brandVoice: string; pagesScraped: number };
-      setBrandVoice(data.brandVoice);
-      toast(`Brand voice generated from ${data.pagesScraped} pages — review and save`);
-      setShowNextSteps(true);
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, { workspaceId });
+      if (jobId) {
+        setLastBrandVoiceJobId(jobId);
+        storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, jobId);
+        toast('Brand voice generation started');
+      } else {
+        setBrandVoiceError('Failed to start brand voice generation');
+        toast('Failed to start brand voice generation', 'error');
+      }
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
-      setBrandVoiceError(err instanceof Error ? err.message : 'Brand voice generation failed');
+      const message = err instanceof Error ? err.message : 'Failed to start brand voice generation';
+      toast(message, 'error');
+      setBrandVoiceError(message);
     } finally {
-      setGeneratingBrandVoice(false);
+      setStartingBrandVoiceJob(false);
     }
   };
 
@@ -248,15 +383,21 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             <button
               type="button"
               onClick={async () => {
-                setGeneratingKB(true);
+                if (generatingKB) return;
+                setStartingKbJob(true);
                 try {
-                  const data = await workspaces.generateKnowledgeBase(workspaceId) as { knowledgeBase: string; pagesScraped: number };
-                  setKbDraft(data.knowledgeBase);
-                  toast(`Knowledge base generated from ${data.pagesScraped} pages — review and save`);
+                  const jobId = await startJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, { workspaceId });
+                  if (jobId) {
+                    setLastKbJobId(jobId);
+                    storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, jobId);
+                    toast('Knowledge base generation started');
+                  } else {
+                    toast('Failed to start knowledge base generation', 'error');
+                  }
                 } catch (err) {
-                  toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                  toast(err instanceof Error ? err.message : 'Failed to start knowledge base generation', 'error');
                 } finally {
-                  setGeneratingKB(false);
+                  setStartingKbJob(false);
                 }
               }}
               disabled={generatingKB || !webflowSiteId}
@@ -496,15 +637,21 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               <button
                 type="button"
                 onClick={async () => {
-                  setGeneratingPersonas(true);
+                  if (generatingPersonas) return;
+                  setStartingPersonasJob(true);
                   try {
-                    const data = await workspaces.generatePersonas(workspaceId) as { personas: AudiencePersona[]; pagesScraped: number };
-                    setLocalPersonas(data.personas);
-                    toast(`${data.personas.length} personas generated from ${data.pagesScraped} pages — review and save`);
+                    const jobId = await startJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, { workspaceId });
+                    if (jobId) {
+                      setLastPersonasJobId(jobId);
+                      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, jobId);
+                      toast('Persona generation started');
+                    } else {
+                      toast('Failed to start persona generation', 'error');
+                    }
                   } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                    toast(err instanceof Error ? err.message : 'Failed to start persona generation', 'error');
                   } finally {
-                    setGeneratingPersonas(false);
+                    setStartingPersonasJob(false);
                   }
                 }}
                 disabled={generatingPersonas || !webflowSiteId}

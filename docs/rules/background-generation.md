@@ -33,6 +33,10 @@ Long-running admin generation routes must:
 1. Create a job through `createJob(...)`.
 2. Respond quickly with `{ jobId }` before expensive work begins.
 3. Store durable results in the owning domain table or file, not only in `job.result`.
+   Exception: existing review-before-save generators may return a draft in
+   `job.result` when auto-saving would overwrite editable workspace context.
+   The UI must hydrate that draft from the terminal job and still require the
+   existing explicit save action.
 4. Update progress with stable `status`, `message`, `progress`, and `total` semantics.
 5. Add activity and broadcast domain events when generated data changes. When a
    shared generation service is used by both direct and background paths, log

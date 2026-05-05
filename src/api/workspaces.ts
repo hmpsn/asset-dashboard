@@ -31,16 +31,6 @@ export const workspaces = {
   removeClientUser: (wsId: string, userId: string) =>
     del(`/api/workspaces/${wsId}/client-users/${userId}`),
 
-  // ── AI generation ─────────────────────────────────────────────
-  generateBrandVoice: (wsId: string) =>
-    post<unknown>(`/api/workspaces/${wsId}/generate-brand-voice`),
-
-  generateKnowledgeBase: (wsId: string) =>
-    post<unknown>(`/api/workspaces/${wsId}/generate-knowledge-base`),
-
-  generatePersonas: (wsId: string) =>
-    post<unknown>(`/api/workspaces/${wsId}/generate-personas`),
-
   deletePageState: (wsId: string, pageId: string) =>
     del(`/api/workspaces/${wsId}/page-states/${pageId}`),
 };

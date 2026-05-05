@@ -9,10 +9,11 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createJob, updateJob, clearCompletedJobs } from '../../server/jobs.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const ctx = createTestContext(13210);
 const { api, postJson, del } = ctx;
@@ -33,6 +34,7 @@ beforeAll(async () => {
   otherWsId = otherWs.id;
   const webflowWs = createWorkspace('Jobs Webflow Workspace', 'wf-site-jobs-test', 'Jobs Test Site');
   webflowWsId = webflowWs.id;
+  updateWorkspace(webflowWsId, { tier: 'growth' });
   const scopedUser = await createUser(
     'jobs-scoped-user@test.local',
     'ScopedPass1!',
@@ -273,6 +275,53 @@ describe('Jobs — creation validation', () => {
       error: 'A keyword strategy is already being generated for this workspace',
       jobId: firstBody.jobId,
     });
+  });
+
+  it.each([
+    [BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION],
+    [BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION],
+    [BACKGROUND_JOB_TYPES.PERSONA_GENERATION],
+  ])('POST /api/jobs with %s without workspaceId returns 400', async (type) => {
+    const res = await postJson('/api/jobs', {
+      type,
+      params: {},
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('workspaceId required');
+  });
+
+  it.each([
+    [BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION],
+    [BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION],
+    [BACKGROUND_JOB_TYPES.PERSONA_GENERATION],
+  ])('POST /api/jobs with %s requires a linked Webflow site', async (type) => {
+    const res = await postJson('/api/jobs', {
+      type,
+      params: { workspaceId: testWsId },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('No Webflow site linked');
+  });
+
+  it.each([
+    [BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION],
+    [BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION],
+    [BACKGROUND_JOB_TYPES.PERSONA_GENERATION],
+  ])('POST /api/jobs with %s rejects a duplicate active job', async (type) => {
+    const active = createJob(type, { workspaceId: webflowWsId, message: 'already running' });
+
+    const res = await postJson('/api/jobs', {
+      type,
+      params: { workspaceId: webflowWsId },
+    });
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ jobId: active.id });
+    expect(body.error).toContain('already running');
+    updateJob(active.id, { status: 'done' });
   });
 
 });

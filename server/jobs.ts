@@ -79,6 +79,21 @@ const stmts = createStmtCache(() => ({
       updated_at = @updatedAt
     WHERE status IN ('running', 'pending')
   `),
+  findActiveByType: db.prepare(`
+    SELECT * FROM jobs
+    WHERE type = ?
+      AND status IN ('pending', 'running')
+    ORDER BY created_at DESC
+    LIMIT 1
+  `),
+  findActiveByTypeWorkspace: db.prepare(`
+    SELECT * FROM jobs
+    WHERE type = ?
+      AND workspace_id = ?
+      AND status IN ('pending', 'running')
+    ORDER BY created_at DESC
+    LIMIT 1
+  `),
 }));
 
 // ── Row ↔ Job mapping ──
@@ -310,6 +325,14 @@ export function hasActiveJob(type: string, workspaceId?: string): Job | undefine
     if (job.type === type && (job.status === 'pending' || job.status === 'running')) {
       if (!workspaceId || job.workspaceId === workspaceId) return job;
     }
+  }
+  const row = workspaceId
+    ? stmts().findActiveByTypeWorkspace.get(type, workspaceId) as JobRow | undefined
+    : stmts().findActiveByType.get(type) as JobRow | undefined;
+  if (row) {
+    const job = rowToJob(row);
+    jobs.set(job.id, job);
+    return job;
   }
   return undefined;
 }
