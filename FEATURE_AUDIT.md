@@ -234,13 +234,13 @@ A comprehensive value assessment of every feature in the platform — **329 feat
 ---
 
 ### 17. Background Tasks
-**What it does:** Long-running operations use the shared background job platform where implemented: `/api/jobs`, durable job records, WebSocket progress updates, `useBackgroundTasks`, and the floating TaskPanel. Phase 1 added shared job metadata for labels, cancellation semantics, and result behavior so server and frontend use one contract. TaskPanel filters to the current workspace, labels feature-specific SEO bulk jobs, and only shows stop controls for jobs with real abort handling.
+**What it does:** Long-running operations use the shared background job platform where implemented: `/api/jobs`, durable job records, WebSocket progress updates, `useBackgroundTasks`, and the floating TaskPanel. Phase 1 added shared job metadata for labels, cancellation semantics, and result behavior so server and frontend use one contract. TaskPanel filters to the current workspace, labels feature-specific SEO bulk jobs, and only shows stop controls for jobs with real abort handling. Keyword strategy generation now starts through the shared `keyword-strategy` job from the admin panel instead of the component directly owning the streaming request, while the worker translates the existing generation stream into job progress.
 
 **Agency value:** No frozen screens or timeouts for job-backed workflows. Start schema generation or page analysis and keep working while progress stays visible. The shared contract also makes it harder for new generation work to drift into invisible fire-and-forget promises.
 
 **Client value:** Invisible to the client, but ensures their dashboard always loads fast and never hangs.
 
-**Mutual:** Professional, responsive UX that handles heavy operations gracefully. Phase 2 will migrate remaining drifted generation flows, including content and keyword strategy paths, onto this same contract.
+**Mutual:** Professional, responsive UX that handles heavy operations gracefully. Phase 2 will migrate remaining drifted generation flows, including content post generation and crawl-heavy workspace setup generation, onto this same contract.
 
 ---
 

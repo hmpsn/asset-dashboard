@@ -29,7 +29,7 @@ import {
   isJobCancelled,
   hasActiveJob,
 } from '../jobs.js';
-import { APP_PASSWORD } from '../middleware.js';
+import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
@@ -76,6 +76,20 @@ import { isProgrammingError } from '../errors.js';
 const log = createLogger('jobs');
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
+
+function internalAdminHeaders(): Record<string, string> {
+  return APP_PASSWORD ? { 'x-auth-token': signAdminToken() } : {};
+}
+
+const keywordStrategyStepLabels: Record<string, string> = {
+  discovery: 'Discovering pages',
+  content: 'Fetching page content',
+  search_data: 'Search Console data',
+  semrush: 'Keyword intelligence',
+  ai: 'AI analysis',
+  enrichment: 'Enriching data',
+  complete: 'Complete',
+};
 
 /**
  * Pre-fetch SEMRush metrics for the top-N pages in a workspace that already have a primary keyword
@@ -391,7 +405,7 @@ router.post('/api/jobs', async (req, res) => {
               try {
                 const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/${params.workspaceId}/compress/${asset.assetId}`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
+                  headers: { 'Content-Type': 'application/json', ...internalAdminHeaders() },
                   body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName, cmsUsages: asset.cmsUsages }),
                 });
                 const r = await compressRes.json() as Record<string, unknown>;
@@ -635,18 +649,60 @@ router.post('/api/jobs', async (req, res) => {
             const mode = (params.mode as string) || 'full';
             const stratRes = await fetch(stratUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
+              headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...internalAdminHeaders() },
               body: JSON.stringify({ businessContext, semrushMode, competitorDomains, maxPages, mode }),
             });
             if (!stratRes.ok) {
               const errText = await stratRes.text();
               throw new Error(`Strategy generation failed: ${errText.slice(0, 200)}`);
             }
-            const stratResult = await stratRes.json();
-            const pageCount = (stratResult as Record<string, unknown[]>).pageMap?.length || 0;
+            let stratResult: unknown;
+            const contentType = stratRes.headers.get('content-type') || '';
+            if (stratRes.body && contentType.includes('text/event-stream')) {
+              const reader = stratRes.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = '';
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                  if (!line.startsWith('data: ')) continue;
+                  const evt = JSON.parse(line.slice(6)) as {
+                    step?: string;
+                    detail?: string;
+                    progress?: number;
+                    error?: string;
+                    done?: boolean;
+                    strategy?: unknown;
+                  };
+                  if (evt.error) throw new Error(evt.error);
+                  if (evt.step) {
+                    const pct = typeof evt.progress === 'number' ? Math.round(evt.progress * 100) : undefined;
+                    const label = keywordStrategyStepLabels[evt.step] || evt.step;
+                    updateJob(job.id, {
+                      message: evt.detail ? `${label}: ${evt.detail}` : label,
+                      ...(pct !== undefined ? { progress: pct, total: 100 } : {}),
+                    });
+                  }
+                  if (evt.done && evt.strategy) {
+                    stratResult = evt.strategy;
+                  }
+                }
+              }
+            } else {
+              stratResult = await stratRes.json();
+            }
+            if (!stratResult) throw new Error('Strategy generation completed without a strategy result');
+            const pageMap = (stratResult as { pageMap?: unknown[] }).pageMap;
+            const pageCount = Array.isArray(pageMap) ? pageMap.length : 0;
             updateJob(job.id, {
               status: 'done',
               result: stratResult,
+              progress: 100,
+              total: 100,
               message: `Strategy complete — ${pageCount} pages mapped`,
             });
             addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
