@@ -387,9 +387,9 @@
           "source": "Follow-up surfaced during codex/extract-schema-page-analysis-workers scaled review",
           "est": "2-3h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-05",
-          "notes": "Tighten page-analysis worker UX/error handling after extraction: show a clearer terminal message when no pages are discovered, include a user-facing job message when OPENAI_API_KEY is missing, and warn or skip AI analysis when both HTML fetch attempts fail instead of analyzing empty content."
+          "notes": "Completed 2026-05-05 in codex/page-analysis-worker-hardening. Page-analysis jobs now finish with a clear no-pages-discovered message, set a user-facing terminal message when OPENAI_API_KEY is missing, and skip AI calls with warning/accounting when all page HTML fetch attempts fail instead of analyzing empty content."
         },
         {
           "id": "platform-consolidation-billing-checkout-only",
