@@ -15,7 +15,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, applyBulkKeywordGuards, resolvePagePath, tryResolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { applySuppressionsToAudit, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
@@ -25,8 +25,6 @@ import {
   cancelJob,
   clearCompletedJobs,
   registerAbort,
-  unregisterAbort,
-  isJobCancelled,
   hasActiveJob,
 } from '../jobs.js';
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
@@ -45,22 +43,14 @@ import {
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
-import { saveSchemaSnapshot } from '../schema-store.js';
-import { generateSchemaSuggestions } from '../schema-suggester.js';
-import { prepareBulkSchemaGenerationContext } from '../schema-generation-context.js';
+import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import {
   updateAsset,
   deleteAsset,
   updatePageSeo,
   uploadAsset,
-  getSiteSubdomain,
-  discoverCmsUrls,
-  buildStaticPathSet,
-  toCmsPageId,
 } from '../webflow.js';
-import { getWorkspacePages } from '../workspace-data.js';
 import {
   listWorkspaces,
   getWorkspace,
@@ -69,17 +59,15 @@ import {
   updatePageState,
   getBrandName,
 } from '../workspaces.js';
-import { getPageKeyword, listPageKeywords, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
-import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
+import { runPageAnalysisJob } from '../page-analysis-job.js';
 import { createLogger } from '../logger.js';
-import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
 import { isProgrammingError } from '../errors.js';
@@ -101,56 +89,6 @@ const keywordStrategyStepLabels: Record<string, string> = {
   enrichment: 'Enriching data',
   complete: 'Complete',
 };
-
-/**
- * Pre-fetch SEMRush metrics for the top-N pages in a workspace that already have a primary keyword
- * assigned. Returns a Map from normalized page path (leading-slash) to a prompt-ready block.
- * Global SQLite cache in the SEMRush provider means repeat lookups cost zero API credits.
- */
-export async function prefetchSemrushForTopPages(
-  workspaceId: string,
-  topN: number,
-): Promise<Map<string, string>> {
-  const cache = new Map<string, string>();
-  const ws = getWorkspace(workspaceId);
-  const provider = getConfiguredProvider(ws?.seoDataProvider);
-  if (!provider) return cache;
-
-  try {
-    const existingPKs = listPageKeywords(workspaceId);
-    // Sort by traffic descending so slice(0, topN) returns the genuinely top pages,
-    // not whichever rows happened to be inserted first. Pages without clicks/impressions
-    // fall to the bottom (treated as 0).
-    const withKeywords = existingPKs
-      .filter(pk => pk.primaryKeyword && pk.primaryKeyword.trim().length > 0)
-      .sort((a, b) => {
-        const ac = a.clicks ?? 0, bc = b.clicks ?? 0;
-        if (ac !== bc) return bc - ac;
-        return (b.impressions ?? 0) - (a.impressions ?? 0);
-      })
-      .slice(0, topN);
-    if (withKeywords.length === 0) return cache;
-
-    const keywords = withKeywords.map(pk => pk.primaryKeyword!);
-    const metrics = await provider.getKeywordMetrics(keywords, workspaceId).catch(() => []);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
-
-    for (const pk of withKeywords) {
-      const m = metricsMap.get(pk.primaryKeyword!.toLowerCase());
-      if (!m) continue;
-      const providerLabel = getProviderDisplayName(provider.name);
-      let block = `\n\nREAL KEYWORD DATA (from ${providerLabel} — use these exact values, do NOT estimate):\n`;
-      block += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
-      const normalized = pk.pagePath.startsWith('/') ? pk.pagePath : `/${pk.pagePath}`;
-      cache.set(normalized, block);
-    }
-    log.info({ workspaceId, cached: cache.size, attempted: withKeywords.length, provider: provider.name },
-      'Pre-fetched keyword data for top pages in bulk analysis');
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'SEMRush pre-fetch for bulk analysis failed — continuing without it');
-  }
-  return cache;
-}
 
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
@@ -747,51 +685,12 @@ router.post('/api/jobs', async (req, res) => {
         const job = createJob('schema-generator', { message: 'Generating schemas...', workspaceId: params.workspaceId as string });
         registerAbort(job.id);
         res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(schemaSiteId);
-            const schemaWsId = (params.workspaceId as string) || '';
-            // Debounced incremental save — persist partial results every 10s
-            let lastSaveTime = 0;
-            const SAVE_INTERVAL = 10_000;
-            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, (partial, _done, message) => {
-              updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
-              const now = Date.now();
-              if (partial.length > 0 && now - lastSaveTime >= SAVE_INTERVAL) {
-                lastSaveTime = now;
-                saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
-              }
-            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
-            // Final save — always write the complete result
-            if (result.length > 0) {
-              saveSchemaSnapshot(schemaSiteId, schemaWsId, result);
-            }
-            if (isJobCancelled(job.id)) {
-              updateJob(job.id, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });
-            } else {
-              updateJob(job.id, {
-                status: 'done',
-                result,
-                message: `Done — ${result.length} page schemas generated`,
-                progress: result.length,
-                total: result.length,
-              });
-            }
-            // Log to activity feed
-            if (schemaWsId && result.length > 0) {
-              addActivity(schemaWsId, 'schema_generated', `Schema generated for ${result.length} pages`, isJobCancelled(job.id) ? 'Partially completed (cancelled)' : 'All pages processed');
-            }
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: schema-generator job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: schema-generator job failed — degrading gracefully');
-            if (!isJobCancelled(job.id)) {
-              updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
-            }
-          } finally {
-            unregisterAbort(job.id);
-          }
-        })();
+        void runSchemaGenerationJob({
+          jobId: job.id,
+          siteId: schemaSiteId,
+          token: schemaToken,
+          workspaceId: (params.workspaceId as string) || '',
+        });
         break;
       }
 
@@ -805,245 +704,13 @@ router.post('/api/jobs', async (req, res) => {
         const paJob = createJob('page-analysis', { message: 'Discovering pages...', workspaceId: paWsId });
         registerAbort(paJob.id);
         res.json({ jobId: paJob.id });
-
-        (async () => {
-          try {
-            updateJob(paJob.id, { status: 'running', message: 'Discovering pages...' });
-
-            // 1. Discover all pages (static + CMS)
-            const published = await getWorkspacePages(paWsId, paSiteId);
-            interface PageItem { id: string; title: string; slug: string; path: string; source: 'static' | 'cms'; seoTitle?: string; metaDesc?: string }
-            const pages: PageItem[] = published.map(p => ({
-              id: p.id,
-              title: p.title,
-              slug: p.slug || '',
-              path: resolvePagePath(p),
-              source: 'static' as const,
-              seoTitle: p.seo?.title || undefined,
-              metaDesc: p.seo?.description || undefined,
-            }));
-
-            // Discover CMS pages from sitemap
-            const paWs = getWorkspace(paWsId);
-            const baseUrl = await resolveBaseUrl({ liveDomain: paWs?.liveDomain, webflowSiteId: paSiteId }, paToken);
-            if (baseUrl) {
-              try {
-                const staticPaths = buildStaticPathSet(published);
-                const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
-                for (const cms of cmsUrls) {
-                  pages.push({
-                    id: toCmsPageId(cms.path),
-                    title: cms.pageName,
-                    slug: cms.path.replace(/^\//, ''),
-                    path: cms.path,
-                    source: 'cms',
-                  });
-                }
-              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* CMS discovery failed — continue with static pages */ }
-            }
-
-            // 2. Skip already-analyzed pages (unless forceRefresh)
-            const forceRefresh = !!params.forceRefresh;
-            let toAnalyze: PageItem[];
-            if (forceRefresh) {
-              toAnalyze = pages;
-              // Clear stale analysis fields from ALL page_keywords rows.
-              // Keeps keyword assignments (primaryKeyword, secondaryKeywords, searchIntent, etc.)
-              // but resets analysis results so removed pages don't retain stale scores.
-              const cleared = clearAnalysisFields(paWsId);
-              log.info({ cleared }, 'Page analysis: cleared stale analysis fields for re-analyze');
-            } else {
-              toAnalyze = pages.filter(p => {
-                const existing = getPageKeyword(paWsId, p.path);
-                return !existing?.optimizationScore || existing.optimizationScore <= 0;
-              });
-            }
-
-            const total = toAnalyze.length;
-            log.info({ total, skipped: pages.length - total, forceRefresh }, 'Page analysis: starting');
-            updateJob(paJob.id, { message: forceRefresh ? `Re-analyzing all ${total} pages...` : `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
-
-            if (total === 0) {
-              updateJob(paJob.id, { status: 'done', message: `All ${pages.length} pages already analyzed`, progress: pages.length, total: pages.length });
-              return;
-            }
-
-            // 3. Process pages in batches
-            const BATCH = 3;
-            let done = 0;
-            const openaiKey = process.env.OPENAI_API_KEY;
-            if (!openaiKey) {
-              updateJob(paJob.id, { status: 'error', error: 'OPENAI_API_KEY not configured' });
-              return;
-            }
-
-            const paSlices = ['seoContext', 'learnings'] as const;
-            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: paSlices });
-            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: paSlices });
-            const kwMapCtx = formatPageMapForPrompt(paIntel.seoContext);
-
-            const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
-
-            // Resolve subdomain ONCE before the loop (was being called per-page — ~256 redundant API calls)
-            let webflowSubdomain: string | null = null;
-            try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* skip */ }
-
-            const TOP_N_SEMRUSH = 10;
-            const semrushCache = await prefetchSemrushForTopPages(paWsId, TOP_N_SEMRUSH);
-
-            for (let i = 0; i < toAnalyze.length; i += BATCH) {
-              if (isJobCancelled(paJob.id)) break;
-              const batch = toAnalyze.slice(i, i + BATCH);
-
-              // Collect results from parallel batch — persist AFTER Promise.all to avoid race condition
-              const batchResults: Array<{ page: typeof batch[0]; analysis: Record<string, unknown> }> = [];
-
-              await Promise.all(batch.map(async (page) => {
-                if (isJobCancelled(paJob.id)) return;
-                try {
-                  // Fetch HTML from live domain
-                  let html = '';
-                  const urls: string[] = [];
-                  if (baseUrl) urls.push(`${baseUrl.replace(/\/+$/, '')}${page.path}`);
-                  if (webflowSubdomain) urls.push(`https://${webflowSubdomain}.webflow.io${page.path}`);
-                  for (const url of urls) {
-                    try {
-                      const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS, signal: AbortSignal.timeout(10_000) });
-                      if (r.ok) { html = await r.text(); break; }
-                    } catch { /* try next */ }
-                  }
-
-                  // Extract title, meta desc, body text
-                  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-                  const htmlTitle = titleMatch ? titleMatch[1].trim() : undefined;
-                  const metaMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
-                    || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
-                  const htmlMeta = metaMatch ? metaMatch[1].trim() : undefined;
-
-                  const pageContent = stripHtmlToText(html, { maxLength: 8000 });
-
-                  const effectiveTitle = page.seoTitle || htmlTitle || page.title;
-                  const effectiveMeta = page.metaDesc || htmlMeta;
-
-                  // SEMRush enrichment — use pre-fetched cache populated before the loop.
-                  const normalizedPath = page.path.startsWith('/') ? page.path : `/${page.path}`;
-                  const semrushBlock = semrushCache.get(normalizedPath) || '';
-
-                  // Call OpenAI for keyword analysis
-                  const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.
-
-Page title: ${page.title}
-SEO title: ${effectiveTitle || '(same as page title)'}
-Meta description: ${effectiveMeta || '(none)'}
-URL slug: /${page.slug || ''}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}${semrushBlock}
-
-Provide your analysis as a JSON object:
-{
-  "primaryKeyword": "the single best target keyword",
-  "primaryKeywordPresence": { "inTitle": true/false, "inMeta": true/false, "inContent": true/false, "inSlug": true/false },
-  "secondaryKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
-  "longTailKeywords": ["phrase1", "phrase2", "phrase3"],
-  "searchIntent": "informational | transactional | navigational | commercial",
-  "searchIntentConfidence": 0.0-1.0,
-  "contentGaps": ["gap1"],
-  "competitorKeywords": ["comp kw1", "comp kw2"],
-  "optimizationScore": 0-100,
-  "optimizationIssues": ["issue1"],
-  "recommendations": ["rec1", "rec2"],
-  "estimatedDifficulty": "low | medium | high",
-  "keywordDifficulty": 0-100,
-  "monthlyVolume": 0,
-  "topicCluster": "broader topic cluster"
-}
-
-IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONLY valid JSON.`;
-
-                  const aiResult = await callOpenAI({
-                    model: 'gpt-4.1-mini',
-                    messages: [{ role: 'user', content: prompt }],
-                    maxTokens: 1000,
-                    temperature: 0.4,
-                    feature: 'keyword-analysis',
-                    workspaceId: paWsId,
-                  });
-
-                  const analysis = JSON.parse(stripCodeFences(aiResult.text));
-                  applyBulkKeywordGuards(analysis, semrushBlock);
-                  batchResults.push({ page, analysis });
-                } catch (err) {
-                  log.warn({ err, page: page.path }, 'Page analysis failed for individual page');
-                }
-              }));
-
-              // Persist ALL batch results via page_keywords table (single transaction)
-              if (batchResults.length > 0) {
-                const now = new Date().toISOString();
-                const entries = batchResults.map(({ page, analysis }) => {
-                  const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
-                  // Merge with existing entry if present (preserves keyword assignments)
-                  const existing = getPageKeyword(paWsId, normalized);
-                  return {
-                    pagePath: normalized,
-                    pageTitle: page.title,
-                    primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
-                    secondaryKeywords: (analysis.secondaryKeywords as string[])?.length ? (analysis.secondaryKeywords as string[]) : existing?.secondaryKeywords || [],
-                    searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
-                    optimizationIssues: (analysis.optimizationIssues as string[]) || [],
-                    recommendations: (analysis.recommendations as string[]) || [],
-                    contentGaps: (analysis.contentGaps as string[]) || [],
-                    optimizationScore: analysis.optimizationScore as number,
-                    analysisGeneratedAt: now,
-                    primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean },
-                    longTailKeywords: (analysis.longTailKeywords as string[]) || [],
-                    competitorKeywords: (analysis.competitorKeywords as string[]) || [],
-                    estimatedDifficulty: analysis.estimatedDifficulty as string,
-                    keywordDifficulty: analysis.keywordDifficulty as number,
-                    monthlyVolume: analysis.monthlyVolume as number,
-                    topicCluster: analysis.topicCluster as string,
-                    searchIntentConfidence: analysis.searchIntentConfidence as number,
-                    // Preserve enrichment fields from existing entry
-                    ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
-                    ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
-                    ...(existing?.clicks != null ? { clicks: existing.clicks } : {}),
-                    ...(existing?.gscKeywords ? { gscKeywords: existing.gscKeywords } : {}),
-                    ...(existing?.volume != null ? { volume: existing.volume } : {}),
-                    ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
-                  };
-                });
-                upsertPageKeywordsBatch(paWsId, entries);
-                log.info({ batchSize: entries.length, totalPages: countPageKeywords(paWsId), withScores: countAnalyzedPages(paWsId) }, 'Page analysis: batch persisted');
-              }
-
-              done += batch.length;
-              updateJob(paJob.id, { progress: Math.min(done, total), message: `Analyzed ${Math.min(done, total)}/${total} pages...` });
-
-              // Rate limit between batches
-              if (i + BATCH < toAnalyze.length) await new Promise(r => setTimeout(r, 1500));
-            }
-
-            if (isJobCancelled(paJob.id)) {
-              updateJob(paJob.id, { status: 'cancelled', message: `Cancelled — ${done} of ${total} pages analyzed` });
-            } else {
-              updateJob(paJob.id, { status: 'done', progress: total, total, message: `Done — ${total} pages analyzed` });
-            }
-            addActivity(paWsId, 'page_analysis', `Bulk page analysis completed — ${done} pages`, `${pages.length} total pages, ${total} analyzed`);
-            // Bridge #5: bulk page analysis complete — clear caches
-            debouncedPageAnalysisInvalidate(paWsId, () => {
-              clearSeoContextCache(paWsId);
-              invalidateIntelligenceCache(paWsId);
-              invalidateSubCachePrefix(paWsId, 'slice:seoContext');
-              invalidateSubCachePrefix(paWsId, 'slice:pageProfile');
-            });
-          } catch (err) {
-            log.error({ err, jobId: paJob.id }, 'Page analysis job failed');
-            if (!isJobCancelled(paJob.id)) {
-              updateJob(paJob.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
-            }
-          } finally {
-            unregisterAbort(paJob.id);
-          }
-        })();
+        void runPageAnalysisJob({
+          jobId: paJob.id,
+          siteId: paSiteId,
+          workspaceId: paWsId,
+          token: paToken,
+          forceRefresh: !!params.forceRefresh,
+        });
         break;
       }
 

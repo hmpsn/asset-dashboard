@@ -47,8 +47,8 @@ describe('PR 2B Bridge Wiring Verification', () => {
       expect(src).toContain('invalidateIntelligenceCache');
     });
 
-    it('jobs.ts calls debouncedPageAnalysisInvalidate', () => {
-      const src = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 also calls debouncedPageAnalysisInvalidate and clearSeoContextCache in the jobs route (background page-analysis job).
+    it('page-analysis-job.ts calls debouncedPageAnalysisInvalidate', () => {
+      const src = readFileSync('server/page-analysis-job.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 also calls debouncedPageAnalysisInvalidate and clearSeoContextCache in the background page-analysis worker.
       expect(src).toContain('debouncedPageAnalysisInvalidate');
       expect(src).toContain('clearSeoContextCache');
     });
