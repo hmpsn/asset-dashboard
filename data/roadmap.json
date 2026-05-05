@@ -452,6 +452,26 @@
           "notes": "Completed 2026-05-05 in codex/keyword-strategy-job-service. Extracted keyword strategy generation into server/keyword-strategy-generation.ts so the direct SSE route and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY worker share native orchestration instead of the job worker internally fetching the route. Preserved active generation guards, billing reservation/refund behavior, persistence, broadcasts, history writes, rank seeding, recommendations, llms.txt regeneration, SSE progress, and job progress translation."
         },
         {
+          "id": "platform-consolidation-background-job-stale-recovery",
+          "title": "Background jobs - recover stale pending/running jobs after process restart",
+          "source": "Follow-up surfaced during codex/keyword-strategy-job-service scaled review",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-05",
+          "notes": "Add a startup recovery pass for persisted background jobs that were left pending/running by a process crash or deploy restart. Mark stale non-retryable jobs failed with a clear message, define retry semantics where appropriate, and add coverage so TaskPanel does not show orphaned forever-running work."
+        },
+        {
+          "id": "platform-consolidation-generation-activity-parity",
+          "title": "Generation activity parity - log direct and background generation consistently",
+          "source": "Follow-up surfaced during codex/keyword-strategy-job-service review",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-05",
+          "notes": "Move generation success activity logging into shared generation services where possible so direct SSE/API generation paths and background job paths emit the same workspace activity. First candidate: keyword strategy direct SSE generations currently rely on the job route for activity logging parity."
+        },
+        {
           "id": "platform-consolidation-webflow-seo-suggestions-list-test",
           "title": "Webflow SEO suggestions - add list endpoint integration coverage",
           "source": "Follow-up surfaced during PR #458 review",
