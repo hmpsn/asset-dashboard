@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
-import { get, post, del } from '../api/client';
+import { ApiError, get, post, del } from '../api/client';
 import type { BackgroundJobType } from '../../shared/types/background-jobs';
 
 export interface BackgroundJob {
@@ -127,6 +127,13 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
       console.error('Failed to start job:', data.error);
       return null;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.body && typeof err.body === 'object' && 'jobId' in err.body) {
+        const jobId = (err.body as { jobId?: unknown }).jobId;
+        if (typeof jobId === 'string') {
+          console.warn('Background job already running; attaching to existing job:', jobId);
+          return jobId;
+        }
+      }
       console.error('Failed to start job:', err);
       return null;
     }

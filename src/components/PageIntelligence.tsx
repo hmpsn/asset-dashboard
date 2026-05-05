@@ -22,6 +22,7 @@ import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
 import { PageIntelligenceGuide } from './PageIntelligenceGuide';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 // MetricsSource is the shared type used by PageKeywordMap.metricsSource
 import type { MetricsSource } from '../../shared/types/keywords.js';
 
@@ -164,10 +165,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const [analyses, setAnalyses] = useState<Record<string, KeywordData>>({});
   const [contentScores, setContentScores] = useState<Record<string, ContentScore>>({});
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
-  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const cancelBulkRef = useRef(false);
-  const { jobs, startJob, cancelJob: cancelBgJob } = useBackgroundTasks();
-  const bulkJobIdRef = useRef<string | null>(null);
+  const { jobs, startJob, findActiveJob, cancelJob: cancelBgJob } = useBackgroundTasks();
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [showNextSteps, setShowNextSteps] = useState(false);
 
@@ -185,6 +184,27 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // SEO copy generation state
   const [generatingCopy, setGeneratingCopy] = useState<string | null>(null);
   const [seoCopyResults, setSeoCopyResults] = useState<Map<string, SeoCopy>>(new Map());
+  const activePageAnalysisJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.PAGE_ANALYSIS, workspaceId });
+  const trackedBulkJob = useMemo(
+    () => (bulkJobId ? jobs.find(job => job.id === bulkJobId) : undefined) || activePageAnalysisJob,
+    [activePageAnalysisJob, bulkJobId, jobs],
+  );
+  const trackedBulkJobId = trackedBulkJob?.id ?? null;
+  const trackedBulkJobStatus = trackedBulkJob?.status ?? null;
+  const trackedBulkJobProgress = trackedBulkJob?.progress;
+  const trackedBulkJobTotal = trackedBulkJob?.total;
+  const trackedBulkJobError = trackedBulkJob?.error;
+  const trackedBulkJobMessage = trackedBulkJob?.message;
+  const cancellableBulkJobId = bulkJobId || activePageAnalysisJob?.id || null;
+  const bulkProgress = useMemo(() => {
+    if (!trackedBulkJobStatus || trackedBulkJobStatus === 'done' || trackedBulkJobStatus === 'error' || trackedBulkJobStatus === 'cancelled') {
+      return null;
+    }
+    return {
+      done: trackedBulkJobProgress ?? 0,
+      total: trackedBulkJobTotal ?? unifiedPages.length,
+    };
+  }, [trackedBulkJobProgress, trackedBulkJobStatus, trackedBulkJobTotal, unifiedPages.length]);
 
   // Rank tracking state
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
@@ -209,6 +229,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // Guard on targetRoute so stale fixContext from other tabs doesn't auto-expand.
   // fixConsumed ref prevents re-triggering on subsequent renders after initial expand.
   const fixConsumed = useRef(false);
+  // effect-layout-ok: auto-expansion waits for async page data and should only happen once per fix context.
   useEffect(() => {
     if (fixContext?.pageSlug && fixContext.targetRoute === 'page-intelligence' && !fixConsumed.current && unifiedPages.length > 0) {
       const match = unifiedPages.find(p =>
@@ -333,45 +354,57 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   // ── Bulk Analysis via Background Job ──
   const analyzeAllPages = async (forceRefresh = false) => {
-    cancelBulkRef.current = false;
     setAnalysisError(null);
     setShowNextSteps(false);
-    setBulkProgress({ done: 0, total: unifiedPages.length });
-    const jobId = await startJob('page-analysis', { siteId, workspaceId, forceRefresh });
+    const jobId = await startJob(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS, { siteId, workspaceId, forceRefresh });
     if (jobId) {
-      bulkJobIdRef.current = jobId;
-    } else {
-      setBulkProgress(null);
+      setBulkJobId(jobId);
     }
   };
 
+  // effect-layout-ok: active page-analysis jobs can predate this component mount.
+  useEffect(() => {
+    if (activePageAnalysisJob && !bulkJobId) {
+      setBulkJobId(activePageAnalysisJob.id);
+    }
+  }, [activePageAnalysisJob, bulkJobId]);
+
   // Watch background job progress via WebSocket
   const lastRefreshedAt = useRef(0);
+  // effect-layout-ok: job terminal state arrives asynchronously from the shared background task stream.
   useEffect(() => {
-    if (!bulkJobIdRef.current) return;
-    const job = jobs.find(j => j.id === bulkJobIdRef.current);
-    if (!job) return;
-    if (job.status === 'running' || job.status === 'pending') {
-      const progress = job.progress || 0;
-      setBulkProgress({ done: progress, total: job.total || 0 });
+    if (!trackedBulkJobStatus) return;
+    if (trackedBulkJobStatus === 'running' || trackedBulkJobStatus === 'pending') {
+      const progress = trackedBulkJobProgress || 0;
       // Refresh strategy cache periodically so analyzed count updates mid-run
       if (progress > 0 && progress - lastRefreshedAt.current >= 5) {
         lastRefreshedAt.current = progress;
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       }
-    } else if (job.status === 'done') {
-      setBulkProgress(null);
+    } else if (trackedBulkJobStatus === 'done') {
       setShowNextSteps(true);
-      bulkJobIdRef.current = null;
+      setBulkJobId(null);
       lastRefreshedAt.current = 0;
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-    } else if (job.status === 'error' || job.status === 'cancelled') {
-      setBulkProgress(null);
-      bulkJobIdRef.current = null;
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.pageJoinPages(siteId, workspaceId) });
+    } else if (trackedBulkJobStatus === 'error' || trackedBulkJobStatus === 'cancelled') {
+      setBulkJobId(null);
       lastRefreshedAt.current = 0;
+      if (trackedBulkJobStatus === 'error') {
+        setAnalysisError(trackedBulkJobError || trackedBulkJobMessage || 'Page analysis failed');
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
     }
-  }, [jobs, queryClient, workspaceId]);
+  }, [
+    queryClient,
+    siteId,
+    trackedBulkJobError,
+    trackedBulkJobId,
+    trackedBulkJobMessage,
+    trackedBulkJobProgress,
+    trackedBulkJobStatus,
+    workspaceId,
+  ]);
 
   // ── Keyword Editing ──
   const startEdit = (page: UnifiedPage) => {
@@ -535,7 +568,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
             <span className="t-caption text-[var(--brand-text-bright)]">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
-            <Button variant="ghost" size="sm" className="ml-2 text-accent-danger hover:text-accent-danger" onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}>Cancel</Button>
+            {cancellableBulkJobId && (
+              <Button variant="ghost" size="sm" className="ml-2 text-accent-danger hover:text-accent-danger" onClick={() => cancelBgJob(cancellableBulkJobId)}>Cancel</Button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -567,7 +602,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           status="running"
           detail={`Analyzing ${bulkProgress.done}/${bulkProgress.total}...`}
           percent={bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
-          onCancel={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}
+          onCancel={cancellableBulkJobId ? () => cancelBgJob(cancellableBulkJobId) : undefined}
         />
       )}
 

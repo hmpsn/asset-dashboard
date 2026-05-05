@@ -17,3 +17,29 @@ describe('PageIntelligence metricsSource — type contract', () => {
     expect(src).not.toContain("'exact' | 'partial_match' | 'ai_estimate'");
   });
 });
+
+describe('PageIntelligence background page-analysis contract', () => {
+  it('rediscovers active page-analysis jobs from useBackgroundTasks', () => {
+    const src = readFileSync('src/components/PageIntelligence.tsx', 'utf-8'); // readFile-ok — intentional background job rediscovery guard
+
+    expect(src).toContain('findActiveJob');
+    expect(src).toContain('BACKGROUND_JOB_TYPES.PAGE_ANALYSIS');
+    expect(src).toContain('findActiveJob({ type: BACKGROUND_JOB_TYPES.PAGE_ANALYSIS, workspaceId })');
+    expect(src).toContain('trackedBulkJob');
+  });
+
+  it('starts page-analysis through shared background job metadata, not a raw string', () => {
+    const src = readFileSync('src/components/PageIntelligence.tsx', 'utf-8'); // readFile-ok — intentional background job start guard
+
+    expect(src).toContain('startJob(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS');
+    expect(src).not.toContain("startJob('page-analysis'");
+  });
+
+  it('does not keep a second local bulk progress state beside the background job', () => {
+    const src = readFileSync('src/components/PageIntelligence.tsx', 'utf-8'); // readFile-ok — intentional background job state contract guard
+
+    expect(src).not.toContain('setBulkProgress');
+    expect(src).not.toContain('cancelBulkRef');
+    expect(src).toContain('queryKeys.admin.pageJoinPages(siteId, workspaceId)');
+  });
+});
