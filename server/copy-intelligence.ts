@@ -3,7 +3,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { getVoiceProfile, updateVoiceProfile } from './voice-calibration.js';
 import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
@@ -274,7 +274,7 @@ Return only valid JSON, no markdown.`;
 
   let result;
   try {
-    result = await callOpenAI({
+    result = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
