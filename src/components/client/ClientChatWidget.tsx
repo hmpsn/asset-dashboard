@@ -202,7 +202,7 @@ export function ClientChatWidget({
                     active={s.id === chatSessionId}
                     className={cn('px-3 py-2 rounded-[var(--radius-lg)] border', s.id === chatSessionId ? 'border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)]')}
                   >
-                    <div className="t-caption-sm font-medium truncate">{s.title}</div>
+                    <div className="t-ui font-medium truncate">{s.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
                     </div>

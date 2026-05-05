@@ -1159,7 +1159,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── RECOMMENDED NEXT STEPS ── */}
       <div className="space-y-3">
         <div>
-          <h3 className="t-h3 text-[var(--brand-text)]">Recommended Next Steps</h3>
+          <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Recommended Next Steps</h3>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">Start here. These are the clearest places to review, request, or give direction.</p>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1393,7 +1393,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-teal-500/20 transition-colors">
                       {/* Row 1: topic title + intent/page-type badges */}
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="t-caption font-semibold text-[var(--brand-text)]">{gap.topic}{gap.opportunityScore != null && (
+                        <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{gap.topic}{gap.opportunityScore != null && (
                             <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
                               {gap.opportunityScore}/100
                             </span>
@@ -1743,7 +1743,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         <div key={page.pagePath} className="rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/80 p-3 flex flex-col hover:border-blue-500/30 transition-all">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{page.pageTitle || page.pagePath}</div>
+                              <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate">{page.pagePath}</div>
                             </div>
                             {page.hasImpressions && <span className="t-caption-sm text-accent-info bg-blue-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-blue-500/20 flex-shrink-0 ml-2">Almost there</span>}

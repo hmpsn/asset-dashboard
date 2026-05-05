@@ -4,7 +4,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { TierGate } from '../ui/TierGate.js';
 import { Icon } from '../ui/Icon.js';
-import { Calendar, TrendingUp, CheckCircle, Award } from 'lucide-react';
+import { Award, ArrowUpRight, Calendar, CheckCircle } from 'lucide-react';
 import type { Tier } from '../ui/TierGate.js';
 import type { MonthlyDigestData, ROIHighlight, DigestItem } from '../../../shared/types/narrative.js';
 
@@ -62,8 +62,8 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* Wins */}
         {digest.wins.length > 0 && (
           <div>
-            <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
-              <Icon as={TrendingUp} size="sm" className="text-accent-success" />
+            <h4 className="t-label text-[var(--brand-text-bright)] mb-2 flex items-center gap-1.5">
+              <Icon as={ArrowUpRight} size="sm" className="text-accent-success" />
               Wins this month
             </h4>
             <ul className="space-y-1.5">
@@ -83,7 +83,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* Issues addressed */}
         {digest.issuesAddressed.length > 0 && (
           <div>
-            <h4 className="t-label text-[var(--brand-text)] mb-2">
+            <h4 className="t-label text-[var(--brand-text-bright)] mb-2">
               Issues addressed
             </h4>
             <ul className="space-y-1.5">
@@ -100,7 +100,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* ROI highlights */}
         {digest.roiHighlights.length > 0 && (
           <div>
-            <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
+            <h4 className="t-label text-[var(--brand-text-bright)] mb-2 flex items-center gap-1.5">
               <Icon as={Award} size="sm" className="text-accent-info" />
               Measurable results
             </h4>

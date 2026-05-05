@@ -135,7 +135,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h2 className="t-h2 text-[var(--brand-text)]">Plans & Pricing</h2>
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">Plans & Pricing</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
         {isTrial && (
           <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/20">
@@ -314,7 +314,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {subData.plans.map(plan => (
                 <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)] hover:border-[var(--brand-border-hover)] transition-colors">
-                  <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
+                  <h4 className="t-page font-semibold text-[var(--brand-text-bright)]">{plan.displayName}</h4>
                   <p className="t-body text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
                     <span className="t-stat text-accent-brand">${plan.priceUsd}</span>
@@ -344,7 +344,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <Icon as={DollarSign} size="lg" className="text-accent-success" />
             </div>
             <div className="flex-1">
-              <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">See the dollar value of your organic traffic</h3>
+              <h3 className="t-page font-semibold text-[var(--brand-text-bright)] mb-1">See the dollar value of your organic traffic</h3>
               <p className="t-body text-[var(--brand-text-muted)] leading-relaxed mb-3">
                 The ROI Dashboard shows what your organic search traffic would cost if you bought it through Google Ads. Growth plan clients see their traffic value, page-by-page breakdown, and content investment returns.
               </p>

@@ -172,7 +172,7 @@ export function ApprovalsTab({
       <div className="flex items-center gap-3">
         <Icon as={ClipboardCheck} size="lg" className="text-accent-brand" />
         <div>
-          <h2 className="t-h2 text-[var(--brand-text)]">SEO Change Approvals</h2>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">SEO Change Approvals</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (
@@ -278,7 +278,7 @@ export function ApprovalsTab({
                         className="px-5 py-3 flex items-center gap-2"
                       >
                         {isCollapsed ? <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}
-                        <span className="t-caption font-medium text-[var(--brand-text)] truncate">{first.pageTitle}</span>
+                        <span className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{first.pageTitle}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">/{first.pageSlug}</span>
                         <StatusBadge status={pageState?.status} />
                         <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>

@@ -181,7 +181,7 @@ export function InboxTab({
         <div className="flex items-center gap-3 mb-4">
           <Icon as={Inbox} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="t-h2 text-[var(--brand-text)]">Inbox</h2>
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">Inbox</h2>
             <p className="t-body text-[var(--brand-text-muted)] mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
           </div>
         </div>
@@ -224,7 +224,7 @@ export function InboxTab({
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="t-caption font-semibold text-[var(--brand-text)]">{action.title}</span>
+                      <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{action.title}</span>
                       <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border bg-teal-500/10 border-teal-500/20 text-accent-brand">{action.sourceType.replaceAll('_', ' ')}</span>
                     </div>
                     <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{action.summary}</p>

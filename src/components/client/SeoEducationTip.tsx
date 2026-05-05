@@ -79,7 +79,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="t-body font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
+              <h4 className="t-page font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
               <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand font-medium">SEO Tip</span>
             </div>
             <p className="t-body text-[var(--brand-text)] leading-relaxed">{tip.body}</p>

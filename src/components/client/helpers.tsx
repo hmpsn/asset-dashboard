@@ -244,7 +244,7 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Headings — strip bold markers inside (GPT sends ## **Overview**)
     if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={elements.length} className="t-body font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
       idx++; continue;
     }
     if (trimmed.startsWith('## ')) {
@@ -309,7 +309,7 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
     <SectionCard>
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
-        <span className={`t-caption font-medium ${c.text}`}>{title}</span>
+        <span className={`t-ui font-medium ${c.text}`}>{title}</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{count} queries</span>
       </div>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{desc}</p>

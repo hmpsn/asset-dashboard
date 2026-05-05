@@ -250,7 +250,7 @@ export function OverviewTab({
                   <Icon as={FileText} size="md" className="text-accent-brand" />
                 </div>
                 <div>
-                  <h3 className="t-body font-medium text-[var(--brand-text)]">Ready to create content?</h3>
+                  <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Ready to create content?</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Your keyword strategy is set up. Generate your first content brief.</p>
                 </div>
               </div>
@@ -273,7 +273,7 @@ export function OverviewTab({
                   <Icon as={Shield} size="md" className="text-accent-warning" />
                 </div>
                 <div>
-                  <h3 className="t-body font-medium text-[var(--brand-text)]">Improve your site health</h3>
+                  <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Improve your site health</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Your site score is {audit.siteScore}/100. Fix issues to boost rankings.</p>
                 </div>
               </div>
@@ -297,7 +297,7 @@ export function OverviewTab({
                   <Icon as={Target} size="md" className="text-accent-info" />
                 </div>
                 <div>
-                  <h3 className="t-body font-medium text-[var(--brand-text)]">Grow your search traffic</h3>
+                  <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Grow your search traffic</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">You got {overview.totalClicks} clicks last month. Let's increase that.</p>
                 </div>
               </div>
@@ -360,7 +360,7 @@ export function OverviewTab({
         {!overview && !audit && !ga4Overview && ( // pr-check-disable-next-line -- Brand signature radius intentional
           <div className="bg-gradient-to-br from-teal-500/10 via-[var(--surface-2)] to-emerald-500/10 border border-[var(--brand-border)] p-8" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><Icon as={BarChart3} size="xl" className="text-accent-brand" /></div>
-            <h2 className="t-h2 text-[var(--brand-text)] mb-2">{ws.name}</h2>
+            <h2 className="t-h2 text-[var(--brand-text-bright)] mb-2">{ws.name}</h2>
             <p className="t-body text-[var(--brand-text-muted)] mb-6 leading-relaxed">We're getting everything set up for you. Here's what we need:</p>
             
             <div className="space-y-3 max-w-md mx-auto">
@@ -441,7 +441,7 @@ export function OverviewTab({
               <div className="space-y-2">
                 {gaps.map((gap, i) => (
                   <div key={i} className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60">
-                    <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-0.5">{gap.topic}</div>
+                    <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-0.5">{gap.topic}</div>
                     <div className="t-caption text-[var(--brand-text-muted)] line-clamp-1">{gap.rationale}</div>
                   </div>
                 ))}
