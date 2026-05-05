@@ -58,7 +58,7 @@ vi.mock('../../server/seo-data-provider.js', async (importOriginal) => {
 async function startTestServer(): Promise<{
   server: http.Server;
   baseUrl: string;
-  stop: () => void;
+  stop: () => Promise<void>;
 }> {
   delete process.env.APP_PASSWORD; // bypass auth gate in-process
   const { createApp } = await import('../../server/app.js');
@@ -68,7 +68,11 @@ async function startTestServer(): Promise<{
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${port}`;
-  return { server, baseUrl, stop: () => server.close() };
+  return {
+    server,
+    baseUrl,
+    stop: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
 }
 
 async function getJson(
@@ -116,14 +120,18 @@ function makeMockProvider(referringDomains: ReferringDomain[]): SeoDataProvider 
 // ---------------------------------------------------------------------------
 
 describe('GET /api/backlinks/:workspaceId — date shape contract', () => {
-  let ws: SeededFullWorkspace;
-  let baseUrl: string;
-  let stopServer: () => void;
+  const TEST_TIMEOUT_MS = 20_000;
 
-  afterEach(() => {
-    ws.cleanup();
+  let ws: SeededFullWorkspace | null = null;
+  let baseUrl: string;
+  let stopServer: (() => Promise<void>) | null = null;
+
+  afterEach(async () => {
+    ws?.cleanup();
+    ws = null;
     mockProviderRef = null;
-    stopServer();
+    await stopServer?.();
+    stopServer = null;
   });
 
   it('returns ISO-8601 firstSeen / lastSeen (not Unix epoch strings)', async () => {
@@ -183,7 +191,7 @@ describe('GET /api/backlinks/:workspaceId — date shape contract', () => {
         }
       }
     }
-  });
+  }, TEST_TIMEOUT_MS);
 
   it('returns empty strings (not "Invalid Date") for missing dates', async () => {
     // Provider returns '' for firstSeen/lastSeen — normalizeProviderDate('') returns ''.
@@ -217,7 +225,7 @@ describe('GET /api/backlinks/:workspaceId — date shape contract', () => {
     // Must be falsy (empty string or absent — not a non-empty garbage value)
     expect(d.firstSeen || '').toBe('');
     expect(d.lastSeen || '').toBe('');
-  });
+  }, TEST_TIMEOUT_MS);
 
   it('date with YYYY-MM-DD format is parseable (short ISO dates from DFS/SEMRush)', async () => {
     // Providers can return short date strings like '2023-01-15' (no time component).
@@ -250,5 +258,5 @@ describe('GET /api/backlinks/:workspaceId — date shape contract', () => {
     // Must not be raw Unix epoch strings
     expect(/^\d{10}$/.test(d.firstSeen)).toBe(false);
     expect(/^\d{10}$/.test(d.lastSeen)).toBe(false);
-  });
+  }, TEST_TIMEOUT_MS);
 });

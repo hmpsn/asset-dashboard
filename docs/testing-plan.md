@@ -383,7 +383,7 @@ Every server→client data crossing, ranked by risk tier.
 
 | Boundary | Route File(s) | External API | Risk |
 |----------|---------------|-------------|------|
-| **Webflow page SEO writes** | `webflow.ts`, `webflow-seo.ts` | Webflow PUT/POST | Phantom success: change marked "applied" when Webflow rejected it |
+| **Webflow page SEO writes** | `webflow.ts`, `webflow-seo-apply.ts`, `webflow-seo-jobs.ts` | Webflow PUT/POST | Phantom success: change marked "applied" when Webflow rejected it |
 | **Webflow schema publish** | `webflow-schema.ts`, `webflow.ts` | Webflow PUT (custom code) | Schema applied locally but not on Webflow |
 | **Webflow CMS item create/update** | `webflow-cms.ts` | Webflow POST/PATCH | CMS item created locally, Webflow API failed |
 | **Webflow asset operations** | `webflow.ts`, `webflow-cms-images.ts` | Webflow PATCH/DELETE/POST | **NO ERROR HANDLING** on asset PATCH/DELETE |
@@ -456,7 +456,7 @@ Every server→client data crossing, ranked by risk tier.
 | Priority | Route File | Why Untested Is Dangerous |
 |----------|-----------|--------------------------|
 | **CRITICAL** | `webflow.ts` | All Webflow API writes — phantom success risk |
-| **CRITICAL** | `webflow-seo.ts` | Bulk SEO operations, CMS filter bypass |
+| **CRITICAL** | `webflow-seo-apply.ts`, `webflow-seo-jobs.ts` | Bulk SEO operations, CMS filter bypass |
 | **CRITICAL** | `webflow-schema.ts` | Schema publish, plan management |
 | **CRITICAL** | `webflow-cms.ts` | CMS item CRUD via Webflow API |
 | **CRITICAL** | `content-posts.ts` | Post generation, publish to Webflow |

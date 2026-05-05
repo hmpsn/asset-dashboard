@@ -207,7 +207,8 @@ const USE_EFFECT_BODY_LOOKAHEAD = 60;
 const ROUTE_CONTRACT_REQUIRED_BASENAMES = new Set([
   'keyword-strategy.ts',
   'jobs.ts',
-  'webflow-seo.ts',
+  'webflow-seo-audit.ts',
+  'webflow-seo-jobs.ts',
   'webflow-schema.ts',
   'workspaces.ts',
   'public-portal.ts',
@@ -893,7 +894,6 @@ export const CHECKS: Check[] = [
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
       'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
-      'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
@@ -2904,7 +2904,6 @@ export const CHECKS: Check[] = [
       'server/routes/public-analytics.ts',
       'server/routes/workspaces.ts',
       'server/routes/voice-calibration.ts',
-      'server/routes/webflow-seo.ts',
       'server/routes/discovery-ingestion.ts',
       'server/routes/google.ts',
       'server/routes/webflow-keywords.ts',
@@ -3436,7 +3435,7 @@ export const CHECKS: Check[] = [
     // path with no indication that the page was not actually updated.
     //
     // PR #1 of the Platform Health Sprint fixed 4 such call sites in
-    // server/routes/webflow-seo.ts; this rule prevents recurrence wherever
+    // server/routes/webflow-seo-apply.ts; this rule prevents recurrence wherever
     // the function is called in the future.
     //
     // Escape hatch: `// seo-ok` on the same line or one line above, for any

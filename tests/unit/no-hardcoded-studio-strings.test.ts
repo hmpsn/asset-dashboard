@@ -4,7 +4,8 @@ import { resolve } from 'path';
 
 const FILES_TO_CHECK = [
   'server/web-scraper.ts',
-  'server/routes/webflow-seo.ts',
+  'server/routes/webflow-seo-audit.ts',
+  'server/routes/webflow-seo-jobs.ts',
   'server/routes/jobs.ts',
   'server/brief-export-html.ts',
   'server/post-export-html.ts',
