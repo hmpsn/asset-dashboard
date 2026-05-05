@@ -725,7 +725,6 @@ router.post('/api/jobs', async (req, res) => {
                 total: 100,
                 message: `Strategy complete — ${pageCount} pages mapped`,
               });
-              addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
             } catch (err) {
               if (jobWasCancelled()) return;
               if (isProgrammingError(err)) log.warn({ err }, 'jobs: keyword-strategy job failed with programming error');

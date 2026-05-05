@@ -467,9 +467,9 @@
           "source": "Follow-up surfaced during codex/keyword-strategy-job-service review",
           "est": "1-2h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-05",
-          "notes": "Move generation success activity logging into shared generation services where possible so direct SSE/API generation paths and background job paths emit the same workspace activity. First candidate: keyword strategy direct SSE generations currently rely on the job route for activity logging parity."
+          "notes": "Completed 2026-05-05 in codex/generation-activity-parity. Keyword strategy success activity now logs from server/keyword-strategy-generation.ts after persistence, so direct SSE/API generation and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY share the same activity behavior. Removed the job-wrapper strategy_generated log to prevent duplicate entries."
         },
         {
           "id": "platform-consolidation-webflow-seo-suggestions-list-test",
