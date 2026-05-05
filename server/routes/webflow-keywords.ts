@@ -2,7 +2,7 @@
  * AI keyword analysis & content scoring routes — extracted from webflow.ts
  */
 import { Router } from 'express';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
@@ -99,7 +99,7 @@ IMPORTANT:
 
 Return ONLY valid JSON, no markdown, no explanation.`;
 
-    const aiResult = await callOpenAI({
+    const aiResult = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,

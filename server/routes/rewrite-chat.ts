@@ -5,7 +5,7 @@
  */
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -237,14 +237,14 @@ ${formatKeywordsForPrompt(seo)}${seo?.effectiveBrandVoiceBlock ?? ''}${formatPer
 
     const systemPrompt = buildSystemPrompt(workspaceId, baseInstructions);
 
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
       ...historyMessages.slice(-12),
       { role: 'user', content: question },
     ];
 
-    const aiResult = await callOpenAI({
+    const aiResult = await callAI({
       model: 'gpt-4.1',
+      system: systemPrompt,
       messages,
       temperature: 0.6,
       maxTokens: 4000,
