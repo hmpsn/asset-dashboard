@@ -36,6 +36,10 @@ Long-running admin generation routes must:
 5. Add activity and broadcast domain events when generated data changes.
 6. Register abort handling when the UI offers cancellation.
 
+On server restart, persisted `pending` or `running` jobs must be marked `error`
+with a visible restart-interruption message. Jobs cannot silently remain active
+after their worker process is gone.
+
 ## Frontend Contract
 
 Admin generation UI must use `useBackgroundTasks()` for job start, progress, cancel, and rediscovery. Feature surfaces may show inline progress, but the inline state should derive from the same job object shown by `TaskPanel`.

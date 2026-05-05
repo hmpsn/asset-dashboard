@@ -31,6 +31,10 @@ let broadcastFn: BroadcastFn | null = null;
 
 const MAX_JOBS = 200;
 const JOB_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const SERVER_RESTART_INTERRUPTED_ERROR = 'Server restarted — job interrupted';
+const SERVER_RESTART_INTERRUPTED_MESSAGE = 'Interrupted by server restart';
+const SERVER_SHUTDOWN_INTERRUPTED_ERROR = 'Server shutting down — job interrupted';
+const SERVER_SHUTDOWN_INTERRUPTED_MESSAGE = 'Interrupted by server shutdown';
 
 // ── Prepared statements ──
 const stmts = createStmtCache(() => ({
@@ -63,6 +67,17 @@ const stmts = createStmtCache(() => ({
     DELETE FROM jobs
     WHERE workspace_id IS NULL
       AND status IN ('done', 'error', 'cancelled')
+  `),
+  // Startup recovery is intentionally global. Active jobs left across a process
+  // restart are unreachable regardless of workspace ownership.
+  // ws-scope-ok
+  markInterruptedAfterRestart: db.prepare(`
+    UPDATE jobs
+    SET status = 'error', -- status-ok: restart recovery marks unreachable jobs terminal
+      message = @message,
+      error = @error,
+      updated_at = @updatedAt
+    WHERE status IN ('running', 'pending')
   `),
 }));
 
@@ -116,16 +131,34 @@ function jobToParams(job: Job) {
 
 // ── Startup: load active jobs from SQLite, mark interrupted ──
 
+export function recoverInterruptedJobsAfterRestart(): number {
+  const updatedAt = new Date().toISOString();
+  const changes = stmts().markInterruptedAfterRestart.run({
+    message: SERVER_RESTART_INTERRUPTED_MESSAGE,
+    error: SERVER_RESTART_INTERRUPTED_ERROR,
+    updatedAt,
+  }).changes;
+
+  for (const job of jobs.values()) {
+    if (job.status === 'running' || job.status === 'pending') {
+      Object.assign(job, {
+        status: 'error',
+        message: SERVER_RESTART_INTERRUPTED_MESSAGE,
+        error: SERVER_RESTART_INTERRUPTED_ERROR,
+        updatedAt,
+      });
+    }
+  }
+
+  return changes;
+}
+
 function loadJobsFromDb(): void {
-  // Mark any 'running' or 'pending' jobs as interrupted (they can't be resumed after restart)
-  const now = new Date().toISOString();
-  // Startup recovery: intentionally global across all workspaces.
-  // Any job left in 'running'/'pending' across the whole DB is unreachable after a
-  // server restart and must be marked as errored regardless of which workspace owns it.
-  // ws-scope-ok
-  db.prepare(
-    `UPDATE jobs SET status = 'error', error = 'Server restarted — job interrupted', updated_at = ? WHERE status IN ('running', 'pending')`
-  ).run(now);
+  // Mark any 'running' or 'pending' jobs as interrupted (they can't be resumed after restart).
+  const recovered = recoverInterruptedJobsAfterRestart();
+  if (recovered > 0) {
+    log.warn({ count: recovered }, 'Recovered interrupted jobs after server restart');
+  }
 
   // Load recent jobs into cache for fast reads
   const rows = db.prepare(
@@ -303,7 +336,11 @@ export function clearCompletedJobs(options: ClearCompletedJobsOptions = {}): num
 export function markRunningJobsInterrupted(): void {
   for (const job of jobs.values()) {
     if (job.status === 'running' || job.status === 'pending') {
-      updateJob(job.id, { status: 'error', error: 'Server shutting down — job interrupted' });
+      updateJob(job.id, {
+        status: 'error',
+        message: SERVER_SHUTDOWN_INTERRUPTED_MESSAGE,
+        error: SERVER_SHUTDOWN_INTERRUPTED_ERROR,
+      });
     }
   }
 }
