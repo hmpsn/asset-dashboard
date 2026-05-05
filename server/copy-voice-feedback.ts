@@ -4,7 +4,8 @@
  *
  * Standalone module — does not auto-apply changes. Returns suggestions for review.
  */
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callAI } from './ai.js';
+import { parseAIJson } from './openai-helpers.js';
 import { getVoiceProfile } from './voice-calibration.js';
 import { createLogger } from './logger.js';
 
@@ -78,12 +79,10 @@ Every input note must appear in exactly one of the two arrays.`;
   const userPrompt = `Classify these steering notes:\n${notes.map((n, i) => `${i + 1}. "${n}"`).join('\n')}`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 500,
       temperature: 0.2,
       responseFormat: { type: 'json_object' },
@@ -186,12 +185,10 @@ ${currentModifiers}
 Based on these feedback notes and the current voice profile, suggest a specific voice profile update if warranted.`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 300,
       temperature: 0.3,
       responseFormat: { type: 'json_object' },
