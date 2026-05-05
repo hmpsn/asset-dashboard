@@ -379,7 +379,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Phase 2 follow-up after the Phase 1 foundation. Migrate drifted surfaces such as content post generation, keyword strategy, schema/page-analysis duplicate workers, and crawl-heavy workspace knowledge/voice/persona generation onto the shared background job contract."
+          "notes": "Phase 2 follow-up after the Phase 1 foundation. First slice in progress: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE. Remaining drifted surfaces include content post generation, schema/page-analysis duplicate workers, and crawl-heavy workspace knowledge/voice/persona generation."
         },
         {
           "id": "platform-consolidation-billing-checkout-only",
@@ -413,13 +413,53 @@
         },
         {
           "id": "platform-consolidation-keyword-strategy-streaming",
-          "title": "Keyword strategy streaming - use one SSE helper",
+          "title": "Keyword strategy generation - start through shared background jobs",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "1-2h",
           "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-04 in codex/platform-keyword-strategy-background-job. Superseded the admin direct-SSE caller by starting BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through useBackgroundTasks, deriving the generating state from the active job, preserving SSE progress inside the worker, and fixing internal job route bridges to use signed admin tokens. The legacy SSE endpoint and streamKeywordStrategy helper remain for compatibility until the backend service extraction follow-up removes the internal route-fetch bridge."
+        },
+        {
+          "id": "platform-consolidation-content-post-generation-job",
+          "title": "Content post generation - migrate brief-to-post flow to background jobs",
+          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
+          "est": "3-5h",
+          "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. KeywordStrategy.tsx still hand-parses the keyword strategy SSE response while src/api/seo.ts exposes streamKeywordStrategy(). Move the component to the shared helper and preserve abort/error/progress/done behavior."
+          "notes": "Migrate POST /api/content-posts/:workspaceId/generate from legacy post-response generation to /api/jobs using a new content-post-generation job type. Preserve the immediate skeleton-post UX by creating and saving the skeleton before expensive AI work, return jobId/postId/post, keep generation non-cancellable until generatePost is abort-aware, and keep request status advancement tied to durable skeleton/job creation."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-job-service-extraction",
+          "title": "Keyword strategy jobs - extract native service worker with progress callbacks",
+          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "The current /api/jobs keyword-strategy case is a compatibility bridge that internally calls POST /api/webflow/keyword-strategy/:workspaceId. Extract the generation orchestration into a service function shared by the route and job worker, translate strategy steps into job progress, and keep billing reservation/refund, active generation guards, persistence, broadcasts, history, rank seeding, recommendations, and llms.txt regeneration behavior intact."
+        },
+        {
+          "id": "platform-consolidation-webflow-seo-suggestions-list-test",
+          "title": "Webflow SEO suggestions - add list endpoint integration coverage",
+          "source": "Follow-up surfaced during PR #458 review",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Add route-level integration coverage for GET /api/webflow/seo-suggestions/:workspaceId, including the field filter, after the low-risk webflow SEO route split."
+        },
+        {
+          "id": "platform-consolidation-seo-copy-happy-path-test",
+          "title": "Webflow SEO copy - add happy-path integration coverage",
+          "source": "Follow-up surfaced during PR #458 review",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-04",
+          "notes": "Add a mocked happy-path integration test for POST /api/webflow/seo-copy so the extracted page-tools route has explicit regression coverage."
         },
         {
           "id": "platform-consolidation-ai-dispatch-migration",

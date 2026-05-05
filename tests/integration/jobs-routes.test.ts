@@ -19,15 +19,20 @@ const { api, postJson, del } = ctx;
 
 let testWsId = '';
 let otherWsId = '';
+let webflowWsId = '';
 let scopedUserId = '';
 let scopedUserToken = '';
+const previousOpenAiKey = process.env.OPENAI_API_KEY;
 
 beforeAll(async () => {
+  process.env.OPENAI_API_KEY = 'test-openai-key';
   await ctx.startServer();
   const ws = createWorkspace('Jobs Test Workspace');
   testWsId = ws.id;
   const otherWs = createWorkspace('Jobs Other Workspace');
   otherWsId = otherWs.id;
+  const webflowWs = createWorkspace('Jobs Webflow Workspace', 'wf-site-jobs-test', 'Jobs Test Site');
+  webflowWsId = webflowWs.id;
   const scopedUser = await createUser(
     'jobs-scoped-user@test.local',
     'ScopedPass1!',
@@ -44,6 +49,9 @@ afterAll(async () => {
   deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
+  deleteWorkspace(webflowWsId);
+  if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = previousOpenAiKey;
   await ctx.stopServer();
 });
 
@@ -195,5 +203,46 @@ describe('Jobs — creation validation', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain('required');
+  });
+
+  it('POST /api/jobs with keyword-strategy without workspaceId returns 400', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'keyword-strategy',
+      params: {},
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('workspaceId required');
+  });
+
+  it('POST /api/jobs with keyword-strategy requires a linked Webflow site', async () => {
+    const res = await postJson('/api/jobs', {
+      type: 'keyword-strategy',
+      params: { workspaceId: testWsId },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('No Webflow site linked');
+  });
+
+  it('POST /api/jobs with keyword-strategy rejects a duplicate active job', async () => {
+    const first = await postJson('/api/jobs', {
+      type: 'keyword-strategy',
+      params: { workspaceId: webflowWsId },
+    });
+    expect(first.status).toBe(200);
+    const firstBody = await first.json();
+
+    const res = await postJson('/api/jobs', {
+      type: 'keyword-strategy',
+      params: { workspaceId: webflowWsId },
+    });
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      error: 'A keyword strategy is already being generated for this workspace',
+      jobId: firstBody.jobId,
+    });
   });
 });

@@ -29,8 +29,10 @@ describe('background job metadata', () => {
 
   it('centralizes labels and cancellation semantics', () => {
     expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE)).toBe('Bulk SEO Rewrite');
+    expect(getBackgroundJobLabel(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe('Keyword Strategy');
     expect(getBackgroundJobLabel('future-job')).toBe('future-job');
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR)).toBe(true);
+    expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)).toBe(false);
     expect(isBackgroundJobCancellable(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
     expect(isBackgroundJobCancellable('future-job')).toBe(true);
   });

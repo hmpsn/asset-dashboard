@@ -24,6 +24,8 @@ import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
 import { clientActions } from '../api/clientActions';
 import { queryKeys } from '../lib/queryKeys';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
@@ -52,7 +54,9 @@ interface Props {
 
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const queryClient = useQueryClient();
-  const [generating, setGenerating] = useState(false);
+  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
+  const [startingStrategyJob, setStartingStrategyJob] = useState(false);
+  const [lastStartedJobId, setLastStartedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // React Query hook replaces manual data fetching
@@ -73,9 +77,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(true);
-  const [progressStep, setProgressStep] = useState('');
-  const [progressDetail, setProgressDetail] = useState('');
-  const [progressPct, setProgressPct] = useState(0);
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
@@ -83,6 +84,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
+  const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
+  const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
+  const generating = startingStrategyJob || Boolean(activeStrategyJob);
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
@@ -103,17 +107,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       })
       .catch(() => {});
   }, [workspaceId]);
-
-  const stepLabels: Record<string, string> = {
-    discovery: 'Discovering pages',
-    content: 'Fetching page content',
-    search_data: 'Search Console data',
-    semrush: 'Keyword intelligence',
-    ai: 'AI analysis',
-    enrichment: 'Enriching data',
-    complete: 'Complete',
-  };
-
 
   // Initialize SEO provider availability from React Query hook
   useEffect(() => {
@@ -143,62 +136,54 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [strategy]);
 
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeStrategyJob && !lastStartedJobId) {
+      setLastStartedJobId(activeStrategyJob.id);
+    }
+  }, [activeStrategyJob, lastStartedJobId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedStartedJob) return;
+    if (completedStartedJob.status === 'done') {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      setShowNextSteps(true);
+      setLastStartedJobId(null);
+    } else if (completedStartedJob.status === 'error') {
+      setError(completedStartedJob.error || completedStartedJob.message || 'Failed to generate strategy');
+      setLastStartedJobId(null);
+    } else if (completedStartedJob.status === 'cancelled') {
+      setError('Strategy generation was cancelled');
+      setLastStartedJobId(null);
+    }
+  }, [completedStartedJob, queryClient, workspaceId]);
+
   const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
-    setGenerating(true);
+    if (generating) return;
+    setStartingStrategyJob(true);
     setShowNextSteps(false);
     setError(null);
-    setProgressStep('');
-    setProgressDetail('');
-    setProgressPct(0);
     try {
       const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        body: JSON.stringify({
-          mode: strategyMode,
-          businessContext: businessContext.trim() || undefined,
-          semrushMode: semrushAvailable ? semrushMode : 'none',
-          competitorDomains: compList,
-          maxPages: maxPages || undefined,
-        }),
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+        mode: strategyMode,
+        workspaceId,
+        businessContext: businessContext.trim() || undefined,
+        semrushMode: semrushAvailable ? semrushMode : 'none',
+        competitorDomains: compList,
+        maxPages: maxPages || undefined,
       });
-
-      if (!res.ok || !res.body) {
-        // Non-streaming error response (429, 400, 500, etc.) or no streaming support
-        const data = await res.json();
-        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); }
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE events from buffer
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); setShowNextSteps(true); break; }
-            if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
-          } catch (err) { console.error('KeywordStrategy operation failed:', err); }
-        }
+      if (jobId) {
+        setLastStartedJobId(jobId);
+      } else {
+        setError('Failed to start keyword strategy generation');
       }
     } catch (err) {
       console.error('KeywordStrategy operation failed:', err);
       setError('Failed to generate strategy');
     } finally {
-      setGenerating(false);
-      setProgressStep('');
+      setStartingStrategyJob(false);
     }
   };
 
@@ -573,9 +558,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {/* Progress Indicator */}
       <ProgressIndicator
         status={generating ? 'running' : 'idle'}
-        step={progressStep ? (stepLabels[progressStep] || progressStep) : undefined}
-        detail={progressDetail || undefined}
-        percent={generating && progressPct > 0 ? Math.round(progressPct * 100) : undefined}
+        step={activeStrategyJob?.message || (startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
+        percent={activeStrategyJob?.total ? Math.round(((activeStrategyJob.progress ?? 0) / activeStrategyJob.total) * 100) : undefined}
       />
 
       {error && (
