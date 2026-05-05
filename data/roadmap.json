@@ -407,9 +407,9 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. InsightsBriefingPage still sends ?tab=content-gaps, while StrategyTab still does not read useSearchParams/searchParams.get('tab'). Sweep all ?tab= senders and extend tests/contract/tab-deep-link-wiring.test.ts coverage."
+          "notes": "Completed 2026-05-05 in codex/tab-deeplink-contracts. StrategyTab now reads useSearchParams/searchParams.get('tab') and maps client briefing ?tab=content-gaps deep links to the Create Content accordion section. Extended tests/contract/tab-deep-link-wiring.test.ts to cover clientPath senders as well as adminPath senders, including client StrategyTab and InboxTab receivers."
         },
         {
           "id": "platform-consolidation-keyword-strategy-streaming",
