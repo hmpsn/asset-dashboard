@@ -377,9 +377,9 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "12-18h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Phase 2 follow-up after the Phase 1 foundation. Completed slices: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation; schema/page-analysis cancellation stays durable after abort-controller cleanup; SEO bulk workers unregister abort controllers; shared schema generation context prep is extracted; schema/page-analysis worker bodies are extracted from server/routes/jobs.ts into dedicated worker modules while the route remains the dispatcher; PageIntelligence rediscovers active page-analysis jobs after navigation/reload so inline progress derives from the same TaskPanel job state; schema snapshot generation, publish, rollback, retract, and delete paths now broadcast schema:snapshot_updated and invalidate admin/client React Query caches. Current branch is migrating crawl-heavy workspace knowledge/voice/persona generation onto the same contract so this slice can close out the BrandHub drift."
+          "notes": "Completed across staged Phase 2 slices by 2026-05-05. KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation; schema/page-analysis cancellation stays durable after abort-controller cleanup; SEO bulk workers unregister abort controllers; shared schema generation context prep is extracted; schema/page-analysis worker bodies are extracted from server/routes/jobs.ts into dedicated worker modules while the route remains the dispatcher; PageIntelligence rediscovers active page-analysis jobs after navigation/reload so inline progress derives from the same TaskPanel job state; schema snapshot generation, publish, rollback, retract, and delete paths now broadcast schema:snapshot_updated and invalidate admin/client React Query caches; BrandHub knowledge base, brand voice, and persona generation now run through shared background jobs with sessionStorage recovery for completed drafts after navigation."
         },
         {
           "id": "platform-consolidation-page-analysis-worker-hardening",
@@ -509,7 +509,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. server/ai.ts callAI exists, but many server modules and high-churn routes still import callOpenAI directly. Migrate general generation paths to callAI and keep intentional Anthropic creative-prose exceptions documented."
+          "notes": "Verified still valid on origin/staging eb0a5832. server/ai.ts callAI exists, but many server modules and high-churn routes still import callOpenAI directly. First conservative slice migrated chat memory summaries, meeting briefs, and monthly digest summaries to callAI while preserving OpenAI model choices. Continue migrating general generation paths and keep intentional provider-specific exceptions documented."
         },
         {
           "id": "platform-consolidation-seo-provider-boundary",
