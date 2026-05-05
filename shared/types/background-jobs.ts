@@ -93,7 +93,7 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
   [BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION]: {
     label: 'Content Post Generation',
     description: 'Generates a full post from a saved content brief.',
-    cancellable: false,
+    cancellable: true,
     resultBehavior: 'domain-store-and-result',
   },
   [BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE]: {

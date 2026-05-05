@@ -379,7 +379,7 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Phase 2 follow-up after the Phase 1 foundation. First slice in progress: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE. Remaining drifted surfaces include content post generation, schema/page-analysis duplicate workers, and crawl-heavy workspace knowledge/voice/persona generation."
+          "notes": "Phase 2 follow-up after the Phase 1 foundation. Completed slices: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation. Remaining drifted surfaces include schema/page-analysis duplicate workers and crawl-heavy workspace knowledge/voice/persona generation."
         },
         {
           "id": "platform-consolidation-billing-checkout-only",
@@ -437,9 +437,9 @@
           "source": "Follow-up surfaced during codex/content-post-background-jobs review",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-05",
-          "notes": "Thread job progress callbacks through generatePost so TaskPanel can show real steps for intro, sections, conclusion, unification, and SEO meta instead of a generic spinner. Add AbortSignal support before marking content-post-generation cancellable in shared job metadata."
+          "notes": "Completed 2026-05-05 in codex/content-post-generation-progress. generatePost now reports durable job progress for context prep, introduction, each body section, conclusion, unification, SEO metadata, and finalization. Content post generation registers an AbortController, passes AbortSignal through content AI helper calls, marks cancelled drafts terminal in the content domain, and BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION is now cancellable in shared metadata."
         },
         {
           "id": "platform-consolidation-keyword-strategy-job-service-extraction",

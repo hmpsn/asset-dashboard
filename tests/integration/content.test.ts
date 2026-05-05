@@ -285,6 +285,8 @@ describe('Content Posts API', () => {
     const job = await jobRes.json();
     expect(job.type).toBe('content-post-generation');
     expect(job.workspaceId).toBe(testWsId);
+    expect(typeof job.progress).toBe('number');
+    expect(job.total).toBeGreaterThan(0);
   });
 
   it('GET /api/content-posts/:wsId/:postId/export/markdown returns markdown', async () => {
