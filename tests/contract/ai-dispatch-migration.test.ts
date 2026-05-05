@@ -25,6 +25,10 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'" },
 ];
 
+const migratedParsedJsonTextFiles: Array<{ path: string; aiImport: string }> = [
+  { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'" },
+];
+
 describe('AI dispatch migration', () => {
   it('keeps migrated general generation paths on callAI', () => {
     for (const file of migratedGeneralGenerationFiles) {
@@ -43,6 +47,19 @@ describe('AI dispatch migration', () => {
       expect(source, file.path).toContain(file.aiImport);
       expect(source, file.path).toContain('callAI({');
       expect(source, file.path).toContain("responseFormat: { type: 'json_object' }");
+      // Parsing helpers may still live in openai-helpers; migrated files must not import the provider call.
+      expect(source, file.path).not.toMatch(
+        /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
+      );
+      expect(source, file.path).not.toContain('callOpenAI({');
+    }
+  });
+
+  it('keeps migrated parsed-JSON text generation paths on callAI', () => {
+    for (const file of migratedParsedJsonTextFiles) {
+      const source = readFileSync(file.path, 'utf-8');
+      expect(source, file.path).toContain(file.aiImport);
+      expect(source, file.path).toContain('callAI({');
       // Parsing helpers may still live in openai-helpers; migrated files must not import the provider call.
       expect(source, file.path).not.toMatch(
         /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
