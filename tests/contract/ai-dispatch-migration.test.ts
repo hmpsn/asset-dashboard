@@ -27,6 +27,7 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
 ];
 
 const migratedParsedJsonTextFiles: Array<{ path: string; aiImport: string }> = [
+  { path: 'server/keyword-recommendations.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'" },
 ];
 
