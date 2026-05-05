@@ -105,6 +105,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.WORKSPACE_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
     },
     [WS_EVENTS.CONTENT_PUBLISHED]: () => {
       if (!workspaceId) return;
