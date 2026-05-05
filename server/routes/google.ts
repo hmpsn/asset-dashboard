@@ -19,7 +19,7 @@ import {
   GLOBAL_KEY,
 } from '../google-auth.js';
 import { IS_PROD } from '../middleware.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import {
   fetchSearchOverview,
   fetchPerformanceTrend,
@@ -198,12 +198,10 @@ ${RICH_BLOCKS_PROMPT}
 Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
-    const aiResult = await callOpenAI({
+    const aiResult = await callAI({
       model: 'gpt-4.1',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: question },
-      ],
+      system: systemPrompt,
+      messages: [{ role: 'user', content: question }],
       temperature: 0.7,
       maxTokens: 1500,
       feature: 'search-chat',
