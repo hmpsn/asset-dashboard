@@ -2,9 +2,11 @@ import { addActivity } from './activity-log.js';
 import { isProgrammingError } from './errors.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
+import { broadcastToWorkspace } from './broadcast.js';
 import { prepareBulkSchemaGenerationContext } from './schema-generation-context.js';
 import { saveSchemaSnapshot } from './schema-store.js';
 import { generateSchemaSuggestions } from './schema-suggester.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('schema-generation-job');
 
@@ -38,6 +40,13 @@ export async function runSchemaGenerationJob({
     // Final save — always write the complete result
     if (result.length > 0) {
       saveSchemaSnapshot(siteId, workspaceId, result);
+      if (workspaceId) {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+          siteId,
+          action: 'generated',
+          pageCount: result.length,
+        });
+      }
     }
     if (isJobCancelled(jobId)) {
       updateJob(jobId, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });

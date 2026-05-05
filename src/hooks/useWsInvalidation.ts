@@ -137,6 +137,16 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!siteId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId) });
     },
+    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: (data: unknown) => {
+      if (!workspaceId) return;
+      const siteId = typeof data === 'object' && data !== null && 'siteId' in data
+        ? String((data as { siteId: unknown }).siteId)
+        : undefined;
+      if (siteId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
+      }
+    },
     [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
@@ -285,9 +295,6 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
     },
-    // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
-    // fetches the plan directly (no React Query cache). Exemption is tracked
-    // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
     [WS_EVENTS.POST_UPDATED]: (data: unknown) => {
       if (!workspaceId) return;
       const payload = data as { postId?: string };

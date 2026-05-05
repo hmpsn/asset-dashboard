@@ -253,22 +253,27 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   // Hydrate local state from snapshot query when it arrives
   useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
-    if (snapshotData && snapshotData.results.length > 0 && !data) {
+    if (!snapshotData) {
+      setSnapshotDate(null);
+      setData(null);
+      return;
+    }
+    setSnapshotDate(prev => prev === snapshotData.createdAt ? prev : snapshotData.createdAt);
+    if (snapshotData.results.length > 0) {
       setData(snapshotData.results as SchemaPageSuggestion[]);
-      setSnapshotDate(snapshotData.createdAt);
       setStarted(true);
-      // Hydrate page types from savedPageType on each result (don't overwrite locally-set types)
-      const typesFromSnapshot: Record<string, string> = {};
-      for (const r of snapshotData.results as SchemaPageSuggestion[]) {
-        if ((r as unknown as { savedPageType?: string }).savedPageType) {
-          typesFromSnapshot[r.pageId] = (r as unknown as { savedPageType?: string }).savedPageType!;
-        }
-      }
-      if (Object.keys(typesFromSnapshot).length > 0) {
-        setPageTypes(prev => ({ ...typesFromSnapshot, ...prev }));
+    }
+    // Hydrate page types from savedPageType on each result (don't overwrite locally-set types)
+    const typesFromSnapshot: Record<string, string> = {};
+    for (const r of snapshotData.results as SchemaPageSuggestion[]) {
+      if ((r as unknown as { savedPageType?: string }).savedPageType) {
+        typesFromSnapshot[r.pageId] = (r as unknown as { savedPageType?: string }).savedPageType!;
       }
     }
-  }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (Object.keys(typesFromSnapshot).length > 0) {
+      setPageTypes(prev => ({ ...typesFromSnapshot, ...prev }));
+    }
+  }, [snapshotData]);
 
   // Load persisted page types from server on mount
   useEffect(() => { // effect-layout-ok: persisted page types arrive asynchronously from the server.
@@ -304,6 +309,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       if (job.result && Array.isArray(job.result)) {
         setData(job.result as SchemaPageSuggestion[]);
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
       setShowNextSteps(true);
       setProgressMsg(null);
       jobIdRef.current = null;

@@ -64,6 +64,20 @@ function sanitizeSchemaJsonForCms(schema: Record<string, unknown>): string {
   return JSON.stringify(schema).replace(/<\/script/gi, '<\\/script');
 }
 
+function broadcastSchemaSnapshotUpdated(
+  siteId: string,
+  workspaceId: string | undefined,
+  action: 'generated' | 'published' | 'deleted' | 'retracted' | 'rolled_back',
+  pageId?: string,
+): void {
+  if (!workspaceId) return;
+  broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+    siteId,
+    action,
+    ...(pageId ? { pageId } : {}),
+  });
+}
+
 async function publishSchemaToCmsField(opts: {
   siteId: string;
   pageId: string;
@@ -390,8 +404,9 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
       if (cmsDelivery.status === 'blocked' || cmsDelivery.status === 'failed') {
         return res.status(422).json({ success: false, cmsDeliveryStatus: cmsDelivery, error: cmsDelivery.message });
       }
-      updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
       const cmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
+      if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, cmsWs?.id, 'published', pageId);
       if (cmsWs) {
         recordSchemaPublish(req.params.siteId, pageId, cmsWs.id || '', schema);
         addActivity(cmsWs.id, 'schema_published', 'Schema written to CMS field', cmsDelivery.message, { pageId });
@@ -416,10 +431,11 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     }
 
     // Persist edited schema back to snapshot so it survives reload
-    updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
+    const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
 
     // Record version history for rollback support
     const pubWsForHistory = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, pubWsForHistory?.id, 'published', pageId);
     recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
 
     // Auto-save site template if this is a homepage publish
@@ -732,7 +748,8 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFrom
   deleteSchemaPlan(req.params.siteId);
 
   // Also clear the schema snapshot so the client dashboard doesn't show stale data
-  deleteSchemaSnapshot(req.params.siteId);
+  const snapshotDeleted = deleteSchemaSnapshot(req.params.siteId);
+  if (snapshotDeleted) broadcastSchemaSnapshotUpdated(req.params.siteId, plan.workspaceId, 'deleted');
 
   // Delete the associated approval batch (sent-to-client preview) if one exists
   if (plan.clientPreviewBatchId) {
@@ -762,10 +779,11 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceSit
     }
 
     // Remove from snapshot so it doesn't show as "existing" on reload
-    removePageFromSnapshot(siteId, pageId);
+    const snapshotUpdated = removePageFromSnapshot(siteId, pageId);
 
     // Update page state + activity
     const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(siteId, ws?.id, 'retracted', pageId);
     if (ws) {
       addActivity(ws.id, 'schema_published', 'Schema retracted from page', `Page ${pageId.slice(0, 8)}… — ${result.removed} script(s) removed`, { pageId });
       updatePageState(ws.id, pageId, { status: 'clean', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
@@ -803,10 +821,11 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceSiteAccessFr
     if (!result.success) return res.status(500).json(result);
 
     // Update snapshot with restored schema
-    updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
+    const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
 
     // Record this rollback as a new publish event
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, ws?.id, 'rolled_back', pageId);
     recordSchemaPublish(req.params.siteId, pageId, ws?.id || '', entry.schemaJson);
 
     // Activity log

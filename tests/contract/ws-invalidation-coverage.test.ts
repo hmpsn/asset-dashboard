@@ -50,11 +50,9 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   'BULK_OPERATION_COMPLETE',
   'BULK_OPERATION_FAILED',
 
-  // SCHEMA_PLAN_SENT is an admin-side fire-and-forget confirmation event —
-  // the server emits it after sending a schema plan to the client. There is
-  // no React Query consumer for schema plan status; the SeoEditor handles this
-  // event locally to show a success toast. Task 1 investigation confirmed no
-  // client-visible React Query query is gated on this event.
+  // SCHEMA_PLAN_SENT refreshes client portal schema-plan React Query caches,
+  // but ClientDashboard owns that client-side subscription because the admin
+  // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
 ]);
 

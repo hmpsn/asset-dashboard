@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, getOptional } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,7 @@ import { OverviewTab } from './client/OverviewTab';
 import { SeoEducationTip } from './client/SeoEducationTip';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { queryKeys } from '../lib/queryKeys';
 import { WS_EVENTS } from '../lib/wsEvents';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
@@ -51,6 +53,7 @@ import {
 } from './client/types';
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
+  const queryClient = useQueryClient();
   const brandTabEnabled = useFeatureFlag('client-brand-section');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
@@ -247,6 +250,15 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => refetchClient('annotations', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.ANOMALIES_UPDATE]: () => refetchClient('anomalies', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_PLAN_SENT]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaPlan(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.schemaSnapshot(workspaceId) });
+    },
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
