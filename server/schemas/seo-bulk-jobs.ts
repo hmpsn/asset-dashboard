@@ -9,4 +9,15 @@ export const seoBulkAcceptFixSchema = z.object({
   pageName: z.string().optional(),
 });
 
+export const seoBulkRewritePageSchema = z.object({
+  pageId: z.string().min(1),
+  title: z.string(),
+  slug: z.string().optional(),
+  publishedPath: z.string().nullable().optional(),
+  currentSeoTitle: z.string().optional(),
+  currentDescription: z.string().optional(),
+});
+
 export type SeoBulkAcceptFix = z.infer<typeof seoBulkAcceptFixSchema>;
+export type SeoBulkRewritePage = z.infer<typeof seoBulkRewritePageSchema>;
+export type SeoBulkRewriteField = 'title' | 'description' | 'both';
