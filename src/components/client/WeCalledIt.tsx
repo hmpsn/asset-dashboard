@@ -172,12 +172,11 @@ export default function WeCalledIt({ workspaceId, tier }: WeCalledItProps) {
 
   return (
     <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard>
-        <div className="flex items-center gap-2 mb-4">
-          <Icon as={Sparkles} size="md" className="text-accent-brand" />
-          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">We called it</h3>
-          <span className="t-caption text-[var(--brand-text-muted)] ml-1">— recommended, implemented, proven</span>
-        </div>
+      <SectionCard
+        title="We called it"
+        titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
+        titleExtra={<span className="t-caption text-[var(--brand-text-muted)]">Recommended, implemented, proven</span>}
+      >
 
         {isLoading && (
           <div className="space-y-3">

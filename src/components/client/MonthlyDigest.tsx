@@ -62,7 +62,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* Wins */}
         {digest.wins.length > 0 && (
           <div>
-            <h4 className="t-caption font-medium text-[var(--brand-text)] tracking-wider mb-2 flex items-center gap-1.5">
+            <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
               <Icon as={TrendingUp} size="sm" className="text-accent-success" />
               Wins this month
             </h4>
@@ -83,7 +83,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* Issues addressed */}
         {digest.issuesAddressed.length > 0 && (
           <div>
-            <h4 className="t-caption font-medium text-[var(--brand-text)] tracking-wider mb-2">
+            <h4 className="t-label text-[var(--brand-text)] mb-2">
               Issues addressed
             </h4>
             <ul className="space-y-1.5">
@@ -100,7 +100,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* ROI highlights */}
         {digest.roiHighlights.length > 0 && (
           <div>
-            <h4 className="t-caption font-medium text-[var(--brand-text)] tracking-wider mb-2 flex items-center gap-1.5">
+            <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
               <Icon as={Award} size="sm" className="text-accent-info" />
               Measurable results
             </h4>

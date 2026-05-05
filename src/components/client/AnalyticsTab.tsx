@@ -3,7 +3,7 @@ import {
   LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
-import { StatCard, EmptyState, Icon } from '../ui';
+import { StatCard, EmptyState, Icon, PageHeader, SectionCard, ChartCard } from '../ui';
 import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -154,10 +154,10 @@ export function AnalyticsTab({
 
   return (<>
     <div className="space-y-6">
-    <div>
-      <h2 className="t-h2 text-[var(--brand-text)]">Analytics</h2>
-      <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
-    </div>
+    <PageHeader
+      title="Analytics"
+      subtitle={ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
+    />
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -172,10 +172,7 @@ export function AnalyticsTab({
     {/* Traffic Trend + Devices row */}
     {ga4Trend.length > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Traffic Trend (2/3) */}
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="lg:col-span-2 bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <h3 className="t-body font-semibold text-[var(--brand-text)] mb-4">Traffic Trend</h3>
+        <ChartCard title="Traffic Trend" className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={192}>
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>
@@ -213,12 +210,11 @@ export function AnalyticsTab({
             <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
             <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
           </div>
-        </div>
+        </ChartCard>
 
         {/* Devices Pie Chart (1/3) */}
-        {ga4Devices.length > 0 && ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 flex flex-col" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-            <h3 className="t-body font-semibold text-[var(--brand-text)] mb-4">Devices</h3>
+        {ga4Devices.length > 0 && (
+          <ChartCard title="Devices" className="flex flex-col">
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
                 const PIE_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber]; // chart-hex-ok — #14b8a6 is teal-500 for pie anchor
@@ -256,16 +252,13 @@ export function AnalyticsTab({
                 );
               })()}
             </div>
-          </div>
+          </ChartCard>
         )}
       </div>
     )}
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Top Pages */}
-      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <h3 className="t-body font-semibold text-[var(--brand-text)] mb-3">Top Pages</h3>
+      <SectionCard title="Top Pages">
         <div className="space-y-1 max-h-[350px] overflow-y-auto">
           {ga4Pages.slice(0, 15).map((p, i) => (
             <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]">
@@ -276,12 +269,9 @@ export function AnalyticsTab({
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Traffic Sources */}
-      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <h3 className="t-body font-semibold text-[var(--brand-text)] mb-3">Traffic Sources</h3>
+      <SectionCard title="Traffic Sources">
         <div className="space-y-2">
           {ga4Sources.slice(0, 10).map((s, i) => {
             const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
@@ -298,7 +288,7 @@ export function AnalyticsTab({
             );
           })}
         </div>
-      </div>
+      </SectionCard>
     </div>
 
     {/* Organic Search + New vs Returning + Landing Pages */}
@@ -371,13 +361,13 @@ export function AnalyticsTab({
           {groups.map(group => {
             const groupEvents = getEventsForModule(group.id);
             const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
-            return ( // pr-check-disable-next-line -- Brand signature radius intentional
-              <div key={group.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2.5 h-2.5 rounded-[var(--radius-pill)]" style={{ backgroundColor: group.color }} />
-                  <h3 className="t-body font-semibold text-[var(--brand-text)]">{group.name}</h3>
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{groupEvents.length} events</span>
-                </div>
+            return (
+              <SectionCard
+                key={group.id}
+                title={group.name}
+                titleIcon={<span className="w-2.5 h-2.5 rounded-[var(--radius-pill)]" style={{ backgroundColor: group.color }} />}
+                action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{groupEvents.length} events</span>}
+              >
                 {renderPageFilter(group.id, group.allowedPages)}
                 {noResults ? (
                   <div className="text-center py-4 t-caption-sm text-[var(--brand-text-muted)]">No events found for this page</div>
@@ -386,14 +376,13 @@ export function AnalyticsTab({
                     {groupEvents.map(renderEventCard)}
                   </div>
                 )}
-              </div>
+              </SectionCard>
             );
           })}
           {/* Ungrouped events */}
-          {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && ( // pr-check-disable-next-line -- Brand signature radius intentional
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-              <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+          {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
+            <SectionCard title={groups.length > 0 ? 'Other Events' : 'Key Events'}>
+              <p className="t-body text-[var(--brand-text-muted)] mb-3">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
               {renderPageFilter('__ungrouped__')}
               {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
                 <div className="text-center py-4 t-caption-sm text-[var(--brand-text-muted)]">No events found for this page</div>
@@ -402,19 +391,16 @@ export function AnalyticsTab({
                   {ungroupedEvents.slice(0, 12).map(renderEventCard)}
                 </div>
               )}
-            </div>
+            </SectionCard>
           )}
 
           {/* Event Trend (shown when an event is selected) */}
-          {ga4SelectedEvent && ga4EventTrend.length > 2 && ( // pr-check-disable-next-line -- Brand signature radius intentional
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="t-body font-semibold text-[var(--brand-text)]">{eventDisplayName(ga4SelectedEvent)}</h3>
-                  <p className="t-caption-sm text-[var(--brand-text-muted)]">Daily event count over the selected period</p>
-                </div>
-                <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>
-              </div>
+          {ga4SelectedEvent && ga4EventTrend.length > 2 && (
+            <ChartCard
+              title={eventDisplayName(ga4SelectedEvent)}
+              action={<button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>}
+            >
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Daily event count over the selected period</p>
               <ResponsiveContainer width="100%" height={112}>
                 <AreaChart data={ga4EventTrend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                   <defs>
@@ -446,15 +432,14 @@ export function AnalyticsTab({
                 <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
                 <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
               </div>
-            </div>
+            </ChartCard>
           )}
         </div>
       );
     })()}
 
     {/* ── Collapsible Event Explorer ── */}
-    {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+    <SectionCard noPadding>
       <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-accent-brand" />
@@ -537,7 +522,7 @@ export function AnalyticsTab({
           )}
         </div>
       )}
-    </div>
+    </SectionCard>
     </div>
   </>);
 }

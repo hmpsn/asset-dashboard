@@ -9,7 +9,7 @@ import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import { useClientIntelligence } from '../../hooks/client';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, PageHeader, SectionCard } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -140,10 +140,11 @@ export function OverviewTab({
   })();
   return (<>
     {/* Welcome header */}
-    <div className="mb-2">
-      <h2 className="t-h2 text-[var(--brand-text)]">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
-      <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">{dynamicSubtitle}</p>
-    </div>
+    <PageHeader
+      title={`Welcome back${clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}`}
+      subtitle={dynamicSubtitle}
+      className="mb-2"
+    />
 
     {/* Headline health score */}
     <HealthScoreCard score={clientIntel?.compositeHealthScore} />
@@ -395,15 +396,12 @@ export function OverviewTab({
       {/* Right sidebar (2/5) */}
       <div className="lg:col-span-2 space-y-8">
         {/* Ask the Insights Engine */}
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-              <Icon as={Sparkles} size="md" className="text-accent-brand" />
-            </div>
-            <span className="t-caption font-medium text-[var(--brand-text)]">Ask the Insights Engine</span>
-          </div>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Get instant answers about your site's performance, SEO opportunities, and next steps.</p>
+        <SectionCard
+          title="Ask the Insights Engine"
+          titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
+          className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
+        >
+          <p className="t-body text-[var(--brand-text-muted)] mb-3">Get instant answers about your site's performance, SEO opportunities, and next steps.</p>
           <div className="space-y-1.5">
             {QUICK_QUESTIONS.slice(0, 4).map((q, i) => (
               <ClickableRow
@@ -429,26 +427,24 @@ export function OverviewTab({
               ))}
             </div>
           </div>
-        </div>
+        </SectionCard>
 
 
         {/* Content opportunities preview — revenue moment */}
         {(() => {
           const gaps = strategyData?.contentGaps?.slice(0, 2);
           if (!gaps || gaps.length === 0) return null;
-          return ( // pr-check-disable-next-line -- Brand signature radius intentional
-            <div className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-                  <Icon as={FileText} size="md" className="text-accent-brand" />
-                </div>
-                <span className="t-caption font-medium text-[var(--brand-text)]">Content Opportunities</span>
-              </div>
+          return (
+            <SectionCard
+              title="Content Opportunities"
+              titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
+              className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
+            >
               <div className="space-y-2">
                 {gaps.map((gap, i) => (
                   <div key={i} className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60">
                     <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-0.5">{gap.topic}</div>
-                    <div className="t-caption-sm text-[var(--brand-text-muted)] line-clamp-1">{gap.rationale}</div>
+                    <div className="t-caption text-[var(--brand-text-muted)] line-clamp-1">{gap.rationale}</div>
                   </div>
                 ))}
               </div>
@@ -459,7 +455,7 @@ export function OverviewTab({
               >
                 View all {strategyData?.contentGaps?.length ?? 0} opportunities
               </Button>
-            </div>
+            </SectionCard>
           );
         })()}
 
@@ -477,12 +473,8 @@ export function OverviewTab({
             links_fixed: { color: '#fb923c', label: 'Links' },
             content_updated: { color: '#2dd4bf', label: 'Content' },
           };
-          return ( // pr-check-disable-next-line -- Brand signature radius intentional
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <Icon as={Activity} size="md" className="text-accent-brand" />
-                <span className="t-caption font-medium text-[var(--brand-text)]">Recent Work</span>
-              </div>
+          return (
+            <SectionCard title="Recent Work" titleIcon={<Icon as={Activity} size="md" className="text-accent-brand" />}>
               <div className="relative">
                 <div className="absolute left-[5px] top-1 bottom-1 w-px bg-[var(--surface-3)]" />
                 <div className="space-y-2.5">
@@ -503,7 +495,7 @@ export function OverviewTab({
                   })}
                 </div>
               </div>
-            </div>
+            </SectionCard>
           );
         })()}
       </div>

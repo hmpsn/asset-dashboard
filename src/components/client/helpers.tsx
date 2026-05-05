@@ -243,15 +243,15 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Headings — strip bold markers inside (GPT sends ## **Overview**)
     if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={elements.length} className="t-caption font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="t-body font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
       idx++; continue;
     }
     if (trimmed.startsWith('## ')) {
-      elements.push(<h3 key={elements.length} className="t-body font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
       idx++; continue;
     }
     if (trimmed.startsWith('# ')) {
-      elements.push(<h3 key={elements.length} className="t-body font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-page font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
       idx++; continue;
     }
 
@@ -259,7 +259,7 @@ export function RenderMarkdown({ text }: { text: string }) {
     if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
       const content = trimmed.slice(2);
       elements.push(
-        <div key={elements.length} className="flex gap-1.5 t-caption-sm text-[var(--brand-text)]" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+        <div key={elements.length} className="flex gap-1.5 t-body text-[var(--brand-text)]" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
           <span className="text-[var(--brand-text-muted)] shrink-0 mt-px">•</span>
           <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
         </div>
@@ -272,7 +272,7 @@ export function RenderMarkdown({ text }: { text: string }) {
       const content = trimmed.replace(/^\d+\.\s/, '');
       const num = trimmed.match(/^(\d+)\./)?.[1];
       elements.push(
-        <div key={elements.length} className="flex gap-1.5 t-caption-sm text-[var(--brand-text)] mt-0.5" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+        <div key={elements.length} className="flex gap-1.5 t-body text-[var(--brand-text)] mt-0.5" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
           <span className="text-[var(--brand-text-muted)] shrink-0 w-4 text-right">{num}.</span>
           <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
         </div>
@@ -285,7 +285,7 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Regular paragraph
     elements.push(
-      <p key={elements.length} className="t-caption-sm text-[var(--brand-text)] leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />
+      <p key={elements.length} className="t-body text-[var(--brand-text)] leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />
     );
     idx++;
   }

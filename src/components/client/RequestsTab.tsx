@@ -4,7 +4,7 @@ import {
   CheckCircle2, X, Paperclip, FileText, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import type { ClientRequest, RequestCategory } from './types';
-import { Button, ClickableRow, Icon, IconButton } from '../ui';
+import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
@@ -71,23 +71,17 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
 
   return (<>
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Icon as={MessageSquare} size="lg" className="text-accent-brand" />
-          <div>
-            <h2 className="t-h2 text-[var(--brand-text)]">Requests</h2>
-            <p className="t-body text-[var(--brand-text-muted)] mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
-          </div>
-        </div>
-        <Button onClick={() => setShowNewRequest(!showNewRequest)} icon={Plus} size="sm" className="rounded-[var(--radius-lg)]">
-          New Request
-        </Button>
-      </div>
+      <PageHeader
+        title="Requests"
+        subtitle={`Submit requests for ${STUDIO_NAME} to action on.`}
+        icon={<Icon as={MessageSquare} size="lg" className="text-accent-brand" />}
+        actions={<Button onClick={() => setShowNewRequest(!showNewRequest)} icon={Plus} size="sm" className="rounded-[var(--radius-lg)]">New Request</Button>}
+      />
 
       {/* New request form */}
-      {showNewRequest && ( // pr-check-disable-next-line -- Brand signature radius intentional
-        <div className="bg-[var(--surface-2)] border border-teal-500/20 p-5 space-y-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <h3 className="t-caption font-semibold text-[var(--brand-text)]">Submit a Request</h3>
+      {showNewRequest && (
+        <SectionCard title="Submit a Request" className="border-teal-500/20">
+          <div className="space-y-4">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5 block">Quick Templates</label>
             <div className="flex flex-wrap gap-2">
@@ -168,7 +162,8 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             </Button>
             <Button onClick={() => setShowNewRequest(false)} variant="ghost">Cancel</Button>
           </div>
-        </div>
+          </div>
+        </SectionCard>
       )}
 
       {/* Loading */}
@@ -184,7 +179,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <Icon as={MessageSquare} size="2xl" className="text-[var(--brand-text-faint)]" />
           </div>
           <h3 className="t-body font-medium text-[var(--brand-text-muted)] mb-1">Need something? We're here to help</h3>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
           <Button onClick={() => setShowNewRequest(true)} icon={Plus} className="rounded-[var(--radius-lg)]">
             Create Your First Request
           </Button>
@@ -213,8 +208,8 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               seo: 'SEO', feature: 'Feature', other: 'Other',
             };
             const teamNotes = req.notes.filter(n => n.author === 'team').length;
-            return ( // pr-check-disable-next-line -- Brand signature radius intentional
-              <div key={req.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+            return (
+              <SectionCard key={req.id} noPadding>
                 <ClickableRow
                   active={isExpanded}
                   onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
@@ -223,7 +218,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="t-caption font-medium text-[var(--brand-text)] truncate">{req.title}</span>
+                        <span className="t-body font-medium text-[var(--brand-text)] truncate">{req.title}</span>
                         <span className={`t-caption-sm px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
                           {statusLabels[req.status] || req.status}
                         </span>
@@ -247,7 +242,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     {/* Description */}
                     <div className="px-5 py-4">
                       <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Description</div>
-                      <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed"><RenderMarkdown text={req.description} /></div>
+                      <div className="t-body text-[var(--brand-text)] leading-relaxed"><RenderMarkdown text={req.description} /></div>
                     </div>
 
                     {/* Notes / conversation */}
@@ -328,7 +323,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     )}
                   </div>
                 )}
-              </div>
+              </SectionCard>
             );
           })}
         </div>

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier, Icon, Button, ClickableRow } from '../ui';
+import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier, Icon, Button, ClickableRow, SectionCard } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
@@ -231,24 +231,26 @@ export function ApprovalsTab({
         const batchRejected = batch.items.filter(i => i.status === 'rejected').length;
         const isApplying = applyingBatch === batch.id;
 
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div key={batch.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-            {/* Batch header */}
-            <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center justify-between">
-              <div>
-                <h3 className="t-body font-medium text-[var(--brand-text)]">{batch.name}</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                  {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  {' · '}{batch.items.length} change{batch.items.length !== 1 ? 's' : ''}
-                </p>
-              </div>
+        return (
+          <SectionCard
+            key={batch.id}
+            title={batch.name}
+            titleExtra={
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {' · '}{batch.items.length} change{batch.items.length !== 1 ? 's' : ''}
+              </span>
+            }
+            action={
               <div className="flex items-center gap-2">
                 {batchPending > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{batchPending} pending</span>}
                 {batchApproved > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{batchApproved} approved</span>}
                 {batchApplied > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 border border-blue-500/30 text-accent-info">{batchApplied} applied</span>}
                 {batchRejected > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-red-500/10 border border-red-500/30 text-accent-danger">{batchRejected} rejected</span>}
               </div>
-            </div>
+            }
+            noPadding
+          >
 
             {/* Items grouped by page */}
             <div className="divide-y divide-[var(--brand-border)]/50">
@@ -589,7 +591,7 @@ export function ApprovalsTab({
                 )}
               </div>
             </div>
-          </div>
+          </SectionCard>
         );
       })}
       <ConfirmDialog

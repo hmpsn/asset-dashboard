@@ -418,7 +418,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
       {((hasTrafficData && totalHighTraffic > 0) || serverRecsError) && (
         <div className="px-5 pt-3 pb-0">
           {hasTrafficData && totalHighTraffic > 0 && (
-            <p className="t-caption text-[var(--brand-text)] leading-relaxed">
+            <p className="t-body text-[var(--brand-text)] leading-relaxed">
               Based on your traffic data, we've identified <span className="text-accent-brand font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
             </p>
           )}
@@ -474,7 +474,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   {/* Insight text */}
                   <div className="mt-1.5 flex items-start gap-1.5">
                     <Icon as={Lightbulb} size="sm" className="text-accent-warning flex-shrink-0 mt-0.5" />
-                    <p className="t-caption text-[var(--brand-text)] leading-relaxed">{cat.insight}</p>
+                    <p className="t-body text-[var(--brand-text)] leading-relaxed">{cat.insight}</p>
                   </div>
 
                   {/* Top affected pages (traffic-sorted) */}

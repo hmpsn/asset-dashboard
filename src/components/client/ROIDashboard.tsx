@@ -3,7 +3,7 @@ import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
-import { EmptyState } from '../ui';
+import { EmptyState, SectionCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { get } from '../../api/client';
@@ -68,8 +68,8 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   // Gate for premium tier
   if (tier !== 'premium' && tier !== 'growth') {
     return (
-      // pr-check-disable-next-line -- ROIDashboard tier-gate is a top-level container intentionally using brand signature shape
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <SectionCard className="text-center" noPadding>
+        <div className="p-8">
         <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
           <Icon as={Lock} size="xl" className="text-[var(--brand-text-dim)]" />
         </div>
@@ -78,16 +78,18 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           See the dollar value of your organic traffic and how much you&apos;d pay for it in Google Ads.
           Available on Growth and Premium plans.
         </p>
-      </div>
+        </div>
+      </SectionCard>
     );
   }
 
   if (loading) {
     return (
-      // pr-check-disable-next-line -- ROIDashboard loading state is a top-level container intentionally using brand signature shape
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <SectionCard noPadding>
+        <div className="p-8">
         <LoadingState message="Calculating your traffic value..." size="md" />
-      </div>
+        </div>
+      </SectionCard>
     );
   }
 
@@ -166,16 +168,12 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
       {/* Page breakdown table */}
       {data.pageBreakdown.length > 0 && (
-        // pr-check-disable-next-line -- ROIDashboard page breakdown panel is a top-level data container intentionally using brand signature shape
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="px-5 py-3.5 border-b border-[var(--brand-border)]/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon as={Target} size="md" className="text-accent-brand" />
-              <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Traffic Value by Page</span>
-            </div>
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.pageBreakdown.length} pages</span>
-          </div>
-
+        <SectionCard
+          title="Traffic Value by Page"
+          titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
+          action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{data.pageBreakdown.length} pages</span>}
+          noPadding
+        >
           <div className="divide-y divide-[var(--brand-border)]/40">
             {pages.map((page, i) => (
               <div key={i} className="px-5 py-3 hover:bg-[var(--surface-3)]/20 transition-colors group">
@@ -220,18 +218,15 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
               </button>
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* Content ROI Attribution */}
       {data.contentItems && data.contentItems.length > 0 && (
-        // pr-check-disable-next-line -- ROIDashboard content ROI panel is a top-level data container intentionally using brand signature shape
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="px-5 py-3.5 border-b border-[var(--brand-border)]/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon as={DollarSign} size="md" className="text-accent-success" />
-              <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Content ROI Attribution</span>
-            </div>
+        <SectionCard
+          title="Content ROI Attribution"
+          titleIcon={<Icon as={DollarSign} size="md" className="text-accent-success" />}
+          action={
             <div className="flex items-center gap-3">
               {data.contentROI && (
                 <>
@@ -244,7 +239,9 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                 </>
               )}
             </div>
-          </div>
+          }
+          noPadding
+        >
           <div className="divide-y divide-[var(--brand-border)]/40">
             {data.contentItems.map((item) => (
               <div key={item.requestId} className="px-5 py-3 hover:bg-[var(--surface-3)]/20 transition-colors">
@@ -287,7 +284,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
               </div>
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* Methodology note */}

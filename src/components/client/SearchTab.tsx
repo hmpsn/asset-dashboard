@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow} from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, PageHeader} from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -78,18 +78,15 @@ export function SearchTab({
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
-    {/* Header with takeaway */}
-    <div className="mb-2">
-      <h2 className="t-h2 text-[var(--brand-text)]">Search Performance</h2>
-      <p className="t-body text-[var(--brand-text-muted)] mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
-    </div>
+    <PageHeader title="Search Performance" subtitle={`${overview.dateRange.start} — ${overview.dateRange.end}`} className="mb-2" />
 
     {/* AI-style takeaway */}
-    {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
-    <div className="bg-[var(--surface-2)]/60 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-5 py-3.5 flex items-start gap-3">
-      <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 shrink-0" />
-      <p className="t-caption text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
-    </div>
+    <SectionCard variant="subtle" noPadding>
+      <div className="px-5 py-3.5 flex items-start gap-3">
+        <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 shrink-0" />
+        <p className="t-body text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
+      </div>
+    </SectionCard>
 
     {/* Compact metrics bar */}
     <CompactStatBar items={[
@@ -167,8 +164,7 @@ export function SearchTab({
     )}
 
     {/* Raw data tables — collapsible, secondary */}
-    {/* pr-check-disable-next-line -- Collapsible raw-data table wrapper with custom toggle button; not a static section card */}
-    <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden">
+    <SectionCard noPadding>
       <ClickableRow
         onClick={() => setShowRawData(!showRawData)}
         className="px-5 py-3.5 flex items-center gap-2"
@@ -227,6 +223,6 @@ export function SearchTab({
           </table>
         </>
       )}
-    </div>
+    </SectionCard>
   </>);
 }

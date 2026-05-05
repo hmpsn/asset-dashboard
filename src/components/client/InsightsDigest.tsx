@@ -533,10 +533,10 @@ export function InsightsDigest(props: InsightsDigestProps) {
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
-              <h3 className="t-body font-medium text-[var(--brand-text-bright)] leading-snug mb-1.5">{insight.headline}</h3>
+              <h3 className="t-page font-medium text-[var(--brand-text-bright)] leading-snug mb-1.5">{insight.headline}</h3>
 
               {/* Body */}
-              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mb-2">
+              <p className="t-body text-[var(--brand-text-muted)] leading-relaxed mb-2">
                 {insight.body}
               </p>
 
