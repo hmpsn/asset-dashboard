@@ -55,6 +55,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from './strategy-filters.js';
 import { MAX_COMPETITORS } from './constants.js';
 import { filterDiscoveredCompetitors } from './competitor-domain-filter.js';
+import { addActivity } from './activity-log.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -2409,6 +2410,7 @@ Rules:
     }
 
     updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
+    addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
       pageCount: pageMap.length,
       siteKeywords: keywordStrategy.siteKeywords?.length || 0,

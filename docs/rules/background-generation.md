@@ -33,7 +33,9 @@ Long-running admin generation routes must:
 2. Respond quickly with `{ jobId }` before expensive work begins.
 3. Store durable results in the owning domain table or file, not only in `job.result`.
 4. Update progress with stable `status`, `message`, `progress`, and `total` semantics.
-5. Add activity and broadcast domain events when generated data changes.
+5. Add activity and broadcast domain events when generated data changes. When a
+   shared generation service is used by both direct and background paths, log
+   activity in that shared service so both paths stay in parity.
 6. Register abort handling when the UI offers cancellation.
 
 On server restart, persisted `pending` or `running` jobs must be marked `error`
