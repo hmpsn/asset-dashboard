@@ -122,36 +122,34 @@ describe('webflow-keywords.ts migration contracts', () => {
   });
 });
 
-// ── webflow-seo.ts (N+1 prevention) ──────────────────────────────────────────
+// ── webflow-seo route N+1 prevention ─────────────────────────────────────────
 
-describe('webflow-seo.ts N+1 prevention contracts', () => {
-  const src = readRoute('webflow-seo.ts');
+describe('webflow SEO route N+1 prevention contracts', () => {
+  const applySrc = readRoute('webflow-seo-apply.ts');
+  const rewriteSrc = readRoute('webflow-seo.ts');
 
   it('bulk-fix loop: seoContext assembled before the for-of loop (not inside it)', () => {
     // Pre-assembly must appear before `for (const page of pages)`.
     // If seoContext is assembled inside the loop, 300-page sites fire 300 DB round-trips.
-    const loopIdx = src.indexOf('for (const page of pages)');
+    const loopIdx = applySrc.indexOf('for (const page of pages)');
     expect(loopIdx).toBeGreaterThan(-1);
-    const beforeLoop = src.slice(0, loopIdx);
+    const beforeLoop = applySrc.slice(0, loopIdx);
     expect(beforeLoop).toContain("slices: ['seoContext']");
   });
 
   it('bulk-rewrite loop: seoContext assembled before the batch for-loop (not inside it)', () => {
     // Pre-assembly must appear before `for (let i = 0; i < pages.length`.
-    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
+    const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
     expect(loopIdx).toBeGreaterThan(-1);
-    const beforeLoop = src.slice(0, loopIdx);
-    // Second occurrence of slices: ['seoContext'] — first is bulk-fix, second is bulk-rewrite
-    const firstIdx = beforeLoop.indexOf("slices: ['seoContext']");
-    const secondIdx = beforeLoop.indexOf("slices: ['seoContext']", firstIdx + 1);
-    expect(secondIdx).toBeGreaterThan(-1);
+    const beforeLoop = rewriteSrc.slice(0, loopIdx);
+    expect(beforeLoop).toContain("slices: ['seoContext']");
   });
 
   it('bulk-rewrite loop: pageProfile still assembled per-page with pagePath inside loop', () => {
     // pageProfile is page-specific (optimization issues + recommendations require pagePath).
     // Must remain inside the per-page map callback, not hoisted.
-    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
-    const afterLoop = src.slice(loopIdx);
+    const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
+    const afterLoop = rewriteSrc.slice(loopIdx);
     expect(afterLoop).toContain("slices: ['pageProfile']");
   });
 });
