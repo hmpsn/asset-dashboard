@@ -43,6 +43,8 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate, z } from '../middleware/validate.js';
 import { fireBridge } from '../bridge-infrastructure.js';
+import { seoBulkAcceptFixSchema } from '../schemas/seo-bulk-jobs.js';
+import { runSeoBulkAcceptFixesJob } from '../webflow-seo-bulk-accept-fixes-job.js';
 
 const log = createLogger('webflow-seo');
 
@@ -1519,14 +1521,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
 
 const bulkAcceptFixesSchema = z.object({
   siteId: z.string().min(1),
-  fixes: z.array(z.object({
-    pageId: z.string().min(1),
-    check: z.string().min(1),
-    suggestedFix: z.string().min(1),
-    message: z.string().optional(),
-    pageSlug: z.string().optional(),
-    pageName: z.string().optional(),
-  })).min(1).max(500),
+  fixes: z.array(seoBulkAcceptFixSchema).min(1).max(500),
 });
 
 router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('workspaceId'), validate(bulkAcceptFixesSchema), async (req, res) => {
@@ -1550,121 +1545,13 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('w
   const ac = registerAbort(job.id);
   res.json({ jobId: job.id });
 
-  (async () => {
-    try {
-      updateJob(job.id, { status: 'running', message: 'Applying fixes to Webflow...' });
-
-      let done = 0;
-      let failed = 0;
-      const applied: string[] = [];
-
-      for (const fix of fixes) {
-        if (isJobCancelled(job.id) || ac.signal.aborted) break;
-
-        try {
-          const fields: Record<string, unknown> = {};
-          if (fix.check === 'title') {
-            fields.seo = { title: fix.suggestedFix };
-          } else if (fix.check === 'meta-description') {
-            fields.seo = { description: fix.suggestedFix };
-          } else if (fix.check === 'og-tags' && fix.message?.includes('title')) {
-            fields.openGraph = { title: fix.suggestedFix };
-          } else if (fix.check === 'og-tags' && fix.message?.includes('description')) {
-            fields.openGraph = { description: fix.suggestedFix };
-          }
-
-          if (Object.keys(fields).length > 0) {
-            const seoResult = await updatePageSeo(fix.pageId, fields, token);
-            if (!seoResult.success) {
-              log.warn({ pageId: fix.pageId, check: fix.check, error: seoResult.error }, 'bulk-accept-fixes: Webflow update failed');
-              failed++;
-            } else {
-              const appliedKey = `${fix.pageId}-${fix.check}`;
-              applied.push(appliedKey);
-
-              // Track the change
-              if (ws) {
-                const changedField = fix.check === 'meta-description' ? 'description' : fix.check;
-                updatePageState(ws.id, fix.pageId, {
-                  status: 'live', source: 'audit', fields: [changedField], updatedBy: 'admin',
-                });
-                recordSeoChange(ws.id, fix.pageId, fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
-              }
-            }
-          } else {
-            // Unrecognized check type — skip Webflow update but still count progress
-            log.debug({ pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: unrecognized check type, skipping');
-          }
-          done++;
-        } catch (err) {
-          log.error({ err, pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: fix failed');
-          failed++;
-          done++;
-        }
-
-        updateJob(job.id, {
-          progress: done,
-          message: `Applied ${done}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}...`,
-        });
-        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
-          jobId: job.id,
-          operation: 'bulk-accept-fixes',
-          done,
-          total: fixes.length,
-          failed,
-          appliedKey: applied[applied.length - 1] ?? null,
-        });
-      }
-
-      if (ac.signal.aborted) {
-        updateJob(job.id, {
-          status: 'cancelled',
-          progress: done,
-          message: `Cancelled after ${done} fixes`,
-          result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
-        });
-        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
-          jobId: job.id,
-          operation: 'bulk-accept-fixes',
-          error: 'Cancelled',
-        });
-        return;
-      }
-
-      updateJob(job.id, {
-        status: 'done',
-        progress: done,
-        message: `Applied ${applied.length}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}`,
-        result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
-      });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
-        jobId: job.id,
-        operation: 'bulk-accept-fixes',
-        applied: applied.length,
-        failed,
-        total: fixes.length,
-        appliedKeys: applied,
-      });
-
-      if (applied.length > 0) {
-        addActivity(workspaceId, 'seo_updated',
-          `Bulk audit fix: ${applied.length} fixes applied`,
-          `Background job applied ${applied.length}/${fixes.length} audit fixes to Webflow`,
-          { applied: applied.length, failed, total: fixes.length },
-        );
-      }
-    } catch (err) {
-      log.error({ err }, 'bulk-accept-fixes: job failed');
-      updateJob(job.id, { status: 'error', error: String(err) });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
-        jobId: job.id,
-        operation: 'bulk-accept-fixes',
-        error: String(err),
-      });
-    } finally {
-      unregisterAbort(job.id);
-    }
-  })();
+  void runSeoBulkAcceptFixesJob({
+    jobId: job.id,
+    workspaceId,
+    fixes,
+    token,
+    signal: ac.signal,
+  });
 });
 
 export default router;
