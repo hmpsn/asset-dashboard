@@ -100,6 +100,7 @@ function seedPost(id: string, briefId: string): void {
 }
 
 function cleanup(): void {
+  db.prepare('DELETE FROM jobs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(testWsId);
@@ -265,6 +266,25 @@ describe('Content Posts API', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('briefId required');
+  });
+
+  it('POST /api/content-posts/:wsId/generate starts a background job and returns a post skeleton', async () => {
+    const genBriefId = `brief_post_gen_${Date.now()}`;
+    seedBrief(genBriefId);
+
+    const res = await postJson(`/api/content-posts/${testWsId}/generate`, { briefId: genBriefId });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toMatch(/^post_/);
+    expect(body.briefId).toBe(genBriefId);
+    expect(body.status).toBe('generating');
+    expect(typeof body.jobId).toBe('string');
+
+    const jobRes = await api(`/api/jobs/${body.jobId}`);
+    expect(jobRes.status).toBe(200);
+    const job = await jobRes.json();
+    expect(job.type).toBe('content-post-generation');
+    expect(job.workspaceId).toBe(testWsId);
   });
 
   it('GET /api/content-posts/:wsId/:postId/export/markdown returns markdown', async () => {

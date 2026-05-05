@@ -12,10 +12,11 @@ import { getBrief } from '../content-brief.js';
 import {
   listPosts,
   getPost,
-  savePost,
   updatePostField,
   deletePost,
-  generatePost,
+  createContentPostGenerationJob,
+  notifyContentUpdated,
+  runContentPostGenerationJob,
   regenerateSection,
   exportPostMarkdown,
   exportPostHTML,
@@ -39,18 +40,16 @@ import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
+import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
 import type { AIReviewResult, AiFixResult, IssueKey } from '../../shared/types/content.js';
 import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
-
-function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-posts', ...payload });
-}
 
 function markProvenanceItemsForHumanReview(
   review: Record<string, AIReviewResult>,
@@ -69,6 +68,10 @@ function markProvenanceItemsForHumanReview(
   return next;
 }
 
+const generatePostSchema = z.object({
+  briefId: z.string({ required_error: 'briefId required' }).trim().min(1, 'briefId required'),
+}).strict();
+
 // --- Content Post Generator (#194) ---
 
 // List all generated posts for a workspace
@@ -84,9 +87,8 @@ router.get('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('wo
 });
 
 // Generate a full post from a brief (async — returns immediately with skeleton, generates in background)
-router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generatePostSchema), async (req, res) => {
   const { briefId } = req.body;
-  if (!briefId) return res.status(400).json({ error: 'briefId required' });
 
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -96,66 +98,16 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
   const brief = getBrief(req.params.workspaceId, briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
-  // Start generation in background — return skeleton immediately
   try {
-    const postId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const skeleton = {
-      id: postId,
+    const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, req.params.workspaceId);
+    if (activeJob) return res.status(409).json({ error: 'Content post generation is already running for this workspace', jobId: activeJob.id });
+    const started = createContentPostGenerationJob(req.params.workspaceId, brief);
+    res.json({ ...started.post, jobId: started.jobId });
+    runContentPostGenerationJob({
       workspaceId: req.params.workspaceId,
-      briefId: brief.id,
-      targetKeyword: brief.targetKeyword,
-      title: brief.suggestedTitle,
-      metaDescription: brief.suggestedMetaDesc,
-      introduction: '',
-      sections: brief.outline.map((s, i) => ({
-        index: i, heading: s.heading, content: '', wordCount: 0,
-        targetWordCount: s.wordCount || 250, keywords: s.keywords || [],
-        status: 'pending' as const,
-      })),
-      conclusion: '',
-      totalWordCount: 0,
-      targetWordCount: brief.wordCountTarget || 1800,
-      status: 'generating' as const,
-      unificationStatus: 'pending' as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    savePost(req.params.workspaceId, skeleton);
-    notifyContentUpdated(req.params.workspaceId, { postId, briefId: brief.id, action: 'post_generation_started' });
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId, status: skeleton.status });
-
-    // Return skeleton to client immediately
-    res.json(skeleton);
-
-    // Generate in background — pass skeleton's postId so it updates the same post
-    // background-generation-ok: legacy skeleton flow; Phase 2 migrates this post generation to /api/jobs.
-    generatePost(req.params.workspaceId, brief, postId).then((generated) => {
-      addActivity(req.params.workspaceId, 'post_generated', `Content generated for "${brief.targetKeyword}"`, `Title: ${brief.suggestedTitle}`);
-      notifyContentUpdated(req.params.workspaceId, { postId: generated.id, briefId: brief.id, action: 'post_generated' });
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: generated.id, status: generated.status });
-    }).catch(err => {
-      log.error({ err: err }, `Generation failed for ${req.params.workspaceId}:`);
-      const failed = getPost(req.params.workspaceId, postId);
-      if (failed) {
-        const message = err instanceof Error ? err.message : 'Generation failed';
-        failed.status = 'error';
-        failed.unificationStatus = 'failed';
-        failed.unificationNote = message;
-        failed.updatedAt = new Date().toISOString();
-        failed.sections = failed.sections.map(section =>
-          section.status === 'done' ? section : { ...section, status: 'error', error: message },
-        );
-        savePost(req.params.workspaceId, failed);
-        addActivity(
-          req.params.workspaceId,
-          'content_updated',
-          `Content generation failed for "${brief.targetKeyword}"`,
-          message,
-          { postId: failed.id, briefId: brief.id, action: 'post_generation_failed' },
-        );
-        notifyContentUpdated(req.params.workspaceId, { postId: failed.id, briefId: brief.id, action: 'post_generation_failed', status: failed.status });
-        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: failed.id, status: failed.status });
-      }
+      brief,
+      postId: started.postId,
+      jobId: started.jobId,
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });

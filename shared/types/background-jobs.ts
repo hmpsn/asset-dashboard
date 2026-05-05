@@ -9,6 +9,7 @@ export const BACKGROUND_JOB_TYPES = {
   SCHEMA_GENERATOR: 'schema-generator',
   PAGE_ANALYSIS: 'page-analysis',
   DEEP_DIAGNOSTIC: 'deep-diagnostic',
+  CONTENT_POST_GENERATION: 'content-post-generation',
   SEO_BULK_ANALYZE: 'seo-bulk-analyze',
   SEO_BULK_REWRITE: 'seo-bulk-rewrite',
   SEO_BULK_ACCEPT_FIXES: 'seo-bulk-accept-fixes',
@@ -88,6 +89,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Runs a diagnostic investigation for an insight.',
     cancellable: false,
     resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION]: {
+    label: 'Content Post Generation',
+    description: 'Generates a full post from a saved content brief.',
+    cancellable: false,
+    resultBehavior: 'domain-store-and-result',
   },
   [BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE]: {
     label: 'Bulk SEO Analysis',

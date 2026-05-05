@@ -427,9 +427,19 @@
           "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Migrate POST /api/content-posts/:workspaceId/generate from legacy post-response generation to /api/jobs using a new content-post-generation job type. Preserve the immediate skeleton-post UX by creating and saving the skeleton before expensive AI work, return jobId/postId/post, keep generation non-cancellable until generatePost is abort-aware, and keep request status advancement tied to durable skeleton/job creation."
+          "notes": "Completed 2026-05-05 in codex/content-post-background-jobs. Moved POST /api/content-posts/:workspaceId/generate off legacy post-response generation and onto the shared jobs store with BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION metadata so TaskPanel can surface it. Preserved the immediate skeleton-post UX, returns jobId with the skeleton, added /api/jobs support for the same job type, kept generation non-cancellable until generatePost is abort-aware, and added route coverage for skeleton response plus persisted job lookup."
+        },
+        {
+          "id": "platform-consolidation-content-post-generation-progress",
+          "title": "Content post generation - add step progress and cancellation",
+          "source": "Follow-up surfaced during codex/content-post-background-jobs review",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-05",
+          "notes": "Thread job progress callbacks through generatePost so TaskPanel can show real steps for intro, sections, conclusion, unification, and SEO meta instead of a generic spinner. Add AbortSignal support before marking content-post-generation cancellable in shared job metadata."
         },
         {
           "id": "platform-consolidation-keyword-strategy-job-service-extraction",
