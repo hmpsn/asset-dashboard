@@ -379,7 +379,17 @@
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Phase 2 follow-up after the Phase 1 foundation. Completed slices: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation. In progress on 2026-05-05: schema/page-analysis cancellation drift fix, SEO bulk abort cleanup, and shared schema generation context prep. Remaining drifted surfaces include extracting schema/page-analysis workers from server/routes/jobs.ts, inline PageIntelligence rediscovery, schema snapshot invalidation, and crawl-heavy workspace knowledge/voice/persona generation."
+          "notes": "Phase 2 follow-up after the Phase 1 foundation. Completed slices: KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation; schema/page-analysis cancellation stays durable after abort-controller cleanup; SEO bulk workers unregister abort controllers; shared schema generation context prep is extracted; schema/page-analysis worker bodies are extracted from server/routes/jobs.ts into dedicated worker modules while the route remains the dispatcher. Remaining drifted surfaces include inline PageIntelligence rediscovery, schema snapshot invalidation, and crawl-heavy workspace knowledge/voice/persona generation."
+        },
+        {
+          "id": "platform-consolidation-page-analysis-worker-hardening",
+          "title": "Page analysis worker hardening - clarify empty states and fetch failure handling",
+          "source": "Follow-up surfaced during codex/extract-schema-page-analysis-workers scaled review",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-05",
+          "notes": "Tighten page-analysis worker UX/error handling after extraction: show a clearer terminal message when no pages are discovered, include a user-facing job message when OPENAI_API_KEY is missing, and warn or skip AI analysis when both HTML fetch attempts fail instead of analyzing empty content."
         },
         {
           "id": "platform-consolidation-billing-checkout-only",

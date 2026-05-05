@@ -4,6 +4,7 @@ Long-running admin generation uses the existing background job platform:
 
 - `server/jobs.ts` owns durable job state.
 - `server/routes/jobs.ts` owns the central `/api/jobs` dispatcher.
+- Dedicated `server/*-job.ts` worker modules own crawl-heavy or AI-heavy job bodies.
 - `src/hooks/useBackgroundTasks.tsx` owns admin job state on the frontend.
 - `src/components/TaskPanel.tsx` owns the floating task surface.
 - `shared/types/background-jobs.ts` owns job type metadata, labels, and cancellation semantics.
@@ -46,6 +47,19 @@ after their worker process is gone.
 Cancellation must remain observable after `cancelJob()` is called. Workers that
 poll `isJobCancelled(jobId)` must continue to see `true` even if their abort
 controller has already been unregistered during cleanup.
+
+## Worker Module Contract
+
+`server/routes/jobs.ts` should stay a thin dispatcher. For heavyweight jobs, keep
+route-local code limited to validation, job creation, `registerAbort(job.id)`,
+the quick `{ jobId }` response, and invoking the worker. Move crawl loops,
+provider prefetches, AI calls, persistence, activity logging, cache invalidation,
+and terminal cleanup into a dedicated worker module.
+
+Worker modules must preserve existing job semantics: they receive the created
+`jobId`, call `updateJob(...)` for progress and terminal state, and call
+`unregisterAbort(jobId)` from a `finally` block. Do not import the route module
+from a worker.
 
 ## Frontend Contract
 

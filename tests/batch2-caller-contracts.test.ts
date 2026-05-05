@@ -276,10 +276,10 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
   });
 });
 
-// ── jobs.ts (page-analysis job) ───────────────────────────────────────────────
+// ── page-analysis-job.ts ─────────────────────────────────────────────────────
 
-describe('jobs.ts page-analysis job migration contracts', () => {
-  const src = readRoute('jobs.ts');
+describe('page-analysis-job.ts migration contracts', () => {
+  const src = read('page-analysis-job.ts');
 
   it('requests seoContext + learnings slices for PA job AI context', () => {
     // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
@@ -345,6 +345,7 @@ describe('slices/sections consistency — learnings section requires learnings s
     { label: 'seo-audit.ts', src: read('seo-audit.ts') },
     { label: 'content-decay.ts', src: read('content-decay.ts') },
     { label: 'keyword-recommendations.ts', src: read('keyword-recommendations.ts') },
+    { label: 'page-analysis-job.ts', src: read('page-analysis-job.ts') },
     { label: 'routes/google.ts', src: readRoute('google.ts') },
     { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
     { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
