@@ -9,7 +9,7 @@ import { requireWorkspaceAccessFromBody, requireWorkspaceSiteAccessFromQuery } f
 import { parseJsonFallback } from '../db/json-validation.js';
 import { stripCodeFences, stripHtmlToText } from '../helpers.js';
 import { createLogger } from '../logger.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getPageKeyword } from '../page-keywords.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getSiteSubdomain } from '../webflow.js';
@@ -160,12 +160,10 @@ ${copyBrandName ? `- The brand name is "${copyBrandName}" - use this exact name 
 Return ONLY valid JSON, no markdown fences.`;
 
   try {
-    const aiResult = await callOpenAI({
+    const aiResult = await callAI({
       model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.' },
-        { role: 'user', content: prompt },
-      ],
+      system: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.',
+      messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.6,
       feature: 'content-score',

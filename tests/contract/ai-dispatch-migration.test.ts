@@ -8,8 +8,10 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/content-decay.ts', aiImport: "from './ai.js'" },
   { path: 'server/internal-links.ts', aiImport: "from './ai.js'" },
   { path: 'server/seo-audit-ai-recs.ts', aiImport: "from './ai.js'" },
+  { path: 'server/llms-txt-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/rewrite-chat.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/webflow-seo-page-tools.ts', aiImport: "from '../ai.js'" },
 ];
 
 const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
