@@ -457,9 +457,9 @@
           "source": "Follow-up surfaced during codex/keyword-strategy-job-service scaled review",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-05",
-          "notes": "Add a startup recovery pass for persisted background jobs that were left pending/running by a process crash or deploy restart. Mark stale non-retryable jobs failed with a clear message, define retry semantics where appropriate, and add coverage so TaskPanel does not show orphaned forever-running work."
+          "notes": "Completed 2026-05-05 in codex/background-job-stale-recovery. Startup recovery now has an explicit exported recovery path with regression coverage, marks persisted pending/running jobs as error after restart, updates the visible TaskPanel message as well as the error field, and keeps graceful-shutdown interruption messages aligned."
         },
         {
           "id": "platform-consolidation-generation-activity-parity",
