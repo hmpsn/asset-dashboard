@@ -67,8 +67,6 @@
 - **SettingsPanel** — `src/components/SettingsPanel.tsx`
 - **SiteArchitecture** — props: workspaceId — `src/components/SiteArchitecture.tsx`
 - **StatusBar** — props: hasOpenAIKey, hasWebflowToken, connected, workspaceCount — `src/components/StatusBar.tsx`
-- **StripePaymentForm** — props: clientSecret, publishableKey, amount, productName, onSuccess, onCancel, accentColor — `src/components/StripePaymentForm.tsx`
-- **StripePaymentModal** — props: clientSecret, publishableKey, amount, productName, topic, targetKeyword, isFull, onSuccess, onClose — `src/components/StripePaymentForm.tsx`
 - **StripeSettings** — `src/components/StripeSettings.tsx`
 - **Styleguide** — `src/components/Styleguide.tsx`
 - **TaskPanel** — `src/components/TaskPanel.tsx`

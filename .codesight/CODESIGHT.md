@@ -383,7 +383,6 @@
 - `POST` `/api/stripe/config/products` params() [auth, db, payment]
 - `DELETE` `/api/stripe/config` params() [auth, db, payment]
 - `GET` `/api/stripe/publishable-key` params() [auth, db, payment]
-- `POST` `/api/stripe/create-payment-intent` params() [auth, db, payment]
 - `POST` `/api/stripe/create-checkout` params() [auth, db, payment]
 - `POST` `/api/stripe/cart-checkout` params() [auth, db, payment]
 - `POST` `/api/public/upgrade-checkout/:workspaceId` params(workspaceId) [auth, db, payment]
@@ -593,8 +592,6 @@
 - **SettingsPanel** — `src/components/SettingsPanel.tsx`
 - **SiteArchitecture** — props: workspaceId — `src/components/SiteArchitecture.tsx`
 - **StatusBar** — props: hasOpenAIKey, hasWebflowToken, connected, workspaceCount — `src/components/StatusBar.tsx`
-- **StripePaymentForm** — props: clientSecret, publishableKey, amount, productName, onSuccess, onCancel, accentColor — `src/components/StripePaymentForm.tsx`
-- **StripePaymentModal** — props: clientSecret, publishableKey, amount, productName, topic, targetKeyword, isFull, onSuccess, onClose — `src/components/StripePaymentForm.tsx`
 - **StripeSettings** — `src/components/StripeSettings.tsx`
 - **Styleguide** — `src/components/Styleguide.tsx`
 - **TaskPanel** — `src/components/TaskPanel.tsx`

@@ -38,7 +38,7 @@ vi.mock('../../server/stripe-config.js', () => ({
 // ---------------------------------------------------------------------------
 
 import { handleWebhookEvent, initStripeBroadcast } from '../../server/stripe.js';
-import { createPayment, getPaymentBySession, listPayments } from '../../server/payments.js';
+import { createPayment, getPaymentByPaymentIntent, getPaymentBySession, listPayments } from '../../server/payments.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { listActivity } from '../../server/activity-log.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
@@ -248,7 +248,35 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
   it('payment_intent.succeeded — updates payment record', async () => {
     const piId = 'pi_test_success_123';
 
-    // Payment stored with PI id as session id (as the code does for PaymentIntent flow)
+    createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: 'cs_test_success_123',
+      stripePaymentIntentId: piId,
+      productType: 'brief_blog',
+      amount: 12500,
+      currency: 'usd',
+      status: 'pending',
+    });
+
+    const event = createWebhookEvent('payment_intent.succeeded', {
+      id: piId,
+      metadata: {
+        workspaceId: ws.workspaceId,
+        productType: 'brief_blog',
+      },
+      amount: 12500,
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const payment = getPaymentByPaymentIntent(ws.workspaceId, piId);
+    expect(payment).toBeDefined();
+    expect(payment!.status).toBe('paid');
+  });
+
+  it('payment_intent.succeeded — supports legacy records keyed by payment intent as session', async () => {
+    const piId = 'pi_test_legacy_session_lookup';
+
     createPayment(ws.workspaceId, {
       workspaceId: ws.workspaceId,
       stripeSessionId: piId,
@@ -272,6 +300,7 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
     const payment = getPaymentBySession(ws.workspaceId, piId);
     expect(payment).toBeDefined();
     expect(payment!.status).toBe('paid');
+    expect(payment!.stripePaymentIntentId).toBe(piId);
   });
 
   it('payment_intent.succeeded — post_polished upgrades an approved brief request', async () => {
@@ -290,7 +319,8 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
 
     createPayment(ws.workspaceId, {
       workspaceId: ws.workspaceId,
-      stripeSessionId: piId,
+      stripeSessionId: 'cs_test_post_polished_upgrade',
+      stripePaymentIntentId: piId,
       productType: 'post_polished',
       amount: 50000,
       currency: 'usd',
