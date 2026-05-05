@@ -13,6 +13,7 @@ import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
+import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
@@ -148,17 +149,7 @@ async function publishSchemaToCmsField(opts: {
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
-    // Build per-page validation map so the AI can avoid repeating known mistakes
-    const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
-    const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
-    // Enrich with architecture tree (best-effort — don't block if unavailable)
-    if (ctx.workspaceId) {
-      try {
-        const arch = await getCachedArchitecture(ctx.workspaceId);
-        ctx._architectureTree = arch.tree;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: GET /api/webflow/schema-suggestions/:siteId: programming error'); /* architecture not available — proceed without */ }
-    }
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(req.params.siteId);
     const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
     res.json(result);
   } catch (err) {
@@ -347,27 +338,9 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSite
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Use explicitly-passed pageType, fall back to persisted type for this page
     const resolvedPageType = pageType || getPageTypes(req.params.siteId)[pageId];
-    if (resolvedPageType) ctx.pageType = resolvedPageType;
-    // Enrich with prior validation errors so the AI avoids repeating known mistakes
-    if (ctx.workspaceId) {
-      const prior = getValidation(ctx.workspaceId, pageId);
-      if (prior?.errors && Array.isArray(prior.errors) && prior.errors.length > 0) {
-        const validErrors = (prior.errors as unknown[]).filter(
-          (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
-        );
-        if (validErrors.length > 0) ctx._existingErrors = validErrors;
-      }
-    }
-    // Enrich with architecture tree for deterministic breadcrumbs
-    if (ctx.workspaceId) {
-      try {
-        const arch = await getCachedArchitecture(ctx.workspaceId);
-        ctx._architectureTree = arch.tree;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: POST /api/webflow/schema-suggestions/:siteId/page: programming error'); /* proceed without architecture */ }
-    }
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, resolvedPageType);
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);

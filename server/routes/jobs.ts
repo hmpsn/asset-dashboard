@@ -15,9 +15,8 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, applyBulkKeywordGuards, buildSchemaContext, resolvePagePath, tryResolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { applySuppressionsToAudit, applyBulkKeywordGuards, resolvePagePath, tryResolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
-import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
   updateJob,
@@ -26,6 +25,7 @@ import {
   cancelJob,
   clearCompletedJobs,
   registerAbort,
+  unregisterAbort,
   isJobCancelled,
   hasActiveJob,
 } from '../jobs.js';
@@ -47,7 +47,7 @@ import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
-import { getValidations } from '../schema-validator.js';
+import { prepareBulkSchemaGenerationContext } from '../schema-generation-context.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import {
@@ -750,18 +750,8 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
+            const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(schemaSiteId);
             const schemaWsId = (params.workspaceId as string) || '';
-            // Build per-page validation map so the AI can avoid repeating known mistakes
-            const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
-            const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
-            // Enrich with architecture tree for deterministic breadcrumbs
-            if (ctx.workspaceId) {
-              try {
-                const arch = await getCachedArchitecture(ctx.workspaceId);
-                ctx._architectureTree = arch.tree;
-              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/schemaWsId: programming error'); /* proceed without architecture */ }
-            }
             // Debounced incremental save — persist partial results every 10s
             let lastSaveTime = 0;
             const SAVE_INTERVAL = 10_000;
@@ -798,6 +788,8 @@ router.post('/api/jobs', async (req, res) => {
             if (!isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
             }
+          } finally {
+            unregisterAbort(job.id);
           }
         })();
         break;
@@ -1048,6 +1040,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             if (!isJobCancelled(paJob.id)) {
               updateJob(paJob.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
             }
+          } finally {
+            unregisterAbort(paJob.id);
           }
         })();
         break;

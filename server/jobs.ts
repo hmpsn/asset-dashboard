@@ -225,7 +225,12 @@ export function createJob(type: BackgroundJobType | string, opts?: { message?: s
 export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 'createdAt'>>) {
   const job = jobs.get(id);
   if (!job) return;
-  Object.assign(job, update, { updatedAt: new Date().toISOString() });
+  const normalizedUpdate = { ...update };
+  if (job.status === 'cancelled' && update.status && update.status !== 'cancelled') {
+    delete normalizedUpdate.status;
+    delete normalizedUpdate.message;
+  }
+  Object.assign(job, normalizedUpdate, { updatedAt: new Date().toISOString() });
   // Write through to SQLite
   stmts().update.run({
     id: job.id,
@@ -274,7 +279,7 @@ export function unregisterAbort(jobId: string): void {
 
 export function cancelJob(id: string): Job | undefined {
   const ac = abortControllers.get(id);
-  if (ac) { ac.abort(); abortControllers.delete(id); }
+  if (ac) ac.abort();
   const job = jobs.get(id);
   if (job && (job.status === 'pending' || job.status === 'running')) {
     Object.assign(job, { status: 'cancelled', message: 'Cancelled by user', updatedAt: new Date().toISOString() });
@@ -295,7 +300,8 @@ export function cancelJob(id: string): Job | undefined {
 
 export function isJobCancelled(id: string): boolean {
   const ac = abortControllers.get(id);
-  return ac?.signal.aborted ?? false;
+  if (ac?.signal.aborted) return true;
+  return getJob(id)?.status === 'cancelled';
 }
 
 /** Check if an active (pending/running) job of the given type already exists for a workspace. */
