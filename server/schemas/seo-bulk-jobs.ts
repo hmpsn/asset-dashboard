@@ -18,6 +18,16 @@ export const seoBulkRewritePageSchema = z.object({
   currentDescription: z.string().optional(),
 });
 
+export const seoBulkAnalyzePageSchema = z.object({
+  pageId: z.string().min(1),
+  title: z.string(),
+  slug: z.string().optional(),
+  publishedPath: z.string().nullable().optional(),
+  seoTitle: z.string().optional(),
+  seoDescription: z.string().optional(),
+});
+
 export type SeoBulkAcceptFix = z.infer<typeof seoBulkAcceptFixSchema>;
+export type SeoBulkAnalyzePage = z.infer<typeof seoBulkAnalyzePageSchema>;
 export type SeoBulkRewritePage = z.infer<typeof seoBulkRewritePageSchema>;
 export type SeoBulkRewriteField = 'title' | 'description' | 'both';

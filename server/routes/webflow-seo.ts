@@ -9,7 +9,6 @@ import { Router } from 'express';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
-import { callOpenAI } from '../openai-helpers.js';
 import { callCreativeAI } from '../content-posts-ai.js';
 import {
   type SeoSuggestion,
@@ -17,7 +16,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo } from '../webflow.js';
 import {
@@ -29,22 +28,20 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { addActivity } from '../activity-log.js';
-import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId, normalizePath } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage, toAuditFindingPageId, normalizePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
-import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort, unregisterAbort } from '../jobs.js';
-import { broadcastToWorkspace } from '../broadcast.js';
-import { WS_EVENTS } from '../ws-events.js';
+import { createJob, hasActiveJob, registerAbort } from '../jobs.js';
 import { validate, z } from '../middleware/validate.js';
 import { fireBridge } from '../bridge-infrastructure.js';
-import { seoBulkAcceptFixSchema, seoBulkRewritePageSchema } from '../schemas/seo-bulk-jobs.js';
+import { seoBulkAcceptFixSchema, seoBulkAnalyzePageSchema, seoBulkRewritePageSchema } from '../schemas/seo-bulk-jobs.js';
 import { runSeoBulkAcceptFixesJob } from '../webflow-seo-bulk-accept-fixes-job.js';
+import { runSeoBulkAnalyzeJob } from '../webflow-seo-bulk-analyze-job.js';
 import { runSeoBulkRewriteJob } from '../webflow-seo-bulk-rewrite-job.js';
 
 const log = createLogger('webflow-seo');
@@ -981,14 +978,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
 // ═══════════════════════════════════════════════════════════════════
 
 const bulkAnalyzeSchema = z.object({
-  pages: z.array(z.object({
-    pageId: z.string().min(1),
-    title: z.string(),
-    slug: z.string().optional(),
-    publishedPath: z.string().nullable().optional(),
-    seoTitle: z.string().optional(),
-    seoDescription: z.string().optional(),
-  })).min(1).max(500),
+  pages: z.array(seoBulkAnalyzePageSchema).min(1).max(500),
 });
 
 router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('workspaceId'), validate(bulkAnalyzeSchema), async (req, res) => {
@@ -1011,218 +1001,13 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
   const ac = registerAbort(job.id);
   res.json({ jobId: job.id });
 
-  // Fire-and-forget background processing
-  (async () => {
-    try {
-      updateJob(job.id, { status: 'running', message: 'Building workspace context...' });
-
-      const siteId = ws.webflowSiteId || '';
-      const token = getTokenForSite(siteId) || undefined;
-
-      // Build workspace context once (not per-page)
-      const slices = ['seoContext', 'learnings'] as const;
-      const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
-      const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
-      const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
-
-      // Resolve live URL base
-      const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: siteId }, token);
-
-      let done = 0;
-      let failed = 0;
-
-      for (const page of pages) {
-        if (isJobCancelled(job.id) || ac.signal.aborted) break;
-
-        try {
-          // Fetch page HTML for content (best-effort)
-          const analyzePagePath = tryResolvePagePath(page);
-          let pageContent = '';
-          if (baseUrl && analyzePagePath) {
-            try {
-              const htmlRes = await fetch(`${baseUrl}${analyzePagePath}`, {
-                redirect: 'follow',
-                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' },
-                signal: AbortSignal.timeout(10_000),
-              });
-              if (htmlRes.ok) {
-                const html = await htmlRes.text();
-                pageContent = stripHtmlToText(html, { maxLength: 3000 });
-              }
-            } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
-          }
-
-          const effectiveTitle = page.seoTitle || page.title;
-          const effectiveMeta = page.seoDescription || '';
-
-          const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.
-
-Page title: ${page.title}
-SEO title: ${effectiveTitle || '(same as page title)'}
-Meta description: ${effectiveMeta || '(none)'}
-URL slug: ${analyzePagePath ?? '(no path)'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}
-
-Provide your analysis as a JSON object:
-{
-  "primaryKeyword": "the single best target keyword",
-  "primaryKeywordPresence": { "inTitle": true/false, "inMeta": true/false, "inContent": true/false, "inSlug": true/false },
-  "secondaryKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
-  "longTailKeywords": ["phrase1", "phrase2", "phrase3"],
-  "searchIntent": "informational | transactional | navigational | commercial",
-  "searchIntentConfidence": 0.0-1.0,
-  "contentGaps": ["gap1"],
-  "competitorKeywords": ["comp kw1", "comp kw2"],
-  "optimizationScore": 0-100,
-  "optimizationIssues": ["issue1"],
-  "recommendations": ["rec1", "rec2"],
-  "estimatedDifficulty": "low | medium | high",
-  "keywordDifficulty": 0-100,
-  "monthlyVolume": 0,
-  "topicCluster": "broader topic cluster"
-}
-
-IMPORTANT: Return ONLY valid JSON.`;
-
-          const aiResult = await callOpenAI({
-            model: 'gpt-4.1-mini',
-            messages: [
-              { role: 'system', content: 'You are an expert SEO keyword analyst. Return valid JSON only.' },
-              { role: 'user', content: prompt },
-            ],
-            maxTokens: 600,
-            temperature: 0.3,
-            feature: 'bulk-page-analysis',
-            workspaceId,
-          });
-
-          const raw = aiResult.text || '{}';
-          const cleaned = stripCodeFences(raw);
-          let analysis: Record<string, unknown>;
-          try {
-            analysis = JSON.parse(cleaned);
-            applyBulkKeywordGuards(analysis, ''); // no SEMRush data in bulk analyze path
-          } catch (err) {
-            log.debug({ err, pageId: page.pageId }, 'bulk-analyze: expected error — AI returned invalid JSON, skipping');
-            failed++;
-            done++;
-            updateJob(job.id, {
-              progress: done,
-              message: `Analyzed ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
-            });
-            broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
-              jobId: job.id,
-              operation: 'bulk-analyze',
-              done,
-              total: pages.length,
-              failed,
-            });
-            continue;
-          }
-
-          // Persist analysis to keyword strategy — skip pages with no slug/publishedPath
-          // to avoid collapsing every path-less page onto the "/" key.
-          if (!analyzePagePath) {
-            log.debug({ pageId: page.pageId }, 'bulk-analyze: skipping persist — no slug or publishedPath');
-          } else {
-            const existing = getPageKeyword(workspaceId, analyzePagePath);
-            upsertPageKeyword(workspaceId, {
-              pagePath: analyzePagePath,
-              pageTitle: existing?.pageTitle || page.title,
-              primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
-              secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
-              searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
-              optimizationIssues: (analysis.optimizationIssues as string[]) || [],
-              recommendations: (analysis.recommendations as string[]) || [],
-              contentGaps: (analysis.contentGaps as string[]) || [],
-              optimizationScore: analysis.optimizationScore as number | undefined,
-              analysisGeneratedAt: new Date().toISOString(),
-              primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | undefined,
-              longTailKeywords: (analysis.longTailKeywords as string[]) || [],
-              competitorKeywords: (analysis.competitorKeywords as string[]) || [],
-              estimatedDifficulty: analysis.estimatedDifficulty as string | undefined,
-              keywordDifficulty: analysis.keywordDifficulty as number | undefined,
-              monthlyVolume: analysis.monthlyVolume as number | undefined,
-              topicCluster: analysis.topicCluster as string | undefined,
-              searchIntentConfidence: analysis.searchIntentConfidence as number | undefined,
-              ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
-              ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
-            });
-          }
-
-          done++;
-        } catch (err) {
-          if (isProgrammingError(err)) {
-            log.warn({ err, pageId: page.pageId }, 'webflow-seo/bulk-analyze: unexpected error in page analysis');
-          } else {
-            log.debug({ err, pageId: page.pageId }, 'webflow-seo/bulk-analyze: page analysis error — degrading gracefully');
-          }
-          failed++;
-          done++;
-        }
-
-        updateJob(job.id, {
-          progress: done,
-          message: `Analyzed ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
-        });
-        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
-          jobId: job.id,
-          operation: 'bulk-analyze',
-          done,
-          total: pages.length,
-          failed,
-        });
-      }
-
-      // Invalidate intelligence cache so UI picks up new data
-      invalidateIntelligenceCache(workspaceId);
-
-      if (ac.signal.aborted) {
-        updateJob(job.id, {
-          status: 'cancelled',
-          progress: done,
-          message: `Cancelled after ${done} pages`,
-          result: { analyzed: done - failed, failed, total: pages.length },
-        });
-        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
-          jobId: job.id,
-          operation: 'bulk-analyze',
-          error: 'Cancelled',
-        });
-        return;
-      }
-
-      updateJob(job.id, {
-        status: 'done',
-        progress: done,
-        message: `Analysis complete: ${done - failed}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}`,
-        result: { analyzed: done - failed, failed, total: pages.length },
-      });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
-        jobId: job.id,
-        operation: 'bulk-analyze',
-        analyzed: done - failed,
-        failed,
-        total: pages.length,
-      });
-
-      addActivity(workspaceId, 'page_analysis',
-        `Bulk page analysis: ${done - failed}/${pages.length} pages analyzed`,
-        `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
-        { analyzed: done - failed, failed, total: pages.length },
-      );
-    } catch (err) {
-      log.error({ err }, 'bulk-analyze: job failed');
-      updateJob(job.id, { status: 'error', error: String(err) });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
-        jobId: job.id,
-        operation: 'bulk-analyze',
-        error: String(err),
-      });
-    } finally {
-      unregisterAbort(job.id);
-    }
-  })();
+  void runSeoBulkAnalyzeJob({
+    jobId: job.id,
+    workspaceId,
+    pages,
+    workspace: ws,
+    signal: ac.signal,
+  });
 });
 
 // ── Bulk AI Rewrite (background job) ──
