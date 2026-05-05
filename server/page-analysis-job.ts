@@ -6,7 +6,7 @@ import { applyBulkKeywordGuards, resolvePagePath, stripCodeFences, stripHtmlToTe
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { z } from './middleware/validate.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import {
   clearAnalysisFields,
   countAnalyzedPages,
@@ -290,7 +290,7 @@ Provide your analysis as a JSON object:
 
 IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONLY valid JSON.`;
 
-          const aiResult = await callOpenAI({
+          const aiResult = await callAI({
             model: 'gpt-4.1-mini',
             messages: [{ role: 'user', content: prompt }],
             maxTokens: 1000,
