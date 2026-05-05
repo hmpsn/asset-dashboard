@@ -447,9 +447,9 @@
           "source": "Follow-up surfaced during PR #458 review",
           "est": "1h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Add route-level integration coverage for GET /api/webflow/seo-suggestions/:workspaceId, including the field filter, after the low-risk webflow SEO route split."
+          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added route-level integration coverage for GET /api/webflow/seo-suggestions/:workspaceId, including counts and field filtering, after the low-risk Webflow SEO route split."
         },
         {
           "id": "platform-consolidation-seo-copy-happy-path-test",
@@ -457,9 +457,9 @@
           "source": "Follow-up surfaced during PR #458 review",
           "est": "1h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Add a mocked happy-path integration test for POST /api/webflow/seo-copy so the extracted page-tools route has explicit regression coverage."
+          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added a mocked happy-path integration test for POST /api/webflow/seo-copy so the extracted page-tools route has explicit regression coverage."
         },
         {
           "id": "platform-consolidation-ai-dispatch-migration",
