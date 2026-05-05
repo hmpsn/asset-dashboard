@@ -178,7 +178,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           <div className="w-16 h-16 bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <Icon as={MessageSquare} size="2xl" className="text-[var(--brand-text-faint)]" />
           </div>
-          <h3 className="t-body font-medium text-[var(--brand-text-muted)] mb-1">Need something? We're here to help</h3>
+          <h3 className="t-page font-semibold text-[var(--brand-text-bright)] mb-1">Need something? We're here to help</h3>
           <p className="t-body text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
           <Button onClick={() => setShowNewRequest(true)} icon={Plus} className="rounded-[var(--radius-lg)]">
             Create Your First Request

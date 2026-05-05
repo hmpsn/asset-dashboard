@@ -236,7 +236,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Entry list grouped by blueprint */}
       {Object.entries(grouped).map(([bpId, { blueprintName, items }]) => (
         <div key={bpId} className="space-y-3">
-          <h3 className="t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wide">{blueprintName}</h3>
+          <h3 className="t-label text-[var(--brand-text-bright)] tracking-wider">{blueprintName}</h3>
           {items.map((entry, idx) => (
             <EntryCard
               key={entry.id}

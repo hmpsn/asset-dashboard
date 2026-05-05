@@ -111,7 +111,7 @@ export function OnboardingWizard({
                 <div className="flex items-start gap-2">
                   <Icon as={Zap} size="md" className="text-accent-info mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="t-caption font-semibold text-[var(--brand-text-bright)]">You&apos;re on a free trial</div>
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">You&apos;re on a free trial</div>
                     <div className="t-caption-sm text-[var(--brand-text)] mt-0.5">Explore all {tierLabel} features for {trialDaysRemaining} more day{trialDaysRemaining !== 1 ? 's' : ''}. No credit card required.</div>
                   </div>
                 </div>
@@ -170,7 +170,7 @@ export function OnboardingWizard({
                     <a.icon className={`w-4 h-4 ${a.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="t-caption font-semibold text-[var(--brand-text-bright)]">{a.label}</div>
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">{a.label}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{a.desc}</div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-[var(--brand-border)] group-hover:text-[var(--brand-text)] transition-colors flex-shrink-0" />

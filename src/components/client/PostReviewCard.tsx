@@ -206,7 +206,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/60 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="t-body font-semibold leading-snug text-[var(--brand-text-bright)]">{post.title}</h3>
+            <h3 className="t-page font-semibold leading-snug text-[var(--brand-text-bright)]">{post.title}</h3>
             {post.metaDescription && (
               <p className="t-caption text-[var(--brand-text)] mt-1 italic leading-relaxed">{post.metaDescription}</p>
             )}
@@ -325,7 +325,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       {post.sections.map(section => (
         <div key={section.index} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
+            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <Button
                 onClick={async () => { await flushSectionHeading(); await flushSection(); setEditingSection(section.index); }}

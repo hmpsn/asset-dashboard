@@ -150,7 +150,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
       <div className="flex items-center gap-3">
         <Icon as={Shield} size="lg" className="text-accent-brand" />
         <div>
-          <h2 className="t-h2 text-[var(--brand-text)]">Schema Strategy Review</h2>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">
             Review the structured data plan for your website. This determines how your pages appear in Google search results.
           </p>
@@ -226,7 +226,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                         {pages.map(pr => (
                           <div key={pr.pagePath} className="flex items-center gap-3 py-1.5 px-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30">
                             <div className="flex-1 min-w-0">
-                              <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
+                              <div className="t-ui text-[var(--brand-text-bright)] truncate">{pr.pageTitle}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
                             </div>
                             <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
@@ -348,7 +348,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
             {snapshot.pages.map(page => (
               <div key={page.pageId} className="px-5 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="t-caption text-[var(--brand-text)] truncate">{page.pageTitle}</div>
+                  <div className="t-ui text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">

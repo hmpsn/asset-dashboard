@@ -266,7 +266,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                   <Icon as={TypeIcon} size="md" className={pConfig.color} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{rec.title}</div>
+                  <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{rec.title}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-1">{rec.insight}</div>
                   {rec.affectedPages.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1 mt-1.5">

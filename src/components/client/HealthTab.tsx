@@ -167,7 +167,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="t-h2 text-[var(--brand-text)]">Site Health</h2>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">Site Health</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <div className="relative" ref={shareRef}>
@@ -191,7 +191,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       {r.type === 'audit' ? <Icon as={BarChart3} size="md" className="text-accent-success" /> : <Icon as={FileText} size="md" className="text-accent-info" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{r.title}</div>
+                      <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{r.title}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">

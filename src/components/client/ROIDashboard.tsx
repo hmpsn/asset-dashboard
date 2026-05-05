@@ -179,7 +179,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
               <div key={i} className="px-5 py-3 hover:bg-[var(--surface-3)]/20 transition-colors group">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex-1 min-w-0 mr-4">
-                    <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
+                    <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="t-caption-sm text-accent-brand truncate">&ldquo;{page.primaryKeyword}&rdquo;</span>
                       {page.position && <span className="t-caption-sm text-[var(--brand-text-muted)]">#{page.position.toFixed(1)}</span>}
@@ -247,7 +247,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
               <div key={item.requestId} className="px-5 py-3 hover:bg-[var(--surface-3)]/20 transition-colors">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex-1 min-w-0 mr-4">
-                    <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</div>
+                    <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</div>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="t-caption-sm text-accent-brand">&ldquo;{item.targetKeyword}&rdquo;</span>
                       {item.targetPageSlug && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{item.targetPageSlug}</span>}

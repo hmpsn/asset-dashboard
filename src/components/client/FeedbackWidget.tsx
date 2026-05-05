@@ -260,7 +260,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{item.title}</span>
+                        <span className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{item.title}</span>
                         {hasTeamReply && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400 flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">

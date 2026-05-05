@@ -494,7 +494,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Icon className={cn('w-3.5 h-3.5', filled ? 'text-accent-brand' : 'text-[var(--brand-border)]')} />
-          <span className="t-caption font-medium text-[var(--brand-text-bright)]">{title}</span>
+          <span className="t-ui font-medium text-[var(--brand-text-bright)]">{title}</span>
           {filled && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
         </div>
         <span className="t-caption-sm text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>

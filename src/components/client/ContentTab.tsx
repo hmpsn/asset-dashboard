@@ -390,7 +390,7 @@ export function ContentTab({
                           {brief.outline.map((s: { heading: string; notes: string; wordCount?: number; keywords?: string[] }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center justify-between">
-                                <div className="t-caption font-medium text-[var(--brand-text)]">H2: {s.heading}</div>
+                                <div className="t-ui font-medium text-[var(--brand-text-bright)]">H2: {s.heading}</div>
                                 {s.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.wordCount} words</span>}
                               </div>
                               <div className="t-body text-[var(--brand-text-muted)] mt-1.5 leading-relaxed">{s.notes}</div>
