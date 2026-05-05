@@ -447,9 +447,9 @@
           "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
           "est": "4-6h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "The current /api/jobs keyword-strategy case is a compatibility bridge that internally calls POST /api/webflow/keyword-strategy/:workspaceId. Extract the generation orchestration into a service function shared by the route and job worker, translate strategy steps into job progress, and keep billing reservation/refund, active generation guards, persistence, broadcasts, history, rank seeding, recommendations, and llms.txt regeneration behavior intact."
+          "notes": "Completed 2026-05-05 in codex/keyword-strategy-job-service. Extracted keyword strategy generation into server/keyword-strategy-generation.ts so the direct SSE route and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY worker share native orchestration instead of the job worker internally fetching the route. Preserved active generation guards, billing reservation/refund behavior, persistence, broadcasts, history writes, rank seeding, recommendations, llms.txt regeneration, SSE progress, and job progress translation."
         },
         {
           "id": "platform-consolidation-webflow-seo-suggestions-list-test",

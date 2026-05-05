@@ -38,6 +38,11 @@ import {
   createContentPostGenerationJob,
   runContentPostGenerationJob,
 } from '../content-posts.js';
+import {
+  generateKeywordStrategy,
+  hasActiveKeywordStrategyGeneration,
+  KeywordStrategyGenerationError,
+} from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
@@ -655,95 +660,84 @@ router.post('/api/jobs', async (req, res) => {
         break;
       }
 
-      case 'keyword-strategy': {
+      case BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY: {
         const wsId = params.workspaceId as string;
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });
+        if (hasActiveKeywordStrategyGeneration(wsId)) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
         const stratWs = getWorkspace(wsId);
         if (!stratWs) return res.status(404).json({ error: 'Workspace not found' });
         if (!stratWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
         if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
         const job = createJob('keyword-strategy', { message: 'Generating keyword strategy...', workspaceId: wsId });
-        res.json({ jobId: job.id });
-        (async () => {
-          try {
-            updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
-            // Call the existing strategy endpoint internally
-            const stratUrl = `http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`;
-            const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
-            const semrushMode = (params.semrushMode as string) || 'none';
-            const competitorDomains = (params.competitorDomains as string[]) || stratWs.competitorDomains || [];
-            const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
-            const mode = (params.mode as string) || 'full';
-            const stratRes = await fetch(stratUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...internalAdminHeaders() },
-              body: JSON.stringify({ businessContext, semrushMode, competitorDomains, maxPages, mode }),
-            });
-            if (!stratRes.ok) {
-              const errText = await stratRes.text();
-              throw new Error(`Strategy generation failed: ${errText.slice(0, 200)}`);
-            }
-            let stratResult: unknown;
-            const contentType = stratRes.headers.get('content-type') || '';
-            if (stratRes.body && contentType.includes('text/event-stream')) {
-              const reader = stratRes.body.getReader();
-              const decoder = new TextDecoder();
-              let buffer = '';
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                for (const line of lines) {
-                  if (!line.startsWith('data: ')) continue;
-                  const evt = JSON.parse(line.slice(6)) as {
-                    step?: string;
-                    detail?: string;
-                    progress?: number;
-                    error?: string;
-                    done?: boolean;
-                    strategy?: unknown;
-                  };
-                  if (evt.error) throw new Error(evt.error);
-                  if (evt.step) {
-                    const pct = typeof evt.progress === 'number' ? Math.round(evt.progress * 100) : undefined;
-                    const label = keywordStrategyStepLabels[evt.step] || evt.step;
-                    updateJob(job.id, {
-                      message: evt.detail ? `${label}: ${evt.detail}` : label,
-                      ...(pct !== undefined ? { progress: pct, total: 100 } : {}),
-                    });
-                  }
-                  if (evt.done && evt.strategy) {
-                    stratResult = evt.strategy;
-                  }
-                }
+        const jobWasCancelled = () => getJob(job.id)?.status === 'cancelled';
+        // Keep the accepted job pending briefly so immediate duplicate requests
+        // see the active job before worker validation failures can mark it terminal.
+        setTimeout(() => {
+          void (async () => {
+            try {
+              if (jobWasCancelled()) return;
+              updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
+              const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
+              const semrushMode = (params.semrushMode as string) || 'none';
+              const competitorDomainsProvided = Array.isArray(params.competitorDomains);
+              const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
+              const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
+              const mode = params.mode === 'incremental' ? 'incremental' : 'full';
+              const generationResult = await generateKeywordStrategy({
+                workspaceId: wsId,
+                businessContext,
+                semrushMode,
+                competitorDomains,
+                competitorDomainsProvided,
+                maxPages,
+                mode,
+                onProgress: (evt) => {
+                  const pct = Math.round(evt.progress * 100);
+                  const label = keywordStrategyStepLabels[evt.step] || evt.step;
+                  updateJob(job.id, {
+                    message: evt.detail ? `${label}: ${evt.detail}` : label,
+                    progress: pct,
+                    total: 100,
+                  });
+                },
+              });
+              if (jobWasCancelled()) return;
+              if (generationResult.upToDate) {
+                updateJob(job.id, {
+                  status: 'done',
+                  result: { upToDate: true, freshPageCount: generationResult.freshPageCount ?? 0 },
+                  progress: 100,
+                  total: 100,
+                  message: 'Strategy already up to date',
+                });
+                return;
               }
-            } else {
-              stratResult = await stratRes.json();
+              const stratResult = generationResult.strategy;
+              if (!stratResult) throw new Error('Strategy generation completed without a strategy result');
+              const pageMap = (stratResult as { pageMap?: unknown[] }).pageMap;
+              const pageCount = Array.isArray(pageMap) ? pageMap.length : 0;
+              updateJob(job.id, {
+                status: 'done',
+                result: stratResult,
+                progress: 100,
+                total: 100,
+                message: `Strategy complete — ${pageCount} pages mapped`,
+              });
+              addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
+            } catch (err) {
+              if (jobWasCancelled()) return;
+              if (isProgrammingError(err)) log.warn({ err }, 'jobs: keyword-strategy job failed with programming error');
+              else log.debug({ err }, 'jobs: keyword-strategy job failed — degrading gracefully');
+              const message = err instanceof KeywordStrategyGenerationError ? err.payload.message || err.payload.error : err instanceof Error ? err.message : String(err);
+              updateJob(job.id, { status: 'error', error: message, message: 'Strategy generation failed' });
             }
-            if (!stratResult) throw new Error('Strategy generation completed without a strategy result');
-            const pageMap = (stratResult as { pageMap?: unknown[] }).pageMap;
-            const pageCount = Array.isArray(pageMap) ? pageMap.length : 0;
-            updateJob(job.id, {
-              status: 'done',
-              result: stratResult,
-              progress: 100,
-              total: 100,
-              message: `Strategy complete — ${pageCount} pages mapped`,
-            });
-            addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
-          } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: keyword-strategy job failed with programming error'); // url-fetch-ok
-            else log.debug({ err }, 'jobs: keyword-strategy job failed — degrading gracefully');
-            updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Strategy generation failed' });
-          }
-        })();
+          })();
+        }, 100);
+        res.json({ jobId: job.id });
         break;
       }
-
       case 'schema-generator': {
         const schemaSiteId = params.siteId as string;
         if (!schemaSiteId) return res.status(400).json({ error: 'siteId required' });
