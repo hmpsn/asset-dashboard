@@ -126,7 +126,7 @@ describe('webflow-keywords.ts migration contracts', () => {
 
 describe('webflow SEO route N+1 prevention contracts', () => {
   const applySrc = readRoute('webflow-seo-apply.ts');
-  const rewriteSrc = readRoute('webflow-seo.ts');
+  const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
 
   it('bulk-fix loop: seoContext assembled before the for-of loop (not inside it)', () => {
     // Pre-assembly must appear before `for (const page of pages)`.
@@ -312,8 +312,8 @@ describe('pageProfile-only callers intentionally omit learnings', () => {
     expect(src).not.toContain("sections: ['seoContext'");
   });
 
-  it('webflow-seo.ts SEO rewrite handlers use pageProfile section only', () => {
-    const src = readRoute('webflow-seo.ts');
+  it('Webflow SEO rewrite handlers use pageProfile section only', () => {
+    const src = `${readRoute('webflow-seo-rewrite.ts')}\n${readRoute('webflow-seo-bulk-rewrite.ts')}`;
     // Both /seo-rewrite and /seo-bulk-rewrite handlers only use formatForPrompt for pageProfile.
     // The keyword/brand voice blocks are assembled manually from seo.* fields.
     expect(src).toContain("sections: ['pageProfile']");
