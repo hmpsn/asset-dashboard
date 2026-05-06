@@ -297,6 +297,37 @@ describe('Content Posts API', () => {
     expect(after.updatedAt).toBe(before.updatedAt);
   });
 
+  it('PATCH /api/content-posts/:wsId/:postId rejects invalid workflow transitions without snapshotting content edits', async () => {
+    const invalidPostId = 'post_invalid_transition_content_' + Date.now();
+    const invalidBriefId = 'brief_invalid_transition_content_' + Date.now();
+    seedBrief(invalidBriefId);
+    seedPost(invalidPostId, invalidBriefId);
+
+    const beforePostRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}`);
+    const beforePost = await beforePostRes.json();
+    const beforeVersionsRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}/versions`);
+    const beforeVersions = await beforeVersionsRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${invalidPostId}`, {
+      title: 'Should Not Save',
+      status: 'generating',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid post transition/);
+
+    const afterPostRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}`);
+    const afterPost = await afterPostRes.json();
+    expect(afterPost.title).toBe(beforePost.title);
+    expect(afterPost.status).toBe(beforePost.status);
+    expect(afterPost.updatedAt).toBe(beforePost.updatedAt);
+
+    const afterVersionsRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}/versions`);
+    const afterVersions = await afterVersionsRes.json();
+    expect(afterVersions).toHaveLength(beforeVersions.length);
+  });
+
   it('PATCH /api/content-posts/:wsId/:postId rejects publish metadata spoofing', async () => {
     const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
       webflowItemId: 'spoofed-item',
@@ -315,6 +346,131 @@ describe('Content Posts API', () => {
     expect(after.webflowCollectionId).toBeUndefined();
     expect(after.publishedAt).toBeUndefined();
     expect(after.publishedSlug).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId merges section edits without dropping stored metadata', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+    const beforeSection = before.sections[0];
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Edited Section',
+          content: '<p>This should keep stored metadata</p>',
+          wordCount: 42,
+          createdAt: 'spoofed-section-created-at',
+        },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sections).toHaveLength(before.sections.length);
+    expect(body.sections[0]).toMatchObject({
+      index: 0,
+      heading: 'Edited Section',
+      content: '<p>This should keep stored metadata</p>',
+      wordCount: 42,
+      targetWordCount: beforeSection.targetWordCount,
+      keywords: beforeSection.keywords,
+      status: beforeSection.status,
+    });
+    expect(body.sections[0].createdAt).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId clears stale section errors when status recovers', async () => {
+    const errorPostId = 'post_section_error_recovery_' + Date.now();
+    const errorBriefId = 'brief_section_error_recovery_' + Date.now();
+    seedBrief(errorBriefId);
+    seedPost(errorPostId, errorBriefId);
+    db.prepare('UPDATE content_posts SET sections = ? WHERE workspace_id = ? AND id = ?').run(
+      JSON.stringify([
+        {
+          index: 0,
+          heading: 'Section 1',
+          content: '<p>Section 1 content</p>',
+          wordCount: 150,
+          targetWordCount: 300,
+          keywords: ['test'],
+          status: 'error',
+          error: 'Generation timed out',
+        },
+      ]),
+      testWsId,
+      errorPostId,
+    );
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${errorPostId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Recovered Section',
+          content: '<p>Recovered content</p>',
+          wordCount: 12,
+          status: 'done',
+        },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sections[0]).toMatchObject({
+      index: 0,
+      heading: 'Recovered Section',
+      status: 'done',
+    });
+    expect(body.sections[0].error).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects malformed sections without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Malformed Section',
+          content: '<p>This should not be stored</p>',
+          wordCount: -1,
+        },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.sections).toEqual(before.sections);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('POST /api/content-posts/:wsId/:postId/regenerate-section rejects non-integer indexes without mutating', async () => {
+    const beforePostRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const beforePost = await beforePostRes.json();
+    const beforeVersionsRes = await api(`/api/content-posts/${testWsId}/${postId}/versions`);
+    const beforeVersions = await beforeVersionsRes.json();
+
+    const res = await postJson(`/api/content-posts/${testWsId}/${postId}/regenerate-section`, {
+      sectionIndex: 0.5,
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterVersionsRes = await api(`/api/content-posts/${testWsId}/${postId}/versions`);
+    const afterVersions = await afterVersionsRes.json();
+    expect(afterVersions).toHaveLength(beforeVersions.length);
+
+    const afterPostRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const afterPost = await afterPostRes.json();
+    expect(afterPost.sections).toEqual(beforePost.sections);
+    expect(afterPost.updatedAt).toBe(beforePost.updatedAt);
   });
 
   it('POST /api/content-posts/:wsId/generate without briefId returns 400', async () => {
