@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
+import type { ClientAction } from '../../shared/types/client-actions.js';
 
 const ctx = createTestContext(13332); // port-ok: 13201-13331 already allocated in integration suite
 const { api, postJson, patchJson, clearCookies } = ctx;
@@ -37,7 +38,7 @@ describe('client action routes', () => {
   async function listActions(workspaceId: string) {
     const res = await api(`/api/client-actions/${workspaceId}`);
     expect(res.status).toBe(200);
-    return await res.json() as Array<{ id: string; status: string; priority: string; updatedAt: string; clientNote?: string }>;
+    return await res.json() as ClientAction[];
   }
 
   function countSentActivitiesForAction(workspaceId: string, actionId: string): number {
@@ -157,6 +158,56 @@ describe('client action routes', () => {
     expect(stored?.status).toBe('pending');
   });
 
+  it('lets admin update action details without creating completion activity', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      sourceId: `internal-links:edit:${Date.now()}`,
+      title: 'Original action title',
+      summary: 'Original summary for client review.',
+      priority: 'low',
+      payload: { suggestions: [{ fromPage: '/old', toPage: '/target' }] },
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json() as ClientAction;
+
+    const patchRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, {
+      title: 'Updated action title',
+      summary: 'Updated summary for the client.',
+      priority: 'high',
+      clientNote: 'Follow-up note carried on the action.',
+      payload: {
+        suggestions: [{ fromPage: '/new', toPage: '/target', anchorText: 'Target' }],
+        reviewedBy: 'coverage-test',
+      },
+    });
+    expect(patchRes.status).toBe(200);
+    const updated = await patchRes.json() as ClientAction;
+    expect(updated).toMatchObject({
+      id: created.id,
+      title: 'Updated action title',
+      summary: 'Updated summary for the client.',
+      priority: 'high',
+      status: 'pending',
+      clientNote: 'Follow-up note carried on the action.',
+    });
+    expect(updated.payload).toEqual({
+      suggestions: [{ fromPage: '/new', toPage: '/target', anchorText: 'Target' }],
+      reviewedBy: 'coverage-test',
+    });
+
+    const stored = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(stored).toMatchObject({
+      title: 'Updated action title',
+      summary: 'Updated summary for the client.',
+      priority: 'high',
+      status: 'pending',
+      clientNote: 'Follow-up note carried on the action.',
+    });
+    expect(stored?.payload).toEqual(updated.payload);
+    expect(countSentActivitiesForAction(wsId, created.id)).toBe(1);
+    expect(countActivitiesForAction(wsId, created.id, 'client_action_completed')).toBe(0);
+  });
+
   it('allows a client to approve a pending action, then blocks duplicate responses', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'content_decay',
@@ -234,7 +285,17 @@ describe('client action routes', () => {
       clientNote: 'Please revise the recommendation.',
     });
     expect(changesRes.status).toBe(200);
-    expect((await changesRes.json()).status).toBe('changes_requested');
+    const changes = await changesRes.json() as ClientAction;
+    expect(changes.status).toBe('changes_requested');
+    expect(changes.clientNote).toBe('Please revise the recommendation.');
+    expect(countActivitiesForAction(wsId, created.id, 'client_action_changes_requested')).toBe(1);
+
+    const publicListRes = await api(`/api/public/client-actions/${wsId}`);
+    expect(publicListRes.status).toBe(200);
+    const publicList = await publicListRes.json() as ClientAction[];
+    const publicAction = publicList.find(action => action.id === created.id);
+    expect(publicAction?.status).toBe('changes_requested');
+    expect(publicAction?.clientNote).toBe('Please revise the recommendation.');
 
     const approveAfterChangesRes = await patchJson(`/api/public/client-actions/${wsId}/${created.id}/respond`, {
       status: 'approved',
