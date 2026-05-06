@@ -106,17 +106,16 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
   const { workspaceId, batchId } = req.params;
   // Fetch batch before deleting so we can reset page edit states
   const batch = getBatch(workspaceId, batchId);
-  if (batch) {
-    for (const item of batch.items) {
-      if (item.pageId) {
-        // Reset any page still associated with this batch (in-review, approved, or rejected)
-        const state = getPageState(workspaceId, item.pageId);
-        if (
-          (state?.status === 'in-review' || state?.status === 'approved' || state?.status === 'rejected') &&
-          state.approvalBatchId === batchId
-        ) {
-          clearPageState(workspaceId, item.pageId);
-        }
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+  for (const item of batch.items) {
+    if (item.pageId) {
+      // Reset any page still associated with this batch (in-review, approved, or rejected)
+      const state = getPageState(workspaceId, item.pageId);
+      if (
+        (state?.status === 'in-review' || state?.status === 'approved' || state?.status === 'rejected') &&
+        state.approvalBatchId === batchId
+      ) {
+        clearPageState(workspaceId, item.pageId);
       }
     }
   }

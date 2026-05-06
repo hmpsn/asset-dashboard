@@ -252,6 +252,19 @@ describe('Approvals — CRUD', () => {
     expect(item.status).toBe('approved');
   });
 
+  it('DELETE with a missing or wrong-workspace batch returns 404 without deleting the owner batch', async () => {
+    const missingRes = await del(`/api/approvals/${testWsId}/batch_missing`);
+    expect(missingRes.status).toBe(404);
+
+    const crossDeleteRes = await del(`/api/approvals/${otherWsId}/${batchId}`);
+    expect(crossDeleteRes.status).toBe(404);
+
+    const ownerRes = await api(`/api/approvals/${testWsId}/${batchId}`);
+    expect(ownerRes.status).toBe(200);
+    const ownerBatch = await ownerRes.json();
+    expect(ownerBatch.id).toBe(batchId);
+  });
+
   // Delete
   it('DELETE removes the batch', async () => {
     const res = await del(`/api/approvals/${testWsId}/${batchId}`);
