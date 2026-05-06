@@ -4,7 +4,7 @@ import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13332); // port-ok: 13201-13331 already allocated in integration suite
-const { api, postJson, patchJson } = ctx;
+const { api, postJson, patchJson, clearCookies } = ctx;
 
 let wsId = '';
 let privateWsId = '';
@@ -41,13 +41,17 @@ describe('client action routes', () => {
   }
 
   function countSentActivitiesForAction(workspaceId: string, actionId: string): number {
+    return countActivitiesForAction(workspaceId, actionId, 'client_action_sent');
+  }
+
+  function countActivitiesForAction(workspaceId: string, actionId: string, type: string): number {
     const row = db.prepare(`
       SELECT COALESCE(COUNT(*), 0) AS count
       FROM activity_log
       WHERE workspace_id = ?
-        AND type = 'client_action_sent'
+        AND type = ?
         AND metadata LIKE ?
-    `).get(workspaceId, `%"actionId":"${actionId}"%`) as { count: number };
+    `).get(workspaceId, type, `%"actionId":"${actionId}"%`) as { count: number };
     return row.count;
   }
 
@@ -305,5 +309,42 @@ describe('client action routes', () => {
   it('requires client auth for password-protected public action reads', async () => {
     const res = await api(`/api/public/client-actions/${privateWsId}`);
     expect(res.status).toBe(401);
+  });
+
+  it('requires client auth before responding to a password-protected action', async () => {
+    const createRes = await postJson(`/api/client-actions/${privateWsId}`, {
+      sourceType: 'content_decay',
+      title: 'Protected client response',
+      summary: 'This action can only be answered after client login.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+
+    clearCookies();
+    const unauthenticatedRes = await patchJson(`/api/public/client-actions/${privateWsId}/${created.id}/respond`, {
+      status: 'approved',
+      clientNote: 'This should not be saved.',
+    });
+    expect(unauthenticatedRes.status).toBe(401);
+
+    const beforeLogin = (await listActions(privateWsId)).find(action => action.id === created.id);
+    expect(beforeLogin?.status).toBe('pending');
+    expect(beforeLogin?.clientNote).toBeUndefined();
+    expect(countActivitiesForAction(privateWsId, created.id, 'client_action_approved')).toBe(0);
+
+    const loginRes = await postJson(`/api/public/auth/${privateWsId}`, {
+      password: 'client-action-test',
+    });
+    expect(loginRes.status).toBe(200);
+
+    const authenticatedRes = await patchJson(`/api/public/client-actions/${privateWsId}/${created.id}/respond`, {
+      status: 'approved',
+      clientNote: 'Approved after login.',
+    });
+    expect(authenticatedRes.status).toBe(200);
+    const approved = await authenticatedRes.json();
+    expect(approved.status).toBe('approved');
+    expect(approved.clientNote).toBe('Approved after login.');
+    expect(countActivitiesForAction(privateWsId, created.id, 'client_action_approved')).toBe(1);
   });
 });
