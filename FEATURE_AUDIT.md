@@ -4574,3 +4574,16 @@ The migration preserves SchemaSuggester behavior: the parent still coordinates g
 **Mutual:** Shrinks the SchemaSuggester parent again while keeping the rendered summary, impact, and edit-status experience unchanged.
 
 **Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/SchemaResultsSummary.tsx`; `tests/unit/schema-suggester-results-summary.test.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`.
+
+### 355. Platform Consolidation — SchemaPageCard Details Split
+**What it does:** Continues the schema monolith cleanup by moving read-only SchemaPageCard detail bands into `SchemaPageCardDetails`. The new module owns existing-schema badges, validation finding grouping/expansion, recommendation banners, graph-type summaries, generation diagnostics, and rich-result eligibility rendering. `SchemaPageCard` now keeps the page header, page-type/regenerate controls, schema preview/editor/diff controls, publish/manual-delivery/send-to-client actions, and version history.
+
+The migration preserves behavior: validation findings are still grouped by field with error groups sorted first, field groups with multiple findings remain expandable, legacy validation error strings still render as warnings when typed findings are absent, recommendation priority badges and diagnostic labels are unchanged, and publish/edit/version-history flows stay in the original card component.
+
+**Agency value:** Engineers can adjust schema diagnostics and validation presentation without reopening publish controls or page-level mutation wiring.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Shrinks the largest remaining schema-specific component while keeping the page-card experience and mutation behavior unchanged.
+
+**Files:** `src/components/schema/SchemaPageCard.tsx`; `src/components/schema/SchemaPageCardDetails.tsx`; `tests/component/SchemaPageCard.test.tsx`.
