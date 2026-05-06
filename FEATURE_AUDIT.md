@@ -4349,3 +4349,17 @@ The migration preserves the current client behavior: feedback approval/decline/u
 **Mutual:** Creates stable client-side ownership boundaries for the larger platform consolidation sprint while keeping the current tab UI intact.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `src/components/client/strategy/useStrategyTrackedKeywords.ts`; `src/components/client/strategy/useStrategyBusinessPriorities.ts`; `tests/contract/client-strategy-tab-split.test.ts`.
+
+
+### 338. Platform Consolidation — Client StrategyTab Drawer Section Phase 2
+**What it does:** Continues the Client StrategyTab split by moving the keyword detail drawer markup and actions into `src/components/client/strategy/StrategyKeywordDrawer.tsx`. Shared keyword row display types, labels, intent colors, confidence labels, audience/momentum formatting, and role badge styling now live in `src/components/client/strategy/strategyKeywordDisplay.ts`, so `StrategyTab.tsx` can keep owning row assembly, state, focus trapping, and drawer snapshot selection while the rendered drawer body is isolated.
+
+The migration preserves the current drawer behavior: close backdrop, focus target, mobile bottom-sheet/desktop side-panel classes, opportunity and position metrics, evidence disclosure, content/page navigation actions, add/remove strategy actions, and dismiss feedback still use the same state and callbacks from `StrategyTab`.
+
+**Agency value:** Engineers can change keyword drawer layout, copy, or evidence presentation without reopening the full StrategyTab workflow file. This reduces review surface for the next content-gap / quick-win section extraction.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab drawer behavior.
+
+**Mutual:** Moves the largest drawer surface out of the client strategy monolith while keeping the state/control flow in one place for this phase.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordDrawer.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
