@@ -3,14 +3,11 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import { addTrackedKeyword } from './rank-tracking.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
-import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
-import { generateRecommendations } from './recommendations.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
 import { discoverKeywordStrategyPages } from './keyword-strategy-pages.js';
 import { fetchKeywordStrategySearchData } from './keyword-strategy-search-data.js';
@@ -21,16 +18,12 @@ import {
 } from './keyword-strategy-ai-synthesis.js';
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
 import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
+import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords } from './keyword-strategy-follow-ons.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 
 const log = createLogger('keyword-strategy');
-
-// Dedup guard: prevents concurrent background recommendation runs for the same workspace
-// (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
-// avoids wasted work and redundant broadcasts.
-const recsInFlight = new Set<string>();
 
 // Concurrent generation guard: prevents two simultaneous strategy generations for the same
 // workspace from racing to the DB. The second request receives a 409 immediately.
@@ -297,21 +290,12 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       },
     });
 
-    // Auto-seed rank tracking with strategy keywords (deduplicates internally)
-    try {
-      const seedKeywords = new Set<string>();
-      for (const kw of keywordStrategy.siteKeywords || []) {
-        const normalized = kw.toLowerCase().trim();
-        if (normalized) seedKeywords.add(normalized); // skip empty strings
-      }
-      for (const pm of pageMap) {
-        if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
-      }
-      for (const kw of seedKeywords) addTrackedKeyword(ws.id, kw);
-      log.info(`Auto-seeded ${seedKeywords.size} keywords into rank tracking for ${ws.name}`);
-    } catch (seedErr) {
-      log.warn({ err: seedErr }, 'Failed to auto-seed rank tracking keywords');
-    }
+    seedKeywordStrategyTrackedKeywords({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      keywordStrategy,
+      pageMap,
+    });
 
     clearKeepalive();
 
@@ -319,17 +303,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const responseStrategy = { ...keywordStrategy, pageMap };
     responseSent = true;
 
-    // Trigger background llms.txt regeneration after strategy update
-    queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
-
-    // Refresh recommendations so quick wins / content gaps / ranking opportunities
-    // reflect the new strategy immediately, without waiting for the next manual audit.
-    if (!recsInFlight.has(ws.id)) {
-      recsInFlight.add(ws.id);
-      generateRecommendations(ws.id)
-        .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
-        .finally(() => recsInFlight.delete(ws.id));
-    }
+    queueKeywordStrategyPostUpdateFollowOns({ workspaceId: ws.id });
     activeGenerations.delete(ws.id);
     return { strategy: responseStrategy as KeywordStrategy & { pageMap: PageKeywordMap[] } };
   } catch (err) {
