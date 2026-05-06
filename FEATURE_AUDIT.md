@@ -4483,3 +4483,16 @@ The migration preserves PageIntelligence behavior: the parent still owns `useBac
 **Mutual:** Further reduces PageIntelligence's component surface while preserving the same page-analysis, edit, tracking, SEO copy, and follow-on action behavior.
 
 **Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-page-list.test.ts`; `tests/unit/page-intelligence-page-list-render.test.tsx`.
+
+### 348. Platform Consolidation — PageIntelligence Row Detail Split
+**What it does:** Continues the PageIntelligence feature-tool split by breaking the extracted page list into focused row and detail renderers. `PageIntelligencePageList` now coordinates the collection and empty state, `PageIntelligencePageRow` owns the collapsed row summary and expand affordance, and `PageIntelligencePageDetails` owns the expanded keyword, SEO copy, AI analysis, content metrics, persisted-analysis, and page action sections.
+
+The migration preserves PageIntelligence behavior: the parent still owns the page-analysis background job platform wiring, single-page analysis calls, keyword persistence, rank tracking, SEO copy generation, and route navigation. The row/detail components receive values and callbacks only, and the source contract guard now pins all three extracted components against accidental background-job ownership drift.
+
+**Agency value:** Engineers can change collapsed row presentation separately from the dense expanded analysis panel, making future PageIntelligence UI work smaller and easier to review.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces the PageIntelligence UI surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
