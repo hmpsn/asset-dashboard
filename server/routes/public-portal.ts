@@ -707,6 +707,23 @@ function toClientSection(s: { id: string; entryId: string; sectionPlanItemId: st
   };
 }
 
+const copySuggestionSchema = z.object({
+  originalText: z.string().trim().min(1, 'originalText is required').max(5000),
+  suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
+}).strict();
+
+const requireClientCopyReviewAuth: RequestHandler = (req, res, next) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+};
+
 // List blueprint entries with their copy status
 router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
   const wsId = req.params.workspaceId;
@@ -766,16 +783,8 @@ router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', (req, res) =
 });
 
 // Client approves a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
@@ -804,25 +813,14 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, re
 });
 
 // Client suggests an edit on a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
   const { originalText, suggestedText } = req.body;
-  if (!originalText || !suggestedText) {
-    return res.status(400).json({ error: 'originalText and suggestedText are required' });
-  }
 
   // Only client_review sections accept suggestions via the client portal
   const existing = getSection(sectionId, wsId);
@@ -831,8 +829,8 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
   }
 
   const section = addClientSuggestion(sectionId, wsId, {
-    originalText: String(originalText).slice(0, 5000),
-    suggestedText: String(suggestedText).slice(0, 5000),
+    originalText,
+    suggestedText,
   });
   if (!section) {
     return res.status(400).json({ error: 'Could not add suggestion. Section not found.' });
