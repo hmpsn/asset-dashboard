@@ -28,6 +28,10 @@ export interface AICallOptions {
   workspaceId?: string;
   /** Optional request timeout. */
   timeoutMs?: number;
+  /** Max retry attempts on 429/5xx. Defaults to provider helper behavior. */
+  maxRetries?: number;
+  /** Optional caller cancellation signal. Composed with provider timeout. */
+  signal?: AbortSignal;
   /** OpenAI-only structured response mode. */
   responseFormat?: { type: 'json_object' };
 }
@@ -53,7 +57,9 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       temperature: rest.temperature,
       feature: rest.feature,
       workspaceId: rest.workspaceId,
+      maxRetries: rest.maxRetries,
       timeoutMs: rest.timeoutMs,
+      signal: rest.signal,
     });
     return {
       text: result.text,
@@ -73,7 +79,9 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     temperature: rest.temperature,
     feature: rest.feature,
     workspaceId: rest.workspaceId,
+    maxRetries: rest.maxRetries,
     timeoutMs: rest.timeoutMs,
+    signal: rest.signal,
     responseFormat: rest.responseFormat,
   });
 
