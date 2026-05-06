@@ -4418,3 +4418,16 @@ The migration preserves the existing data ownership: `StrategyTab.tsx` still ass
 **Mutual:** Reduces the remaining client strategy monolith while preserving tier gates, suggestion review actions, decline/restore behavior, and keyword drawer compatibility.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclinedKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclineKeywordModal.tsx`; `tests/contract/client-strategy-tab-request-flow.test.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
+
+### 343. Platform Consolidation — Client StrategyTab Shell Sections Phase 7
+**What it does:** Completes the Client StrategyTab split by moving the remaining rendered shell sections into focused strategy components. `StrategySnapshotSection` owns the planning-readiness score, summary metrics, and readiness bars. `StrategyNextStepsSection` owns the top recommended action cards and receives scroll callbacks from the shell. `StrategyPageKeywordMapSection` owns the Keyword Map tier gate, accordion header, and `PageKeywordMapContent` wiring.
+
+The migration preserves the existing StrategyTab orchestration contract: `StrategyTab.tsx` still owns strategy data assembly, deep-link expansion, section refs, keyword feedback state, drawer state, pricing/modal callbacks, and all workflow hooks. The extracted components receive the same counts, callbacks, tier value, feedback map, and public request callbacks that the inline JSX used before.
+
+**Agency value:** Engineers can now change snapshot, next-step card, or page-map presentation without reopening the StrategyTab data assembly and workflow shell. The client strategy surface is split into narrow modules with contract tests for each migration slice.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab behavior.
+
+**Mutual:** Finishes the StrategyTab consolidation track while preserving tier gates, deep-link behavior, feedback actions, and keyword drawer compatibility.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategySnapshotSection.tsx`; `src/components/client/strategy/StrategyNextStepsSection.tsx`; `src/components/client/strategy/StrategyPageKeywordMapSection.tsx`; `tests/contract/client-strategy-tab-shell-sections.test.ts`.
