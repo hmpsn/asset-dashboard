@@ -12,14 +12,15 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13214);
-const { api, postJson, patchJson, del } = ctx;
+const { api, postJson, patchJson, del, clearCookies } = ctx;
 
 let testWsId = '';
 let otherWsId = '';
+let protectedWsId = '';
 const testSiteId = 'site_approval_test';
 
 beforeAll(async () => {
@@ -28,12 +29,16 @@ beforeAll(async () => {
   testWsId = ws.id;
   const otherWs = createWorkspace('Approvals Other Workspace');
   otherWsId = otherWs.id;
+  const protectedWs = createWorkspace('Approvals Protected Workspace');
+  protectedWsId = protectedWs.id;
+  updateWorkspace(protectedWsId, { clientPassword: 'approval-test-pw' });
 }, 25_000);
 
 afterAll(async () => {
-  db.prepare('DELETE FROM approval_batches WHERE workspace_id IN (?, ?)').run(testWsId, otherWsId);
+  db.prepare('DELETE FROM approval_batches WHERE workspace_id IN (?, ?, ?)').run(testWsId, otherWsId, protectedWsId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
+  deleteWorkspace(protectedWsId);
   await ctx.stopServer();
 });
 
@@ -171,6 +176,67 @@ describe('Approvals — CRUD', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(batchId);
+  });
+
+  it('requires client auth before reading or updating protected public approvals', async () => {
+    const createRes = await postJson(`/api/approvals/${protectedWsId}`, {
+      siteId: testSiteId,
+      name: 'Protected SEO Changes',
+      items: [
+        {
+          pageId: 'protected_page_1',
+          pageSlug: '/protected-page',
+          pageTitle: 'Protected Page',
+          field: 'seoTitle',
+          currentValue: 'Protected Old Title',
+          proposedValue: 'Protected New Title',
+        },
+      ],
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    const protectedItemId = created.items[0].id;
+
+    clearCookies();
+    const listRes = await api(`/api/public/approvals/${protectedWsId}`);
+    expect(listRes.status).toBe(401);
+
+    const readRes = await api(`/api/public/approvals/${protectedWsId}/${created.id}`);
+    expect(readRes.status).toBe(401);
+
+    const unauthenticatedPatchRes = await patchJson(
+      `/api/public/approvals/${protectedWsId}/${created.id}/${protectedItemId}`,
+      { status: 'approved', clientNote: 'This should not save.' },
+    );
+    expect(unauthenticatedPatchRes.status).toBe(401);
+
+    const beforeLoginRes = await api(`/api/approvals/${protectedWsId}/${created.id}`);
+    expect(beforeLoginRes.status).toBe(200);
+    const beforeLoginBatch = await beforeLoginRes.json();
+    const beforeLoginItem = beforeLoginBatch.items.find((i: { id: string }) => i.id === protectedItemId);
+    expect(beforeLoginItem).toBeDefined();
+    expect(beforeLoginItem.status).toBe('pending');
+    expect(beforeLoginItem.clientNote).toBeUndefined();
+
+    const loginRes = await postJson(`/api/public/auth/${protectedWsId}`, {
+      password: 'approval-test-pw',
+    });
+    expect(loginRes.status).toBe(200);
+
+    const authedReadRes = await api(`/api/public/approvals/${protectedWsId}/${created.id}`);
+    expect(authedReadRes.status).toBe(200);
+
+    const authedPatchRes = await patchJson(
+      `/api/public/approvals/${protectedWsId}/${created.id}/${protectedItemId}`,
+      { status: 'approved', clientNote: 'Approved after login.' },
+    );
+    expect(authedPatchRes.status).toBe(200);
+    const updatedBatch = await authedPatchRes.json();
+    const updatedItem = updatedBatch.items.find((i: { id: string }) => i.id === protectedItemId);
+    expect(updatedItem).toBeDefined();
+    expect(updatedItem.status).toBe('approved');
+    expect(updatedItem.clientNote).toBe('Approved after login.');
+    clearCookies();
   });
 
   // Client review
