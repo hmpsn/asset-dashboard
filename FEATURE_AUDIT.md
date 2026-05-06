@@ -4587,3 +4587,16 @@ The migration preserves behavior: validation findings are still grouped by field
 **Mutual:** Shrinks the largest remaining schema-specific component while keeping the page-card experience and mutation behavior unchanged.
 
 **Files:** `src/components/schema/SchemaPageCard.tsx`; `src/components/schema/SchemaPageCardDetails.tsx`; `tests/component/SchemaPageCard.test.tsx`.
+
+### 356. Platform Consolidation — SchemaSuggester Setup Split
+**What it does:** Completes the SchemaSuggester monolith cleanup by moving setup-only rendering into `SchemaGeneratorSetup`. The new module owns the business-profile schema callout, generator hero actions, initial page search/type picker, page-type guide, and CMS collection field-mapping panel. `SchemaSuggester` now stays focused on workflow orchestration across generation, CMS template workflow, publishing, approvals, impact, completeness, and page-card rendering.
+
+The migration preserves behavior: the business-profile callout still gates on missing address data and deep-links to the business-profile settings tab, the CMS Templates action still calls the existing CMS workflow hook, initial page type updates still flow through the shared page-type state, single-page generation still calls the existing generation hook, and CMS field mapping still uses the same typed `SchemaFieldTarget` contract. No background-job, endpoint, or mutation behavior was changed.
+
+**Agency value:** Engineers can adjust schema setup controls without reopening the full SchemaSuggester shell, and the remaining schema-specific components now sit under 500 lines each.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Finishes the schema monolith portion of the platform-consolidation sprint while preserving the generator, template, and mapping experience.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaGeneratorSetup.tsx`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `tests/component/SchemaGeneratorSetup.test.tsx`.
