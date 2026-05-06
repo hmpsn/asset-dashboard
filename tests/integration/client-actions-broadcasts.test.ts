@@ -169,6 +169,28 @@ describe('client action broadcasts and workflow side effects', () => {
     expect(clientActionBroadcasts()).toHaveLength(0);
   });
 
+  it('does not duplicate completion activity when completed status is submitted again', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'content_decay',
+      sourceId: 'broadcast:duplicate-completion',
+      title: 'Complete once',
+      summary: 'Repeated completion patches should not create duplicate activity.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+
+    const completeRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'completed' });
+    expect(completeRes.status).toBe(200);
+    expect(countActivitiesForAction(created.id, 'client_action_completed')).toBe(1);
+
+    const repeatCompleteRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'completed' });
+    expect(repeatCompleteRes.status).toBe(200);
+
+    const stored = getClientAction(wsId, created.id);
+    expect(stored?.status).toBe('completed');
+    expect(countActivitiesForAction(created.id, 'client_action_completed')).toBe(1);
+  });
+
   it('does not broadcast or mutate when admin update validation fails', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'internal_link',
