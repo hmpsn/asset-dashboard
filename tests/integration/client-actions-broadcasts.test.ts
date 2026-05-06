@@ -22,6 +22,7 @@ import { WS_EVENTS } from '../../server/ws-events.js';
 let baseUrl = '';
 let server: http.Server | undefined;
 let wsId = '';
+const originalAppPassword = process.env.APP_PASSWORD;
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
@@ -91,6 +92,11 @@ afterAll(async () => {
   db.prepare('DELETE FROM client_actions WHERE workspace_id = ?').run(wsId);
   deleteWorkspace(wsId);
   await stopTestServer();
+  if (originalAppPassword === undefined) {
+    delete process.env.APP_PASSWORD;
+  } else {
+    process.env.APP_PASSWORD = originalAppPassword;
+  }
 });
 
 describe('client action broadcasts and workflow side effects', () => {
@@ -163,6 +169,30 @@ describe('client action broadcasts and workflow side effects', () => {
     expect(clientActionBroadcasts()).toHaveLength(0);
   });
 
+  it('does not broadcast or mutate when admin update validation fails', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      sourceId: 'broadcast:admin-validation',
+      title: 'Admin validation guard',
+      summary: 'Invalid update values should stop before storage.',
+      priority: 'low',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    broadcastState.calls = [];
+
+    const invalidRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, {
+      status: 'not_a_status',
+      priority: 'urgent',
+    });
+    expect(invalidRes.status).toBe(400);
+
+    const stored = getClientAction(wsId, created.id);
+    expect(stored).toMatchObject({ status: 'pending', priority: 'low' });
+    expect(clientActionBroadcasts()).toHaveLength(0);
+    expect(countActivitiesForAction(created.id, 'client_action_completed')).toBe(0);
+  });
+
   it('broadcasts a public response once and blocks duplicate response broadcasts', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'aeo_change',
@@ -200,6 +230,31 @@ describe('client action broadcasts and workflow side effects', () => {
     const stored = getClientAction(wsId, created.id);
     expect(stored?.status).toBe('approved');
     expect(stored?.clientNote).toBe('Approved.');
+    expect(countActivitiesForAction(created.id, 'client_action_changes_requested')).toBe(0);
+  });
+
+  it('does not broadcast or mutate when public response validation fails', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'redirect_proposal',
+      sourceId: 'broadcast:public-validation',
+      title: 'Public validation guard',
+      summary: 'Invalid public response values should stop before storage.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    broadcastState.calls = [];
+
+    const invalidRes = await patchJson(`/api/public/client-actions/${wsId}/${created.id}/respond`, {
+      status: 'completed',
+      clientNote: 'Trying to skip the approval workflow.',
+    });
+    expect(invalidRes.status).toBe(400);
+
+    const stored = getClientAction(wsId, created.id);
+    expect(stored?.status).toBe('pending');
+    expect(stored?.clientNote).toBeUndefined();
+    expect(clientActionBroadcasts()).toHaveLength(0);
+    expect(countActivitiesForAction(created.id, 'client_action_approved')).toBe(0);
     expect(countActivitiesForAction(created.id, 'client_action_changes_requested')).toBe(0);
   });
 });
