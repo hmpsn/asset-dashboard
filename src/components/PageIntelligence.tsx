@@ -27,73 +27,19 @@ import {
   intentIcon,
   kdColor,
   kdLabel,
-  opportunityScore,
   positionColor,
 } from './page-intelligence/pageIntelligenceDisplay';
+import { buildEffectiveAnalyses, buildFilteredPages, buildFixQueue } from './page-intelligence/pageIntelligenceData';
+import type { ContentScore, KeywordData, SeoCopy, SortBy } from './page-intelligence/pageIntelligenceTypes';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-// MetricsSource is the shared type used by PageKeywordMap.metricsSource
-import type { MetricsSource } from '../../shared/types/keywords.js';
 
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
-
-// ── Types ──
-
-interface KeywordPresence {
-  inTitle: boolean;
-  inMeta: boolean;
-  inContent: boolean;
-  inSlug: boolean;
-}
-
-interface KeywordData {
-  primaryKeyword: string;
-  primaryKeywordPresence: KeywordPresence;
-  secondaryKeywords: string[];
-  longTailKeywords: string[];
-  searchIntent: string;
-  searchIntentConfidence: number;
-  contentGaps: string[];
-  competitorKeywords: string[];
-  optimizationScore: number;
-  optimizationIssues: string[];
-  recommendations: string[];
-  estimatedDifficulty: string;
-  keywordDifficulty: number;
-  monthlyVolume: number;
-  topicCluster: string;
-  metricsSource?: MetricsSource;
-}
-
-interface ContentScore {
-  wordCount: number;
-  sentenceCount: number;
-  avgWordsPerSentence: number;
-  readabilityScore: number;
-  readabilityGrade: string;
-  headings: { total: number; h1: number; h2: number; texts: string[] };
-  topKeywords: Array<{ word: string; count: number; density: number }>;
-  titleLength: number;
-  descLength: number;
-  titleOk: boolean;
-  descOk: boolean;
-}
-
-interface SeoCopy {
-  seoTitle: string;
-  metaDescription: string;
-  h1: string;
-  introParagraph: string;
-  internalLinkSuggestions?: { targetPath: string; anchorText: string; context: string }[];
-  changes?: string[];
-}
 
 interface Props {
   workspaceId: string;
   siteId: string;
   fixContext?: FixContext | null;
 }
-
-type SortBy = 'priority' | 'position' | 'volume' | 'score';
 
 // ── Component ──
 
@@ -194,31 +140,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // Derive effective analyses: always hydrate from persisted strategy data (keyed by
   // current page IDs), then overlay any fresh in-session analyses on top.
   const effectiveAnalyses = useMemo(() => {
-    const fromStrategy: Record<string, KeywordData> = {};
-    for (const page of unifiedPages) {
-      const sp = page.strategy;
-      if (sp?.analysisGeneratedAt && (sp.optimizationScore != null)) {
-        fromStrategy[page.id] = {
-          primaryKeyword: sp.primaryKeyword,
-          primaryKeywordPresence: sp.primaryKeywordPresence || { inTitle: false, inMeta: false, inContent: false, inSlug: false },
-          secondaryKeywords: sp.secondaryKeywords || [],
-          longTailKeywords: sp.longTailKeywords || [],
-          searchIntent: sp.searchIntent || 'informational',
-          searchIntentConfidence: sp.searchIntentConfidence ?? 0.5,
-          contentGaps: sp.contentGaps || [],
-          competitorKeywords: sp.competitorKeywords || [],
-          optimizationScore: sp.optimizationScore ?? 0,
-          optimizationIssues: sp.optimizationIssues || [],
-          recommendations: sp.recommendations || [],
-          estimatedDifficulty: sp.estimatedDifficulty || 'medium',
-          keywordDifficulty: sp.keywordDifficulty ?? 0,
-          monthlyVolume: sp.monthlyVolume ?? 0,
-          topicCluster: sp.topicCluster || '',
-        };
-      }
-    }
-    // Fresh in-session analyses take precedence over persisted data
-    return { ...fromStrategy, ...analyses };
+    return buildEffectiveAnalyses(unifiedPages, analyses);
   }, [unifiedPages, analyses]);
 
   // ── AI Analysis ──
@@ -414,35 +336,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   };
 
   // ── Filtering + Sorting ──
-  const filtered = unifiedPages
-    .filter(p => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return p.title.toLowerCase().includes(q) ||
-             p.path.toLowerCase().includes(q) ||
-             (p.strategy?.primaryKeyword || '').toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      let cmp = 0;
-      const sa = a.strategy;
-      const sb = b.strategy;
-      switch (sortBy) {
-        case 'position': cmp = (sa?.currentPosition || 999) - (sb?.currentPosition || 999); break;
-        case 'volume': cmp = (sb?.volume || 0) - (sa?.volume || 0); break;
-        case 'score': {
-          const scoreA = effectiveAnalyses[a.id]?.optimizationScore ?? sa?.optimizationScore ?? -1;
-          const scoreB = effectiveAnalyses[b.id]?.optimizationScore ?? sb?.optimizationScore ?? -1;
-          cmp = scoreB - scoreA;
-          break;
-        }
-        case 'priority':
-        default:
-          cmp = (sa ? opportunityScore(sa) : 0) - (sb ? opportunityScore(sb) : 0);
-          cmp = -cmp; // Higher opportunity first
-          break;
-      }
-      return sortDir === 'asc' ? -cmp : cmp;
-    });
+  const filtered = buildFilteredPages({
+    pages: unifiedPages,
+    search,
+    sortBy,
+    sortDir,
+    analyses: effectiveAnalyses,
+  });
 
   // ── Stats ──
   const analyzedCount = Object.keys(effectiveAnalyses).length;
@@ -450,20 +350,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const withStrategy = unifiedPages.filter(p => p.strategy).length;
 
   // ── Fix Queue: score × traffic impact ranking ──
-  const fixQueue = unifiedPages
-    .map(p => {
-      const score = effectiveAnalyses[p.id]?.optimizationScore ?? p.strategy?.optimizationScore;
-      const impressions = p.strategy?.impressions || 0;
-      if (score === undefined || score === null) return null;
-      // Impact = traffic potential lost due to poor optimization
-      const impact = impressions > 0
-        ? Math.round(impressions * (100 - score) / 100)
-        : Math.max(1, 100 - score); // fallback: pure score gap
-      return { page: p, score, impressions, impact };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null && x.score < 75)
-    .sort((a, b) => b.impact - a.impact)
-    .slice(0, 5);
+  const fixQueue = buildFixQueue(unifiedPages, effectiveAnalyses);
 
   const loading = pagesLoading;
 

@@ -4444,3 +4444,16 @@ The migration preserves the current PageIntelligence behavior: the component sti
 **Mutual:** Reduces a >1,000-line admin feature module while keeping the shared background job platform and typed PageKeywordMap contract unchanged.
 
 **Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceDisplay.ts`; `tests/unit/page-intelligence-display.test.ts`.
+
+### 345. Platform Consolidation — PageIntelligence Data Helpers Split
+**What it does:** Continues the feature-tool monolith split by moving PageIntelligence's pure data derivation into `src/components/page-intelligence/pageIntelligenceData.ts` and the local PageIntelligence data contracts into `src/components/page-intelligence/pageIntelligenceTypes.ts`. The extracted helper module owns persisted-analysis hydration, page search/filtering, sort ordering, and the traffic-impact fix queue.
+
+The migration preserves PageIntelligence behavior: the component still owns page-analysis background job rediscovery/start/cancel wiring, direct single-page analysis calls, keyword editing, rank tracking, SEO copy generation, navigation actions, and rendering. The data helpers are covered by focused unit tests that pin defaults, fresh-analysis precedence, search fields, sort semantics, and fix-queue impact scoring.
+
+**Agency value:** Engineers can reason about PageIntelligence ranking and hydration behavior in a small testable module instead of the full workflow component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Reduces PageIntelligence's component surface while keeping the shared background job platform and typed `PageKeywordMap` / `UnifiedPage` contracts unchanged.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-data.test.ts`; `tests/unit/page-intelligence-metricsSource.test.ts`.
