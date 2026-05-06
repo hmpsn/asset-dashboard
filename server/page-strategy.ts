@@ -609,6 +609,7 @@ export function bulkAddEntries(
         secondaryKeywords: item.secondaryKeywords,
         keywordSource: 'ai_suggested',
         sectionPlan,
+        notes: item.rationale,
         createdAt: now,
         updatedAt: now,
       });
