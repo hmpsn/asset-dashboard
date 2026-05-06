@@ -270,7 +270,7 @@ describe('Webflow SEO copy route coverage', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       feature: 'content-score',
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
     });
     expect(calls[0].messages[1]?.content).toContain('PAGE: /services/local-seo');
   });

@@ -465,7 +465,7 @@ Rules for remediation:
 - Order by priority then impact`;
 
   const result = await callAI({
-    model: 'gpt-4.1',
+    model: 'gpt-5.5',
     system: systemPrompt,
     messages: [{ role: 'user', content: JSON.stringify(context) }],
     maxTokens: 3000,

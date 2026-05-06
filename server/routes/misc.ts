@@ -206,7 +206,7 @@ Just output the filename slug, nothing else.`;
           const base64 = smallBuf.toString('base64');
 
           const visionRes = await client.chat.completions.create({
-            model: 'gpt-4.1-nano',
+            model: 'gpt-5.4-nano',
             max_tokens: 60,
             messages: [{
               role: 'user',
@@ -226,7 +226,7 @@ Just output the filename slug, nothing else.`;
     // Fallback to text-only if vision didn't work
     if (!suggestion) {
       const response = await client.chat.completions.create({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-5.4-nano',
         max_tokens: 60,
         messages: [{ role: 'user', content: promptText }],
       });

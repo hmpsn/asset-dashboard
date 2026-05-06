@@ -161,7 +161,7 @@ Return ONLY valid JSON, no markdown fences.`;
 
   try {
     const aiResult = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,

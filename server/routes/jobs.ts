@@ -508,7 +508,7 @@ router.post('/api/jobs', async (req, res) => {
                   ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
                   : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
                 const aiResult = await callAI({
-                  model: 'gpt-4.1-mini',
+                  model: 'gpt-5.4-mini',
                   messages: [{ role: 'user', content: prompt }],
                   maxTokens: 200,
                   temperature: 0.7,

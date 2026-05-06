@@ -367,7 +367,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
 
   try {
     const aiResult = await callAI({
-      model: 'gpt-4.1',
+      model: 'gpt-5.5',
       system: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,

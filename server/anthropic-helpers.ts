@@ -17,7 +17,11 @@ interface ChatMessage {
 }
 
 interface AnthropicChatOptions {
-  model?: 'claude-sonnet-4-20250514' | 'claude-3-5-sonnet-20241022' | 'claude-3-5-haiku-20241022';
+  model?:
+    | 'claude-sonnet-4-6'
+    | 'claude-haiku-4-5-20251001'
+    | 'claude-3-5-sonnet-20241022'
+    | 'claude-3-5-haiku-20241022';
   system?: string;
   messages: ChatMessage[];
   maxTokens?: number;
@@ -50,7 +54,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const {
-    model = 'claude-sonnet-4-20250514',
+    model = 'claude-sonnet-4-6',
     system,
     messages,
     maxTokens = 2000,

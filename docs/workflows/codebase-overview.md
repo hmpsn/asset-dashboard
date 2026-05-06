@@ -33,7 +33,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()`, `RICH_BLOCKS_PROMPT` — shared AI prompt builders + multi-modal chat instructions |
 | `server/chat-memory.ts` | Chat session persistence, `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union (includes `anomaly_detected`, `anomaly_positive`) |
-| `server/anomaly-detection.ts` | AI anomaly detection: compares current vs previous 28-day period for GSC, GA4, audit. Configurable thresholds. AI summaries via gpt-4o-mini. Scheduler (12h) + manual trigger. File storage in `.anomalies.json` |
+| `server/anomaly-detection.ts` | AI anomaly detection: compares current vs previous 28-day period for GSC, GA4, audit. Configurable thresholds. AI summaries via gpt-5.4-mini. Scheduler (12h) + manual trigger. File storage in `.anomalies.json` |
 | `server/monthly-report.ts` | `gatherMonthlyData`, auto-report scheduler, `generateReportHTML`. Trial banner: `isTrial`/`trialDaysRemaining` threaded to email template |
 | `server/email-templates.ts` | HTML email builders: `renderMonthlyReport` (with trial banner), `renderApprovalReminder`, `renderAnomalyAlert`, etc. 16 event types including `anomaly_alert` |
 | `server/content-brief.ts` | AI content brief generation with SEMRush/GSC enrichment, 7 page-type-specific prompts. `brief-export-html.ts` renders branded HTML/PDF with page type badge |

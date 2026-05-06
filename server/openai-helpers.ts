@@ -92,23 +92,33 @@ function loadEntriesFromDisk(since?: string, days?: number): TokenUsage[] {
 
 // --- Cost estimation per model ---
 
-/** Per-token pricing (USD). Updated March 2026. */
+/** Per-token pricing (USD). Updated May 2026. */
 function estimateCost(entry: TokenUsage): number {
   const m = entry.model;
-  // GPT-4.1 nano
-  if (m.includes('nano')) return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
-  // GPT-4.1 mini
-  if (m.includes('mini')) return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
-  // GPT-4.1
+  // GPT-5.5
+  if (m.startsWith('gpt-5.5')) return (entry.promptTokens * 0.000005) + (entry.completionTokens * 0.00003);
+  // GPT-5.4 nano
+  if (m.startsWith('gpt-5.4-nano')) return (entry.promptTokens * 0.0000002) + (entry.completionTokens * 0.00000125);
+  // GPT-5.4 mini
+  if (m.startsWith('gpt-5.4-mini')) return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
+  // GPT-5.4
+  if (m.startsWith('gpt-5.4')) return (entry.promptTokens * 0.0000025) + (entry.completionTokens * 0.000015);
+  // Historical GPT-4.1 nano
+  if (m === 'gpt-4.1-nano') return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
+  // Historical GPT-4.1 mini
+  if (m === 'gpt-4.1-mini') return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
+  // Historical GPT-4.1
   if (m.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
-  // Claude Sonnet 4
+  // Claude Sonnet 4+
   if (m.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
+  // Claude Haiku 4.5
+  if (m.includes('claude-haiku-4-5')) return (entry.promptTokens * 0.000001) + (entry.completionTokens * 0.000005);
   // Claude 3.5 Sonnet
   if (m.includes('claude-3-5-sonnet')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
   // Claude 3.5 Haiku
   if (m.includes('claude-3-5-haiku')) return (entry.promptTokens * 0.0000008) + (entry.completionTokens * 0.000004);
-  // Fallback: GPT-4.1 pricing
-  return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
+  // Fallback: current default OpenAI mini pricing
+  return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
 }
 
 function getProvider(model: string): 'openai' | 'anthropic' {
@@ -217,7 +227,17 @@ interface ChatMessage {
 }
 
 interface OpenAIChatOptions {
-  model?: 'gpt-4.1-nano' | 'gpt-4.1-mini' | 'gpt-4.1' | 'gpt-4o-mini' | 'gpt-4o';
+  model?:
+    | 'gpt-5.5'
+    | 'gpt-5.4'
+    | 'gpt-5.4-mini'
+    | 'gpt-5.4-nano'
+    | 'chat-latest'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1'
+    | 'gpt-4o-mini'
+    | 'gpt-4o';
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -248,7 +268,7 @@ interface OpenAIChatResult {
  */
 export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
   const {
-    model = 'gpt-4.1-mini',
+    model = 'gpt-5.4-mini',
     messages,
     maxTokens = 1000,
     temperature = 0.7,
@@ -299,7 +319,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const {
-    model = 'gpt-4.1-mini',
+    model = 'gpt-5.4-mini',
     messages,
     maxTokens = 1000,
     temperature = 0.7,

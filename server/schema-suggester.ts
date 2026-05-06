@@ -1002,7 +1002,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
     const aiResult = await callAI({
-      model: 'gpt-4.1',
+      model: 'gpt-5.5',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,

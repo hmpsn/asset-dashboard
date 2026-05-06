@@ -504,7 +504,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string, wo
     ).join('\n');
 
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`,
       messages: [
         {

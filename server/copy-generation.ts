@@ -104,7 +104,7 @@ ${context}`;
 
   const response = await callAI({
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     maxTokens: 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: `Generate copy for "${entry.name}" (${entry.pageType} page). Return only valid JSON.` }],
@@ -205,7 +205,7 @@ ${context}`;
 
   const response = await callAI({
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     maxTokens: 2000,
     system: systemPrompt,
     messages: [{ role: 'user', content: 'Regenerate this section. Return only valid JSON.' }],

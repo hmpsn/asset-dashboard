@@ -342,7 +342,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
 
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       feature: 'intelligence-profile-autofill',
       workspaceId: ws.id,
       temperature: 0.3,  // low temperature for consistent JSON output

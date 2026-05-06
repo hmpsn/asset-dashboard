@@ -662,7 +662,7 @@ Return the complete brief as valid JSON with these fields:
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callAI({
-    model: 'gpt-4.1',
+    model: 'gpt-5.5',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
     temperature: 0.5,
@@ -806,7 +806,7 @@ Rules:
 - Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
 
   const aiResult = await callAI({
-    model: 'gpt-4.1',
+    model: 'gpt-5.5',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
@@ -1206,7 +1206,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
 
   const aiResult = await callAI({
-    model: 'gpt-4.1',
+    model: 'gpt-5.5',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
