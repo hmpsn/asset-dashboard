@@ -569,7 +569,7 @@
           "priority": "P3",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. SchemaSuggester, PageIntelligence, SeoEditor, and VoiceTab remain >1,000-line feature modules. PageIntelligence slices on 2026-05-06 have extracted pure display/scoring helpers, data derivation helpers for persisted-analysis hydration/search/sort/fix-queue ranking, the pages-tab header/control strip, the pages list/expanded detail renderer, page row/detail renderers, and expanded detail strategy/analysis/persisted-summary/action sections with unit/source contract coverage; see FEATURE_AUDIT entries 344-349. Continue remaining PageIntelligence sections plus SchemaSuggester, SeoEditor, and VoiceTab."
+          "notes": "Verified still valid on origin/staging eb0a5832. SchemaSuggester, PageIntelligence, SeoEditor, and VoiceTab remain >1,000-line feature modules. PageIntelligence slices on 2026-05-06 have extracted pure display/scoring helpers, data derivation helpers for persisted-analysis hydration/search/sort/fix-queue ranking, the pages-tab header/control strip, the pages list/expanded detail renderer, page row/detail renderers, expanded detail strategy/analysis/persisted-summary/action sections, and parent workflow hooks for page-analysis jobs, keyword editing/tracking, and SEO copy state with unit/source contract coverage; see FEATURE_AUDIT entries 344-350. Continue remaining PageIntelligence sections plus SchemaSuggester, SeoEditor, and VoiceTab."
         },
         {
           "id": "platform-consolidation-workspace-intelligence-slices",

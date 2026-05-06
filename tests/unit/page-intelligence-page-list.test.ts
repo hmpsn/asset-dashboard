@@ -32,6 +32,10 @@ describe('PageIntelligence page list extraction', () => {
 
   it('keeps PageIntelligence wired to the extracted list without moving background job ownership', () => {
     const pageIntelligence = readFileSync('src/components/PageIntelligence.tsx', 'utf-8'); // readFile-ok — intentional extraction contract guard
+    const analysisHook = readFileSync('src/components/page-intelligence/usePageIntelligenceAnalysis.ts', 'utf-8'); // readFile-ok — intentional extraction contract guard
+    const editingHook = readFileSync('src/components/page-intelligence/usePageIntelligenceKeywordEditing.ts', 'utf-8'); // readFile-ok — intentional extraction contract guard
+    const seoCopyHook = readFileSync('src/components/page-intelligence/usePageIntelligenceSeoCopy.ts', 'utf-8'); // readFile-ok — intentional extraction contract guard
+    const trackingHook = readFileSync('src/components/page-intelligence/usePageIntelligenceKeywordTracking.ts', 'utf-8'); // readFile-ok — intentional extraction contract guard
     const pageList = readFileSync('src/components/page-intelligence/PageIntelligencePageList.tsx', 'utf-8'); // readFile-ok — intentional extraction contract guard
     const pageRow = readFileSync('src/components/page-intelligence/PageIntelligencePageRow.tsx', 'utf-8'); // readFile-ok — intentional extraction contract guard
     const pageDetails = readFileSync('src/components/page-intelligence/PageIntelligencePageDetails.tsx', 'utf-8'); // readFile-ok — intentional extraction contract guard
@@ -44,9 +48,16 @@ describe('PageIntelligence page list extraction', () => {
     ];
 
     expect(pageIntelligence).toContain("import { PageIntelligencePageList } from './page-intelligence/PageIntelligencePageList'");
+    expect(pageIntelligence).toContain('usePageIntelligenceAnalysis');
+    expect(pageIntelligence).toContain('usePageIntelligenceKeywordEditing');
+    expect(pageIntelligence).toContain('usePageIntelligenceKeywordTracking');
+    expect(pageIntelligence).toContain('usePageIntelligenceSeoCopy');
     expect(pageIntelligence).toContain('<PageIntelligencePageList');
-    expect(pageIntelligence).toContain('startJob(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS');
-    expect(pageIntelligence).toContain('findActiveJob({ type: BACKGROUND_JOB_TYPES.PAGE_ANALYSIS, workspaceId })');
+    expect(analysisHook).toContain('startJob(BACKGROUND_JOB_TYPES.PAGE_ANALYSIS');
+    expect(analysisHook).toContain('findActiveJob({ type: BACKGROUND_JOB_TYPES.PAGE_ANALYSIS, workspaceId })');
+    expect(editingHook).toContain('keywords.patchStrategy');
+    expect(seoCopyHook).toContain('keywords.seoCopy');
+    expect(trackingHook).toContain('rankTracking.addKeyword');
     for (const component of [pageList, pageRow, pageDetails, ...detailSections]) {
       expect(component).not.toContain('useBackgroundTasks');
       expect(component).not.toContain('BACKGROUND_JOB_TYPES');
