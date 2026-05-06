@@ -207,7 +207,7 @@ Just output the filename slug, nothing else.`;
 
           const visionRes = await client.chat.completions.create({
             model: 'gpt-5.4-nano',
-            max_tokens: 60,
+            max_completion_tokens: 60,
             messages: [{
               role: 'user',
               content: [
@@ -227,7 +227,7 @@ Just output the filename slug, nothing else.`;
     if (!suggestion) {
       const response = await client.chat.completions.create({
         model: 'gpt-5.4-nano',
-        max_tokens: 60,
+        max_completion_tokens: 60,
         messages: [{ role: 'user', content: promptText }],
       });
       suggestion = response.choices[0]?.message?.content?.trim() || originalName.replace(/\.[^.]+$/, '');
