@@ -53,6 +53,18 @@ function derivePageStatus(batch: import('../../shared/types/approvals').Approval
   return 'in-review';
 }
 
+const APPROVAL_FIELD_LABELS: Record<string, string> = {
+  seoTitle: 'SEO title',
+  seo_title: 'SEO title',
+  seoDescription: 'meta description',
+  seo_description: 'meta description',
+  schema: 'schema markup',
+};
+
+function approvalActivityLabel(field: string): string {
+  return APPROVAL_FIELD_LABELS[field] ?? field.replace(/[_-]+/g, ' ');
+}
+
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
   name: z.string().optional().default('SEO Changes'),
@@ -207,15 +219,17 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
       // Activity feed for client actions
       const actorInfo = getClientActor(req, req.params.workspaceId);
       const actorName = actorInfo?.name || 'Client';
+      const fieldLabel = approvalActivityLabel(item.field);
+      const pageLabel = item.pageTitle || item.pageSlug || item.pageId;
       if (status === 'approved') {
         addActivity(req.params.workspaceId, 'approval_applied',
-          `${actorName} approved ${item.field} change on ${item.pageId}`,
+          `${actorName} approved ${fieldLabel} changes for ${pageLabel}`,
           item.proposedValue ? `New value: ${item.proposedValue.slice(0, 80)}` : undefined,
           { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
           actorInfo);
       } else {
         addActivity(req.params.workspaceId, 'changes_requested',
-          `${actorName} rejected ${item.field} change on ${item.pageId}`,
+          `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,
           clientNote || undefined,
           { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
           actorInfo);
@@ -247,7 +261,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
       });
       const actorInfo = getClientActor(req, req.params.workspaceId);
       addActivity(req.params.workspaceId, 'approval_reverted',
-        `${actorInfo?.name || 'Client'} reverted ${item.field} decision on ${item.pageTitle || item.pageId}`,
+        `${actorInfo?.name || 'Client'} reverted ${approvalActivityLabel(item.field)} decision for ${item.pageTitle || item.pageSlug || item.pageId}`,
         undefined,
         { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
         actorInfo);

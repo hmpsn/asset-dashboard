@@ -145,6 +145,19 @@ function countActivities(type: string, metadataLike: string): number {
   return row.count;
 }
 
+function latestActivityTitle(type: string, metadataLike: string): string | undefined {
+  const row = db.prepare(`
+    SELECT title
+    FROM activity_log
+    WHERE workspace_id = ?
+      AND type = ?
+      AND metadata LIKE ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(wsId, type, metadataLike) as { title: string } | undefined;
+  return row?.title;
+}
+
 beforeAll(async () => {
   await startTestServer();
   const ws = createWorkspace('Public Approval Broadcasts', siteId);
@@ -301,6 +314,9 @@ describe('public approval broadcasts and workflow side effects', () => {
       },
     ]);
     expect(countActivities('changes_requested', `%"itemId":"${item.id}"%`)).toBe(1);
+    expect(latestActivityTitle('changes_requested', `%"itemId":"${item.id}"%`)).toBe(
+      'Client requested changes to SEO title for Reject Revert Broadcast Page',
+    );
 
     broadcastState.calls = [];
 
