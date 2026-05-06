@@ -4321,3 +4321,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Moves the storage and realtime consistency layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `tests/contract/keyword-strategy-activity-parity.test.ts` (activity/persistence ordering guard now follows the extracted service).
+
+
+### 336. Platform Consolidation — Keyword Strategy Service Split Phase 6
+**What it does:** Completes the behavior-preserving keyword strategy backend split by moving post-persistence follow-ons into `server/keyword-strategy-follow-ons.ts`. The extracted service owns rank-tracking auto-seeding from strategy keywords/page primary keywords, keyword-strategy-triggered llms.txt regeneration, and deduped recommendation refreshes after strategy updates.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestrator and still owns generation lifecycle state, keepalive cleanup, response assembly, usage refunds, and active-generation cleanup. Follow-on ordering is preserved: tracked keyword seeding runs after persistence succeeds, and detached llms.txt/recommendation refreshes are queued only after the response strategy is assembled and marked safe.
+
+**Agency value:** Engineers can review post-strategy side effects without reopening crawl, AI synthesis, enrichment, or persistence code. The generator now reads as a focused orchestration service, making the follow-on behavior easier to audit for direct route/background job parity.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Finishes the route split portion of the platform consolidation keyword strategy work while leaving storage normalization sequenced under the dedicated follow-up roadmap items.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-follow-ons.ts`; `tests/contract/keyword-strategy-follow-ons.test.ts`.
