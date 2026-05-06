@@ -4,7 +4,7 @@ import {
   Zap, FileText, Target,
   ChevronDown, Layers,
   AlertTriangle,
-  ThumbsDown, Undo2, Ban, Plus, X, Trash2, Briefcase,
+  ThumbsDown, Undo2, Ban, X, Trash2,
 } from 'lucide-react';
 import { TierGate, EmptyState, Skeleton, type Tier, Icon, Button, PageHeader, SectionCard } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -12,6 +12,7 @@ import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
 import { Modal } from '../ui/overlay/Modal';
+import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
 import { StrategyKeywordDrawer } from './strategy/StrategyKeywordDrawer';
 import { StrategyPageImprovementsSection } from './strategy/StrategyPageImprovementsSection';
@@ -258,6 +259,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywordsRef = useRef<HTMLDivElement>(null);
   const optimizeExistingRef = useRef<HTMLDivElement>(null);
   const newContentRef = useRef<HTMLDivElement>(null);
+  const businessPrioritiesRef = useRef<HTMLDivElement>(null);
 
   const kwListScrollRef = useRef<HTMLDivElement>(null);
   const [kwListOverflows, setKwListOverflows] = useState(false);
@@ -285,7 +287,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       'content-gaps': newContentRef,
       'quick-wins': optimizeExistingRef,
       'page-keyword-map': priorityKeywordsRef,
-      'business-priorities': priorityKeywordsRef,
+      'business-priorities': businessPrioritiesRef,
     };
     window.setTimeout(() => {
       refs[tab].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1042,110 +1044,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      {/* ── GUIDE THIS STRATEGY (client driver's seat) ── */}
-      {workspaceId && prioritiesLoaded && (
-        <SectionCard noPadding>
-          <button
-            onClick={() => toggleSection('business-priorities')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
-                <Icon as={Briefcase} size="md" className="text-accent-brand" />
-              </div>
-              <div className="text-left">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide This Strategy</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                  {priorities.length > 0
-                    ? `${priorities.length} business ${priorities.length === 1 ? 'priority' : 'priorities'} saved`
-                    : 'Tell us what matters most'}
-                </div>
-              </div>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('business-priorities') ? '' : '-rotate-90'}`} />
-          </button>
-
-          {expandedSections.has('business-priorities') && (
-            <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
-              <p className="t-body text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                Share business goals and priorities that should shape future strategy recommendations. Keywords are managed in the Strategy Keywords section.
-              </p>
-
-              {/* Existing priorities */}
-              {priorities.length > 0 && (
-                <div className="space-y-1.5 mb-3">
-                  {priorities.map((p, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/50 group">
-                      <span className={`t-micro font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${
-                        p.category === 'growth' ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20' :
-                        p.category === 'brand' ? 'bg-teal-500/10 text-accent-brand border border-teal-500/20' :
-                        p.category === 'product' ? 'bg-blue-500/10 text-accent-info border border-blue-500/20' :
-                        p.category === 'audience' ? 'bg-amber-500/10 text-accent-warning border border-amber-500/20' :
-                        p.category === 'competitive' ? 'bg-red-500/10 text-accent-danger border border-red-500/20' :
-                        'bg-[var(--surface-3)]/50 text-[var(--brand-text-muted)] border border-[var(--brand-border-strong)]/30'
-                      }`}>{p.category}</span>
-                      <span className="t-caption-sm text-[var(--brand-text)] flex-1">{p.text}</span>
-                      <button
-                        onClick={() => {
-                          const next = priorities.filter((_, j) => j !== i);
-                          savePriorities(next);
-                        }}
-                        disabled={savingPriorities}
-                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all disabled:opacity-50"
-                      >
-                        <Icon as={X} size="md" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Add new priority */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={newPriorityCategory}
-                  onChange={e => setNewPriorityCategory(e.target.value)}
-                  className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2 py-1.5 t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
-                >
-                  <option value="growth">Growth</option>
-                  <option value="brand">Brand</option>
-                  <option value="product">Product</option>
-                  <option value="audience">Audience</option>
-                  <option value="competitive">Competitive</option>
-                  <option value="other">Other</option>
-                </select>
-                <input
-                  value={newPriority}
-                  onChange={e => setNewPriority(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && newPriority.trim()) {
-                      savePriorities([...priorities, { text: newPriority.trim(), category: newPriorityCategory }]);
-                      setNewPriority('');
-                    }
-                  }}
-                  placeholder="e.g., We're launching a new product line in Q3..."
-                  className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
-                />
-                <button
-                  onClick={() => {
-                    if (newPriority.trim()) {
-                      savePriorities([...priorities, { text: newPriority.trim(), category: newPriorityCategory }]);
-                      setNewPriority('');
-                    }
-                  }}
-                  disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
-                >
-                  <Icon as={Plus} size="sm" /> Add
-                </button>
-              </div>
-              {priorities.length >= 10 && (
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">Maximum 10 priorities reached</p>
-              )}
-            </div>
-          )}
-        </SectionCard>
-      )}
+      <StrategyBusinessPrioritiesSection
+        businessPrioritiesRef={businessPrioritiesRef}
+        workspaceId={workspaceId}
+        prioritiesLoaded={prioritiesLoaded}
+        priorities={priorities}
+        newPriority={newPriority}
+        setNewPriority={setNewPriority}
+        newPriorityCategory={newPriorityCategory}
+        setNewPriorityCategory={setNewPriorityCategory}
+        savingPriorities={savingPriorities}
+        savePriorities={savePriorities}
+        expandedSections={expandedSections}
+        toggleSection={toggleSection}
+      />
 
       <StrategyContentOpportunitiesSection
         newContentRef={newContentRef}

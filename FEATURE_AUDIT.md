@@ -4391,3 +4391,17 @@ The migration preserves the current client behavior: the Improve Pages deep-link
 **Mutual:** Moves another rendered accordion out of the client strategy monolith while keeping current tier gates, deep-link expansion, request-review behavior, and page-map ownership intact.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `tests/contract/client-strategy-tab-page-improvements.test.ts`.
+
+
+### 341. Platform Consolidation — Client StrategyTab Business Priorities Phase 5
+**What it does:** Continues the Client StrategyTab split by moving the Guide This Strategy business-priority accordion into `src/components/client/strategy/StrategyBusinessPrioritiesSection.tsx`. The extracted section owns saved-priority rendering, category badge styling, add/remove controls, max-priority messaging, and the existing save callback wiring, while `StrategyTab.tsx` keeps owning the `useStrategyBusinessPriorities` hook state and section expansion orchestration.
+
+The migration preserves the current persistence behavior through `useStrategyBusinessPriorities`, fixes the adjacent `?tab=business-priorities` scroll target so same-page deep links expand and scroll to the business-priority accordion instead of the strategy-keywords panel, and keeps the keyboard add path aligned with the existing 10-priority cap.
+
+**Agency value:** Engineers can review client strategy priority controls without reopening the full StrategyTab workflow file. This leaves the remaining StrategyTab work focused on request-flow cleanup and final shell reduction.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab business-priority behavior.
+
+**Mutual:** Moves another client strategy workflow section out of the monolith while preserving the existing public business-priorities API path, toast behavior, and deep-link expansion contract.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyBusinessPrioritiesSection.tsx`; `tests/contract/client-strategy-tab-business-priorities.test.ts`.
