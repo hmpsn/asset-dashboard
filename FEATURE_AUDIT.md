@@ -4405,3 +4405,16 @@ The migration preserves the current persistence behavior through `useStrategyBus
 **Mutual:** Moves another client strategy workflow section out of the monolith while preserving the existing public business-priorities API path, toast behavior, and deep-link expansion contract.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyBusinessPrioritiesSection.tsx`; `tests/contract/client-strategy-tab-business-priorities.test.ts`.
+
+### 342. Platform Consolidation — Client StrategyTab Request Flow Phase 6
+**What it does:** Continues the Client StrategyTab split by moving the Strategy Keywords request/feedback surface into focused strategy modules. `StrategyKeywordsSection` now owns the add-keyword form, confirmed keyword list, suggestion add/dismiss controls, overflow affordance, and row-level remove actions. `StrategyDeclinedKeywordsSection` owns the declined-keyword restore accordion, and `StrategyDeclineKeywordModal` owns the decline-reason form.
+
+The migration preserves the existing data ownership: `StrategyTab.tsx` still assembles keyword rows from strategy data, tracked keywords, requested keywords, and feedback state; the extracted components receive the same callbacks for adding tracked keywords, submitting/removing feedback, restoring declined keywords, and opening the keyword drawer.
+
+**Agency value:** Engineers can review keyword request and feedback UI without reopening the full StrategyTab orchestration file. StrategyTab is now a smaller shell around data assembly, deep-link expansion, and section composition.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab keyword request behavior.
+
+**Mutual:** Reduces the remaining client strategy monolith while preserving tier gates, suggestion review actions, decline/restore behavior, and keyword drawer compatibility.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclinedKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclineKeywordModal.tsx`; `tests/contract/client-strategy-tab-request-flow.test.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
