@@ -23,12 +23,11 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(hook).toContain('copyCmsTemplate');
   });
 
-  it('leaves page-level publishing workflow in SchemaSuggester for the next slice', () => {
+  it('leaves page-card rendering in SchemaSuggester while publishing workflow moves separately', () => {
     const component = readFileSync('src/components/SchemaSuggester.tsx', 'utf-8'); // readFile-ok — intentional slice boundary guard
 
     expect(component).toContain('BulkPublishPanel');
-    expect(component).toContain('publishToWebflow');
-    expect(component).toContain('schema-publish');
+    expect(component).toContain('useSchemaSuggesterPublishingWorkflow');
     expect(component).toContain('SchemaPageCard');
   });
 });
