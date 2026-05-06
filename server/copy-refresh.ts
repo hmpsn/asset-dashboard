@@ -232,15 +232,18 @@ Prioritize sections that are most likely contributing to the decline (outdated i
       return [];
     }
 
-    // Build a lookup for section data by id
+    // Build lookups for section data by both persisted copy section ID and
+    // section plan item ID. AI responses sometimes include both; prefer the
+    // concrete section ID, but still fall back to the plan item when the ID is
+    // hallucinated.
     const sectionMap = new Map(sectionsWithCopy.map(s => [s.id, s]));
+    const sectionPlanItemMap = new Map(sectionsWithCopy.map(s => [s.sectionPlanItemId, s]));
 
     const suggestions: CopyRefreshSuggestion[] = [];
     for (const raw of parsed.suggestions) {
-      const sectionId = raw.sectionId ?? raw.sectionPlanItemId ?? '';
       // Resolve section — AI may return the copy section id or the plan item id
-      const section = sectionMap.get(sectionId)
-        ?? sectionsWithCopy.find(s => s.sectionPlanItemId === sectionId);
+      const section = (raw.sectionId ? sectionMap.get(raw.sectionId) : undefined)
+        ?? (raw.sectionPlanItemId ? sectionPlanItemMap.get(raw.sectionPlanItemId) : undefined);
 
       if (!section) continue;
 
