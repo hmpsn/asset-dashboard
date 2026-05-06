@@ -96,7 +96,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
     if (context) svgPrompt += `\n\nContext: ${context}`;
     const response = await callWithRetry(() => openai.chat.completions.create({
       model: 'gpt-5.4-nano',
-      max_tokens: 150,
+      max_completion_tokens: 150,
       messages: [{ role: 'user', content: svgPrompt }],
     }));
     return response.choices[0]?.message?.content?.trim() || null;
@@ -119,7 +119,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
 
     const response = await callWithRetry(() => openai.chat.completions.create({
       model: 'gpt-5.4-nano',
-      max_tokens: 150,
+      max_completion_tokens: 150,
       messages: [{
         role: 'user',
         content: [

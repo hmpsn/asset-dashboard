@@ -61,4 +61,40 @@ describe('callOpenAI response_format', () => {
     const body = JSON.parse(call[1].body);
     expect(body.response_format).toBeUndefined();
   });
+
+  it('uses max_completion_tokens for GPT-5 chat models', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-5.4',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-gpt5-token-limit',
+      maxTokens: 321,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.max_completion_tokens).toBe(321);
+    expect(body.max_tokens).toBeUndefined();
+  });
+
+  it('keeps max_tokens for legacy GPT-4 chat models', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-legacy-token-limit',
+      maxTokens: 123,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.max_tokens).toBe(123);
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
 });

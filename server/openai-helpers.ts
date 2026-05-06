@@ -125,6 +125,10 @@ function getProvider(model: string): 'openai' | 'anthropic' {
   return model.includes('claude') ? 'anthropic' : 'openai';
 }
 
+function usesMaxCompletionTokens(model: string): boolean {
+  return model.startsWith('gpt-5') || model === 'chat-latest' || /^o\d/.test(model);
+}
+
 /** Get recent token usage, optionally filtered by workspace */
 export function getTokenUsage(workspaceId?: string, since?: string): { entries: TokenUsage[]; totalTokens: number; estimatedCost: number } {
   let entries = loadEntriesFromDisk(since);
@@ -331,10 +335,14 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     signal,
   } = opts;
 
+  const tokenLimit = usesMaxCompletionTokens(model)
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
+
   const body = JSON.stringify({
     model,
     messages,
-    max_tokens: maxTokens,
+    ...tokenLimit,
     temperature,
     ...(responseFormat && { response_format: responseFormat }),
   });
