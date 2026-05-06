@@ -559,7 +559,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. StrategyTab is still 2,157 lines and combines keyword feedback, tracked keywords, business priorities, content gaps, drawers, tier gates, and request flows."
+          "notes": "Partial progress on 2026-05-06 from origin/staging e9da8b37. First slice extracted keyword feedback, tracked strategy keyword, and business-priority workflow state/API calls from StrategyTab into focused hooks with a static contract guard. Remaining work: split large rendered sections/drawers/request flows into focused components while preserving tier gates and deep-link behavior."
         },
         {
           "id": "platform-consolidation-feature-tool-splits",
