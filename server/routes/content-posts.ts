@@ -51,6 +51,20 @@ import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
 
+const aiReviewResultSchema = z.object({
+  pass: z.boolean(),
+  reason: z.string(),
+}).strict();
+
+const aiReviewResponseSchema = z.object({
+  factual_accuracy: aiReviewResultSchema,
+  brand_voice: aiReviewResultSchema,
+  internal_links: aiReviewResultSchema,
+  no_hallucinations: aiReviewResultSchema,
+  meta_optimized: aiReviewResultSchema,
+  word_count_target: aiReviewResultSchema,
+}).strict();
+
 function markProvenanceItemsForHumanReview(
   review: Record<string, AIReviewResult>,
 ): Record<string, AIReviewResult> {
@@ -469,13 +483,15 @@ Return ONLY valid JSON like:
       workspaceId: req.params.workspaceId,
     });
 
-    const parsed = parseAIJson<Record<string, AIReviewResult>>(result.text);
-    if (!parsed) {
+    const parsed = parseAIJson<unknown>(result.text);
+    const reviewResult = aiReviewResponseSchema.safeParse(parsed);
+    if (!reviewResult.success) {
+      log.warn({ issues: reviewResult.error.issues }, 'AI review response failed schema validation');
       return res.status(500).json({ error: 'Failed to parse AI review response' });
     }
 
     log.info(`AI review completed for post ${post.id}`);
-    res.json({ review: markProvenanceItemsForHumanReview(parsed) });
+    res.json({ review: markProvenanceItemsForHumanReview(reviewResult.data) });
   } catch (err) {
     log.error({ err }, 'AI review failed');
     const msg = err instanceof Error ? err.message : String(err);

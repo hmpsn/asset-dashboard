@@ -255,6 +255,26 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
 });
 
 describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
+  it('returns 500 without mutating when AI review JSON has the wrong shape', async () => {
+    const before = getPost(wsId, postId);
+    mockOpenAIJsonResponse('content-review', {
+      factual_accuracy: { pass: 'yes', reason: 'Wrong pass type.' },
+      brand_voice: { pass: true, reason: 'Tone is consistent.' },
+      internal_links: { pass: true, reason: 'Internal links are present.' },
+      no_hallucinations: { pass: false, reason: 'Needs human review.' },
+      meta_optimized: { pass: true, reason: 'Metadata is in range.' },
+      word_count_target: { pass: true, reason: 'Word count is in range.' },
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to parse AI review response' });
+
+    expect(getPost(wsId, postId)).toEqual(before);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
   it('marks provenance-sensitive checklist items as human-review required even when AI returns pass', async () => {
     const before = getPost(wsId, postId);
     mockOpenAIJsonResponse('content-review', {
