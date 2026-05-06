@@ -51,3 +51,8 @@ export interface SeoCopy {
 
 export type SortBy = 'priority' | 'position' | 'volume' | 'score';
 export type SortDir = 'asc' | 'desc';
+
+export interface BulkProgress {
+  done: number;
+  total: number;
+}
