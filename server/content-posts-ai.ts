@@ -4,8 +4,8 @@
  * unification passes, and SEO meta generation.
  */
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
-import { callOpenAI } from './openai-helpers.js';
-import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
+import { callAI } from './ai.js';
+import { isAnthropicConfigured } from './anthropic-helpers.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -72,7 +72,8 @@ export async function callCreativeAI(opts: {
 
   if (isAnthropicConfigured()) {
     try {
-      const result = await callAnthropic({
+      const result = await callAI({
+        provider: 'anthropic',
         model: CLAUDE_MODEL,
         system: effectiveSystem,
         messages: [{ role: 'user', content: userPrompt }],
@@ -94,7 +95,7 @@ export async function callCreativeAI(opts: {
   }
 
   // Fallback to GPT (or primary if no Anthropic key)
-  const result = await callOpenAI({
+  const result = await callAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
     maxTokens,
@@ -548,7 +549,7 @@ Return valid JSON only:
 }`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: CONTENT_MODEL,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
@@ -734,7 +735,7 @@ Return ONLY valid JSON in this exact format:
   "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
 }`;
 
-  const result = await callOpenAI({
+  const result = await callAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,

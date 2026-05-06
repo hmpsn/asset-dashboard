@@ -66,4 +66,56 @@ describe('callAI', () => {
       ],
     }));
   });
+
+  it('passes OpenAI cancellation and retry options through the dispatcher', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: 'ok',
+      promptTokens: 8,
+      completionTokens: 2,
+      totalTokens: 10,
+    });
+    const controller = new AbortController();
+
+    await callAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: 'Draft this.' }],
+      feature: 'unit-test-options',
+      maxRetries: 1,
+      timeoutMs: 12_000,
+      signal: controller.signal,
+    });
+
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      maxRetries: 1,
+      timeoutMs: 12_000,
+      signal: controller.signal,
+    }));
+  });
+
+  it('passes Anthropic cancellation and retry options through the dispatcher', async () => {
+    mocks.callAnthropic.mockResolvedValue({
+      text: 'ok',
+      promptTokens: 9,
+      completionTokens: 3,
+      totalTokens: 12,
+    });
+    const controller = new AbortController();
+
+    await callAI({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      system: 'Write clearly.',
+      messages: [{ role: 'user', content: 'Draft this.' }],
+      feature: 'unit-test-anthropic-options',
+      maxRetries: 2,
+      timeoutMs: 45_000,
+      signal: controller.signal,
+    });
+
+    expect(mocks.callAnthropic).toHaveBeenCalledWith(expect.objectContaining({
+      maxRetries: 2,
+      timeoutMs: 45_000,
+      signal: controller.signal,
+    }));
+  });
 });

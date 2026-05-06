@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/anomaly-detection.ts', aiImport: "from './ai.js'" },
   { path: 'server/chat-memory.ts', aiImport: "from './ai.js'" },
+  { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'" },
   { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/monthly-digest.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-decay.ts', aiImport: "from './ai.js'" },
