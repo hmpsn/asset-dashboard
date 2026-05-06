@@ -6,10 +6,16 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { renderBriefHTML } from '../brief-export-html.js';
+import { requireWorkspaceAccess } from '../auth.js';
+import {
+  eeatGuidanceSchema,
+  keywordValidationSchema,
+  outlineItemSchema,
+  realTopResultSchema,
+  schemaRecommendationSchema,
+  serpAnalysisSchema,
+} from '../schemas/content-schemas.js';
 import {
   listBriefs,
   getBrief,
@@ -36,8 +42,48 @@ import { recordAction } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
+import { validate, z } from '../middleware/validate.js';
 
+const router = Router();
 const log = createLogger('content-briefs');
+
+const contentBriefPatchSchema = z.object({
+  targetKeyword: z.string().trim().min(1).max(200).optional(),
+  secondaryKeywords: z.array(z.string().trim().min(1).max(200)).optional(),
+  suggestedTitle: z.string().trim().min(1).max(300).optional(),
+  suggestedMetaDesc: z.string().trim().min(1).max(500).optional(),
+  outline: z.array(outlineItemSchema).optional(),
+  wordCountTarget: z.number().int().min(100).max(10000).optional(),
+  intent: z.string().trim().min(1).max(100).optional(),
+  audience: z.string().trim().min(1).max(1000).optional(),
+  competitorInsights: z.string().trim().max(10000).optional(),
+  internalLinkSuggestions: z.array(z.string().trim().min(1).max(500)).optional(),
+  executiveSummary: z.string().trim().max(5000).optional(),
+  contentFormat: z.string().trim().max(100).optional(),
+  toneAndStyle: z.string().trim().max(2000).optional(),
+  peopleAlsoAsk: z.array(z.string().trim().min(1).max(300)).optional(),
+  topicalEntities: z.array(z.string().trim().min(1).max(100)).optional(),
+  serpAnalysis: serpAnalysisSchema.optional(),
+  difficultyScore: z.number().min(0).max(100).optional(),
+  trafficPotential: z.string().trim().max(1000).optional(),
+  ctaRecommendations: z.array(z.string().trim().min(1).max(300)).optional(),
+  eeatGuidance: eeatGuidanceSchema.optional(),
+  contentChecklist: z.array(z.string().trim().min(1).max(300)).optional(),
+  schemaRecommendations: z.array(schemaRecommendationSchema).optional(),
+  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
+  referenceUrls: z.array(z.string().url()).optional(),
+  realPeopleAlsoAsk: z.array(z.string().trim().min(1).max(300)).optional(),
+  realTopResults: z.array(realTopResultSchema).optional(),
+  keywordLocked: z.boolean().optional(),
+  keywordSource: z.enum(['manual', 'semrush', 'dataforseo', 'gsc', 'matrix', 'template']).optional(),
+  keywordValidation: keywordValidationSchema.optional(),
+  templateId: z.string().trim().max(100).optional(),
+  titleVariants: z.array(z.string().trim().min(1).max(300)).optional(),
+  metaDescVariants: z.array(z.string().trim().min(1).max(500)).optional(),
+}).refine(
+  (body) => Object.values(body).some((value) => value !== undefined),
+  { message: 'At least one editable field required' },
+);
 
 function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
@@ -76,7 +122,7 @@ router.get('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('
 });
 
 // Update a content brief (inline editing)
-router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), validate(contentBriefPatchSchema), (req, res) => {
   const updated = updateBrief(req.params.workspaceId, req.params.briefId, req.body);
   if (!updated) return res.status(404).json({ error: 'Brief not found' });
   addActivity(
