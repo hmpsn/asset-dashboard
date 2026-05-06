@@ -45,6 +45,7 @@ import {
   requestPostChangesSchema,
   clientPostEditSchema,
 } from '../schemas/public-content.js';
+import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
 
 const log = createLogger('public-content');
 const router = Router();
@@ -75,6 +76,14 @@ function assertUpgradeableBriefRequest(workspaceId: string, requestId: string, r
     return null;
   }
   return existing;
+}
+
+function findAssociatedPostRequest(
+  requests: ContentTopicRequest[],
+  post: GeneratedPost,
+): ContentTopicRequest | undefined {
+  return requests.find(r => r.postId === post.id)
+    ?? requests.find(r => !r.postId && r.briefId === post.briefId);
 }
 
 // --- Public SEO Strategy (client dashboard) ---
@@ -507,7 +516,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
 
   // Verify the associated request is in post_review (or delivered for read-only view)
   const requests = listContentRequests(req.params.workspaceId);
-  const req_ = requests.find(r => r.briefId === post.briefId);
+  const req_ = findAssociatedPostRequest(requests, post);
   if (!req_ || !['post_review', 'changes_requested', 'delivered', 'published'].includes(req_.status)) {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
@@ -590,7 +599,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   // Only allow edits when request is in post_review
   const requests = listContentRequests(req.params.workspaceId);
-  const associatedReq = requests.find(r => r.briefId === post.briefId);
+  const associatedReq = findAssociatedPostRequest(requests, post);
   if (!associatedReq || associatedReq.status !== 'post_review') {
     return res.status(403).json({ error: 'Post is not open for editing' });
   }
