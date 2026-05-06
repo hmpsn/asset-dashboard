@@ -19,13 +19,18 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { callAI } from '../ai.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 
 const log = createLogger('content-publish');
-import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
+const publishContentPostSchema = z.object({
+  generateImage: z.boolean().optional(),
+}).strict().default({});
+
 // --- Publish a content post to Webflow CMS ---
-router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), validate(publishContentPostSchema), async (req, res) => {
   const { workspaceId, postId } = req.params;
   const { generateImage } = req.body as { generateImage?: boolean };
 

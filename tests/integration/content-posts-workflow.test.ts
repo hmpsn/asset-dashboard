@@ -22,11 +22,22 @@ const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: unknown }>,
 }));
 
+const imageState = vi.hoisted(() => ({
+  calls: [] as Array<{ postId?: string; siteId?: string }>,
+}));
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: unknown) => {
     broadcastState.calls.push({ workspaceId, event, payload });
+  }),
+}));
+
+vi.mock('../../server/content-image.js', () => ({
+  generateFeaturedImage: vi.fn(async (post: { id?: string }, siteId: string, _tokenOverride?: string) => {
+    imageState.calls.push({ postId: post.id, siteId });
+    return { success: true, hostedUrl: 'https://cdn.example.com/generated-featured-image.jpg' };
   }),
 }));
 
@@ -79,6 +90,13 @@ async function postJson(path: string, body: unknown): Promise<Response> {
   });
 }
 
+async function postWithoutBody(path: string): Promise<Response> {
+  return api(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 function makeSection(index: number, overrides: Partial<PostSection> = {}): PostSection {
   return {
     index,
@@ -122,7 +140,7 @@ function seedPost(overrides: Partial<GeneratedPost> = {}): GeneratedPost {
   return post;
 }
 
-function configurePublishTarget(): void {
+function configurePublishTarget(options: { featuredImage?: boolean } = {}): void {
   updateWorkspace(wsId, {
     webflowSiteId: 'site_content_posts_workflow',
     webflowToken: 'wf-token-content-posts',
@@ -136,6 +154,7 @@ function configurePublishTarget(): void {
         metaTitle: 'seo-title',
         metaDescription: 'seo-description',
         publishDate: 'published-on',
+        ...(options.featuredImage ? { featuredImage: 'featured-image' } : {}),
       },
     },
   });
@@ -160,6 +179,7 @@ beforeAll(async () => {
 beforeEach(() => {
   setupWebflowMocks();
   broadcastState.calls = [];
+  imageState.calls = [];
 });
 
 afterAll(async () => {
@@ -294,6 +314,51 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
 });
 
 describe('POST /api/content-posts/:workspaceId/:postId/publish-to-webflow', () => {
+  it('keeps the optional body contract for default publish requests', async () => {
+    configurePublishTarget();
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items$/, { id: 'wf_no_body_item' });
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items\/publish$/, {});
+    const post = seedPost({ status: 'approved' });
+
+    const res = await postWithoutBody(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.itemId).toBe('wf_no_body_item');
+
+    expect(imageState.calls).toHaveLength(0);
+    const requests = getCapturedRequests();
+    expect(requests).toHaveLength(2);
+    const stored = getPost(wsId, post.id);
+    expect(stored?.webflowItemId).toBe('wf_no_body_item');
+    expect(stored?.webflowCollectionId).toBe('collection_content_posts');
+    expect(stored?.publishedAt).toBeDefined();
+    expect(stored?.publishedSlug).toBe('workflow-coverage-post');
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(true);
+  });
+
+  it('rejects malformed publish options before image generation, Webflow calls, or metadata mutation', async () => {
+    configurePublishTarget({ featuredImage: true });
+    const post = seedPost({ status: 'approved' });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {
+      generateImage: 'false',
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    expect(imageState.calls).toHaveLength(0);
+    expect(getCapturedRequests()).toHaveLength(0);
+    const stored = getPost(wsId, post.id);
+    expect(stored?.status).toBe('approved');
+    expect(stored?.webflowItemId).toBeUndefined();
+    expect(stored?.webflowCollectionId).toBeUndefined();
+    expect(stored?.publishedAt).toBeUndefined();
+    expect(stored?.publishedSlug).toBeUndefined();
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+
   it('rejects unsupported post statuses before calling Webflow or mutating publish metadata', async () => {
     configurePublishTarget();
     const post = seedPost({ status: 'generating' });
