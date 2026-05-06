@@ -11,7 +11,6 @@ describe('client StrategyTab section split', () => {
     expect(strategyTabSrc).toContain("from './strategy/strategyKeywordDisplay'");
     expect(strategyTabSrc).toContain('<StrategyKeywordDrawer');
     expect(strategyTabSrc).toContain('ROLE_DISPLAY_LABELS');
-    expect(strategyTabSrc).toContain('kdColor');
     expect(strategyTabSrc).not.toContain('aria-label={`Keyword details:');
     expect(strategyTabSrc).not.toContain('See the numbers');
 

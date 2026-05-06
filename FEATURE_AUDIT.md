@@ -4377,3 +4377,17 @@ Shared keyword display helpers now include `kdColor()` alongside the existing in
 **Mutual:** Moves another high-churn rendered section out of the client strategy monolith while keeping current tier gates, deep-link expansion, feedback, plan badges, and pricing-modal behavior intact.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-content-gaps.test.ts`.
+
+
+### 340. Platform Consolidation — Client StrategyTab Page Improvements Phase 4
+**What it does:** Continues the Client StrategyTab split by moving the Improve Pages accordion into `src/components/client/strategy/StrategyPageImprovementsSection.tsx`. The extracted section owns quick-win rendering, unranked page growth-opportunity scoring/sorting, "Pages to Review" cards, request-review API submission state, and show-more controls, while `StrategyTab.tsx` keeps owning expansion state, deep-link refs, strategy health scoring, page-map rendering, and the remaining workflow shell.
+
+The migration preserves the current client behavior: the Improve Pages deep-link still expands the same section, quick wins still show the same impact badges and limits, page review cards keep the same "Almost there" and difficulty signals, and optimization requests still POST to the existing public content-request route with the same payload, toast, and refresh callbacks.
+
+**Agency value:** Engineers can review quick-win/page-review behavior without reopening the full StrategyTab workflow file. This narrows remaining StrategyTab work to business-priority UI extraction and request-flow cleanup.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab Improve Pages behavior.
+
+**Mutual:** Moves another rendered accordion out of the client strategy monolith while keeping current tier gates, deep-link expansion, request-review behavior, and page-map ownership intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `tests/contract/client-strategy-tab-page-improvements.test.ts`.
