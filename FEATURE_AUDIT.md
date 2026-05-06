@@ -4548,3 +4548,16 @@ The migration preserves SchemaSuggester behavior: the parent still renders the C
 **Mutual:** Reduces SchemaSuggester's parent surface again while keeping CMS template publishing, field mapping, and page-level publish/approval flows behaviorally unchanged.
 
 **Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterCmsWorkflow.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/CmsTemplatePanel.tsx`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
+
+### 353. Platform Consolidation — SchemaSuggester Publishing Workflow Hook
+**What it does:** Continues the SchemaSuggester feature-tool split by moving page-level schema publishing, client approval submission, manual-delivery state, retraction, schema JSON edit/copy actions, site-template saving, bulk publish progress, and page edit-state refreshes into `useSchemaSuggesterPublishingWorkflow`.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the bulk publish controls, pending approvals panel, schema impact panel, schema completeness widget, and `SchemaPageCard` list, while the hook owns the API calls to `/api/webflow/schema-publish`, `/api/approvals/:workspaceId`, `/api/webflow/schema-template`, and `schemaApi.retract`. No background-job or endpoint behavior was changed.
+
+**Agency value:** Engineers can adjust schema publish/approval state in a focused workflow hook instead of threading page-card mutations through the remaining SchemaSuggester shell.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Further reduces SchemaSuggester's parent component while preserving page publishing, approval batches, manual fallback copying, retraction, and edit-status display behavior.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
