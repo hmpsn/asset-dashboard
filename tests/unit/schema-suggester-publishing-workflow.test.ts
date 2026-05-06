@@ -20,12 +20,17 @@ describe('SchemaSuggester publishing workflow extraction', () => {
     expect(hook).toContain('sendSingleSchemaToClient');
   });
 
-  it('keeps page-card rendering and schema impact display in SchemaSuggester', () => {
+  it('keeps page-card rendering in SchemaSuggester while impact display moves to a focused component', () => {
     const component = readFileSync('src/components/SchemaSuggester.tsx', 'utf-8'); // readFile-ok — intentional shell ownership guard
+    const impactPanel = readFileSync('src/components/schema/SchemaImpactPanel.tsx', 'utf-8'); // readFile-ok — intentional impact rendering ownership guard
 
     expect(component).toContain('SchemaPageCard');
     expect(component).toContain('BulkPublishPanel');
-    expect(component).toContain('Schema Impact');
-    expect(component).toContain('schemaImpactApi.get');
+    expect(component).toContain('SchemaImpactPanel');
+    expect(component).not.toContain('schemaImpactApi.get');
+
+    expect(impactPanel).toContain('Schema Impact');
+    expect(impactPanel).toContain('schemaImpactApi.get');
+    expect(impactPanel).toContain('TrendBadge');
   });
 });

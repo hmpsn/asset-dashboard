@@ -1,24 +1,22 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { put } from '../api/client';
-import { schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
-  Clock, BarChart3, BookOpen, AlertTriangle, X,
+  BookOpen, AlertTriangle, X,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
-import { StatusBadge, Icon, cn } from './ui';
-import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard, TrendBadge } from './ui';
+import { Icon, cn } from './ui';
+import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
 import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
-import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { useSchemaSuggesterGeneration } from './schema/useSchemaSuggesterGeneration';
@@ -29,6 +27,8 @@ import {
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import { adminPath } from '../routes.js';
 import { useSchemaSuggesterPublishingWorkflow } from './schema/useSchemaSuggesterPublishingWorkflow';
+import { SchemaImpactPanel, useSchemaImpactData } from './schema/SchemaImpactPanel';
+import { SchemaEditStatusSummary, SchemaResultsSummary, summarizeSchemaResults } from './schema/SchemaResultsSummary';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -155,6 +155,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     restoreSchema,
     clearManualDeliveryForPage,
   } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData });
+  const impactData = useSchemaImpactData(workspaceId);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -163,33 +164,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       return next;
     });
   };
-
-  // ── Schema Impact Tracking (C6) ──
-  const [impactData, setImpactData] = useState<SchemaImpactData | null>(null);
-  const [showImpactDetail, setShowImpactDetail] = useState(false);
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    let cancelled = false;
-    schemaImpactApi.get(workspaceId)
-      .then(d => { if (!cancelled) setImpactData(d); })
-      .catch(() => { /* GSC not connected or no schema changes — silent */ });
-    return () => { cancelled = true; };
-  }, [workspaceId]);
-
-  // Hooks must be called before ANY conditional early returns (Rules of Hooks).
-  // `data` may be null while loading; guard inside the memo. (Devin Review BUG-0001 on PR #379.)
-  const fixesAvailable = useMemo(() => {
-    if (!data) return 0;
-    const fields = new Set<string>();
-    for (const p of data) {
-      for (const f of p.validationFindings ?? []) {
-        if (!f.field) continue;
-        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
-      }
-    }
-    return fields.size;
-  }, [data]);
 
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
@@ -476,20 +450,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     );
   }
 
-  const pagesWithExisting = data.filter(p => p.existingSchemas.length > 0).length;
-  const pagesWithErrors = data.filter(p => (p.validationErrors?.length || 0) > 0).length;
-  // Page count, not finding count — units must match `pagesWithErrors` since the display reads
-  // "${N} with warnings" sister to "${N} with errors". A page with 3 warning findings counts once.
-  // (Devin Review BUG-0001 on PR #376.)
-  const pagesWithWarnings = data.filter(p =>
-    (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
-  ).length;
-  // fixesAvailable is hoisted above the early returns (Rules of Hooks); reuse here.
-  const totalTypes = data.reduce((s, p) => {
-    const schema = p.suggestedSchemas[0]?.template;
-    const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
-    return s + (graph?.length || 0);
-  }, 0);
+  const resultStats = summarizeSchemaResults(data);
 
   return (
     <div className="space-y-8">
@@ -567,7 +528,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="t-caption text-[var(--brand-text-muted)]">
-            {data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}
+            {data.length} pages · {resultStats.totalTypes} schema types generated{loading ? ' (so far)' : ''}
             {snapshotDate && !loading && <span className="text-[var(--brand-text-muted)]"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
           </span>
         </div>
@@ -630,127 +591,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       {/* Schema completeness widget — aggregates validationFindings and deep-links to fix locations */}
       <SchemaCompletenessWidget pages={data} workspaceId={workspaceId} />
 
-      {/* Summary cards */}
-      <div id="schema-suggestions-list" />
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Pages</div>
-          <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{data.length}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">{totalTypes} @graph types total</div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
-          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-accent-warning' : 'text-accent-success')}>{data.length - pagesWithErrors}/{data.length}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">
-            {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
-            {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
-          </div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>
-          <div className="text-2xl font-bold text-accent-success">{pagesWithExisting}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">pages already have JSON-LD</div>
-        </div>
-      </div>
-
-      {/* Schema Impact Panel (C6) */}
-      {impactData && impactData.totalDeployments > 0 && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <button
-            onClick={() => setShowImpactDetail(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Icon as={BarChart3} size="md" className="text-accent-brand" />
-              <span className="t-caption font-medium text-[var(--brand-text-bright)]">Schema Impact</span>
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
-            </div>
-            <div className="flex items-center gap-3">
-              {impactData.avgClicksDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-accent-success' : 'text-accent-danger')}>
-                  {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
-                </span>
-              )}
-              {impactData.avgPositionDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-accent-success' : 'text-accent-danger')}>
-                  {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
-                </span>
-              )}
-              {impactData.tooRecent > 0 && (
-                <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
-                  <Icon as={Clock} size="sm" /> {impactData.tooRecent} pending
-                </span>
-              )}
-            </div>
-          </button>
-          {showImpactDetail && (
-            <div className="border-t border-[var(--brand-border)]">
-              {/* Aggregate stat cards */}
-              <div className="grid grid-cols-4 gap-px bg-[var(--brand-border)]">
-                {[
-                  { label: 'Avg Clicks', value: impactData.avgClicksDelta, suffix: '', positive: (v: number) => v >= 0 },
-                  { label: 'Avg Impressions', value: impactData.avgImpressionsDelta, suffix: '', positive: (v: number) => v >= 0 },
-                  { label: 'Avg CTR', value: impactData.avgCtrDelta, suffix: '%', positive: (v: number) => v >= 0 },
-                  { label: 'Avg Position', value: impactData.avgPositionDelta, suffix: '', positive: (v: number) => v <= 0 },
-                ].map(stat => (
-                  <div key={stat.label} className="bg-[var(--surface-2)] px-3 py-2.5">
-                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{stat.label}</div>
-                    {stat.value !== null ? (
-                      <div className={cn('t-body font-bold', stat.positive(stat.value) ? 'text-accent-success' : 'text-accent-danger')}>
-                        {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
-                      </div>
-                    ) : (
-                      <div className="t-body text-[var(--brand-text-muted)]">—</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {/* Per-deployment list */}
-              <div className="max-h-[240px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
-                {impactData.deployments.map((d: SchemaDeploymentImpact) => (
-                  <div key={d.change.id} className="flex items-center gap-3 px-4 py-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="t-caption text-[var(--brand-text)] truncate">{d.change.pageTitle || d.change.pageSlug || 'Unknown page'}</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {new Date(d.change.changedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {' · '}{d.daysSinceChange}d ago
-                      </div>
-                    </div>
-                    {d.tooRecent ? (
-                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><Icon as={Clock} size="sm" /> Too recent</span>
-                    ) : d.before && d.after ? (
-                      <div className="flex items-center gap-3 t-caption-sm">
-                        <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
-                        <span className={d.after.position <= d.before.position ? 'text-accent-success' : 'text-accent-danger'}>
-                          pos {d.after.position.toFixed(1)}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">No GSC data</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="px-4 py-2 border-t border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-muted)]">
-                Compares 28-day GSC metrics before vs after each schema deployment. Changes &lt; 7 days old are marked pending.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Edit status summary bar */}
-      {summary.total > 0 && (
-        <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
-          <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
-          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-accent-brand">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-accent-info">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-accent-success">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-accent-danger">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-accent-warning">{summary.issueDetected}</span></>}
-          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-accent-info">{summary.fixProposed}</span></>}
-        </div>
-      )}
+      <SchemaResultsSummary pages={data} stats={resultStats} />
+      <SchemaImpactPanel impactData={impactData} />
+      <SchemaEditStatusSummary summary={summary} />
 
       {/* Page list */}
       <div className="space-y-3">

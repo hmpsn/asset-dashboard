@@ -4561,3 +4561,16 @@ The migration preserves SchemaSuggester behavior: the parent still renders the b
 **Mutual:** Further reduces SchemaSuggester's parent component while preserving page publishing, approval batches, manual fallback copying, retraction, and edit-status display behavior.
 
 **Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
+
+### 354. Platform Consolidation — SchemaSuggester Results Rendering Split
+**What it does:** Continues the SchemaSuggester feature-tool split by moving schema impact rendering/fetch state and results-summary calculations out of the parent shell. `SchemaImpactPanel` now owns schema deployment impact display state and the existing `schemaImpactApi.get` fetch, while `SchemaResultsSummary` owns the page/validation/existing-schema summary cards and `SchemaEditStatusSummary` owns the edit-status summary bar.
+
+The migration preserves SchemaSuggester behavior: the parent still coordinates generation, CMS workflow, publishing workflow, page cards, approvals, completeness, and add-page controls. Impact tracking still uses the existing schema impact API, summary warning counts still count pages rather than findings, and edit-status counts still use the shared `usePageEditStates` summary returned by `useSchemaSuggesterPublishingWorkflow`. No background-job, endpoint, or mutation behavior was changed.
+
+**Agency value:** Engineers can adjust schema impact and summary presentation without reopening the remaining SchemaSuggester controller logic.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Shrinks the SchemaSuggester parent again while keeping the rendered summary, impact, and edit-status experience unchanged.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/SchemaResultsSummary.tsx`; `tests/unit/schema-suggester-results-summary.test.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`.
