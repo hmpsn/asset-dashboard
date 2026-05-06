@@ -7,7 +7,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { stripCodeFences } from './helpers.js';
-import { callAnthropic } from './anthropic-helpers.js';
+import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getBrandscript } from './brandscript.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -187,7 +187,8 @@ For each recommended page, provide:
 
 Return ONLY a JSON array of objects with these fields. No markdown, no explanation outside the JSON.`;
 
-  const aiResponse = await callAnthropic({
+  const aiResponse = await callAI({
+    provider: 'anthropic',
     model: 'claude-sonnet-4-20250514',
     maxTokens: 4000,
     messages: [{ role: 'user', content: prompt }],

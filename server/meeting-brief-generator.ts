@@ -157,6 +157,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
     messages,
     maxTokens: 2000,
     temperature: 0.3,
+    responseFormat: { type: 'json_object' },
     feature: 'meeting-brief',
     workspaceId,
   });
@@ -178,6 +179,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       messages: retryMessages,
       maxTokens: 2000,
       temperature: 0.1,
+      responseFormat: { type: 'json_object' },
       feature: 'meeting-brief',
       workspaceId,
     });

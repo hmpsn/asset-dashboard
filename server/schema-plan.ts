@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment, SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
@@ -342,11 +342,12 @@ IMPORTANT:
 - Return ONLY valid JSON, no markdown`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.1,
+      responseFormat: { type: 'json_object' },
       feature: 'schema-plan',
       workspaceId,
       maxRetries: 3,
