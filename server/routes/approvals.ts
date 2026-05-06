@@ -190,6 +190,8 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
   if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
   const { status, clientNote } = req.body;
+  const beforeBatch = getBatch(req.params.workspaceId, req.params.batchId);
+  const beforeItem = beforeBatch?.items.find(i => i.id === req.params.itemId);
   let batch;
   try {
     batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
@@ -200,6 +202,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
     return next(err);
   }
   if (!batch) return res.status(404).json({ error: 'Item not found' });
+  const statusChanged = status !== undefined && beforeItem?.status !== status;
   // Sync PageEditState when client approves or rejects
   if (status === 'approved' || status === 'rejected') {
     const item = batch.items.find(i => i.id === req.params.itemId);
@@ -221,13 +224,13 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
       const actorName = actorInfo?.name || 'Client';
       const fieldLabel = approvalActivityLabel(item.field);
       const pageLabel = item.pageTitle || item.pageSlug || item.pageId;
-      if (status === 'approved') {
+      if (status === 'approved' && statusChanged) {
         addActivity(req.params.workspaceId, 'approval_applied',
           `${actorName} approved ${fieldLabel} changes for ${pageLabel}`,
           item.proposedValue ? `New value: ${item.proposedValue.slice(0, 80)}` : undefined,
           { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
           actorInfo);
-      } else {
+      } else if (status === 'rejected' && statusChanged) {
         addActivity(req.params.workspaceId, 'changes_requested',
           `${actorName} requested changes to ${fieldLabel} for ${pageLabel}`,
           clientNote || undefined,
@@ -237,7 +240,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
     }
   }
   // Handle undo — client reverting their approve/reject decision back to pending
-  if (status === 'pending') {
+  if (status === 'pending' && statusChanged) {
     const item = batch.items.find(i => i.id === req.params.itemId);
     if (item?.pageId) {
       // Aggregate across all items for this page — don't blindly reset to in-review

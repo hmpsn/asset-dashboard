@@ -212,6 +212,50 @@ describe('public approval broadcasts and workflow side effects', () => {
     expect(countActivities('approval_applied', `%"itemId":"${item.id}"%`)).toBe(beforeActivity + 1);
   });
 
+  it('does not duplicate approval activity when an approved item is approved again', async () => {
+    const batch = createApprovalBatch('Duplicate Approval Activity Guard');
+    const item = batch.items[0];
+
+    const approveRes = await patchJson(`/api/public/approvals/${wsId}/${batch.id}/${item.id}`, {
+      status: 'approved',
+    });
+    expect(approveRes.status).toBe(200);
+    expect(countActivities('approval_applied', `%"itemId":"${item.id}"%`)).toBe(1);
+
+    const repeatApproveRes = await patchJson(`/api/public/approvals/${wsId}/${batch.id}/${item.id}`, {
+      status: 'approved',
+    });
+    expect(repeatApproveRes.status).toBe(200);
+
+    expect(getBatch(wsId, batch.id)?.items[0].status).toBe('approved');
+    expect(getPageState(wsId, item.pageId)?.status).toBe('approved');
+    expect(countActivities('approval_applied', `%"itemId":"${item.id}"%`)).toBe(1);
+  });
+
+  it('refreshes rejection notes without duplicating rejection activity', async () => {
+    const batch = createApprovalBatch('Duplicate Rejection Activity Guard');
+    const item = batch.items[0];
+
+    const rejectRes = await patchJson(`/api/public/approvals/${wsId}/${batch.id}/${item.id}`, {
+      status: 'rejected',
+      clientNote: 'Please keep the original headline.',
+    });
+    expect(rejectRes.status).toBe(200);
+    expect(countActivities('changes_requested', `%"itemId":"${item.id}"%`)).toBe(1);
+
+    const repeatRejectRes = await patchJson(`/api/public/approvals/${wsId}/${batch.id}/${item.id}`, {
+      status: 'rejected',
+      clientNote: 'Please make the headline less promotional.',
+    });
+    expect(repeatRejectRes.status).toBe(200);
+
+    const storedItem = getBatch(wsId, batch.id)?.items[0];
+    expect(storedItem?.status).toBe('rejected');
+    expect(storedItem?.clientNote).toBe('Please make the headline less promotional.');
+    expect(getPageState(wsId, item.pageId)?.rejectionNote).toBe('Please make the headline less promotional.');
+    expect(countActivities('changes_requested', `%"itemId":"${item.id}"%`)).toBe(1);
+  });
+
   it('does not broadcast or mutate when public approval validation fails', async () => {
     const batch = createApprovalBatch('Invalid Status Broadcast Guard');
     const item = batch.items[0];
