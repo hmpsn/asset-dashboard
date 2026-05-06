@@ -261,6 +261,62 @@ describe('Content Posts API', () => {
     expect(body.status).toBe('review');
   });
 
+  it('PATCH /api/content-posts/:wsId/:postId rejects arbitrary statuses without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      status: 'published',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.status).toBe(before.status);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects invalid workflow transitions without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      status: 'generating',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid post transition/);
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.status).toBe(before.status);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects publish metadata spoofing', async () => {
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      webflowItemId: 'spoofed-item',
+      webflowCollectionId: 'spoofed-collection',
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      publishedSlug: 'spoofed-slug',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Unrecognized key/);
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.webflowItemId).toBeUndefined();
+    expect(after.webflowCollectionId).toBeUndefined();
+    expect(after.publishedAt).toBeUndefined();
+    expect(after.publishedSlug).toBeUndefined();
+  });
+
   it('POST /api/content-posts/:wsId/generate without briefId returns 400', async () => {
     const res = await postJson(`/api/content-posts/${testWsId}/generate`, {});
     expect(res.status).toBe(400);

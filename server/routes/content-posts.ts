@@ -167,10 +167,6 @@ const updatePostSchema = z.object({
   status: z.enum(['generating', 'draft', 'review', 'approved', 'error']).optional(),
   voiceScore: z.number().min(0).max(100).optional(),
   voiceFeedback: z.string().optional(),
-  webflowItemId: z.string().optional(),
-  webflowCollectionId: z.string().optional(),
-  publishedAt: z.string().optional(),
-  publishedSlug: z.string().optional(),
   reviewChecklist: z.object({
     factual_accuracy: z.boolean(),
     brand_voice: z.boolean(),
