@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createBatch, updateItem } from '../../server/approvals.js';
+import { createBatch, getBatch, updateItem } from '../../server/approvals.js';
 import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13333); // port-ok: 13201-13332 already allocated in integration suite
@@ -10,6 +10,7 @@ const { postJson } = ctx;
 let wsId = '';
 let schemaBatchId = '';
 let cmsBatchId = '';
+let pendingBatchId = '';
 let savedWebflowToken: string | undefined;
 
 beforeAll(async () => {
@@ -44,6 +45,16 @@ beforeAll(async () => {
   }]);
   cmsBatchId = cmsBatch.id;
   updateItem(wsId, cmsBatchId, cmsBatch.items[0].id, { status: 'approved' });
+
+  const pendingBatch = createBatch(wsId, 'site-apply-guard', 'Pending Batch', [{
+    pageId: 'page-static-pending',
+    pageTitle: 'Pending Static Page',
+    pageSlug: 'pending-static-page',
+    field: 'seoTitle',
+    currentValue: 'Current',
+    proposedValue: 'Proposed',
+  }]);
+  pendingBatchId = pendingBatch.id;
 });
 
 afterAll(async () => {
@@ -58,6 +69,10 @@ describe('public approval apply guard', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain('Only static page SEO title and meta description');
+
+    const batch = getBatch(wsId, schemaBatchId);
+    expect(batch?.status).toBe('approved');
+    expect(batch?.items[0].status).toBe('approved');
   });
 
   it('blocks CMS approval items from client apply even when the field is SEO title', async () => {
@@ -65,5 +80,20 @@ describe('public approval apply guard', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain('Only static page SEO title and meta description');
+
+    const batch = getBatch(wsId, cmsBatchId);
+    expect(batch?.status).toBe('approved');
+    expect(batch?.items[0].status).toBe('approved');
+  });
+
+  it('does not mutate pending items when there are no approved items to apply', async () => {
+    const res = await postJson(`/api/public/approvals/${wsId}/${pendingBatchId}/apply`, {});
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('No approved items to apply');
+
+    const batch = getBatch(wsId, pendingBatchId);
+    expect(batch?.status).toBe('pending');
+    expect(batch?.items[0].status).toBe('pending');
   });
 });
