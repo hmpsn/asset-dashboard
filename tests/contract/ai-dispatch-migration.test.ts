@@ -5,7 +5,7 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/anomaly-detection.ts', aiImport: "from './ai.js'" },
   { path: 'server/chat-memory.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'" },
-  { path: 'server/keyword-strategy-generation.ts', aiImport: "from './ai.js'" },
+  { path: 'server/keyword-strategy-ai-synthesis.ts', aiImport: "from './ai.js'" },
   { path: 'server/monthly-digest.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-decay.ts', aiImport: "from './ai.js'" },
   { path: 'server/internal-links.ts', aiImport: "from './ai.js'" },

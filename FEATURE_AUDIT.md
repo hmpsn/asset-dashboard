@@ -4279,3 +4279,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Moves another cohesive chunk out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-pages.ts`; `server/keyword-strategy-search-data.ts`.
+
+
+### 333. Platform Consolidation — Keyword Strategy Service Split Phase 3
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving AI prompt context assembly, page-batch keyword mapping, keyword-pool construction, incremental fresh-page merge handling, post-AI keyword validation, and master site-level synthesis into `server/keyword-strategy-ai-synthesis.ts`.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for discovery, search data, provider data, enrichment, persistence/history, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration. The extracted synthesis service preserves the shared `callAI()` dispatcher path, prompt wrapping through `buildSystemPrompt()`, declined/requested keyword handling, competitor brand filtering, invalid-master-JSON payload behavior, and incremental no-op refund path compatibility.
+
+**Agency value:** Engineers can review prompt assembly and AI synthesis behavior without reopening crawl/search/provider/enrichment/persistence code. This narrows future review surface for prompt changes and keeps the remaining split work easier to sequence.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the highest-token AI section out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `tests/contract/ai-dispatch-migration.test.ts` (AI dispatcher guard moved to the synthesis module); `tests/integration/brand-filter-wiring.test.ts` (static wiring assertions split between generation and synthesis responsibilities).
