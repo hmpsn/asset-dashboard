@@ -4522,3 +4522,16 @@ The migration preserves PageIntelligence behavior: the parent still coordinates 
 **Mutual:** Further reduces PageIntelligence's parent component while preserving the same page-analysis, keyword edit, tracking, SEO copy, and route action behavior.
 
 **Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordEditing.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordTracking.ts`; `src/components/page-intelligence/usePageIntelligenceSeoCopy.ts`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 351. Platform Consolidation — SchemaSuggester Generation Workflow Hook
+**What it does:** Begins the SchemaSuggester feature-tool split by moving schema generation workflow state into `useSchemaSuggesterGeneration`. The hook owns saved snapshot hydration, persisted page-type hydration, Webflow page loading, fix-context single-page generation, add-page filtering, scan progress/error/next-step state, and shared `schema-generator` background job start/cancel/result handling.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the generator, CMS template tools, schema cards, approvals, publishing, retraction, impact tracking, and navigation affordances. The bulk generation path still uses the shared `useBackgroundTasks` platform and now starts jobs through `BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR` instead of a raw string; no separate background-job implementation was introduced.
+
+**Agency value:** Engineers can reason about schema generation, page hydration, and background job progress in a focused hook instead of reopening the full 1,000+ line SchemaSuggester component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Reduces SchemaSuggester's controller surface while preserving schema scan, single-page generation, page picker, saved snapshot, and progress behavior.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `tests/unit/schema-suggester-generation.test.ts`.

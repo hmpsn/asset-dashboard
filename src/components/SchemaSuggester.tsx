@@ -1,17 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { post, put, get, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
-import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
   Clock, BarChart3, BookOpen, AlertTriangle, X,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
-import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge, Icon, cn } from './ui';
@@ -25,43 +23,15 @@ import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
 import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
+import { useSchemaSuggesterGeneration } from './schema/useSchemaSuggesterGeneration';
+import type { SchemaPageSuggestion, SchemaSuggestion } from './schema/schemaSuggesterTypes';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
-import type { ValidationFinding } from '../../shared/types/schema-validation';
-import type { SchemaDeliveryDecision, SchemaGenerationDiagnostics, SchemaPublishResponse } from '../../shared/types/schema-generation';
+import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../../shared/types/schema-generation';
 import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
 import { queryKeys } from '../lib/queryKeys';
 
 type SchemaSubTab = 'generator' | 'guide';
-
-interface SchemaSuggestion {
-  type: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-  template: Record<string, unknown>;
-}
-
-interface RichResultEligibility {
-  type: string;
-  eligible: boolean;
-  feature: string;
-  missingFields?: string[];
-}
-
-interface SchemaPageSuggestion {
-  pageId: string;
-  pageTitle: string;
-  slug: string;
-  url: string;
-  existingSchemas: string[];
-  existingSchemaJson?: Record<string, unknown>[];
-  suggestedSchemas: SchemaSuggestion[];
-  validationErrors?: string[];
-  validationFindings?: ValidationFinding[];
-  richResultsEligibility?: RichResultEligibility[];
-  generationDiagnostics?: SchemaGenerationDiagnostics;
-  lastPublishedAt?: string | null;
-}
 
 interface CmsTemplatePage {
   pageId: string;
@@ -112,49 +82,59 @@ const MAX_SCHEMA_MAPPING_COLLECTIONS = 4;
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
-  const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [started, setStarted] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [publishError, setPublishError] = useState<Record<string, string>>({});
   const [manualDelivery, setManualDelivery] = useState<Record<string, SchemaDeliveryDecision>>({});
-  const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
-  const [progressMsg, setProgressMsg] = useState<string | null>(null);
-  const [showNextSteps, setShowNextSteps] = useState(false);
-  const [showPagePicker, setShowPagePicker] = useState(false);
-  const [availablePages, setAvailablePages] = useState<Array<{ id: string; title: string; slug: string }>>([]);
-  const [pageSearch, setPageSearch] = useState('');
-  const [loadingPages, setLoadingPages] = useState(false);
-  const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
-  const [pageTypes, setPageTypes] = useState<Record<string, string>>({});
   const [retractingPages, setRetractingPages] = useState<Set<string>>(new Set());
   const [retractedPages, setRetractedPages] = useState<Set<string>>(new Set());
-  const { jobs, startJob, cancelJob } = useBackgroundTasks();
-  const jobIdRef = useRef<string | null>(null);
-
-  // Auto-generate for a specific page when arriving from audit Fix→
-  // Guard on targetRoute so stale fixContext from other tabs doesn't trigger generation.
-  const fixConsumed = useRef(false);
-  useEffect(() => {
-    if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
-      fixConsumed.current = true;
-      // Small delay to let snapshot load finish first
-      const timer = setTimeout(() => {
-        generateSinglePage(fixContext.pageId!);
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, [fixContext]); // generateSinglePage intentionally excluded — ref guard prevents re-fire
+  const {
+    data,
+    setData,
+    loading,
+    started,
+    regenerating,
+    scanError,
+    progressMsg,
+    showNextSteps,
+    setShowNextSteps,
+    showPagePicker,
+    setShowPagePicker,
+    availablePages,
+    pageSearch,
+    setPageSearch,
+    loadingPages,
+    generatingSingle,
+    pageTypes,
+    setPageTypes,
+    snapshotDate,
+    filteredInitialPages,
+    runScan,
+    stopScan,
+    fetchPages,
+    generateSinglePage,
+    regeneratePage,
+  } = useSchemaSuggesterGeneration({
+    siteId,
+    workspaceId,
+    fixContext,
+    onPageGenerated: pageId => {
+      setExpanded(prev => new Set(prev).add(pageId));
+      setManualDelivery(prev => {
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      });
+    },
+  });
 
   // CMS template schema state
   const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
@@ -248,87 +228,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   // Unified page edit states
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
-  // Load saved schema snapshot — React Query
-  const { data: snapshotData } = useSchemaSnapshot(siteId, workspaceId);
-  const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
-  // Hydrate local state from snapshot query when it arrives
-  useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
-    if (!snapshotData) {
-      setSnapshotDate(null);
-      setData(null);
-      return;
-    }
-    setSnapshotDate(prev => prev === snapshotData.createdAt ? prev : snapshotData.createdAt);
-    if (snapshotData.results.length > 0) {
-      setData(snapshotData.results as SchemaPageSuggestion[]);
-      setStarted(true);
-    }
-    // Hydrate page types from savedPageType on each result (don't overwrite locally-set types)
-    const typesFromSnapshot: Record<string, string> = {};
-    for (const r of snapshotData.results as SchemaPageSuggestion[]) {
-      if ((r as unknown as { savedPageType?: string }).savedPageType) {
-        typesFromSnapshot[r.pageId] = (r as unknown as { savedPageType?: string }).savedPageType!;
-      }
-    }
-    if (Object.keys(typesFromSnapshot).length > 0) {
-      setPageTypes(prev => ({ ...typesFromSnapshot, ...prev }));
-    }
-  }, [snapshotData]);
-
-  // Load persisted page types from server on mount
-  useEffect(() => { // effect-layout-ok: persisted page types arrive asynchronously from the server.
-    if (!siteId) return;
-    getSafe<{ pageTypes: Record<string, string> }>(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageTypes: {} })
-      .then(({ pageTypes: saved }) => {
-        if (saved && Object.keys(saved).length > 0) {
-          setPageTypes(prev => ({ ...saved, ...prev }));
-        }
-      })
-      .catch(() => { /* ignore — page types are non-critical */ });
-  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-load all pages — React Query
-  const { data: fetchedPages = [] } = useWebflowPages(siteId, workspaceId);
-  useEffect(() => {
-    if (fetchedPages.length > 0 && availablePages.length === 0) {
-      setAvailablePages(fetchedPages);
-    }
-  }, [fetchedPages]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Stream partial results from background job via WebSocket
-  useEffect(() => { // effect-layout-ok: background job results arrive asynchronously via WebSocket.
-    if (!jobIdRef.current) return;
-    const job = jobs.find(j => j.id === jobIdRef.current);
-    if (!job) return;
-    if (job.result && Array.isArray(job.result) && job.result.length > 0) {
-      setData(job.result as SchemaPageSuggestion[]);
-    }
-    if (job.message) setProgressMsg(job.message);
-    if (job.status === 'done') {
-      setLoading(false);
-      if (job.result && Array.isArray(job.result)) {
-        setData(job.result as SchemaPageSuggestion[]);
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
-      setShowNextSteps(true);
-      setProgressMsg(null);
-      jobIdRef.current = null;
-    } else if (job.status === 'error') {
-      setLoading(false);
-      setScanError(job.error || 'Schema generation failed');
-      setProgressMsg(null);
-      jobIdRef.current = null;
-    } else if (job.status === 'cancelled') {
-      setLoading(false);
-      setProgressMsg(null);
-      jobIdRef.current = null;
-    }
-  }, [jobs]);
-
-  const stopScan = () => {
-    if (jobIdRef.current) cancelJob(jobIdRef.current);
-  };
-
   const sendSchemasToClient = async () => {
     if (!data || !workspaceId) return;
     setSendingToClient(true);
@@ -350,89 +249,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       setApprovalRefreshKey(k => k + 1);
     } catch (err) { console.error('SchemaSuggester operation failed:', err); }
     setSendingToClient(false);
-  };
-
-  const runScan = async () => {
-    setStarted(true);
-    setLoading(true);
-    setShowNextSteps(false);
-    setData(null);
-    setScanError(null);
-    setProgressMsg('Starting schema generation...');
-    const jobId = await startJob('schema-generator', { siteId, workspaceId: workspaceId || '' });
-    if (jobId) {
-      jobIdRef.current = jobId;
-    } else {
-      setScanError('Failed to start schema generation job');
-      setLoading(false);
-    }
-  };
-
-  const fetchPages = async () => {
-    if (availablePages.length > 0) { setShowPagePicker(true); return; }
-    setLoadingPages(true);
-    try {
-      const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
-      if (Array.isArray(pages)) {
-        setAvailablePages(pages.map((p: { _id?: string; id?: string; title?: string; slug?: string }) => ({
-          id: p._id || p.id || '',
-          title: p.title || p.slug || 'Untitled',
-          slug: p.slug || '',
-        })));
-      }
-      setShowPagePicker(true);
-    } catch (err) { console.error('SchemaSuggester operation failed:', err); }
-    setLoadingPages(false);
-  };
-
-  const generateSinglePage = async (pageId: string) => {
-    setGeneratingSingle(pageId);
-    setShowPagePicker(false);
-    setStarted(true);
-    try {
-      const pt = pageTypes[pageId];
-      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
-      setData(prev => {
-        if (!prev) return [result];
-        const exists = prev.findIndex(p => p.pageId === pageId);
-        if (exists >= 0) return prev.map(p => p.pageId === pageId ? result : p);
-        return [...prev, result];
-      });
-      setExpanded(prev => new Set(prev).add(pageId));
-      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
-    } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
-      setScanError('Single page generation failed');
-    } finally {
-      setGeneratingSingle(null);
-    }
-  };
-
-  const regeneratePage = async (pageId: string) => {
-    setRegenerating(prev => new Set(prev).add(pageId));
-    try {
-      const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId });
-      setData(prev => {
-        if (!prev) return prev;
-        // Full replacement — preserve lastPublishedAt which comes from the
-        // snapshot endpoint annotation, not the generate response.
-        return prev.map(p => p.pageId === pageId ? {
-          ...result,
-          lastPublishedAt: p.lastPublishedAt,
-        } : p);
-      });
-      setExpanded(prev => new Set(prev).add(pageId));
-      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
-    } catch (err) {
-      console.error('SchemaSuggester operation failed:', err);
-      // keep existing data
-    } finally {
-      setRegenerating(prev => {
-        const next = new Set(prev);
-        next.delete(pageId);
-        return next;
-      });
-    }
   };
 
   const publishToWebflow = async (pageId: string, schema: Record<string, unknown>) => {
@@ -710,10 +526,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       return role === 'location' || role === 'service' ? { ...collection, schemaRole: role } : null;
     })
     .filter((collection): collection is CmsMappingCollection & { schemaRole: 'location' | 'service' } => Boolean(collection));
-
-  const filteredInitialPages = availablePages.filter(
-    p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase())
-  );
 
   const schemaTabBar = (
     <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
