@@ -5,13 +5,7 @@ import { useSchemaSnapshot, useWebflowPages } from '../../hooks/admin';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { queryKeys } from '../../lib/queryKeys';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
-import type { SchemaPageSuggestion } from './schemaSuggesterTypes';
-
-interface SchemaPageOption {
-  id: string;
-  title: string;
-  slug: string;
-}
+import type { SchemaPageOption, SchemaPageSuggestion } from './schemaSuggesterTypes';
 
 interface UseSchemaSuggesterGenerationOptions {
   siteId: string;

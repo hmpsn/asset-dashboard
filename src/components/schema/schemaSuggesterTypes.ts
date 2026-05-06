@@ -31,6 +31,12 @@ export interface SchemaPageSuggestion {
   lastPublishedAt?: string | null;
 }
 
+export interface SchemaPageOption {
+  id: string;
+  title: string;
+  slug: string;
+}
+
 export interface CmsTemplatePage {
   pageId: string;
   pageTitle: string;
