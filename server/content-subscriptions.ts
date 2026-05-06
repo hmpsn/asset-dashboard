@@ -56,6 +56,9 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(
     'SELECT * FROM content_subscriptions WHERE id = ?',
   ),
+  selectByIdAndWorkspace: db.prepare(
+    'SELECT * FROM content_subscriptions WHERE id = ? AND workspace_id = ?',
+  ),
   selectByStripeSubId: db.prepare(
     'SELECT * FROM content_subscriptions WHERE stripe_subscription_id = ?',
   ),
@@ -137,6 +140,11 @@ export function getContentSubscription(id: string): ContentSubscription | null {
   return row ? rowToSub(row) : null;
 }
 
+function getContentSubscriptionForWorkspace(workspaceId: string, id: string): ContentSubscription | null {
+  const row = stmts().selectByIdAndWorkspace.get(id, workspaceId) as SubRow | undefined;
+  return row ? rowToSub(row) : null;
+}
+
 export function getContentSubscriptionByStripeId(stripeSubId: string): ContentSubscription | null {
   const row = stmts().selectByStripeSubId.get(stripeSubId) as SubRow | undefined;
   return row ? rowToSub(row) : null;
@@ -190,14 +198,15 @@ export function updateContentSubscription(
     }
   }
 
-  if (sets.length === 0) return getContentSubscription(id);
+  if (sets.length === 0) return getContentSubscriptionForWorkspace(workspaceId, id);
 
   sets.push("updated_at = @now");
   values.now = new Date().toISOString();
 
   const sql = `UPDATE content_subscriptions SET ${sets.join(', ')} WHERE id = @id AND workspace_id = @workspace_id`;
-  db.prepare(sql).run(values);
-  return getContentSubscription(id);
+  const result = db.prepare(sql).run(values);
+  if (result.changes === 0) return null;
+  return getContentSubscriptionForWorkspace(workspaceId, id);
 }
 
 export function deleteContentSubscription(workspaceId: string, id: string): boolean {
