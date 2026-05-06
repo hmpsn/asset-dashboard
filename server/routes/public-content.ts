@@ -87,7 +87,7 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   if (!strategy) return res.json(null);
   // Reassemble pageMap from page_keywords table
   const fullPageMap = listPageKeywords(ws.id);
-  // Return client-safe subset (no semrushMode, no internal-only fields)
+  // Return client-safe subset (no SEO data mode/provider internals)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
     siteKeywordMetrics: strategy.siteKeywordMetrics || undefined,

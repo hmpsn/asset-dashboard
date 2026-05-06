@@ -491,7 +491,8 @@ describe('GET /api/public/seo-strategy — brand keyword filtering', () => {
     const body = await res.json();
 
     // The strategy was stored with branded gaps (as generation would normally filter them)
-    // The public endpoint must not add semrushMode or other internal admin-only fields
+    // The public endpoint must not add SEO data mode/provider internals
+    expect(body.seoDataMode).toBeUndefined();
     expect(body.semrushMode).toBeUndefined();
     expect(body.keywordPool).toBeUndefined();
     expect(body.decayingPages).toBeUndefined();

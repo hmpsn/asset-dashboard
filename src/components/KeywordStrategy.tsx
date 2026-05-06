@@ -67,11 +67,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // when page_keywords rows exist but no strategy blob — that case must render as "no strategy yet"
   // in this component, while still exposing pageMap via Page Intelligence separately.
   const isRealStrategy = strategy?.generatedAt != null;
-  const semrushAvailableFromHook = keywordData?.semrushAvailable || false;
+  const seoDataAvailableFromHook = keywordData?.seoDataAvailable || false;
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
-  const [semrushAvailable, setSemrushAvailable] = useState(semrushAvailableFromHook);
-  const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
+  const [seoDataAvailable, setSeoDataAvailable] = useState(seoDataAvailableFromHook);
+  const [seoDataMode, setSeoDataMode] = useState<'none' | 'quick' | 'full'>('none');
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
@@ -87,6 +87,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
+  const displayedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
@@ -110,14 +111,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   // Initialize SEO provider availability from React Query hook
   useEffect(() => {
-    setSemrushAvailable(semrushAvailableFromHook);
-    if (semrushAvailableFromHook) {
+    setSeoDataAvailable(seoDataAvailableFromHook);
+    if (seoDataAvailableFromHook) {
       // Default to quick mode when an SEO data provider is available
-      setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
+      setSeoDataMode(prev => prev === 'none' ? 'quick' : prev);
     } else {
-      setSemrushMode('none');
+      setSeoDataMode('none');
     }
-  }, [semrushAvailableFromHook]);
+  }, [seoDataAvailableFromHook]);
 
   // Load saved competitor domains from React Query hook data
   useEffect(() => {
@@ -131,8 +132,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     if (strategy?.businessContext && !businessContext) {
       setBusinessContext(strategy.businessContext);
     }
-    if (strategy?.semrushMode && strategy.semrushMode !== 'none') {
-      setSemrushMode(strategy.semrushMode);
+    const savedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+    if (savedSeoDataMode && savedSeoDataMode !== 'none') {
+      setSeoDataMode(savedSeoDataMode);
     }
   }, [strategy]);
 
@@ -170,7 +172,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         mode: strategyMode,
         workspaceId,
         businessContext: businessContext.trim() || undefined,
-        semrushMode: semrushAvailable ? semrushMode : 'none',
+        seoDataMode: seoDataAvailable ? seoDataMode : 'none',
         competitorDomains: compList,
         maxPages: maxPages || undefined,
       });
@@ -364,8 +366,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                {semrushMode !== 'none' ? `SEO data: ${semrushMode}` : ''}
-                {maxPages > 0 ? `${semrushMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${semrushMode !== 'none' ? ' · ' : ''}All pages`}
+                {seoDataMode !== 'none' ? `SEO data: ${seoDataMode}` : ''}
+                {maxPages > 0 ? `${seoDataMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${seoDataMode !== 'none' ? ' · ' : ''}All pages`}
                 {businessContext ? ` · Context set` : ''}
                 {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
               </span>
@@ -412,7 +414,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             )}
 
             {/* SEO Data Mode */}
-            {semrushAvailable && (
+            {seoDataAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Icon as={BarChart3} size="md" className="text-accent-orange" />
@@ -422,9 +424,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   {(['none', 'quick', 'full'] as const).map(mode => (
                     <button
                       key={mode}
-                      onClick={() => setSemrushMode(mode)}
+                      onClick={() => setSeoDataMode(mode)}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                        semrushMode === mode
+                        seoDataMode === mode
                           ? 'border-orange-500/50 bg-orange-500/10 text-accent-orange'
                           : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
@@ -439,15 +441,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from your configured SEO provider.'}
-                  {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
-                  {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEO provider credits used.'}
+                  {seoDataMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from your configured SEO provider.'}
+                  {seoDataMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
+                  {seoDataMode === 'none' && 'Uses AI + Google Search Console data only. No SEO provider credits used.'}
                 </p>
               </div>
             )}
 
             {/* Competitor Domains */}
-            {semrushAvailable && (
+            {seoDataAvailable && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
@@ -696,7 +698,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <CompetitiveIntel
             workspaceId={workspaceId}
             competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-            semrushAvailable={semrushAvailable}
+            seoDataAvailable={seoDataAvailable}
             cachedKeywordGaps={strategy?.keywordGaps}
           />
 
@@ -759,7 +761,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
                 Use <strong className="text-accent-brand">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
-                {strategy.semrushMode && strategy.semrushMode !== 'none' && (
+                {displayedSeoDataMode && displayedSeoDataMode !== 'none' && (
                   <span className="block mt-1 text-accent-orange">
                     SEO provider data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>

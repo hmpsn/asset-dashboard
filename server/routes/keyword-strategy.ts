@@ -32,6 +32,22 @@ export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCom
 
 const log = createLogger('keyword-strategy');
 
+function readSeoDataMode(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const candidate = (body as { seoDataMode?: unknown; semrushMode?: unknown }).seoDataMode
+    ?? (body as { seoDataMode?: unknown; semrushMode?: unknown }).semrushMode;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
+function serializeKeywordStrategy(strategy: KeywordStrategy, pageMap: ReturnType<typeof listPageKeywords>) {
+  const { semrushMode, ...rest } = strategy;
+  return {
+    ...rest,
+    seoDataMode: strategy.seoDataMode ?? semrushMode ?? 'none',
+    pageMap,
+  };
+}
+
 // --- Keyword Strategy Generation (SSE progress) ---
 router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const wantsStream = req.headers.accept === 'text/event-stream';
@@ -69,7 +85,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       workspaceId: req.params.workspaceId,
       businessContext: typeof req.body?.businessContext === 'string' ? req.body.businessContext : undefined,
       mode: req.body?.mode === 'incremental' ? 'incremental' : 'full',
-      semrushMode: typeof req.body?.semrushMode === 'string' ? req.body.semrushMode : undefined,
+      seoDataMode: readSeoDataMode(req.body),
       competitorDomains: competitorDomainsProvided ? req.body.competitorDomains : undefined,
       competitorDomainsProvided,
       maxPages: req.body?.maxPages != null ? Number(req.body.maxPages) : undefined,
@@ -133,7 +149,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       generatedAt: null,
     });
   }
-  res.json({ ...strategy, pageMap });
+  res.json(serializeKeywordStrategy(strategy, pageMap));
 });
 
 // Get strategy diff (compare current vs previous)
