@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { post, put, get, getSafe } from '../api/client';
+import { post, put } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import {
@@ -24,51 +23,16 @@ import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { useSchemaSuggesterGeneration } from './schema/useSchemaSuggesterGeneration';
+import {
+  MAX_SCHEMA_MAPPING_COLLECTIONS,
+  useSchemaSuggesterCmsWorkflow,
+} from './schema/useSchemaSuggesterCmsWorkflow';
 import type { SchemaPageSuggestion, SchemaSuggestion } from './schema/schemaSuggesterTypes';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../../shared/types/schema-generation';
-import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
-import { queryKeys } from '../lib/queryKeys';
 
 type SchemaSubTab = 'generator' | 'guide';
-
-interface CmsTemplatePage {
-  pageId: string;
-  pageTitle: string;
-  slug: string;
-  collectionId: string;
-  collectionName: string;
-  collectionSlug: string;
-}
-
-interface CmsTemplateResult {
-  templateString: string;
-  schemaTypes: string[];
-  fieldsUsed: string[];
-  collectionName: string;
-  collectionSlug: string;
-}
-
-interface CmsMappingField {
-  slug: string;
-  displayName: string;
-  type: string;
-  target?: SchemaFieldTarget;
-}
-
-interface CmsMappingCollection {
-  collectionId: string;
-  collectionName: string;
-  collectionSlug: string;
-  fields: CmsMappingField[];
-  recommendedFieldSlug?: string;
-  mapping: CmsSchemaFieldMapping | null;
-}
-
-interface CmsMappingsResponse {
-  collections: CmsMappingCollection[];
-}
 
 interface Props {
   siteId: string;
@@ -76,8 +40,6 @@ interface Props {
   fixContext?: FixContext | null;
   businessProfile?: BusinessProfileContact | null;
 }
-
-const MAX_SCHEMA_MAPPING_COLLECTIONS = 4;
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
@@ -148,77 +110,31 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setCalloutDismissed(true);
   };
 
-  const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
-  const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
-  const [loadingCmsPages, setLoadingCmsPages] = useState(false);
-  const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
-  const [cmsTemplateResult, setCmsTemplateResult] = useState<CmsTemplateResult | null>(null);
-  const [cmsSelectedPage, setCmsSelectedPage] = useState<CmsTemplatePage | null>(null);
-  const [publishingCmsTemplate, setPublishingCmsTemplate] = useState(false);
-  const [cmsPublished, setCmsPublished] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
-  const [cmsCopied, setCmsCopied] = useState(false);
-  const [cmsError, setCmsError] = useState<string | null>(null);
-  const [cmsMappingError, setCmsMappingError] = useState<string | null>(null);
-
-  const queryClient = useQueryClient();
-  const cmsMappingsQuery = useQuery({
-    queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId, workspaceId),
-    queryFn: () => get<CmsMappingsResponse>(
-      `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
-    ),
-    enabled: !!siteId && !!workspaceId,
-    staleTime: 30_000,
-  });
-  const cmsMappings = cmsMappingsQuery.data?.collections ?? [];
-  const saveCmsMappingMutation = useMutation({
-    mutationFn: async ({ collection, target, slug }: { collection: CmsMappingCollection; target: SchemaFieldTarget; slug: string }) => {
-      const fieldMappings = { ...(collection.mapping?.fieldMappings ?? {}) };
-      const trimmed = slug.trim();
-      if (trimmed) {
-        fieldMappings[target] = trimmed;
-      } else {
-        delete fieldMappings[target];
-      }
-      const mapping = await put<CmsSchemaFieldMapping>(
-        `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
-        {
-          collectionId: collection.collectionId,
-          collectionName: collection.collectionName,
-          collectionSlug: collection.collectionSlug,
-          schemaFieldSlug: collection.mapping?.schemaFieldSlug || collection.recommendedFieldSlug,
-          collectionRole: collection.mapping?.collectionRole,
-          fieldMappings,
-        },
-      );
-      return { collectionId: collection.collectionId, mapping };
-    },
-    onMutate: () => setCmsMappingError(null),
-    onSuccess: ({ collectionId, mapping }) => {
-      queryClient.setQueryData<CmsMappingsResponse>(
-        queryKeys.admin.schemaCmsFieldMappings(siteId, workspaceId),
-        old => ({
-          collections: (old?.collections ?? []).map(collection => (
-            collection.collectionId === collectionId ? { ...collection, mapping } : collection
-          )),
-        }),
-      );
-    },
-    onError: err => {
-      setCmsMappingError(err instanceof Error ? err.message : 'Failed to save CMS field mapping');
-    },
-  });
-  const savingCmsMapping = saveCmsMappingMutation.isPending && saveCmsMappingMutation.variables
-    ? `${saveCmsMappingMutation.variables.collection.collectionId}:${saveCmsMappingMutation.variables.target}`
-    : null;
-
-  const saveCmsFieldMapping = (collection: CmsMappingCollection, target: SchemaFieldTarget, slug: string) => {
-    if (!workspaceId) return;
-    saveCmsMappingMutation.mutate({ collection, target, slug });
-  };
+  const {
+    showCmsPanel,
+    setShowCmsPanel,
+    cmsTemplatePages,
+    loadingCmsPages,
+    generatingCmsTemplate,
+    cmsTemplateResult,
+    publishingCmsTemplate,
+    cmsPublished,
+    cmsCopied,
+    cmsError,
+    cmsMappingError,
+    savingCmsMapping,
+    fieldMappingTargets,
+    schemaMappingCollections,
+    fetchCmsTemplatePages,
+    generateCmsTemplate,
+    publishCmsTemplate,
+    copyCmsTemplate,
+    saveCmsFieldMapping,
+  } = useSchemaSuggesterCmsWorkflow({ siteId, workspaceId });
 
   // Schema editing state — stores edited JSON string per pageId
   const [editingSchema, setEditingSchema] = useState<Set<string>>(new Set());
@@ -392,59 +308,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setSavingTemplate(false);
   };
 
-  // CMS template functions
-  const fetchCmsTemplatePages = async () => {
-    if (cmsTemplatePages.length > 0) { setShowCmsPanel(true); return; }
-    setLoadingCmsPages(true);
-    setCmsError(null);
-    try {
-      const pages = await getSafe<CmsTemplatePage[]>(`/api/webflow/cms-template-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
-      if (Array.isArray(pages)) setCmsTemplatePages(pages);
-      setShowCmsPanel(true);
-    } catch { setCmsError('Failed to load CMS collections'); }
-    setLoadingCmsPages(false);
-  };
-
-  const generateCmsTemplate = async (page: CmsTemplatePage) => {
-    setCmsSelectedPage(page);
-    setGeneratingCmsTemplate(page.collectionId);
-    setCmsTemplateResult(null);
-    setCmsPublished(false);
-    setCmsError(null);
-    try {
-      const result = await post<CmsTemplateResult>(`/api/webflow/schema-cms-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { collectionId: page.collectionId });
-      setCmsTemplateResult(result);
-    } catch (err) {
-      setCmsError(err instanceof Error ? err.message : 'Failed to generate CMS template schema');
-    }
-    setGeneratingCmsTemplate(null);
-  };
-
-  const publishCmsTemplate = async () => {
-    if (!cmsSelectedPage || !cmsTemplateResult) return;
-    setPublishingCmsTemplate(true);
-    setCmsError(null);
-    try {
-      await post(`/api/webflow/schema-cms-template/${siteId}/publish${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, {
-        pageId: cmsSelectedPage.pageId,
-        templateString: cmsTemplateResult.templateString,
-        publishAfter: true,
-      });
-      setCmsPublished(true);
-    } catch (err) {
-      setCmsError(err instanceof Error ? err.message : 'Publish failed');
-    }
-    setPublishingCmsTemplate(false);
-  };
-
-  const copyCmsTemplate = () => {
-    if (!cmsTemplateResult) return;
-    const script = `<script type="application/ld+json">\n${cmsTemplateResult.templateString}\n</script>`;
-    navigator.clipboard.writeText(script);
-    setCmsCopied(true);
-    setTimeout(() => setCmsCopied(false), 2000);
-  };
-
   const publishAllToWebflow = async () => {
     if (!data) return;
     const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
@@ -499,33 +362,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     { value: 'auto', label: 'Auto-detect' },
     ...Object.entries(SCHEMA_ROLE_LABELS).map(([value, label]) => ({ value, label })),
   ];
-
-  const fieldMappingTargets: Array<{ target: SchemaFieldTarget; label: string; roles: Array<'location' | 'service'> }> = [
-    { target: 'streetAddress', label: 'Street', roles: ['location'] },
-    { target: 'addressLocality', label: 'City', roles: ['location'] },
-    { target: 'addressRegion', label: 'State', roles: ['location'] },
-    { target: 'postalCode', label: 'ZIP', roles: ['location'] },
-    { target: 'phone', label: 'Phone', roles: ['location'] },
-    { target: 'email', label: 'Email', roles: ['location'] },
-    { target: 'openingHours', label: 'Hours', roles: ['location'] },
-    { target: 'serviceName', label: 'Service name', roles: ['service'] },
-    { target: 'serviceType', label: 'Service type', roles: ['service'] },
-    { target: 'areaServed', label: 'Area served', roles: ['service'] },
-    { target: 'price', label: 'Price', roles: ['service'] },
-    { target: 'priceCurrency', label: 'Currency', roles: ['service'] },
-  ];
-
-  const schemaMappingCollections = cmsMappings
-    .map(collection => {
-      const role = collection.mapping?.collectionRole
-        || (/(location|locations|clinic|clinics|store|stores|branch|branches)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
-          ? 'location'
-          : /(service|services|treatment|treatments|procedure|procedures)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
-            ? 'service'
-            : undefined);
-      return role === 'location' || role === 'service' ? { ...collection, schemaRole: role } : null;
-    })
-    .filter((collection): collection is CmsMappingCollection & { schemaRole: 'location' | 'service' } => Boolean(collection));
 
   const schemaTabBar = (
     <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">

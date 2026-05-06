@@ -4535,3 +4535,16 @@ The migration preserves SchemaSuggester behavior: the parent still renders the g
 **Mutual:** Reduces SchemaSuggester's controller surface while preserving schema scan, single-page generation, page picker, saved snapshot, and progress behavior.
 
 **Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `tests/unit/schema-suggester-generation.test.ts`.
+
+### 352. Platform Consolidation — SchemaSuggester CMS Workflow Hook
+**What it does:** Continues the SchemaSuggester feature-tool split by moving CMS template and field-mapping workflow state into `useSchemaSuggesterCmsWorkflow`. The hook owns CMS template page loading, template generation, template publish/copy feedback, CMS field-mapping query/mutation state, saving/error labels, and detected location/service collection derivation.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the CMS template panel and collection field mapping controls, while continuing to own page-level schema publishing, bulk publish progress, approvals/retractions, impact tracking, and schema card editing. The CMS mapping query keeps the existing `queryKeys.admin.schemaCmsFieldMappings` contract and React Query mutation cache update; no background-job or endpoint behavior was changed.
+
+**Agency value:** Engineers can adjust CMS template/schema-field mapping behavior in a focused workflow hook instead of editing the remaining SchemaSuggester shell.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Reduces SchemaSuggester's parent surface again while keeping CMS template publishing, field mapping, and page-level publish/approval flows behaviorally unchanged.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterCmsWorkflow.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/CmsTemplatePanel.tsx`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
