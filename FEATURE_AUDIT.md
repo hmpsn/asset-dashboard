@@ -4496,3 +4496,16 @@ The migration preserves PageIntelligence behavior: the parent still owns the pag
 **Mutual:** Further reduces the PageIntelligence UI surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
 
 **Files:** `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 349. Platform Consolidation — PageIntelligence Detail Sections Split
+**What it does:** Continues the PageIntelligence feature-tool split by breaking the expanded page detail renderer into focused section components. `PageIntelligenceStrategySection` owns strategy keyword display/editing and the SEO copy panel, `PageIntelligenceAnalysisSection` owns the AI analysis and content metrics cards, `PageIntelligencePersistedAnalysisSummary` owns the persisted-analysis fallback summary, `PageIntelligencePageActions` owns the follow-on navigation actions, and `PageIntelligenceTrackKeywordButton` centralizes the duplicated track/tracking badge.
+
+The migration preserves PageIntelligence behavior: the parent still owns page-analysis background job wiring, single-page analysis calls, keyword persistence, rank tracking mutation state, SEO copy generation, and route navigation. The extracted sections receive values and callbacks only, and the source contract guard now pins the detail-section boundary against accidental background-job ownership drift.
+
+**Agency value:** Engineers can change strategy, analysis, persisted-summary, or action-button presentation independently instead of reopening the full expanded detail renderer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's dense detail surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligenceStrategySection.tsx`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/PageIntelligencePersistedAnalysisSummary.tsx`; `src/components/page-intelligence/PageIntelligencePageActions.tsx`; `src/components/page-intelligence/PageIntelligenceTrackKeywordButton.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
