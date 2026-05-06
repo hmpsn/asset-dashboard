@@ -19,6 +19,7 @@ import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
+import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13209);
 const { api, postJson, patchJson, del } = ctx;
@@ -31,6 +32,16 @@ let clientUserId = '';
 let clientUserToken = '';
 const ownedSiteId = 'site_guard_owned';
 const otherSiteId = 'site_guard_other';
+
+function cleanKeywordFeedback(workspaceId: string) {
+  db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ?').run(workspaceId);
+}
+
+async function listAdminKeywordFeedback(workspaceId: string, token: string) {
+  const res = await api(`/api/webflow/keyword-feedback/${workspaceId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(res.status).toBe(200);
+  return await res.json() as Array<{ keyword: string; status: string; source?: string | null }>;
+}
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -69,6 +80,8 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
+  cleanKeywordFeedback(testWsId);
+  cleanKeywordFeedback(otherWsId);
   deleteClientUser(clientUserId, testWsId);
   deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
@@ -278,6 +291,58 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
       body: JSON.stringify({ keyword: 'cross workspace keyword', status: 'approved' }),
     });
     expect(res.status).toBe(403);
+  });
+
+  it('rejects whitespace-only admin keyword feedback before inserting an empty row', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: '   ', status: 'approved' }),
+    });
+    expect(res.status).toBe(400);
+
+    const rows = await listAdminKeywordFeedback(testWsId, scopedUserToken);
+    expect(rows.find(row => row.keyword === '')).toBeUndefined();
+  });
+
+  it('rejects unsupported admin keyword feedback fields before changing existing feedback', async () => {
+    const keyword = `admin strict ${Date.now()}`;
+    const createRes = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, status: 'approved', source: 'content_gap' }),
+    });
+    expect(createRes.status).toBe(200);
+
+    const invalidRes = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, status: 'declined', adminOverride: true }),
+    });
+    expect(invalidRes.status).toBe(400);
+
+    const row = (await listAdminKeywordFeedback(testWsId, scopedUserToken)).find(item => item.keyword === keyword);
+    expect(row?.status).toBe('approved');
+  });
+
+  it('rejects unsupported admin bulk feedback sources without partial writes', async () => {
+    const validKeyword = `admin valid ${Date.now()}`;
+    const badKeyword = `admin bad source ${Date.now()}`;
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}/bulk`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keywords: [
+          { keyword: validKeyword, status: 'approved', source: 'content_gap' },
+          { keyword: badKeyword, status: 'requested', source: 'admin_override' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(400);
+
+    const rows = await listAdminKeywordFeedback(testWsId, scopedUserToken);
+    expect(rows.find(row => row.keyword === validKeyword)).toBeUndefined();
+    expect(rows.find(row => row.keyword === badKeyword)).toBeUndefined();
   });
 
   it('rejects Webflow asset reads when the workspace query is outside the JWT scope', async () => {

@@ -28,6 +28,12 @@ import { WS_EVENTS } from '../ws-events.js';
 import { hasActiveJob } from '../jobs.js';
 import { generateKeywordStrategy, KeywordStrategyGenerationError } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import {
+  adminBulkKeywordFeedbackSchema,
+  adminKeywordFeedbackSchema,
+  type AdminBulkKeywordFeedbackBody,
+  type AdminKeywordFeedbackBody,
+} from '../schemas/keyword-feedback.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -302,19 +308,11 @@ router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess(
 });
 
 // Admin or client: submit feedback on a keyword
-const feedbackSchema = z.object({
-  keyword: z.string().min(1),
-  status: z.enum(['approved', 'declined', 'requested']),
-  reason: z.string().optional(),
-  source: z.enum(['content_gap', 'page_map', 'opportunity', 'topic_cluster', 'keyword_gap']).optional(),
-  declinedBy: z.string().optional(),
-});
-
-// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
-router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(feedbackSchema), (req, res) => {
+// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(adminKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { keyword, status, reason, source, declinedBy } = req.body;
+  const { keyword, status, reason, source, declinedBy } = req.body as AdminKeywordFeedbackBody;
   const kw = keyword.toLowerCase().trim();
 
   db.prepare(`
@@ -325,29 +323,21 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
       reason = excluded.reason,
       declined_by = excluded.declined_by,
       updated_at = datetime('now')
-  `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy || null);
+  `).run(ws.id, kw, status, reason || null, source, declinedBy || null);
 
   if (status === 'approved') addTrackedKeyword(ws.id, kw);
 
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
 // Bulk feedback (approve/decline multiple keywords at once)
-const bulkFeedbackSchema = z.object({
-  keywords: z.array(z.object({
-    keyword: z.string().min(1),
-    status: z.enum(['approved', 'declined', 'requested']),
-    reason: z.string().optional(),
-    source: z.string().optional(),
-  })).min(1).max(100),
-  declinedBy: z.string().optional(),
-});
-
-// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
-router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceAccess('workspaceId'), validate(bulkFeedbackSchema), (req, res) => {
+// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceAccess('workspaceId'), validate(adminBulkKeywordFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keywords, declinedBy } = req.body as AdminBulkKeywordFeedbackBody;
 
   const stmt = db.prepare(`
     INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
@@ -359,19 +349,20 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
       updated_at = datetime('now')
   `);
 
-  const insert = db.transaction((items: typeof req.body.keywords) => {
+  const insert = db.transaction((items: AdminBulkKeywordFeedbackBody['keywords']) => {
     for (const item of items) {
-      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', req.body.declinedBy || null);
+      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source, declinedBy || null);
     }
   });
-  insert(req.body.keywords);
+  insert(keywords);
 
-  for (const item of req.body.keywords) {
+  for (const item of keywords) {
     if (item.status === 'approved') addTrackedKeyword(ws.id, item.keyword.toLowerCase().trim());
   }
 
-  log.info(`Bulk keyword feedback: ${req.body.keywords.length} keywords for workspace ${ws.id}`);
-  res.json({ updated: req.body.keywords.length });
+  log.info(`Bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  res.json({ updated: keywords.length });
 });
 
 // Delete feedback (un-decline a keyword)
