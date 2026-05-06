@@ -31,6 +31,11 @@ const createRequestSchema = z.object({
   submittedBy: z.string().max(200).optional(),
 });
 
+const requestNoteContentSchema = z.string().trim().max(5000);
+const addRequestNoteSchema = z.object({
+  content: requestNoteContentSchema.min(1, 'content required'),
+});
+
 router.use('/api/public/requests/:workspaceId', requireClientPortalAuth('workspaceId'));
 router.use('/api/public/requests/:workspaceId', (req, res, next) => {
   if (!getWorkspace(req.params.workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
@@ -77,9 +82,8 @@ router.get('/api/public/requests/:workspaceId/:requestId', (req, res) => {
 });
 
 // Public: client adds a note
-router.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
+router.post('/api/public/requests/:workspaceId/:requestId/notes', validate(addRequestNoteSchema), (req, res) => {
   const { content } = req.body;
-  if (!content) return res.status(400).json({ error: 'content required' });
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content);
@@ -105,7 +109,9 @@ router.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.a
 
 // Upload attachments with a note (public client)
 router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upload.array('files', 5), (req, res) => {
-  const content = req.body.content || '';
+  const contentResult = requestNoteContentSchema.optional().safeParse(req.body.content);
+  if (!contentResult.success) return res.status(400).json({ error: contentResult.error.issues[0]?.message || 'Invalid content' });
+  const content = contentResult.data || '';
   const files = req.files as Express.Multer.File[];
   if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
   const r = getRequest(req.params.requestId);
