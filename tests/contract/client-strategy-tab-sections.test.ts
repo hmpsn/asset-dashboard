@@ -11,8 +11,7 @@ describe('client StrategyTab section split', () => {
     expect(strategyTabSrc).toContain("from './strategy/strategyKeywordDisplay'");
     expect(strategyTabSrc).toContain('<StrategyKeywordDrawer');
     expect(strategyTabSrc).toContain('ROLE_DISPLAY_LABELS');
-    expect(strategyTabSrc).toContain('fmtNum');
-    expect(strategyTabSrc).toContain('intentColor');
+    expect(strategyTabSrc).toContain('kdColor');
     expect(strategyTabSrc).not.toContain('aria-label={`Keyword details:');
     expect(strategyTabSrc).not.toContain('See the numbers');
 
@@ -26,6 +25,7 @@ describe('client StrategyTab section split', () => {
     expect(displaySrc).toContain('export const SIGNAL_LABELS');
     expect(displaySrc).toContain('export const fmtNum');
     expect(displaySrc).toContain('export const intentColor');
+    expect(displaySrc).toContain('export const kdColor');
     expect(displaySrc).toContain('export function fmtAudience');
     expect(displaySrc).toContain('export function fmtMomentum');
     expect(displaySrc).toContain('export function confidenceStatement');
