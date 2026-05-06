@@ -4237,3 +4237,17 @@ All replaced `.includes()` / `.endsWith()` with `normalizePath()` + exact compar
 **Mutual:** Creates the first clean stepping stone for the larger monolith roadmap: keyword strategy route split, StrategyTab decomposition, Webflow SEO job split, and workspace intelligence slice extraction.
 
 **Files:** `server/routes/webflow-seo-suggestions.ts`; `server/routes/webflow-seo-page-tools.ts`; `server/routes/webflow-seo-rewrite.ts`; `server/routes/webflow-seo-bulk-rewrite.ts`; `server/routes/webflow-seo-apply.ts`; `server/routes/webflow-seo-audit.ts`; `server/routes/webflow-seo-jobs.ts`; `server/webflow-seo-rewrite-utils.ts`; `server/webflow-seo-audit-bridges.ts`; `server/webflow-seo-bulk-accept-fixes-job.ts`; `server/webflow-seo-bulk-rewrite-job.ts`; `server/webflow-seo-bulk-analyze-job.ts`; `server/schemas/seo-bulk-jobs.ts`; `server/route-groups/webflow.ts`; `server/workspace-intelligence.ts`; `server/intelligence/page-elements-slice.ts`; `tests/unit/page-elements-slice.test.ts`; `tests/unit/webflow-seo-audit-bridges.test.ts`; `tests/unit/webflow-seo-bulk-accept-fixes-job.test.ts`; `tests/unit/webflow-seo-bulk-rewrite-job.test.ts`; `tests/unit/webflow-seo-bulk-analyze-job.test.ts`.
+
+
+### 330. Platform Consolidation — SEO Provider Boundary Cleanup
+**What it does:** Finishes the keyword-strategy-facing cleanup from SEMRush-specific naming toward the existing `SeoDataProvider` abstraction. Provider-neutral trend/SERP helpers now live in `server/seo-provider-signals.ts`; `server/semrush.ts` keeps compatibility re-exports only. Keyword strategy generation imports the neutral helpers, emits `seo-data` progress events, and stores `seoDataMode` for new strategies while preserving `semrushMode` fallback for legacy jobs, direct route callers, and existing stored strategy blobs.
+
+The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state and sends `seoDataMode` into background jobs. `useKeywordStrategy()` derives availability from `/api/seo-providers/status`, so DataForSEO-only workspaces can enable SEO data mode without depending on the legacy `/api/semrush/status` naming. The admin read path returns a provider-neutral `seoDataMode` alias for old strategies that only have `semrushMode`; the public client strategy endpoint continues to omit provider/mode internals.
+
+**Agency value:** Keyword strategy settings now describe the configured SEO data provider instead of implying SEMRush is the only backend. This reduces confusion as DataForSEO becomes the default provider.
+
+**Client value:** N/A — admin-facing naming and platform boundary cleanup only. Client-safe APIs remain unchanged.
+
+**Mutual:** Keeps provider-specific code at the provider boundary while preserving old route/job payload compatibility, making the next keyword strategy service split less tangled.
+
+**Files:** `server/seo-provider-signals.ts`; `server/keyword-strategy-generation.ts`; `server/routes/keyword-strategy.ts`; `server/routes/jobs.ts`; `server/semrush.ts`; `shared/types/workspace.ts`; `src/hooks/admin/useKeywordStrategy.ts`; `src/components/KeywordStrategy.tsx`; `src/components/strategy/CompetitiveIntel.tsx`; `src/components/strategy/KeywordStrategyGuide.tsx`; `tests/contract/seo-provider-boundary.test.ts`; `tests/component/KeywordStrategyBackgroundJob.test.tsx`; `tests/integration/client-strategy.test.ts`; `tests/unit/use-page-join.test.ts`.

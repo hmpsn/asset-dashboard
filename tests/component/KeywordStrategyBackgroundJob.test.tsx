@@ -16,7 +16,7 @@ vi.mock('../../src/hooks/admin', () => ({
   useKeywordStrategy: () => ({
     data: {
       strategy: null,
-      semrushAvailable: true,
+      seoDataAvailable: true,
       workspaceData: { competitorDomains: ['competitor.test'] },
     },
     isLoading: false,
@@ -91,7 +91,7 @@ describe('KeywordStrategyPanel background job wiring', () => {
         mode: 'full',
         workspaceId: 'ws-1',
         businessContext: undefined,
-        semrushMode: 'quick',
+        seoDataMode: 'quick',
         competitorDomains: ['competitor.test'],
         maxPages: 500,
       });

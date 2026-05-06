@@ -146,7 +146,7 @@
           "source": "PR #159 code review flag",
           "est": "0.5h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
         },
         {
@@ -507,7 +507,7 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "4-6h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
           "notes": "Verified still valid on origin/staging eb0a5832. Completed across thirteen slices. Earlier slices migrated chat memory summaries, meeting briefs, monthly digests, content decay recommendations, internal link suggestions, SEO audit metadata recommendations, rewrite chat, Webflow keyword analysis, brandscript import, copy-intelligence pattern extraction, copy refresh suggestions, discovery extraction, copy voice feedback classification/suggestion generation, llms.txt page summaries, Webflow per-page SEO copy generation, page analysis jobs, bulk Webflow page analysis jobs, Google Search Console chat, workspace intelligence-profile autofill, anomaly digest summaries, keyword recommendation relevance ranking, and content post creative generation/SEO metadata/voice scoring. Final broad batch migrates the remaining general app generation paths: content briefs and outline regeneration, AEO page review, schema plan/template suggestions, keyword strategy synthesis, content publish field mapping, content post AI review, diagnostic synthesis, admin/client Search chat, jobs bulk SEO fixes, copy pipeline generation/regeneration, and blueprint generation. Claude review follow-up added JSON responseFormat defense to object-shaped parsers in the final batch plus meeting brief generation. Direct provider-helper usage now remains at the dispatcher/helper boundary, provider helper tests/usage exports, parseAIJson compatibility imports, and documented vision payload exceptions."
         },
@@ -517,9 +517,9 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "4-6h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. SeoDataProvider exists, but server/routes/keyword-strategy.ts still imports helpers from server/semrush.ts, semrushMode remains feature-facing, and provider-specific naming leaks through strategy UI/state."
+          "notes": "Completed 2026-05-05 in codex/seo-provider-keyword-strategy-consolidation. Keyword strategy generation now imports trend/SERP helpers from provider-neutral server/seo-provider-signals.ts instead of server/semrush.ts, while semrush.ts keeps compatibility re-exports for older tests/imports. Keyword strategy route/job/component paths use seoDataMode, keep legacy semrushMode fallback for existing callers and stored strategies, and return a provider-neutral seoDataMode alias from the admin strategy read path. useKeywordStrategy now derives availability from /api/seo-providers/status so DataForSEO-only workspaces enable SEO data mode. Keyword Strategy UI state/props/guide copy now use provider-neutral naming, and generation progress uses seo-data while jobs still label old semrush progress for compatibility."
         },
         {
           "id": "platform-consolidation-keyword-strategy-route-split",
@@ -529,7 +529,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. server/routes/keyword-strategy.ts is still 2,755 lines. Split generation orchestration, page analysis, feedback, tracked keywords/signals, history diff, and broadcasts into services. Sequence with existing normalization items #365, #367, #368, #369, and #370."
+          "notes": "Verified still valid after provider-boundary cleanup on 2026-05-05. server/routes/keyword-strategy.ts is now a 387-line route wrapper after prior extraction, but server/keyword-strategy-generation.ts remains a 2,489-line generation service. Next split should carve generation orchestration, provider enrichment/page analysis, feedback, tracked keywords/signals, history diff, and broadcasts into focused services. Sequence with existing normalization items #365, #367, #368, #369, and #370."
         },
         {
           "id": "platform-consolidation-webflow-seo-route-split",

@@ -88,6 +88,7 @@ const keywordStrategyStepLabels: Record<string, string> = {
   discovery: 'Discovering pages',
   content: 'Fetching page content',
   search_data: 'Search Console data',
+  'seo-data': 'Keyword intelligence',
   semrush: 'Keyword intelligence',
   ai: 'AI analysis',
   enrichment: 'Enriching data',
@@ -636,7 +637,7 @@ router.post('/api/jobs', async (req, res) => {
               if (jobWasCancelled()) return;
               updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
               const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
-              const semrushMode = (params.semrushMode as string) || 'none';
+              const seoDataMode = (params.seoDataMode as string) || (params.semrushMode as string) || 'none';
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
               const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
@@ -644,7 +645,7 @@ router.post('/api/jobs', async (req, res) => {
               const generationResult = await generateKeywordStrategy({
                 workspaceId: wsId,
                 businessContext,
-                semrushMode,
+                seoDataMode,
                 competitorDomains,
                 competitorDomainsProvided,
                 maxPages,

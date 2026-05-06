@@ -16,7 +16,7 @@ interface WorkspaceData {
 
 interface KeywordStrategyData {
   strategy: KeywordStrategy | null;
-  semrushAvailable: boolean;
+  seoDataAvailable: boolean;
   workspaceData: WorkspaceData | null;
 }
 
@@ -24,15 +24,15 @@ export function useKeywordStrategy(workspaceId: string) {
   return useQuery({
     queryKey: queryKeys.admin.keywordStrategy(workspaceId),
     queryFn: async (): Promise<KeywordStrategyData> => {
-      const [strategyResponse, semrushStatus, workspaceResponse] = await Promise.all([
+      const [strategyResponse, providerStatus, workspaceResponse] = await Promise.all([
         workspaceId ? get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null) : Promise.resolve(null),
-        keywords.semrushStatus().catch(() => ({ configured: false } as { configured?: boolean })),
+        keywords.providerStatus().catch(() => ({ providers: [] })),
         workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null)
       ]);
       
       return {
         strategy: strategyResponse || null,
-        semrushAvailable: (semrushStatus as { configured?: boolean })?.configured || false,
+        seoDataAvailable: Boolean((providerStatus as { providers?: Array<{ configured: boolean }> })?.providers?.some(provider => provider.configured)),
         workspaceData: workspaceResponse as WorkspaceData | null
       };
     },

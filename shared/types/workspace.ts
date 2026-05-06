@@ -116,6 +116,8 @@ export interface CannibalizationItem {
   recommendation: string;
 }
 
+export type SeoDataMode = 'quick' | 'full' | 'none';
+
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[]; // SEMRush data for site keywords
@@ -144,7 +146,9 @@ export interface KeywordStrategy {
   cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
-  semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
+  seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
+  /** @deprecated use seoDataMode. Kept for strategies generated before provider-neutral naming. */
+  semrushMode?: SeoDataMode;
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {
     /** Matches DeviceBreakdown from server/search-console.ts */

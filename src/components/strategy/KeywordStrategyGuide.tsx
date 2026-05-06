@@ -11,13 +11,13 @@ import {
 const STEPS = [
   {
     number: 1,
-    title: 'Configure SEMRush Mode',
+    title: 'Configure SEO Data Mode',
     icon: Settings2,
     color: 'text-teal-400',
     bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'Choose how much keyword intelligence to pull in. The mode determines the depth of data used during strategy generation.',
     actions: [
-      'Off — uses AI + Google Search Console only (no SEMRush credits)',
+      'Off — uses AI + Google Search Console only (no SEO provider credits)',
       'Quick (~500 credits) — adds real search volume + keyword difficulty per page keyword',
       'Full (~7,500 credits) — adds competitive gap analysis, domain-level keywords, and related terms',
       'Use "Quick" for most clients; "Full" for competitive markets or quarterly deep-dives',
@@ -45,14 +45,14 @@ const STEPS = [
     icon: Sparkles,
     color: 'text-sky-400',
     bg: 'bg-sky-500/10 border-sky-500/20',
-    description: 'The AI crawls every mapped page, pulls Search Console data, enriches with SEMRush if enabled, and produces a keyword map + opportunity analysis.',
+    description: 'The AI crawls every mapped page, pulls Search Console data, enriches with your configured SEO provider if enabled, and produces a keyword map + opportunity analysis.',
     actions: [
       'Click "Generate Strategy" — expect 2–15 min depending on site size + mode',
       'Output includes: target keywords per page, search intent labels, position data, and CPC',
       'Quick Wins, Content Gaps, and Keyword Gaps are calculated automatically',
       'Use "Update changed pages" to cheaply re-process only recently modified pages',
     ],
-    tip: 'For a 500-page site with SEMRush Quick mode, expect ~5–7 minutes. The progress bar shows which phase is running (pages → Search Console → SEMRush → AI).',
+    tip: 'For a 500-page site with Quick SEO data mode, expect ~5–7 minutes. The progress bar shows which phase is running (pages → Search Console → SEO data → AI).',
   },
   {
     number: 4,

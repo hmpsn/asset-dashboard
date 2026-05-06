@@ -23,7 +23,7 @@ import { addTrackedKeyword, getTrackedKeywords } from './rank-tracking.js';
 import {
   trendDirection,
   hasSerpOpportunity,
-} from './semrush.js';
+} from './seo-provider-signals.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
@@ -360,6 +360,8 @@ export interface GenerateKeywordStrategyOptions {
   workspaceId: string;
   businessContext?: string;
   mode?: 'full' | 'incremental';
+  seoDataMode?: 'quick' | 'full' | 'none' | string;
+  /** @deprecated use seoDataMode. Preserved for legacy route/job callers. */
   semrushMode?: 'quick' | 'full' | 'none' | string;
   competitorDomains?: string[];
   competitorDomainsProvided?: boolean;
@@ -388,6 +390,10 @@ export class KeywordStrategyGenerationError extends Error {
 
 export function hasActiveKeywordStrategyGeneration(workspaceId: string): boolean {
   return activeGenerations.has(workspaceId);
+}
+
+function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'none' {
+  return mode === 'quick' || mode === 'full' ? mode : 'none';
 }
 
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
@@ -419,7 +425,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
-  const semrushMode = options.semrushMode || 'none'; // 'quick', 'full', 'none'
+  const seoDataMode = normalizeSeoDataMode(options.seoDataMode ?? options.semrushMode);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
   const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, 2000) : 0; // 0 = no cap, clamped at 2000
@@ -787,11 +793,11 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       }
     }
 
-    if (semrushMode !== 'none' && provider) {
-      sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
+    if (seoDataMode !== 'none' && provider) {
+      sendProgress('seo-data', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
       if (!fetchCompetitors) {
         log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
-        sendProgress('semrush', 'Competitor data still fresh — skipping re-fetch...', 0.58);
+        sendProgress('seo-data', 'Competitor data still fresh — skipping re-fetch...', 0.58);
       }
       // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
@@ -816,7 +822,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         // Both quick and full: auto-discover competitors if none provided
         if (fetchCompetitors && competitorDomains.length === 0) {
           try {
-            sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
+            sendProgress('seo-data', 'Auto-discovering organic competitors...', 0.57);
             const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
             const autoCompetitors = filterDiscoveredCompetitors(discovered, siteDomain)
               .slice(0, MAX_COMPETITORS)
@@ -839,7 +845,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
             // competitor keywords. Cost: ~4× provider credits vs old 100-row limit
             // (200 compLimit × 2× SEMRush overfetch = 400 rows × 10 credits each).
             // Worth it for gap-analysis quality. PR #221 A-series verification notes.
-            const compLimit = semrushMode === 'full' ? 200 : 50;
+            const compLimit = seoDataMode === 'full' ? 200 : 50;
 
             // Provider parity: DFS gets an explicit search_volume,desc order_by
             // (see dataforseo-provider.ts), so its top-N already IS top-N-by-volume.
@@ -849,7 +855,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
             const fetchLimit = compLimit * fetchMultiplier;
 
             const cappedCompetitorDomains = competitorDomains.slice(0, MAX_COMPETITORS);
-            sendProgress('semrush', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
+            sendProgress('seo-data', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
             for (const comp of cappedCompetitorDomains) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
@@ -899,7 +905,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         // Both quick and full: keyword gap analysis
         if (fetchCompetitors && competitorDomains.length > 0) {
           try {
-            sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
+            sendProgress('seo-data', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
             keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
             log.info(`Found ${keywordGaps.length} keyword gaps`);
@@ -923,9 +929,9 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
         }
 
         // Full mode only: related keywords for deeper topic expansion
-        if (semrushMode === 'full') {
+        if (seoDataMode === 'full') {
           try {
-            sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
+            sendProgress('seo-data', 'Fetching related keyword ideas...', 0.65);
             const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
             for (const seed of seedKeywords) {
               const related = await provider.getRelatedKeywords(seed, ws.id, 10);
@@ -944,7 +950,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
 
           // Full mode only: question keywords for FAQ/AEO targeting
           try {
-            sendProgress('semrush', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
+            sendProgress('seo-data', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
             const qSeeds = semrushDomainData.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
             for (const seed of qSeeds) {
               const questions = await provider.getQuestionKeywords(seed, ws.id, 10);
@@ -1144,7 +1150,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           if (!semrushByPath.has(p)) semrushByPath.set(p, []);
           semrushByPath.get(p)!.push(k);
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
-        keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: 'semrush' });
+        keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
       }
     }
     // Add GSC queries to the pool (these are proven search terms)
@@ -1360,9 +1366,9 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       log.info(`Incremental mode: merged ${pagesToPreserve.length} preserved pages into final mappings`);
     }
 
-    // --- Post-AI keyword validation via SEMRush bulk lookup ---
+    // --- Post-AI keyword validation via SEO provider bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
-    if (provider && semrushMode !== 'none') {
+    if (provider && seoDataMode !== 'none') {
       const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
@@ -1859,7 +1865,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // If we still have keywords without volume data and a provider is available, bulk-fetch them
     // Only look up keywords NOT already in the pool (those are "invented" by the AI)
     // Cap at 30 to avoid burning credits on keywords that will mostly return NOTHING FOUND
-    if (provider && semrushMode !== 'none') {
+    if (provider && seoDataMode !== 'none') {
       const pagesNeedingVolume = strategy.pageMap
         .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume && pm.primaryKeyword);
       // Filter to reasonable keywords only (≤5 words, not too specific)
@@ -1923,7 +1929,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         missingCgKws.push(cg.targetKeyword);
       }
       log.info(`Content gap enrichment: ${poolEnriched} from keyword pool, ${strategy.contentGaps.length - poolEnriched - missingCgKws.length} from domain data, ${missingCgKws.length} need API lookup`);
-      if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
+      if (missingCgKws.length > 0 && provider && seoDataMode !== 'none') {
         try {
           const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
           const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
@@ -2252,7 +2258,7 @@ Rules:
 
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
-    if (provider && semrushMode !== 'none' && strategy.siteKeywords?.length) {
+    if (provider && seoDataMode !== 'none' && strategy.siteKeywords?.length) {
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const found: typeof siteKeywordMetrics = [];
       const missing: string[] = [];
@@ -2379,7 +2385,7 @@ Rules:
       cannibalization: cannibalization.length > 0 ? cannibalization.slice(0, 20) : undefined,
       questionKeywords: allQuestionKws.length > 0 ? allQuestionKws : undefined,
       businessContext: businessContext || undefined,
-      semrushMode: semrushMode as 'quick' | 'full' | 'none',
+      seoDataMode: seoDataMode as 'quick' | 'full' | 'none',
       // Enriched search signals
       searchSignals: {
         deviceBreakdown: deviceBreakdown.length > 0 ? deviceBreakdown : undefined,
