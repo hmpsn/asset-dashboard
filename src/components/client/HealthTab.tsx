@@ -8,6 +8,10 @@ import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail, CwvStrategyResult } from './types';
 import { STUDIO_NAME } from '../../constants';
 import { post, getSafe } from '../../api/client';
+import {
+  hasContentIssues,
+  buildContentImprovementRequest,
+} from '../../lib/health-tab-content-request';
 
 const ScoreRing = MetricRing;
 
@@ -60,14 +64,7 @@ function checkImpact(check: string): string | null {
   return CHECK_IMPACT[chk] || null;
 }
 
-const CONTENT_ISSUE_CHECKS = ['content-length', 'heading', 'h1', 'h1-missing', 'h1-multiple', 'word-count'];
-function hasContentIssues(issues: { check: string; message: string }[]): boolean {
-  return issues.some(i => {
-    const chk = i.check?.toLowerCase() || '';
-    const msg = i.message?.toLowerCase() || '';
-    return CONTENT_ISSUE_CHECKS.some(c => chk.includes(c)) || msg.includes('thin content') || msg.includes('word');
-  });
-}
+
 
 export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested, actionPlanSlot }: HealthTabProps) {
   // State for accordion sections
@@ -88,15 +85,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     if (!workspaceId || requestedPages.has(page.pageId)) return;
     setRequestingPage(page.pageId);
     try {
-      const wordIssue = page.issues.find(i => i.check?.toLowerCase().includes('content-length'));
-      const wordMatch = wordIssue?.message?.match(/(\d+)\s*words?/i);
-      const wordCount = wordMatch ? parseInt(wordMatch[1], 10) : undefined;
-      await post(`/api/public/content-request/${workspaceId}/from-audit`, {
-        pageSlug: page.slug,
-        pageName: page.page,
-        issues: page.issues.filter(i => hasContentIssues([i])).map(i => i.message),
-        wordCount,
-      });
+      await post(
+        `/api/public/content-request/${workspaceId}/from-audit`,
+        buildContentImprovementRequest(page),
+      );
       setRequestedPages(prev => new Set(prev).add(page.pageId));
       onContentRequested?.();
     } catch { setRequestError(page.pageId); }
