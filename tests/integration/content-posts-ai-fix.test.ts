@@ -188,6 +188,7 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     mockOpenAIJsonResponse('content-fix', {
       seoTitle: 'Optimized Test Post Title',
       seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
+      reasoning: 'Extra model commentary should not break the response.',
     });
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'meta_optimized',
@@ -199,11 +200,69 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     const parsed = JSON.parse(body.suggestedText);
     expect(parsed).toHaveProperty('seoTitle');
     expect(parsed).toHaveProperty('seoMetaDescription');
+    expect(parsed).not.toHaveProperty('reasoning');
 
     const after = getPost(wsId, postId);
     expect(after?.seoTitle).toBe(before?.seoTitle);
     expect(after?.seoMetaDescription).toBe(before?.seoMetaDescription);
     expect(after?.updatedAt).toBe(before?.updatedAt);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('meta_optimized — rejects malformed AI meta JSON without mutating or broadcasting', async () => {
+    const before = getPost(wsId, postId);
+    mockOpenAIJsonResponse('content-fix', {
+      seoTitle: 'Optimized Test Post Title',
+      seoMetaDescription: 42,
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      issueKey: 'meta_optimized',
+      reason: 'Meta description too short',
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+
+    expect(getPost(wsId, postId)).toEqual(before);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('meta_optimized — rejects blank AI meta fields without mutating or broadcasting', async () => {
+    const before = getPost(wsId, postId);
+    mockOpenAIJsonResponse('content-fix', {
+      seoTitle: '   ',
+      seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      issueKey: 'meta_optimized',
+      reason: 'Meta title is missing',
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+
+    expect(getPost(wsId, postId)).toEqual(before);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('meta_optimized — rejects AI meta fields that sanitize to blank without mutating or broadcasting', async () => {
+    const before = getPost(wsId, postId);
+    mockOpenAIJsonResponse('content-fix', {
+      seoTitle: '<script></script>',
+      seoMetaDescription: 'An optimized meta description for the test post that is 150 characters long and includes the keyword.',
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      issueKey: 'meta_optimized',
+      reason: 'Meta title is missing',
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to parse AI meta response' });
+
+    expect(getPost(wsId, postId)).toEqual(before);
     expect(broadcastState.calls).toHaveLength(0);
   });
 
@@ -278,12 +337,13 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
   it('marks provenance-sensitive checklist items as human-review required even when AI returns pass', async () => {
     const before = getPost(wsId, postId);
     mockOpenAIJsonResponse('content-review', {
-      factual_accuracy: { pass: true, reason: 'No suspicious claims detected.' },
+      factual_accuracy: { pass: true, reason: 'No suspicious claims detected.', confidence: 0.95 },
       brand_voice: { pass: true, reason: 'Tone is consistent.' },
       internal_links: { pass: true, reason: 'Internal links are present.' },
       no_hallucinations: { pass: true, reason: 'No obvious fabricated statistics detected.' },
       meta_optimized: { pass: true, reason: 'Metadata is in range.' },
       word_count_target: { pass: true, reason: 'Word count is in range.' },
+      summary: 'Extra model commentary should not fail the review.',
     });
 
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
@@ -299,6 +359,8 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
     expect(body.review.no_hallucinations.humanReviewRequired).toBe(true);
     expect(body.review.brand_voice.pass).toBe(true);
     expect(body.review.internal_links.pass).toBe(true);
+    expect(body.review.factual_accuracy).not.toHaveProperty('confidence');
+    expect(body.review).not.toHaveProperty('summary');
 
     const after = getPost(wsId, postId);
     expect(after?.reviewChecklist).toBe(before?.reviewChecklist);
