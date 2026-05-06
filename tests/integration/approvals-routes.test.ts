@@ -13,25 +13,37 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13214);
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
 const testSiteId = 'site_approval_test';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Approvals Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Approvals Other Workspace');
+  otherWsId = otherWs.id;
 }, 25_000);
 
 afterAll(async () => {
+  db.prepare('DELETE FROM approval_batches WHERE workspace_id IN (?, ?)').run(testWsId, otherWsId);
   deleteWorkspace(testWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
 describe('Approvals — create validation', () => {
+  async function listBatches() {
+    const res = await api(`/api/approvals/${testWsId}`);
+    expect(res.status).toBe(200);
+    return await res.json() as Array<{ id: string }>;
+  }
+
   it('POST without siteId or items returns 400', async () => {
     const res = await postJson(`/api/approvals/${testWsId}`, {});
     expect(res.status).toBe(400);
@@ -46,6 +58,47 @@ describe('Approvals — create validation', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.toLowerCase()).toContain('required');
+  });
+
+  it('rejects unsupported create workflow fields without inserting a batch', async () => {
+    const before = await listBatches();
+
+    const topLevelStatusRes = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: 'Unsupported Batch Status',
+      status: 'approved',
+      items: [
+        {
+          pageId: 'page_invalid_top',
+          pageSlug: '/invalid-top',
+          pageTitle: 'Invalid Top',
+          field: 'seoTitle',
+          currentValue: 'Old',
+          proposedValue: 'New',
+        },
+      ],
+    });
+    expect(topLevelStatusRes.status).toBe(400);
+
+    const itemStatusRes = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: 'Unsupported Item Status',
+      items: [
+        {
+          pageId: 'page_invalid_item',
+          pageSlug: '/invalid-item',
+          pageTitle: 'Invalid Item',
+          field: 'seoTitle',
+          currentValue: 'Old',
+          proposedValue: 'New',
+          status: 'approved',
+        },
+      ],
+    });
+    expect(itemStatusRes.status).toBe(400);
+
+    const after = await listBatches();
+    expect(after).toHaveLength(before.length);
   });
 });
 
@@ -127,6 +180,51 @@ describe('Approvals — CRUD', () => {
       { status: 'approved' },
     );
     expect(res.status).toBe(404);
+  });
+
+  it('rejects invalid public review input without mutating the item', async () => {
+    const beforeRes = await api(`/api/public/approvals/${testWsId}/${batchId}`);
+    expect(beforeRes.status).toBe(200);
+    const beforeBatch = await beforeRes.json();
+    const beforeItem = beforeBatch.items.find((i: { id: string }) => i.id === itemId);
+    expect(beforeItem.status).toBe('pending');
+
+    const invalidStatusRes = await patchJson(
+      `/api/public/approvals/${testWsId}/${batchId}/${itemId}`,
+      { status: 'applied', clientNote: 'Trying to skip apply.' },
+    );
+    expect(invalidStatusRes.status).toBe(400);
+
+    const unsupportedFieldRes = await patchJson(
+      `/api/public/approvals/${testWsId}/${batchId}/${itemId}`,
+      { status: 'approved', id: 'spoofed_item_id' },
+    );
+    expect(unsupportedFieldRes.status).toBe(400);
+
+    const afterRes = await api(`/api/public/approvals/${testWsId}/${batchId}`);
+    expect(afterRes.status).toBe(200);
+    const afterBatch = await afterRes.json();
+    const afterItem = afterBatch.items.find((i: { id: string }) => i.id === itemId);
+    expect(afterItem.status).toBe(beforeItem.status);
+    expect(afterItem.clientNote).toBeUndefined();
+    expect(afterItem.updatedAt).toBe(beforeItem.updatedAt);
+  });
+
+  it('does not let public routes read or update a batch through the wrong workspace', async () => {
+    const crossGetRes = await api(`/api/public/approvals/${otherWsId}/${batchId}`);
+    expect(crossGetRes.status).toBe(404);
+
+    const crossPatchRes = await patchJson(
+      `/api/public/approvals/${otherWsId}/${batchId}/${itemId}`,
+      { status: 'approved' },
+    );
+    expect(crossPatchRes.status).toBe(404);
+
+    const ownerRes = await api(`/api/public/approvals/${testWsId}/${batchId}`);
+    expect(ownerRes.status).toBe(200);
+    const ownerBatch = await ownerRes.json();
+    const ownerItem = ownerBatch.items.find((i: { id: string }) => i.id === itemId);
+    expect(ownerItem.status).toBe('pending');
   });
 
   it('PATCH approves an item', async () => {
