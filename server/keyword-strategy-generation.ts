@@ -25,7 +25,6 @@ import {
   hasSerpOpportunity,
 } from './seo-provider-signals.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
-import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import {
   discoverSitemapUrls,
@@ -40,7 +39,7 @@ import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
-import type { Workspace, PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
+import type { PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from './llms-txt-generator.js';
 import { buildStrategySignals } from './insight-feedback.js';
@@ -53,9 +52,16 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from './strategy-filters.js';
-import { MAX_COMPETITORS } from './constants.js';
-import { filterDiscoveredCompetitors } from './competitor-domain-filter.js';
 import { addActivity } from './activity-log.js';
+import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
+import {
+  buildStrategyIntelligenceBlock,
+  computeOpportunityScore,
+  getPagesNeedingAnalysis,
+  INCREMENTAL_THRESHOLD_DAYS,
+} from './keyword-strategy-helpers.js';
+
+export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -67,136 +73,6 @@ const recsInFlight = new Set<string>();
 // Concurrent generation guard: prevents two simultaneous strategy generations for the same
 // workspace from racing to the DB. The second request receives a 409 immediately.
 const activeGenerations = new Set<string>();
-
-/** Composite opportunity score (0–100) for a content gap.
- *  Weighted components of the raw score (pre-trend):
- *    - volume:      vol/10000 capped at 1.0, × 0.45 → up to 0.45
- *    - ease:        (1 − difficulty/100),    × 0.45 → up to 0.45
- *    - GSC bonus:   impressions/2000 capped at 0.5, × 0.1 → up to 0.05
- *  Max raw = 0.95 (the 5% headroom is intentional — GSC signal is an additive
- *  bonus on top of volume/ease, not a co-equal component).
- *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
- *  Returns undefined when no signal data (volume, difficulty, impressions) is present. */
-export function computeOpportunityScore(cg: {
-  volume?: number;
-  difficulty?: number;
-  impressions?: number;
-  trendDirection?: string;
-}): number | undefined {
-  const hasData = (cg.volume != null && cg.volume > 0)
-    || cg.difficulty != null
-    || (cg.impressions != null && cg.impressions > 0);
-  if (!hasData) return undefined;
-  const vol = Math.min((cg.volume ?? 0) / 10000, 1);
-  const ease = 1 - (cg.difficulty ?? 50) / 100;
-  const gscBonus = Math.min((cg.impressions ?? 0) / 2000, 0.5);
-  const trendMult =
-    cg.trendDirection === 'rising' ? 1.3 :
-    cg.trendDirection === 'declining' ? 0.7 : 1.0;
-  const raw = (vol * 0.45 + ease * 0.45 + gscBonus * 0.1) * trendMult;
-  return Math.min(100, Math.round(raw * 100));
-}
-
-// ── Incremental mode helpers ─────────────────────────────────────
-
-const INCREMENTAL_THRESHOLD_DAYS = 7;
-/** Days before competitor keyword data is considered stale and re-fetched */
-const COMPETITOR_CACHE_DAYS = 7;
-
-/**
- * Split pages into those needing AI analysis vs those with fresh analysis.
- * In 'full' mode all pages go to toAnalyze.
- * In 'incremental' mode only pages with no analysis_generated_at or a stale
- * one (older than INCREMENTAL_THRESHOLD_DAYS) go to toAnalyze; the rest go
- * to toPreserve so their existing keyword assignments are kept unchanged.
- */
-function getPagesNeedingAnalysis<T extends { path: string }>(
-  allPages: T[],
-  mode: 'full' | 'incremental',
-  existingByPath: Map<string, { analysisGeneratedAt?: string | null }>,
-): { toAnalyze: T[]; toPreserve: T[] } {
-  if (mode === 'full') {
-    return { toAnalyze: allPages, toPreserve: [] };
-  }
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
-  const cutoffIso = cutoff.toISOString();
-
-  const toAnalyze: T[] = [];
-  const toPreserve: T[] = [];
-  for (const page of allPages) {
-    const existing = existingByPath.get(page.path);
-    const genAt = existing?.analysisGeneratedAt;
-    if (!genAt || genAt < cutoffIso) {
-      toAnalyze.push(page);
-    } else {
-      toPreserve.push(page);
-    }
-  }
-  return { toAnalyze, toPreserve };
-}
-
-export function shouldFetchCompetitorData(ws: Workspace, currentDomains?: string[]): boolean {
-  if (!ws.competitorLastFetchedAt) return true;
-
-  // Direct domain-change signal: re-fetch immediately if domains changed.
-  // Skip when competitorDomainsAtLastFetch is null — this is the pre-migration state
-  // for existing workspaces (migration 064 adds the column as NULL). Comparing null
-  // against current domains would always appear as a "change" and force a costly
-  // API re-fetch on every workspace that had data fetched before the migration.
-  if (ws.competitorDomainsAtLastFetch !== null && ws.competitorDomainsAtLastFetch !== undefined) {
-    // Use caller-supplied domains when available (e.g. req.body.competitorDomains was just
-    // saved to DB but ws is the pre-save snapshot). Falls back to ws.competitorDomains.
-    const current = (currentDomains ?? ws.competitorDomains ?? []).slice().sort().join(',');
-    const lastFetchDomains = ws.competitorDomainsAtLastFetch.slice().sort().join(',');
-    if (current !== lastFetchDomains) return true;
-  }
-
-  const cutoff = new Date(Date.now() - COMPETITOR_CACHE_DAYS * 24 * 60 * 60 * 1000);
-  if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
-
-  return false;
-}
-
-// ── Strategy Intelligence Block ──────────────────────────────────
-
-interface StrategyIntelligenceInput {
-  keywordClusters?: Array<{
-    label: string;
-    queries: string[];
-    totalImpressions: number;
-    avgPosition: number;
-    pillarPage: string | null;
-  }>;
-  competitorGaps?: Array<{
-    keyword: string;
-    competitorDomain: string;
-    competitorPosition: number;
-    ourPosition: number | null;
-    volume: number;
-    difficulty: number;
-  }>;
-  performanceDeltas?: Array<{
-    query: string;
-    positionDelta: number;
-    clicksDelta: number;
-    currentPosition: number;
-  }>;
-  conversionPages?: Array<{
-    pageUrl: string;
-    conversions: number;
-    conversionRate: number;
-    sessions: number;
-  }>;
-  contentDecay?: Array<{
-    pageId: string;
-    clicksDelta: number;
-    deltaPercent: number;
-  }>;
-  cannibalization?: Array<AnalyticsInsight<'cannibalization'>>;
-  ctrOpportunities?: Array<AnalyticsInsight<'ctr_opportunity'>>;
-  rankingOpportunities?: Array<AnalyticsInsight<'ranking_opportunity'>>;
-}
 
 interface StrategyPageMapEntry {
   pagePath: string;
@@ -262,92 +138,6 @@ interface StrategyOutput {
   quickWins?: StrategyQuickWin[];
   keywordFixes?: StrategyKeywordFix[];
   pageMap?: StrategyPageMapEntry[];
-}
-
-/**
- * Build an intelligence block for the strategy generation prompt.
- * Injects keyword clusters, competitor gaps, performance deltas,
- * and conversion data to improve AI strategy output.
- */
-export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput): string {
-  const sections: string[] = [];
-
-  // Keyword clusters
-  if (opts.keywordClusters && opts.keywordClusters.length > 0) {
-    const lines = opts.keywordClusters.slice(0, 10).map(c => {
-      let pillar = '';
-      if (c.pillarPage) {
-        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch (err) { pillar = ` → pillar: ${c.pillarPage}`; }
-      }
-      return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
-    });
-    sections.push(`KEYWORD CLUSTERS (topic groups discovered from GSC queries — use these to inform site keyword themes and content gap topics):\n${lines.join('\n')}`);
-  }
-
-  // Competitor gaps
-  if (opts.competitorGaps && opts.competitorGaps.length > 0) {
-    const lines = opts.competitorGaps.slice(0, 15).map(g => {
-      const ours = g.ourPosition != null ? `our pos ${Math.round(g.ourPosition)}` : 'not ranking';
-      return `  "${g.keyword}" — ${g.competitorDomain} pos ${g.competitorPosition}, vol ${g.volume}, diff ${g.difficulty} (${ours})`;
-    });
-    sections.push(`COMPETITOR GAPS (high-priority keywords competitors rank for — prioritize these in contentGaps):\n${lines.join('\n')}`);
-  }
-
-  // Performance deltas
-  if (opts.performanceDeltas && opts.performanceDeltas.length > 0) {
-    const lines = opts.performanceDeltas.slice(0, 10).map(d => {
-      const posDir = d.positionDelta > 0 ? `↓${d.positionDelta} pos` : `↑${Math.abs(d.positionDelta)} pos`;
-      return `  "${d.query}": ${posDir}, ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks (now pos ${Math.round(d.currentPosition)})`;
-    });
-    sections.push(`PERFORMANCE CHANGES (keywords with significant position/click changes — declining keywords need defensive strategy):\n${lines.join('\n')}`);
-  }
-
-  // Content decay
-  if (opts.contentDecay && opts.contentDecay.length > 0) {
-    const lines = opts.contentDecay.slice(0, 10).map(d => {
-      const pctStr = d.deltaPercent != null ? ` (${d.deltaPercent > 0 ? '+' : ''}${Math.round(d.deltaPercent)}%)` : '';
-      return `  ${d.pageId}: ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks${pctStr}`;
-    });
-    sections.push(`CONTENT DECAY (pages losing organic clicks — consider refreshing content or updating keyword targeting):\n${lines.join('\n')}`);
-  }
-
-  // Cannibalization warnings
-  if (opts.cannibalization && opts.cannibalization.length > 0) {
-    const lines = opts.cannibalization.slice(0, 8).map(i => {
-      const pages = i.data.pages.length > 0 ? i.data.pages.join(' vs ') : (i.pageId ?? 'unknown pages');
-      return `  "${i.data.query}" → ${pages} (${i.data.totalImpressions} imp)`;
-    });
-    sections.push(`CANNIBALIZATION WARNINGS (multiple pages competing for the same query — avoid creating new overlapping content):\n${lines.join('\n')}`);
-  }
-
-  // CTR opportunities
-  if (opts.ctrOpportunities && opts.ctrOpportunities.length > 0) {
-    const lines = opts.ctrOpportunities.slice(0, 8).map(i => {
-      return `  "${i.data.query}" → ${i.data.pageUrl}: CTR ${i.data.actualCtr}% vs expected ${i.data.expectedCtr}% (${Math.round(i.data.estimatedClickGap)} click gap)`;
-    });
-    sections.push(`CTR OPPORTUNITIES (below-expected click-through rate — quick wins via title/meta optimization):\n${lines.join('\n')}`);
-  }
-
-  // Ranking opportunities
-  if (opts.rankingOpportunities && opts.rankingOpportunities.length > 0) {
-    const lines = opts.rankingOpportunities.slice(0, 8).map(i => {
-      return `  "${i.data.query}" → ${i.data.pageUrl}: position ${Math.round(i.data.currentPosition)}, estimated gain ${Math.round(i.data.estimatedTrafficGain)} clicks`;
-    });
-    sections.push(`RANKING OPPORTUNITIES (positions 4-20 — small improvements could reach page 1):\n${lines.join('\n')}`);
-  }
-
-  // Conversion data
-  if (opts.conversionPages && opts.conversionPages.length > 0) {
-    const lines = opts.conversionPages.slice(0, 10).map(c => {
-      let path: string;
-      try { path = new URL(c.pageUrl).pathname; } catch (err) { path = c.pageUrl; }
-      return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR, ${c.conversions} conversions (${c.sessions} sessions)`;
-    });
-    sections.push(`CONVERSION DATA (pages driving business outcomes — protect and prioritize keywords for these "money pages"):\n${lines.join('\n')}`);
-  }
-
-  if (sections.length === 0) return '';
-  return `\nANALYTICS INTELLIGENCE (from computed intelligence layer — use to inform strategy decisions):\n\n${sections.join('\n\n')}\n`;
 }
 
 export interface KeywordStrategyProgressEvent {
@@ -760,220 +550,23 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     }
 
     // 5. SEO provider data gathering (based on mode)
-    // The keyword pool paradigm: provider data supplies the keyword universe, AI assigns terms to pages
-    let semrushContext = '';
-    let semrushDomainData: DomainKeyword[] = [];
-    let keywordGaps: KeywordGapEntry[] = [];
-    const relatedKws: RelatedKeyword[] = [];
-    const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
-    // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
-    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number; serpFeatures?: string }> = [];
-
-    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws, competitorDomains);
-
-    // When skipping competitor fetch, carry forward previously stored data so the
-    // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
-    // Also inject gaps into semrushContext so the AI still sees competitor gap
-    // narrative on cache-hit incremental runs.
-    if (!fetchCompetitors) {
-      // Carry forward cached competitor data so the keyword pool, AI context,
-      // and topic-cluster competitor coverage aren't empty on incremental runs.
-      if (ws.keywordStrategy?.keywordGaps) {
-        keywordGaps = ws.keywordStrategy.keywordGaps;
-        if (keywordGaps.length > 0) {
-          semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
-          semrushContext += keywordGaps.slice(0, 30).map(g =>
-            `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
-          ).join('\n');
-        }
-      }
-      if (ws.keywordStrategy?.competitorKeywordData?.length) {
-        competitorKeywordData.push(...ws.keywordStrategy.competitorKeywordData);
-        log.info(`Incremental mode: restored ${competitorKeywordData.length} cached competitor keywords into pool`);
-      }
-    }
-
-    if (seoDataMode !== 'none' && provider) {
-      sendProgress('seo-data', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
-      if (!fetchCompetitors) {
-        log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
-        sendProgress('seo-data', 'Competitor data still fresh — skipping re-fetch...', 0.58);
-      }
-      // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
-      const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
-
-      if (siteDomain) {
-        // Both quick and full: get domain organic keywords
-        try {
-          log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-          semrushDomainData = await provider.getDomainKeywords(siteDomain, ws.id, 200);
-          log.info(`Got ${semrushDomainData.length} domain keywords`);
-
-          if (semrushDomainData.length > 0) {
-            semrushContext += `\n\nSEO PROVIDER DOMAIN ORGANIC KEYWORDS (real search volume + difficulty data):\n`;
-            semrushContext += semrushDomainData.slice(0, 100).map(k =>
-              `- "${k.keyword}" → ${k.url} (pos: #${k.position}, vol: ${k.volume}/mo, KD: ${k.difficulty}%, CPC: $${k.cpc}, traffic: ${k.traffic})`
-            ).join('\n');
-          }
-        } catch (err) {
-          log.error({ err: err }, 'Domain organic error');
-        }
-
-        // Both quick and full: auto-discover competitors if none provided
-        if (fetchCompetitors && competitorDomains.length === 0) {
-          try {
-            sendProgress('seo-data', 'Auto-discovering organic competitors...', 0.57);
-            const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
-            const autoCompetitors = filterDiscoveredCompetitors(discovered, siteDomain)
-              .slice(0, MAX_COMPETITORS)
-              .map(c => c.domain);
-            if (autoCompetitors.length > 0) {
-              competitorDomains.push(...autoCompetitors);
-              log.info(`Auto-discovered ${autoCompetitors.length} competitors: ${autoCompetitors.join(', ')}`);
-              // Save discovered competitors to workspace for next time
-              updateWorkspace(ws.id, { competitorDomains });
-            }
-          } catch (err) {
-            log.error({ err: err }, 'Competitor auto-discovery error');
-          }
-        }
-
-        // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
-        if (fetchCompetitors && competitorDomains.length > 0) {
-          try {
-            // Raised 100 → 200 (full mode) to capture the long tail of high-value
-            // competitor keywords. Cost: ~4× provider credits vs old 100-row limit
-            // (200 compLimit × 2× SEMRush overfetch = 400 rows × 10 credits each).
-            // Worth it for gap-analysis quality. PR #221 A-series verification notes.
-            const compLimit = seoDataMode === 'full' ? 200 : 50;
-
-            // Provider parity: DFS gets an explicit search_volume,desc order_by
-            // (see dataforseo-provider.ts), so its top-N already IS top-N-by-volume.
-            // SEMRush domain_organic has no URL-level sort knob and returns rank-ordered
-            // by default. To get the same semantics we overfetch 2× and re-sort in-memory.
-            const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
-            const fetchLimit = compLimit * fetchMultiplier;
-
-            const cappedCompetitorDomains = competitorDomains.slice(0, MAX_COMPETITORS);
-            sendProgress('seo-data', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
-            for (const comp of cappedCompetitorDomains) {
-              const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-              try {
-                // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
-                // SEMRush cache key includes the limit param, so _400 entries don't collide with _200.
-                const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
-                // Sort by volume DESC, then slice to compLimit. For DFS this is a no-op
-                // (already sorted); for SEMRush this is the parity step.
-                const compKws = [...rawKws]
-                  .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-                  .slice(0, compLimit);
-                for (const ck of compKws) {
-                  competitorKeywordData.push({
-                    keyword: ck.keyword,
-                    volume: ck.volume,
-                    difficulty: ck.difficulty,
-                    domain: cleanComp,
-                    position: ck.position,
-                    // serpFeatures carried so downstream SERP-feature chip rendering
-                    // and opportunity scoring can see it. DomainKeyword.serpFeatures
-                    // is populated by both providers (DFS dedupe loop, SEMRush Fk column).
-                    serpFeatures: ck.serpFeatures,
-                  });
-                }
-                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp} (fetched ${rawKws.length})`);
-              } catch (err) {
-                log.warn({ err }, `Failed to fetch keywords for competitor ${cleanComp}`);
-              }
-            }
-
-            if (competitorKeywordData.length > 0) {
-              semrushContext += `\n\nCOMPETITOR KEYWORDS (what your competitors rank for — these are proven industry terms):\n`;
-              // Deduplicate and sort by volume, show top 50
-              const seen = new Set<string>();
-              const deduped = competitorKeywordData
-                .filter(k => { const lc = k.keyword.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
-                .sort((a, b) => b.volume - a.volume);
-              semrushContext += deduped.slice(0, 50).map(k =>
-                `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%) — ${k.domain} ranks #${k.position}`
-              ).join('\n');
-            }
-          } catch (err) {
-            log.error({ err: err }, 'Competitor keywords error');
-          }
-        }
-
-        // Both quick and full: keyword gap analysis
-        if (fetchCompetitors && competitorDomains.length > 0) {
-          try {
-            sendProgress('seo-data', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
-            log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
-            keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
-            log.info(`Found ${keywordGaps.length} keyword gaps`);
-
-            if (keywordGaps.length > 0) {
-              semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (keywords competitors rank for but YOU don't — HIGHEST priority opportunities):\n`;
-              semrushContext += keywordGaps.slice(0, 30).map(g =>
-                `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
-              ).join('\n');
-            }
-          } catch (err) {
-            log.error({ err: err }, 'Keyword gap error');
-          }
-        }
-
-        if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
-          updateWorkspace(ws.id, {
-            competitorLastFetchedAt: new Date().toISOString(),
-            competitorDomainsAtLastFetch: competitorDomains,
-          });
-        }
-
-        // Full mode only: related keywords for deeper topic expansion
-        if (seoDataMode === 'full') {
-          try {
-            sendProgress('seo-data', 'Fetching related keyword ideas...', 0.65);
-            const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
-            for (const seed of seedKeywords) {
-              const related = await provider.getRelatedKeywords(seed, ws.id, 10);
-              relatedKws.push(...related);
-            }
-            if (relatedKws.length > 0) {
-              const unique = relatedKws.filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
-              semrushContext += `\n\nSEO PROVIDER RELATED KEYWORDS (expansion ideas with real volume):\n`;
-              semrushContext += unique.slice(0, 30).map(k =>
-                `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`
-              ).join('\n');
-            }
-          } catch (err) {
-            log.error({ err: err }, 'Related keywords error');
-          }
-
-          // Full mode only: question keywords for FAQ/AEO targeting
-          try {
-            sendProgress('seo-data', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
-            const qSeeds = semrushDomainData.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
-            for (const seed of qSeeds) {
-              const questions = await provider.getQuestionKeywords(seed, ws.id, 10);
-              if (questions.length > 0) {
-                allQuestionKws.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
-              }
-            }
-            const allQs = allQuestionKws.flatMap(q => q.questions);
-            if (allQs.length > 0) {
-              const uniqueQs = allQs.filter((q, i, arr) => arr.findIndex(x => x.keyword === q.keyword) === i)
-                .sort((a, b) => b.volume - a.volume);
-              semrushContext += `\n\nQUESTION KEYWORDS (real questions people search — use for FAQ sections, AEO, featured snippets):\n`;
-              semrushContext += uniqueQs.slice(0, 20).map(q =>
-                `- "${q.keyword}" (${q.volume}/mo)`
-              ).join('\n');
-              log.info(`Found ${uniqueQs.length} unique question keywords from ${qSeeds.length} seeds`);
-            }
-          } catch (err) {
-            log.error({ err: err }, 'Question keywords error');
-          }
-        }
-      }
-    }
+    // The keyword pool paradigm: provider data supplies the keyword universe, AI assigns terms to pages.
+    const {
+      seoContext: semrushContext,
+      domainKeywords: semrushDomainData,
+      keywordGaps,
+      relatedKeywords: relatedKws,
+      questionKeywords: allQuestionKws,
+      competitorKeywords: competitorKeywordData,
+    } = await fetchAndCacheKeywordStrategySeoData({
+      ws,
+      provider,
+      baseUrl,
+      strategyMode,
+      seoDataMode,
+      competitorDomains,
+      sendProgress,
+    });
 
     // 6. BATCHED AI STRATEGY — parallel page analysis + master synthesis
     //    Step 1: Split pages into batches, analyze each batch in parallel (per-page keyword mapping)
