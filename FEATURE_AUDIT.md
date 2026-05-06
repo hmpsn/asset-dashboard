@@ -4431,3 +4431,16 @@ The migration preserves the existing StrategyTab orchestration contract: `Strate
 **Mutual:** Finishes the StrategyTab consolidation track while preserving tier gates, deep-link behavior, feedback actions, and keyword drawer compatibility.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategySnapshotSection.tsx`; `src/components/client/strategy/StrategyNextStepsSection.tsx`; `src/components/client/strategy/StrategyPageKeywordMapSection.tsx`; `tests/contract/client-strategy-tab-shell-sections.test.ts`.
+
+### 344. Platform Consolidation — PageIntelligence Display Helpers Split
+**What it does:** Begins the feature-tool monolith split by moving PageIntelligence's pure display and priority helpers into `src/components/page-intelligence/pageIntelligenceDisplay.ts`. The extracted module owns rank color thresholds, keyword difficulty labels/colors, search-intent badge classes/icons, estimated-difficulty text colors, and opportunity scoring used by the existing PageIntelligence sort and report cards.
+
+The migration preserves the current PageIntelligence behavior: the component still owns data fetching, background page-analysis job rediscovery/start/cancel wiring, tab state, filters, expansion, editing, and rendering. The extracted helpers are directly covered by unit tests that pin the existing class strings and scoring thresholds.
+
+**Agency value:** Engineers can update PageIntelligence presentation rules without reopening the full workflow component, creating a safe first boundary for the larger feature-tool split track.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Reduces a >1,000-line admin feature module while keeping the shared background job platform and typed PageKeywordMap contract unchanged.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceDisplay.ts`; `tests/unit/page-intelligence-display.test.ts`.
