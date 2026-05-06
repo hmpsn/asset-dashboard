@@ -228,6 +228,18 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
     if (item?.pageId) {
       // Aggregate across all items for this page — don't blindly reset to in-review
       const pageStatus = derivePageStatus(batch, item.pageId);
+      if (pageStatus === 'in-review') {
+        const currentState = getPageState(req.params.workspaceId, item.pageId);
+        if (currentState?.status === 'approved' || currentState?.status === 'rejected') {
+          // updatePageState blocks approved/rejected → in-review downgrades, so reset
+          // first while preserving row metadata, then write the derived review state.
+          updatePageState(req.params.workspaceId, item.pageId, {
+            status: 'clean',
+            updatedBy: 'client',
+            rejectionNote: '',
+          });
+        }
+      }
       updatePageState(req.params.workspaceId, item.pageId, {
         status: pageStatus,
         updatedBy: 'client',
