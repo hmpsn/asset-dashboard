@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Zap, FileText, Target,
-  ChevronDown, Layers,
+  Target,
   AlertTriangle,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier, Icon, Button, PageHeader, SectionCard } from '../ui';
+import { TierGate, EmptyState, type Tier, Icon, PageHeader } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
-import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
@@ -16,7 +14,10 @@ import { StrategyDeclinedKeywordsSection } from './strategy/StrategyDeclinedKeyw
 import { StrategyDeclineKeywordModal } from './strategy/StrategyDeclineKeywordModal';
 import { StrategyKeywordDrawer } from './strategy/StrategyKeywordDrawer';
 import { StrategyKeywordsSection } from './strategy/StrategyKeywordsSection';
+import { StrategyNextStepsSection } from './strategy/StrategyNextStepsSection';
+import { StrategyPageKeywordMapSection } from './strategy/StrategyPageKeywordMapSection';
 import { StrategyPageImprovementsSection } from './strategy/StrategyPageImprovementsSection';
+import { StrategySnapshotSection } from './strategy/StrategySnapshotSection';
 import { useStrategyBusinessPriorities } from './strategy/useStrategyBusinessPriorities';
 import { useStrategyKeywordFeedback } from './strategy/useStrategyKeywordFeedback';
 import { useStrategyTrackedKeywords } from './strategy/useStrategyTrackedKeywords';
@@ -662,138 +663,28 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      {/* Strategy Snapshot */}
-      <SectionCard>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
-              {/* score-color-deviation-ok: planning readiness, not a health grade - teal avoids false alarm */}
-              {healthScore}<span className="t-caption-sm text-[var(--brand-text-muted)]">/100</span>
-            </div>
-            <div>
-              <div className="t-label text-[var(--brand-text-muted)]">Strategy Snapshot</div>
-              <div className="t-body font-medium text-[var(--brand-text)]">
-                {healthScore >= 80 ? 'Strong action plan' : healthScore >= 60 ? 'Good opportunity mix' : 'Building your strategy'}
-              </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-                Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[560px]">
-            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Create content</div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentGapsFound}</div>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Improve pages</div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Ranking coverage</div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
-            </div>
-            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Strategy keywords</div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{strategyKeywords.length}</div>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-3 mt-4 pt-4 border-t border-[var(--brand-border)]/50 md:grid-cols-3">
-          <div>
-            <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>Content readiness</span>
-              <span>{contentScore}/40</span>
-            </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-              <div className="h-full bg-teal-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(contentScore / 40) * 100}%` }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>Page improvements</span>
-              <span>{quickWinScore}/30</span>
-            </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-              <div className="h-full bg-amber-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(quickWinScore / 30) * 100}%` }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>Ranking coverage</span>
-              <span>{coverageScore}/30</span>
-            </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-              <div className="h-full bg-emerald-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(coverageScore / 30) * 100}%` }} />
-            </div>
-          </div>
-        </div>
-        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
-          This is a planning-readiness score, not a grade. It shows how much clear SEO work is ready to review or move into production.
-        </p>
-      </SectionCard>
+      <StrategySnapshotSection
+        healthScore={healthScore}
+        generatedAt={strategyData.generatedAt}
+        contentGapsFound={contentGapsFound}
+        totalPageImprovements={totalPageImprovements}
+        pagesRanking={pagesRanking}
+        totalPages={totalPages}
+        strategyKeywordCount={strategyKeywords.length}
+        contentScore={contentScore}
+        quickWinScore={quickWinScore}
+        coverageScore={coverageScore}
+      />
 
-      {/* ── RECOMMENDED NEXT STEPS ── */}
-      <div className="space-y-3">
-        <div>
-          <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Recommended Next Steps</h3>
-          <p className="t-body text-[var(--brand-text-muted)] mt-1">Start here. These are the clearest places to review, request, or give direction.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <SectionCard variant="subtle">
-            <div className="flex h-full flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                  <Icon as={FileText} size="lg" className="text-accent-brand" />
-                </div>
-                <div className="min-w-0">
-                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Review new content ideas</div>
-                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
-                </div>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => scrollToSection('new-content', newContentRef)} className="self-start">
-                Review Ideas
-              </Button>
-            </div>
-          </SectionCard>
-
-        {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
-          <SectionCard variant="subtle">
-            <div className="flex h-full flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                  <Icon as={Zap} size="lg" className="text-accent-warning" />
-                </div>
-                <div className="min-w-0">
-                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Improve existing pages</div>
-                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
-                </div>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)} className="self-start">
-                Review Pages
-              </Button>
-            </div>
-          </SectionCard>
-        )}
-
-          <SectionCard variant="subtle">
-            <div className="flex h-full flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <Icon as={Target} size="lg" className="text-accent-info" />
-                </div>
-                <div className="min-w-0">
-                  <div className="t-ui font-medium text-[var(--brand-text-bright)]">Guide strategy keywords</div>
-                  <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords shaping the strategy</div>
-                </div>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="self-start">
-                Manage Keywords
-              </Button>
-            </div>
-          </SectionCard>
-        </div>
-      </div>
+      <StrategyNextStepsSection
+        contentGapsFound={contentGapsFound}
+        totalPageImprovements={totalPageImprovements}
+        strategyKeywordCount={strategyKeywords.length}
+        showPageImprovements={quickWinsAvailable > 0 || pagesWithGrowthOpps > 0}
+        onReviewIdeas={() => scrollToSection('new-content', newContentRef)}
+        onReviewPages={() => scrollToSection('optimize-existing', optimizeExistingRef)}
+        onManageKeywords={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      />
 
       {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
       {(feedbackLoadError || trackedKeywordsError) && (
@@ -890,45 +781,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       </div>
 
-      {/* ── PAGE KEYWORD MAP (advanced page detail) ── */}
-      <div>
-      <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
-        <SectionCard noPadding>
-          <button
-            onClick={() => toggleSection('page-keyword-map')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center">
-                <Icon as={Layers} size="md" className="text-accent-info" />
-              </div>
-              <div className="text-left">
-                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Page Keyword Map</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyData.pageMap.length} pages mapped · advanced page-to-keyword detail</div>
-              </div>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('page-keyword-map') ? '' : '-rotate-90'}`} />
-          </button>
-
-          {expandedSections.has('page-keyword-map') && (
-            <>
-            {/* Page Performance Map */}
-            <PageKeywordMapContent
-              pageMap={strategyData.pageMap}
-              workspaceId={workspaceId}
-              setToast={setToast}
-              onContentRequested={onContentRequested}
-              keywordFeedback={keywordFeedback}
-              onApproveKeyword={(kw, source) => submitFeedback(kw, 'approved', source)}
-              onDeclineKeyword={(kw, source) => { setDeclineReason({ keyword: kw, source }); setDeclineReasonText(''); }}
-              onUndoFeedback={undoFeedback}
-              isLoadingFeedback={isLoadingFeedback}
-            />
-            </>
-          )}
-        </SectionCard>
-      </TierGate>
-      </div>
+      <StrategyPageKeywordMapSection
+        effectiveTier={effectiveTier}
+        pageMap={strategyData.pageMap}
+        expandedSections={expandedSections}
+        toggleSection={toggleSection}
+        workspaceId={workspaceId}
+        setToast={setToast}
+        onContentRequested={onContentRequested}
+        keywordFeedback={keywordFeedback}
+        submitFeedback={submitFeedback}
+        onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
+        undoFeedback={undoFeedback}
+        isLoadingFeedback={isLoadingFeedback}
+      />
 
       {/* ── DECLINED KEYWORDS SUMMARY ── */}
       <StrategyDeclinedKeywordsSection
