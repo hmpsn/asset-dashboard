@@ -56,6 +56,11 @@ import { isProgrammingError } from '../errors.js';
 const router = Router();
 const log = createLogger('webflow-schema');
 
+const schemaPlanFeedbackSchema = z.object({
+  action: z.enum(['approve', 'request_changes']),
+  note: z.string().max(2000).optional(),
+}).strict();
+
 function schemaHash(schema: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(schema)).digest('hex').slice(0, 16);
 }
@@ -876,11 +881,8 @@ router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (r
 });
 
 // POST: client feedback on schema plan (approve / request changes)
-router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortalAuth(), (req, res) => {
+router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortalAuth(), validate(schemaPlanFeedbackSchema), (req, res) => {
   const { action, note } = req.body;
-  if (!action || !['approve', 'request_changes'].includes(action)) {
-    return res.status(400).json({ error: 'action must be "approve" or "request_changes"' });
-  }
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const existing = getSchemaPlan(ws.webflowSiteId);
