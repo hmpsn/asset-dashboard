@@ -4251,3 +4251,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Keeps provider-specific code at the provider boundary while preserving old route/job payload compatibility, making the next keyword strategy service split less tangled.
 
 **Files:** `server/seo-provider-signals.ts`; `server/keyword-strategy-generation.ts`; `server/routes/keyword-strategy.ts`; `server/routes/jobs.ts`; `server/semrush.ts`; `shared/types/workspace.ts`; `src/hooks/admin/useKeywordStrategy.ts`; `src/components/KeywordStrategy.tsx`; `src/components/strategy/CompetitiveIntel.tsx`; `src/components/strategy/KeywordStrategyGuide.tsx`; `tests/contract/seo-provider-boundary.test.ts`; `tests/component/KeywordStrategyBackgroundJob.test.tsx`; `tests/integration/client-strategy.test.ts`; `tests/unit/use-page-join.test.ts`.
+
+
+### 331. Platform Consolidation — Keyword Strategy Service Split Phase 1
+**What it does:** Starts the keyword strategy backend split after the route wrapper and provider-boundary cleanup. Pure deterministic helpers now live in `server/keyword-strategy-helpers.ts`: content-gap opportunity scoring, incremental page freshness selection, competitor cache freshness checks, and strategy-intelligence prompt block formatting. SEO provider data collection now lives in `server/keyword-strategy-seo-data.ts`, keeping domain keyword fetches, competitor discovery, competitor keyword/gap collection, related keywords, question keywords, and competitor cache timestamp writes behind one focused function.
+
+`server/keyword-strategy-generation.ts` remains the orchestration service for discovery, analytics collection, AI page mapping, enrichment, persistence, broadcasts, activity, and follow-on recommendation/llms.txt work, but it no longer owns the pure helper logic or provider collection internals. Public route re-exports remain compatible for existing tests and importers.
+
+**Agency value:** Engineers can review and change keyword strategy helper logic or provider collection behavior without reopening the entire generation service. This reduces merge risk and makes the remaining split work easier to sequence.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Creates the first keyword-strategy-specific stepping stone for the larger backend split: orchestration can now be separated from provider collection, helper logic, enrichment, and persistence in follow-up slices.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-helpers.ts`; `server/keyword-strategy-seo-data.ts`.
