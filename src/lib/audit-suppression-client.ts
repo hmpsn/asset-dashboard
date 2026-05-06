@@ -27,7 +27,10 @@ export function applyClientSuppressions(
 ): SeoAuditResult {
   const exactSupps = suppressions.filter(s => !s.pagePattern);
   const patternSupps = suppressions.filter(s => s.pagePattern);
-  const suppSet = new Set(exactSupps.map(s => `${s.check}:${s.pageSlug}`));
+  // `::` separator matches server/helpers.ts so a check name containing a
+  // single colon (e.g. `og:title`) cannot collide with a different
+  // {check, pageSlug} pair when concatenated.
+  const suppSet = new Set(exactSupps.map(s => `${s.check}::${s.pageSlug}`));
   if (suppSet.size === 0 && patternSupps.length === 0) return data;
 
   // Simple glob matcher for client-side pattern filtering
@@ -39,7 +42,7 @@ export function applyClientSuppressions(
 
   const pages = data.pages.map(page => {
     const filtered = page.issues.filter(i => {
-      if (suppSet.has(`${i.check}:${page.slug}`)) return false;
+      if (suppSet.has(`${i.check}::${page.slug}`)) return false;
       for (const pm of patternMatchers) {
         if (pm.check === i.check && pm.regex.test(page.slug)) return false;
       }

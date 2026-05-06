@@ -281,12 +281,11 @@ describe('applyClientSuppressions', () => {
 
   // ── Separator bug regression ──
 
-  // Marked .fails because the current single-colon separator collapses
+  // Verifies the `::` separator (matched to server/helpers.ts) keeps
   // {check: "og", pageSlug: "title:home"} and {check: "og:title", pageSlug: "home"}
-  // into the same key ("og:title:home"), causing collateral suppression. The
-  // follow-up fix commit aligns the separator with the server (`::`) and flips
-  // this back to a regular `it()`.
-  it.fails('treats `og:title` (check name with colon) on `home` as distinct from `og` on `title:home`', () => {
+  // distinct — the previous single-colon separator collapsed both into the
+  // same key and caused collateral suppression.
+  it('treats `og:title` (check name with colon) on `home` as distinct from `og` on `title:home`', () => {
     const audit = makeAudit([
       { slug: 'home', issues: [{ check: 'og:title', severity: 'warning' }] },
       { slug: 'title:home', issues: [{ check: 'og', severity: 'warning' }] },
