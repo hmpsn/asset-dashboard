@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { createTestContext } from './helpers.js';
-import { createFeedback, deleteFeedback } from '../../server/feedback.js';
+import { createFeedback, deleteFeedback, getFeedbackItem, listFeedback } from '../../server/feedback.js';
 import { listActivity } from '../../server/activity-log.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
@@ -22,19 +22,23 @@ const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
 let protectedWsId = '';
+let otherWsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
+  setBroadcast(vi.fn(), vi.fn());
   const ws = createWorkspace('Feedback Test Workspace');
   testWsId = ws.id;
   const protectedWs = createWorkspace('Protected Feedback Test Workspace');
   protectedWsId = protectedWs.id;
   updateWorkspace(protectedWsId, { clientPassword: await bcrypt.hash('feedback-secret', 12) });
+  otherWsId = createWorkspace('Other Feedback Test Workspace').id;
 }, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(testWsId);
   deleteWorkspace(protectedWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
@@ -96,6 +100,21 @@ describe('Feedback — reply validation', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Content required');
+  });
+
+  it('POST reply with malformed content returns 400 without mutating replies', async () => {
+    const item = createFeedback(testWsId, {
+      type: 'general',
+      title: 'Admin reply validation guard',
+      description: 'Malformed admin replies should not be stored.',
+    });
+
+    const res = await postJson(`/api/feedback/${testWsId}/${item.id}/reply`, {
+      content: { text: 'This should not persist.' },
+    });
+
+    expect(res.status).toBe(400);
+    expect(getFeedbackItem(testWsId, item.id)?.replies).toHaveLength(0);
   });
 
   it('POST reply with bad id returns 404', async () => {
@@ -183,6 +202,68 @@ describe('Public Feedback — client portal auth and workspace checks', () => {
     expect(listRes.status).toBe(200);
     const items = await listRes.json();
     expect(items.some((row: { id: string }) => row.id === item.id)).toBe(true);
+  });
+
+  it('rejects malformed public feedback submissions without creating feedback', async () => {
+    ctx.clearCookies();
+    const beforeCount = listFeedback(testWsId).length;
+
+    const malformedTitleRes = await postJson(`/api/public/feedback/${testWsId}`, {
+      type: 'bug',
+      title: { text: 'This should not persist.' },
+      description: 'Malformed titles should fail validation.',
+    });
+    expect(malformedTitleRes.status).toBe(400);
+
+    const malformedSubmittedByRes = await postJson(`/api/public/feedback/${testWsId}`, {
+      type: 'general',
+      title: 'Malformed submitter',
+      description: 'Submitted by should remain a string.',
+      submittedBy: { name: 'Client' },
+    });
+    expect(malformedSubmittedByRes.status).toBe(400);
+
+    const malformedContextRes = await postJson(`/api/public/feedback/${testWsId}`, {
+      type: 'feature',
+      title: 'Malformed context',
+      description: 'Context should stay in the expected captured shape.',
+      context: { currentTab: ['strategy'] },
+    });
+    expect(malformedContextRes.status).toBe(400);
+
+    expect(listFeedback(testWsId)).toHaveLength(beforeCount);
+  });
+
+  it('rejects malformed public feedback replies without mutating replies', async () => {
+    ctx.clearCookies();
+    const item = createFeedback(testWsId, {
+      type: 'general',
+      title: 'Reply validation guard',
+      description: 'Malformed replies should not be stored.',
+    });
+
+    const res = await postJson(`/api/public/feedback/${testWsId}/${item.id}/reply`, {
+      content: { text: 'This should not persist.' },
+    });
+
+    expect(res.status).toBe(400);
+    expect(getFeedbackItem(testWsId, item.id)?.replies).toHaveLength(0);
+  });
+
+  it('does not add public feedback replies through the wrong workspace', async () => {
+    ctx.clearCookies();
+    const item = createFeedback(otherWsId, {
+      type: 'bug',
+      title: 'Cross-workspace reply guard',
+      description: 'Replies should stay scoped to the owning workspace.',
+    });
+
+    const res = await postJson(`/api/public/feedback/${testWsId}/${item.id}/reply`, {
+      content: 'Wrong workspace reply.',
+    });
+
+    expect(res.status).toBe(404);
+    expect(getFeedbackItem(otherWsId, item.id)?.replies).toHaveLength(0);
   });
 
   it('returns 404 for unknown public feedback workspaces instead of creating orphan rows', async () => {
