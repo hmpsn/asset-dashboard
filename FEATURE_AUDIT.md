@@ -4457,3 +4457,16 @@ The migration preserves PageIntelligence behavior: the component still owns page
 **Mutual:** Reduces PageIntelligence's component surface while keeping the shared background job platform and typed `PageKeywordMap` / `UnifiedPage` contracts unchanged.
 
 **Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-data.test.ts`; `tests/unit/page-intelligence-metricsSource.test.ts`.
+
+### 346. Platform Consolidation — PageIntelligence Pages Header Split
+**What it does:** Extracts the PageIntelligence pages-tab header/control strip into `src/components/page-intelligence/PageIntelligencePagesHeader.tsx`. The focused component owns the page counts, analyze-all/analyze-remaining buttons, inline background-job progress display, `ProgressIndicator`, analysis error state, completion next-step card, impact-ranked "Fix These First" queue, and search/sort controls.
+
+The migration preserves PageIntelligence behavior: the parent still owns `useBackgroundTasks`, `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS` rediscovery/start/cancel wiring, single-page analysis, query invalidation, rank tracking, keyword editing, SEO copy generation, page expansion, and navigation handlers. The extracted header receives values and callbacks only, and a source-level unit guard pins the boundary so the background job ownership stays in `PageIntelligence.tsx`.
+
+**Agency value:** Engineers can adjust PageIntelligence's page-level workflow controls without editing the full analysis/detail renderer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Continues reducing PageIntelligence's component surface while keeping the shared background job platform and existing page-analysis UX intact.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePagesHeader.tsx`; `tests/unit/page-intelligence-pages-header.test.ts`.
