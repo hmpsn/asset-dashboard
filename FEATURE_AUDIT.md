@@ -4363,3 +4363,17 @@ The migration preserves the current drawer behavior: close backdrop, focus targe
 **Mutual:** Moves the largest drawer surface out of the client strategy monolith while keeping the state/control flow in one place for this phase.
 
 **Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordDrawer.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
+
+
+### 339. Platform Consolidation — Client StrategyTab Content Section Phase 3
+**What it does:** Continues the Client StrategyTab split by moving the Create Content accordion into `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`. The extracted section owns strong content recommendations, keyword idea review cards, additional page ideas, request-status badges, content-plan navigation badges, feedback chips, and brief/full-post request actions, while `StrategyTab.tsx` keeps owning expansion state, deep-link refs, pricing-modal state, feedback callbacks, and tab navigation.
+
+Shared keyword display helpers now include `kdColor()` alongside the existing intent and number formatting helpers so content gaps, keyword ideas, quick wins, and future extracted sections use the same difficulty color mapping.
+
+**Agency value:** Engineers can review content recommendation layout and request-button behavior without reopening the full StrategyTab orchestration file. This narrows the next section extraction to quick wins/page opportunities, business priorities, and remaining request-flow cleanup.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab Create Content behavior.
+
+**Mutual:** Moves another high-churn rendered section out of the client strategy monolith while keeping current tier gates, deep-link expansion, feedback, plan badges, and pricing-modal behavior intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-content-gaps.test.ts`.

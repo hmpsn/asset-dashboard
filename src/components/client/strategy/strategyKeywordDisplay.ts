@@ -65,6 +65,15 @@ export const intentColor = (intent?: string) => {
   }
 };
 
+export const kdColor = (kd?: number) =>
+  !kd
+    ? 'text-[var(--brand-text-muted)]'
+    : kd <= 30
+      ? 'text-accent-success'
+      : kd <= 60
+        ? 'text-accent-warning'
+        : 'text-accent-danger';
+
 export function fmtAudience(volume?: number): string {
   if (volume == null) return 'Gathering…';
   if (volume === 0) return 'Very niche or emerging term';
