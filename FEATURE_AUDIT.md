@@ -4265,3 +4265,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Creates the first keyword-strategy-specific stepping stone for the larger backend split: orchestration can now be separated from provider collection, helper logic, enrichment, and persistence in follow-up slices.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-helpers.ts`; `server/keyword-strategy-seo-data.ts`.
+
+
+### 332. Platform Consolidation — Keyword Strategy Service Split Phase 2
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving live-page discovery/content collection and first-party search signal collection out of the orchestration service. `server/keyword-strategy-pages.ts` now owns live domain resolution, Webflow metadata lookup, sitemap-based live page discovery, utility/legal page filtering, large-site page caps, bounded HTML snippet reads, thin-page filtering, and incremental-mode fresh-page skeleton recovery. `server/keyword-strategy-search-data.ts` now owns GSC query/device/country/period comparison fetches and GA4 organic landing page/conversion/event fetches.
+
+`server/keyword-strategy-generation.ts` still coordinates provider data, prompt assembly, AI page mapping/master synthesis, enrichment, persistence, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration, but it no longer owns the discovery and search-data plumbing directly. Progress labels, incremental no-op behavior, sitemap fallback behavior, and direct/background job compatibility are preserved.
+
+**Agency value:** Engineers can reason about crawl/page collection and analytics collection independently from the AI synthesis body. This reduces the review surface for the remaining keyword strategy split work and makes future fixes to page discovery or search data safer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves another cohesive chunk out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-pages.ts`; `server/keyword-strategy-search-data.ts`.
