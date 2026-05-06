@@ -227,6 +227,20 @@ describe('Approvals — CRUD', () => {
     expect(ownerItem.status).toBe('pending');
   });
 
+  it('does not let public apply preflight mask missing or wrong-workspace batches', async () => {
+    const missingRes = await postJson(`/api/public/approvals/${testWsId}/batch_missing/apply`, {});
+    expect(missingRes.status).toBe(404);
+
+    const crossApplyRes = await postJson(`/api/public/approvals/${otherWsId}/${batchId}/apply`, {});
+    expect(crossApplyRes.status).toBe(404);
+
+    const ownerRes = await api(`/api/public/approvals/${testWsId}/${batchId}`);
+    expect(ownerRes.status).toBe(200);
+    const ownerBatch = await ownerRes.json();
+    const ownerItem = ownerBatch.items.find((i: { id: string }) => i.id === itemId);
+    expect(ownerItem.status).toBe('pending');
+  });
+
   it('PATCH approves an item', async () => {
     const res = await patchJson(
       `/api/public/approvals/${testWsId}/${batchId}/${itemId}`,
