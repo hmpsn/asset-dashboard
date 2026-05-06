@@ -82,6 +82,7 @@ explicit justification.
 | Direct buildSeoContext() call | regex-shell | Literal function name; grep succeeds. |
 | formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices) | regex-shell | Literal function name with nested match; grep succeeds. |
 | Placeholder test assertion — expect(true).toBe(true) | regex-shell | Fully-escaped literal; grep succeeds; `tests/` pathFilter correctly opted in after the EXCLUDED_DIRS fix. |
+| Source-sniffing in tests (readFileSync on .ts/.tsx source) | regex-shell | Pattern `readFileSync\(.*\.(ts\|tsx)`; grep succeeds; intentional endpoint migration guards must use `// readFile-ok` on the source-read line. Current keyword-strategy provider-boundary contract uses those hatches explicitly, so full-repo scan reports ✓. |
 | Bare JSON.parse on DB row column | regex-shell | Literal `JSON\.parse\(row\.`; grep succeeds; json-validation.ts and migrate-json.ts are excluded. |
 | Unguarded SET status = ? (state machine transition) | regex-shell | Pattern `SET\s+(status\|batch_status)\s*=\s*[?@]`; standard alternation; grep succeeds. |
 | Raw bulk_lookup string outside keywords type file | regex-shell | Literal `'bulk_lookup'`; grep succeeds. |
@@ -154,7 +155,7 @@ explicit justification.
 | Unfiltered staff image URL in schema template (use filterHttpUrls) | regex-shell | PR #406 schema semantic extraction (2026-05-01). Pattern `'image'[[:space:]]*:[[:space:]]*s\.image` in `server/schema/templates/`. Staff `Person` nodes are populated from AI-extracted semantics where `s.image` may be an attacker-controllable URL (data: URI, javascript: scheme, etc.) from page HTML. All three templates that emit staff nodes (`local-business.ts`, `service.ts`, `static.ts`) were fixed to use `filterHttpUrls([s.image ?? ''])[0]`. Manual `grep -rn --include='*.ts' -E "'image'[[:space:]]*:[[:space:]]*s\.image" server/schema/templates/` returns zero hits. Hatch `// staff-image-filter-ok`. |
 | Unfiltered semantics.primaryImage in schema template (use filterHttpUrls) | regex-shell | PR #406 schema semantic extraction (2026-05-01). Pattern `'image'[[:space:]]*:[[:space:]]*semantics?\??.primaryImage` in `server/schema/templates/`. `semantics.primaryImage` is AI-extracted from attacker-controllable page HTML, same risk as `s.image`. `homepage.ts` and `service.ts` were originally missing the filter that `article.ts` and `local-business.ts` had — fixed in the same PR. All four templates now use `filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]`. Manual grep returns zero hits. Hatch `// primary-image-filter-ok`. |
 
-**Count: 86 verified-clean rules.**
+**Count: 87 verified-clean rules.**
 
 > Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
 > warn severity because a full-repo `--all` scan finds ~11 remaining
