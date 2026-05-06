@@ -559,7 +559,7 @@
           "priority": "P2",
           "status": "pending",
           "createdAt": "2026-05-04",
-          "notes": "Partial progress on 2026-05-06 from origin/staging c5a26a15. First slice extracted keyword feedback, tracked strategy keyword, and business-priority workflow state/API calls from StrategyTab into focused hooks. Second slice extracted the keyword detail drawer and shared keyword display helpers into client/strategy modules with static contract guards. Third slice extracted the Create Content/content-opportunity accordion into StrategyContentOpportunitiesSection with a static contract guard. Remaining work: split quick-win/page-opportunity, business-priority, and request-flow sections into focused components while preserving tier gates and deep-link behavior."
+          "notes": "Partial progress on 2026-05-06 from origin/staging 11807972. First slice extracted keyword feedback, tracked strategy keyword, and business-priority workflow state/API calls from StrategyTab into focused hooks. Second slice extracted the keyword detail drawer and shared keyword display helpers into client/strategy modules with static contract guards. Third slice extracted the Create Content/content-opportunity accordion into StrategyContentOpportunitiesSection with a static contract guard. Fourth slice extracted the Improve Pages quick-win/page-review accordion into StrategyPageImprovementsSection with a static contract guard. Remaining work: split business-priority and request-flow sections into focused components while preserving tier gates and deep-link behavior."
         },
         {
           "id": "platform-consolidation-feature-tool-splits",
