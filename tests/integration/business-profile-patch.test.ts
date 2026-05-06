@@ -26,6 +26,24 @@ afterAll(async () => {
 });
 
 let workspaceId = '';
+let otherWorkspaceId = '';
+let otherSessionCookie = '';
+
+async function getPublicBusinessProfile(workspace = workspaceId) {
+  const res = await api(`/api/public/workspace/${workspace}`);
+  expect(res.status).toBe(200);
+  const ws = await res.json();
+  return ws.businessProfile;
+}
+
+async function putBusinessProfile(profile: unknown, workspace = workspaceId): Promise<void> {
+  const res = await api(`/api/workspaces/${workspace}/business-profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  });
+  expect(res.status).toBe(200);
+}
 
 /** Set up a workspace with client auth and return authenticated context */
 async function setupWorkspace() {
@@ -39,6 +57,17 @@ async function setupWorkspace() {
   // Login as client → populates cookie jar with client_session_* cookie
   const loginRes = await postJson(`/api/public/auth/${workspaceId}`, { password: CLIENT_PASSWORD });
   expect(loginRes.status).toBe(200);
+
+  const otherRes = await postJson('/api/workspaces', { name: 'BP Patch Other Workspace' });
+  const otherBody = await otherRes.json();
+  otherWorkspaceId = otherBody.id;
+  await patchJson(`/api/workspaces/${otherWorkspaceId}`, { clientPassword: CLIENT_PASSWORD });
+  const otherLoginRes = await postJson(`/api/public/auth/${otherWorkspaceId}`, { password: CLIENT_PASSWORD });
+  expect(otherLoginRes.status).toBe(200);
+  const setCookie = otherLoginRes.headers.getSetCookie?.() || [];
+  const sessionCookie = setCookie.find((cookie: string) => cookie.startsWith(`client_session_${otherWorkspaceId}=`));
+  expect(sessionCookie).toBeDefined();
+  otherSessionCookie = sessionCookie?.split(';')[0] ?? '';
 }
 
 describe('PATCH /api/public/workspaces/:id/business-profile', () => {
@@ -84,9 +113,57 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
     expect(res.status).toBe(200);
   });
 
+  it('rejects invalid email without mutating the stored business profile', async () => {
+    await putBusinessProfile({
+      phone: '+1 (555) 333-3333',
+      email: 'valid@example.com',
+    });
+    const before = await getPublicBusinessProfile();
+
+    const res = await patchJson(`/api/public/workspaces/${workspaceId}/business-profile`, {
+      email: 'not-an-email',
+    });
+
+    expect(res.status).toBe(400);
+    expect(await getPublicBusinessProfile()).toEqual(before);
+  });
+
+  it('rejects invalid social profile URLs without mutating the stored business profile', async () => {
+    await putBusinessProfile({
+      socialProfiles: ['https://twitter.com/example'],
+    });
+    const before = await getPublicBusinessProfile();
+
+    const res = await patchJson(`/api/public/workspaces/${workspaceId}/business-profile`, {
+      socialProfiles: ['https://twitter.com/example', 'not-a-url'],
+    });
+
+    expect(res.status).toBe(400);
+    expect(await getPublicBusinessProfile()).toEqual(before);
+  });
+
+  it('does not allow a client session from another workspace to mutate the profile', async () => {
+    await putBusinessProfile({
+      phone: '+1 (555) 444-4444',
+    });
+    const before = await getPublicBusinessProfile();
+
+    const res = await fetch(`http://localhost:${ctx.PORT}/api/public/workspaces/${workspaceId}/business-profile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: otherSessionCookie,
+      },
+      body: JSON.stringify({ phone: '+1 (555) 999-9999' }),
+    });
+
+    expect(res.status).toBe(401);
+    expect(await getPublicBusinessProfile()).toEqual(before);
+  });
+
   it('merges with existing profile — does not wipe unrelated fields', async () => {
     // Set a full profile first
-    await patchJson(`/api/public/workspaces/${workspaceId}/business-profile`, {
+    await putBusinessProfile({
       phone: '+1 (555) 111-1111',
       email: 'keep@example.com',
       openingHours: 'Mon-Fri 9-5',
@@ -105,7 +182,7 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
 
   it('deep-merges address — partial address PATCH preserves sibling fields', async () => {
     // Set a full address first
-    await patchJson(`/api/public/workspaces/${workspaceId}/business-profile`, {
+    await putBusinessProfile({
       address: { street: '123 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'USA' },
     });
 
