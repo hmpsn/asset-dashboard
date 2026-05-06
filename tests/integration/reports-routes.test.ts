@@ -204,6 +204,18 @@ describe('Reports — action items CRUD', () => {
     expect(body.error).toBe('Title is required');
   });
 
+  it('POST /api/reports/snapshot/:id/actions rejects invalid priority', async () => {
+    const res = await postJson(`/api/reports/snapshot/${snapshotId}/actions`, {
+      title: 'Invalid priority action',
+      priority: 'critical',
+    });
+    expect(res.status).toBe(400);
+
+    const listRes = await api(`/api/reports/snapshot/${snapshotId}/actions`);
+    const body = await listRes.json();
+    expect(body).toHaveLength(0);
+  });
+
   it('POST /api/reports/snapshot/:id/actions creates action item', async () => {
     const res = await postJson(`/api/reports/snapshot/${snapshotId}/actions`, {
       title: 'Fix broken links',
@@ -231,10 +243,27 @@ describe('Reports — action items CRUD', () => {
     const res = await patchJson(`/api/reports/snapshot/${snapshotId}/actions/${actionId}`, {
       title: 'Fix all broken links',
       status: 'in-progress',
+      priority: 'low',
     });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.title).toBe('Fix all broken links');
+    expect(body.status).toBe('in-progress');
+    expect(body.priority).toBe('low');
+  });
+
+  it('PATCH rejects invalid status without mutating the action', async () => {
+    const res = await patchJson(`/api/reports/snapshot/${snapshotId}/actions/${actionId}`, {
+      status: 'done',
+      priority: 'urgent',
+    });
+    expect(res.status).toBe(400);
+
+    const listRes = await api(`/api/reports/snapshot/${snapshotId}/actions`);
+    const body = await listRes.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].status).toBe('in-progress');
+    expect(body[0].priority).toBe('low');
   });
 
   it('PATCH with bad action id returns 404', async () => {
