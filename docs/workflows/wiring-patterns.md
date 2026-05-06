@@ -121,7 +121,7 @@ The anomaly detection system (`server/anomaly-detection.ts`) runs on a 12h sched
 1. **Thresholds**: Configurable in `THRESHOLDS` constant — % change that triggers an anomaly (traffic, impressions, CTR, position, bounce, conversions, audit score)
 2. **Detection**: `detectForWorkspace(ws)` compares current vs previous 28-day period using `getSearchPeriodComparison` (GSC) and `getGA4PeriodComparison` (GA4), plus audit `listSnapshots` for score deltas
 3. **Deduplication**: `alreadyDetected()` prevents duplicate anomalies within 48h window
-4. **AI Summary**: `generateAiSummary()` calls gpt-4o-mini for a 2-3 sentence executive summary per workspace
+4. **AI Summary**: `generateAiSummary()` calls gpt-5.4-mini for a 2-3 sentence executive summary per workspace
 5. **Activity logging**: Critical/warning anomalies log `anomaly_detected`; positive trends log `anomaly_positive`
 6. **Storage**: JSON file at `.anomalies.json` with 60-day auto-pruning
 7. **API endpoints**: `GET /api/anomalies[/:workspaceId]`, `POST /api/anomalies/:id/dismiss`, `POST /api/anomalies/:id/acknowledge`, `POST /api/anomalies/scan`, `GET /api/public/anomalies/:workspaceId`

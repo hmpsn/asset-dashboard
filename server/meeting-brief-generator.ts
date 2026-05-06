@@ -152,7 +152,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
   ];
 
   const result = await callAI({
-    model: 'gpt-4.1',
+    model: 'gpt-5.4',
     system: systemPrompt,
     messages,
     maxTokens: 2000,
@@ -174,7 +174,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
     const retryResult = await callAI({
-      model: 'gpt-4.1',
+      model: 'gpt-5.4',
       system: systemPrompt,
       messages: retryMessages,
       maxTokens: 2000,

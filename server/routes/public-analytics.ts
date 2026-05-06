@@ -71,7 +71,7 @@ router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('worksp
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
-// Uses gpt-4.1-nano (cheapest model) for a simple JSON classification.
+// Uses gpt-5.4-nano (cheapest model) for a simple JSON classification.
 // Returns null on any failure — intent detection must never block chat.
 async function classifyMessageIntent(
   question: string,
@@ -85,7 +85,7 @@ async function classifyMessageIntent(
   const contextBlock = contextLines ? `Recent conversation:\n${contextLines}\n\n` : '';
 
   const result = await callAI({
-    model: 'gpt-4.1-nano',
+    model: 'gpt-5.4-nano',
     system: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
 
 Values:
@@ -461,7 +461,7 @@ ${JSON.stringify(context, null, 2)}`;
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
       callAI({
-        model: 'gpt-4.1',
+        model: 'gpt-5.4',
         system: systemPrompt,
         messages: [
           ...historyMessages.slice(-10),

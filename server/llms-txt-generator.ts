@@ -227,7 +227,7 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
 async function generatePageSummary(workspaceId: string, title: string, description: string, pageUrl: string): Promise<string> {
   try {
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture: what the page is about, what services/expertise it represents, and who the target audience is. Be factual and precise. Do not use marketing language.',
       messages: [{
         role: 'user',

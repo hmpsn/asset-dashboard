@@ -266,7 +266,7 @@ export async function generateSessionSummary(
       .join('\n');
 
     const result = await callAI({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-5.4-nano',
       system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
       messages: [{ role: 'user', content: transcript }],
       maxTokens: 150,

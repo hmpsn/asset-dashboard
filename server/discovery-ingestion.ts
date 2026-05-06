@@ -205,7 +205,7 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
   let result;
   try {
     result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.2,

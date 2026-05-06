@@ -30,7 +30,7 @@ describe('callAI', () => {
     });
 
     await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: 'Return JSON.' }],
       feature: 'unit-test',
       responseFormat: { type: 'json_object' },
@@ -51,7 +51,7 @@ describe('callAI', () => {
     });
 
     await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: 'Return only valid JSON.',
       messages: [{ role: 'user', content: 'Classify this note.' }],
       feature: 'unit-test-system-json',
@@ -77,7 +77,7 @@ describe('callAI', () => {
     const controller = new AbortController();
 
     await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: 'Draft this.' }],
       feature: 'unit-test-options',
       maxRetries: 1,
@@ -103,7 +103,7 @@ describe('callAI', () => {
 
     await callAI({
       provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       system: 'Write clearly.',
       messages: [{ role: 'user', content: 'Draft this.' }],
       feature: 'unit-test-anthropic-options',

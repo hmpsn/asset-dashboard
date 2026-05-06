@@ -144,7 +144,7 @@ Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
           const aiResult = await callAI({
-            model: 'gpt-4.1-mini',
+            model: 'gpt-5.4-mini',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.6,
             maxTokens: 400,

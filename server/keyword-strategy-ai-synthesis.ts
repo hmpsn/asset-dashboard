@@ -147,7 +147,7 @@ export async function callKeywordStrategyAI(
   const aiMessages = (system ? wrappedMessages.slice(1) : wrappedMessages) as Array<{ role: 'user' | 'assistant'; content: string }>;
 
   const result = await callAI({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     system,
     messages: aiMessages,
     maxTokens,

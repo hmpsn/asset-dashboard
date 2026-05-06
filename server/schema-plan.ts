@@ -343,7 +343,7 @@ IMPORTANT:
 
   try {
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.1,

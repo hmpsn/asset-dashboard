@@ -12,7 +12,7 @@ import { callAnthropic } from './anthropic-helpers.js';
 export interface AICallOptions {
   /** Provider to use. Defaults to 'openai'. */
   provider?: 'openai' | 'anthropic';
-  /** Model override. Defaults to provider's default (gpt-4.1-mini / claude-sonnet-4). */
+  /** Model override. Defaults to provider's default (gpt-5.4-mini / claude-sonnet-4-6). */
   model?: string;
   /** System prompt (mapped to OpenAI system message or Anthropic system field). */
   system?: string;

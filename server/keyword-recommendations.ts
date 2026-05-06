@@ -298,7 +298,7 @@ Return a JSON array of the keywords in ranked order (best first). Only return th
 ["best keyword", "second best", ...]`;
 
   const result = await callAI({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.2,

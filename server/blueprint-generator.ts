@@ -189,7 +189,7 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
 
   const aiResponse = await callAI({
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     maxTokens: 4000,
     messages: [{ role: 'user', content: prompt }],
     feature: 'blueprint-generation',

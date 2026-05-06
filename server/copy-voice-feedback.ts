@@ -80,7 +80,7 @@ Every input note must appear in exactly one of the two arrays.`;
 
   try {
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 500,
@@ -186,7 +186,7 @@ Based on these feedback notes and the current voice profile, suggest a specific 
 
   try {
     const result = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 300,

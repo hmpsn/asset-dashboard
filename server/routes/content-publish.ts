@@ -185,7 +185,7 @@ router.post('/api/webflow/suggest-field-mapping/:siteId', requireWorkspaceSiteAc
     const fieldsDescription = schema.fields.map(f => `- slug: "${f.slug}", displayName: "${f.displayName}", type: "${f.type}"`).join('\n');
 
     const result = await callAI({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-5.4-nano',
       messages: [{
         role: 'user',
         content: `Given this Webflow CMS collection schema, suggest which field slugs map to each blog post property. Return ONLY valid JSON.

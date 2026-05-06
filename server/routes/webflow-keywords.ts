@@ -100,7 +100,7 @@ IMPORTANT:
 Return ONLY valid JSON, no markdown, no explanation.`;
 
     const aiResult = await callAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       temperature: 0.4,
