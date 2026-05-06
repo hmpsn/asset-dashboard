@@ -3,11 +3,40 @@ import { createFeedback, listFeedback, addFeedbackReply } from '../feedback.js';
 import { getWorkspace } from '../workspaces.js';
 import { notifyTeamNewFeedback } from '../email.js';
 import { requireClientPortalAuth } from '../middleware.js';
-import type { FeedbackType } from '../feedback.js';
+import { validate, z } from '../middleware/validate.js';
 
 const router = Router();
 
-const VALID_TYPES: FeedbackType[] = ['bug', 'feature', 'general'];
+const feedbackTypeSchema = z.enum(['bug', 'feature', 'general'], {
+  errorMap: () => ({ message: 'Invalid type. Must be bug, feature, or general.' }),
+});
+
+const publicFeedbackSchema = z.object({
+  type: feedbackTypeSchema,
+  title: z.string({
+    required_error: 'Title is required.',
+    invalid_type_error: 'Title is required.',
+  }).trim().min(1, 'Title is required.').max(500),
+  description: z.string({
+    required_error: 'Description is required.',
+    invalid_type_error: 'Description is required.',
+  }).trim().min(1, 'Description is required.').max(5000),
+  context: z.object({
+    currentTab: z.string().trim().max(100).optional(),
+    browser: z.string().trim().max(200).optional(),
+    screenSize: z.string().trim().max(100).optional(),
+    url: z.string().trim().max(1000).optional(),
+    userAgent: z.string().trim().max(1000).optional(),
+  }).optional(),
+  submittedBy: z.string().trim().max(200).optional(),
+});
+
+const publicFeedbackReplySchema = z.object({
+  content: z.string({
+    required_error: 'Content required',
+    invalid_type_error: 'Content required',
+  }).trim().min(1, 'Content required').max(5000),
+});
 
 router.use('/api/public/feedback/:workspaceId', requireClientPortalAuth(), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -16,28 +45,16 @@ router.use('/api/public/feedback/:workspaceId', requireClientPortalAuth(), (req,
 });
 
 /** Client submits feedback */
-router.post('/api/public/feedback/:workspaceId', (req, res) => {
+router.post('/api/public/feedback/:workspaceId', validate(publicFeedbackSchema), (req, res) => {
   const { workspaceId } = req.params;
-  const { type, title, description, context, submittedBy } = req.body as {
-    type?: string;
-    title?: string;
-    description?: string;
-    context?: { currentTab?: string; browser?: string; screenSize?: string; url?: string; userAgent?: string };
-    submittedBy?: string;
-  };
-
-  if (!type || !VALID_TYPES.includes(type as FeedbackType)) {
-    return res.status(400).json({ error: 'Invalid type. Must be bug, feature, or general.' });
-  }
-  if (!title?.trim()) return res.status(400).json({ error: 'Title is required.' });
-  if (!description?.trim()) return res.status(400).json({ error: 'Description is required.' });
+  const { type, title, description, context, submittedBy } = req.body;
 
   const item = createFeedback(workspaceId, {
-    type: type as FeedbackType,
-    title: title.trim(),
-    description: description.trim(),
+    type,
+    title,
+    description,
     context,
-    submittedBy: submittedBy?.trim(),
+    submittedBy,
   });
 
   // Email notification to admin
@@ -46,8 +63,8 @@ router.post('/api/public/feedback/:workspaceId', (req, res) => {
     workspaceName: ws?.name ?? workspaceId,
     workspaceId,
     feedbackType: type,
-    title: title.trim(),
-    description: description.trim().slice(0, 200),
+    title,
+    description: description.slice(0, 200),
   });
 
   res.json(item);
@@ -60,10 +77,9 @@ router.get('/api/public/feedback/:workspaceId', (req, res) => {
 });
 
 /** Client adds a reply to their own feedback */
-router.post('/api/public/feedback/:workspaceId/:id/reply', (req, res) => {
-  const { content } = req.body as { content?: string };
-  if (!content?.trim()) return res.status(400).json({ error: 'Content required' });
-  const item = addFeedbackReply(req.params.workspaceId, req.params.id, 'client', content.trim());
+router.post('/api/public/feedback/:workspaceId/:id/reply', validate(publicFeedbackReplySchema), (req, res) => {
+  const { content } = req.body;
+  const item = addFeedbackReply(req.params.workspaceId, req.params.id, 'client', content);
   if (!item) return res.status(404).json({ error: 'Not found' });
   res.json(item);
 });
