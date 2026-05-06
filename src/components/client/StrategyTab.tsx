@@ -11,9 +11,12 @@ import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
-import { post, keywordFeedback as kwFeedbackApi, businessPriorities as bizPrioritiesApi, trackedKeywords as trackedKwApi } from '../../api';
+import { post } from '../../api';
 import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 import { Modal } from '../ui/overlay/Modal';
+import { useStrategyBusinessPriorities } from './strategy/useStrategyBusinessPriorities';
+import { useStrategyKeywordFeedback } from './strategy/useStrategyKeywordFeedback';
+import { useStrategyTrackedKeywords } from './strategy/useStrategyTrackedKeywords';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -69,14 +72,6 @@ const intentColor = (intent?: string) => {
   }
 };
 
-
-export interface KeywordFeedback {
-  keyword: string;
-  status: 'approved' | 'declined' | 'requested';
-  reason?: string;
-  source?: string;
-  created_at?: string;
-}
 
 type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
 type StrategyKeywordRole = 'strategy' | 'page' | 'content' | 'idea';
@@ -188,80 +183,46 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     return initial;
   });
 
-  // ── Keyword Feedback State ──
-  const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined' | 'requested'>>(new Map());
-  const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
+  const {
+    keywordFeedback,
+    feedbackLoadError,
+    loadFeedback,
+    submitFeedback,
+    removeFeedback,
+    undoFeedback,
+    getFeedbackStatus,
+    isLoadingFeedback,
+    requestedKeywords,
+  } = useStrategyKeywordFeedback({ workspaceId, setToast });
+
+  const {
+    priorities,
+    prioritiesLoaded,
+    newPriority,
+    setNewPriority,
+    newPriorityCategory,
+    setNewPriorityCategory,
+    savingPriorities,
+    savePriorities,
+  } = useStrategyBusinessPriorities({ workspaceId, setToast });
+
+  const {
+    trackedKeywords,
+    newTrackedKeyword,
+    setNewTrackedKeyword,
+    addingKeyword,
+    setAddingKeyword,
+    removingKeyword,
+    setRemovingKeyword,
+    trackedKeywordsLoading,
+    trackedKeywordsError,
+    loadTrackedKeywords,
+    addTrackedKeyword,
+    removeTrackedKeyword,
+  } = useStrategyTrackedKeywords({ workspaceId });
+
   const [declineReason, setDeclineReason] = useState<{ keyword: string; source: string } | null>(null);
   const [declineReasonText, setDeclineReasonText] = useState('');
-  const [feedbackLoadError, setFeedbackLoadError] = useState(false);
-
-  // Load existing feedback on mount
-  const loadFeedback = useCallback(() => {
-    if (!workspaceId) return;
-    setFeedbackLoadError(false);
-    kwFeedbackApi.get(workspaceId)
-      .then((items) => {
-        const map = new Map<string, 'approved' | 'declined' | 'requested'>();
-        for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
-        setKeywordFeedback(map);
-      })
-      .catch(() => { setFeedbackLoadError(true); });
-  }, [workspaceId]);
-  useEffect(() => { loadFeedback(); }, [loadFeedback]);
-
-  const submitFeedback = useCallback(async (keyword: string, status: 'approved' | 'declined', source: string, reason?: string) => {
-    if (!workspaceId) return;
-    const kw = keyword.toLowerCase().trim();
-    setFeedbackLoading(prev => new Set(prev).add(kw));
-    try {
-      await post(`/api/public/keyword-feedback/${workspaceId}`, { keyword: kw, status, source, reason });
-      setKeywordFeedback(prev => {
-        const next = new Map(prev);
-        next.set(kw, status);
-        return next;
-      });
-      setToast?.(status === 'approved' ? `"${keyword}" marked relevant - it can shape future recommendations` : `"${keyword}" marked not relevant - it won't appear in future strategies`);
-    } catch {
-      setToast?.('Failed to save feedback');
-    } finally {
-      setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
-    }
-  }, [workspaceId, setToast]);
-
-  const undoFeedback = useCallback(async (keyword: string) => {
-    if (!workspaceId) return;
-    const kw = keyword.toLowerCase().trim();
-    setFeedbackLoading(prev => new Set(prev).add(kw));
-    try {
-      await kwFeedbackApi.remove(workspaceId, kw);
-      setKeywordFeedback(prev => { const next = new Map(prev); next.delete(kw); return next; });
-      setToast?.(`"${keyword}" restored - it can appear in future strategies`);
-    } catch {
-      setToast?.('Failed to undo');
-    } finally {
-      setFeedbackLoading(prev => { const next = new Set(prev); next.delete(kw); return next; });
-    }
-  }, [workspaceId, setToast]);
-
-  const getFeedbackStatus = (keyword: string) => keywordFeedback.get(keyword.toLowerCase().trim());
-  const isLoadingFeedback = (keyword: string) => feedbackLoading.has(keyword.toLowerCase().trim());
-
-  const requestedKeywords = [...keywordFeedback.entries()].filter(([, s]) => s === 'requested').map(([k]) => k);
-
-  // ── Business Priorities State ──
-  const [priorities, setPriorities] = useState<{ text: string; category: string }[]>([]);
-  const [prioritiesLoaded, setPrioritiesLoaded] = useState(false);
-  const [newPriority, setNewPriority] = useState('');
-  const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
-  const [savingPriorities, setSavingPriorities] = useState(false);
-
-  // ── Strategy keyword state backed by tracked-keyword APIs ──
-  const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
-  const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
-  const [addingKeyword, setAddingKeyword] = useState(false);
-  const [removingKeyword, setRemovingKeyword] = useState<string | null>(null);
-  const [trackedKeywordsLoading, setTrackedKeywordsLoading] = useState(false);
-  const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
   const [openKeywordDrawer, setOpenKeywordDrawer] = useState<string | null>(null);
   const [drawerClosing, setDrawerClosing] = useState(false);
@@ -302,35 +263,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     try {
       let removedTracked = false;
       if (item.isTracked) {
-        const data = await trackedKwApi.remove(workspaceId, item.label);
-        setTrackedKeywords(data.keywords || []);
+        await removeTrackedKeyword(item.label);
         removedTracked = true;
       }
 
       if (item.isStrategy) {
-        await kwFeedbackApi.submit(workspaceId, {
-          keyword: kw,
-          status: 'declined',
-          source: 'topic_cluster',
-          reason: 'Removed from strategy keywords',
-        });
-        setKeywordFeedback(prev => {
-          const next = new Map(prev);
-          next.set(kw, 'declined');
-          return next;
-        });
+        await submitFeedback(kw, 'declined', 'topic_cluster', 'Removed from strategy keywords', { toast: false, rethrow: true });
         setToast?.(`"${item.label}" removed from strategy keywords - it won't guide future recommendations`);
       } else if (item.isRequested) {
         try {
-          await kwFeedbackApi.remove(workspaceId, kw);
+          await removeFeedback(kw, { toast: false, rethrow: true, clearOnError: removedTracked });
         } catch {
           if (!removedTracked) throw new Error('Failed to remove keyword feedback');
         }
-        setKeywordFeedback(prev => {
-          const next = new Map(prev);
-          next.delete(kw);
-          return next;
-        });
         setToast?.(removedTracked
           ? `"${item.label}" removed from strategy keywords. Historical ranking data is preserved.`
           : `"${item.label}" removed from keyword ideas`);
@@ -342,30 +287,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     } finally {
       setRemovingKeyword(null);
     }
-  }, [workspaceId, removingKeyword, setToast]);
-
-  // Load business priorities + strategy keyword data on mount
-  const loadTrackedKeywords = useCallback(() => {
-    if (!workspaceId) return;
-    setTrackedKeywordsError(false);
-    setTrackedKeywordsLoading(true);
-    trackedKwApi.get(workspaceId)
-      .then((data) => {
-        setTrackedKeywords(data.keywords || []);
-      })
-      .catch(() => { setTrackedKeywordsError(true); })
-      .finally(() => setTrackedKeywordsLoading(false));
-  }, [workspaceId]);
-  useEffect(() => {
-    if (!workspaceId) return;
-    bizPrioritiesApi.get(workspaceId)
-      .then((data) => {
-        setPriorities(data.priorities || []);
-        setPrioritiesLoaded(true);
-      })
-      .catch(() => setPrioritiesLoaded(true));
-    loadTrackedKeywords();
-  }, [workspaceId, loadTrackedKeywords]);
+  }, [workspaceId, removingKeyword, setToast, removeTrackedKeyword, submitFeedback, removeFeedback]);
 
   // Capture previously focused element when drawer opens (open: null → string).
   // Separate effect with [openKeywordDrawer] only so it doesn't re-run on
@@ -421,21 +343,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     const prev = drawerPreviousFocusRef.current;
     if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus();
   }, [openKeywordDrawer]);
-
-  const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
-    if (!workspaceId) return;
-    setSavingPriorities(true);
-    try {
-      await post(`/api/public/business-priorities/${workspaceId}`, { priorities: newList });
-      setPriorities(newList);
-      setToast?.('Business priorities saved - they will shape your next strategy');
-    } catch {
-      setToast?.('Failed to save priorities');
-    } finally {
-      setSavingPriorities(false);
-    }
-  }, [workspaceId, setToast]);
-
 
   // Refs for scroll-to-section
   const priorityKeywordsRef = useRef<HTMLDivElement>(null);
@@ -817,16 +724,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
     setAddingKeyword(true);
     try {
-      const res = await trackedKwApi.add(workspaceId, kw);
+      await addTrackedKeyword(kw);
       if (['declined', 'requested'].includes(keywordFeedback.get(normalized) || '')) {
         try {
-          await kwFeedbackApi.remove(workspaceId, normalized);
+          await removeFeedback(normalized, { toast: false, clearOnError: true });
         } catch {
           // The keyword was added successfully; keep this view aligned with that action.
         }
-        setKeywordFeedback(prev => { const next = new Map(prev); next.delete(normalized); return next; });
       }
-      setTrackedKeywords(res.keywords || []);
       if (options?.clearInput) setNewTrackedKeyword('');
       setToast?.('Added to Strategy Keywords. This will guide future recommendations, but it will not rewrite the current strategy instantly.');
     } catch {

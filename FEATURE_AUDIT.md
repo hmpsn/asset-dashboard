@@ -4335,3 +4335,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Finishes the route split portion of the platform consolidation keyword strategy work while leaving storage normalization sequenced under the dedicated follow-up roadmap items.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-follow-ons.ts`; `tests/contract/keyword-strategy-follow-ons.test.ts`.
+
+
+### 337. Platform Consolidation — Client StrategyTab State Hooks Phase 1
+**What it does:** Starts the Client StrategyTab split by moving keyword feedback, tracked strategy keyword, and business-priority workflow state out of `StrategyTab.tsx` into focused hooks under `src/components/client/strategy/`. The tab remains the rendering/orchestration shell for now, while `useStrategyKeywordFeedback`, `useStrategyTrackedKeywords`, and `useStrategyBusinessPriorities` own the API calls, loading/error state, local optimistic state, retry entry points, and existing toast behavior for those workflows.
+
+The migration preserves the current client behavior: feedback approval/decline/undo still uses the public keyword-feedback endpoints, tracked keywords still load/add/remove through the typed API wrapper, business priorities still persist through the existing public route, and the tab's retry/error UI still calls the same logical reload paths.
+
+**Agency value:** Engineers can continue splitting the 2k-line client strategy surface without editing keyword feedback, tracked keyword, and priority persistence logic in the same file. This reduces review noise for the next section-extraction slice.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab behavior.
+
+**Mutual:** Creates stable client-side ownership boundaries for the larger platform consolidation sprint while keeping the current tab UI intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `src/components/client/strategy/useStrategyTrackedKeywords.ts`; `src/components/client/strategy/useStrategyBusinessPriorities.ts`; `tests/contract/client-strategy-tab-split.test.ts`.
