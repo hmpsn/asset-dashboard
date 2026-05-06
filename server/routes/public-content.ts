@@ -49,8 +49,15 @@ import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/cont
 
 const log = createLogger('public-content');
 const router = Router();
+const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
+
+function activityCommentPreview(content: string): string {
+  return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
+    ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
+    : content;
+}
 
 function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
   const existing = getContentRequest(workspaceId, requestId);
@@ -333,6 +340,8 @@ router.post('/api/public/content-request/:workspaceId/:id/comment', validate(add
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_request_commented', `${actor?.name || 'Client'} commented on "${updated.topic}"`, activityCommentPreview(content), { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
@@ -419,6 +428,7 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)
         .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));
+    // url-fetch-ok: GSC lookup is best-effort external data; malformed provider URLs degrade to fallback keywords.
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-content: POST /api/public/content-request/:workspaceId/from-audit: programming error'); /* GSC unavailable */ }
   }
 
@@ -491,6 +501,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
     const provider = actor ? getConfiguredProvider(ws.seoDataProvider ?? undefined) : null;
     if (provider) {
       provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+        // url-fetch-ok: async keyword enrichment is best-effort provider prewarming.
         if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
         // Non-critical — enrichment will run again on next strategy generation
       });

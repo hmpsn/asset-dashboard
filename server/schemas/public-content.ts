@@ -51,7 +51,7 @@ export const requestChangesSchema = z.object({
 // (unauthenticated public endpoint). Keeping 'author' in the schema would imply 'team' is accepted.
 export const addCommentSchema = z.object({
   content: z.string().min(1, 'content is required').max(2000),
-});
+}).strict();
 
 // POST /api/public/content-request/:workspaceId/from-audit
 export const fromAuditSchema = z.object({
