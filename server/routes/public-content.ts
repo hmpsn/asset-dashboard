@@ -503,8 +503,15 @@ router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTracke
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
-  const keywords = removeTrackedKeyword(ws.id, keyword);
+  const existingKeywords = getTrackedKeywords(ws.id);
+  const wasTracked = existingKeywords.some(k => k.query === keyword);
+  const keywords = wasTracked ? removeTrackedKeyword(ws.id, keyword) : existingKeywords;
   res.json({ keywords });
+  if (wasTracked) {
+    const actor = getClientActor(req, ws.id);
+    addActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword, removed: true });
+  }
 });
 
 // Client reads a post (only allowed when request is in post_review status)
