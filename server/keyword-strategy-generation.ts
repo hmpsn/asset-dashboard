@@ -3,22 +3,9 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import {
-  getGA4Conversions,
-  getGA4EventsByPage,
-  getGA4LandingPages,
-  getGA4OrganicOverview,
-} from './google-analytics.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath, stripHtmlToText, stripCodeFences } from './helpers.js';
-import { resolveBaseUrl } from './url-helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { getLatestSnapshot } from './reports.js';
-import {
-  getQueryPageData,
-  getSearchDeviceBreakdown,
-  getSearchCountryBreakdown,
-  getSearchPeriodComparison,
-} from './search-console.js';
 import { addTrackedKeyword, getTrackedKeywords } from './rank-tracking.js';
 import {
   trendDirection,
@@ -26,10 +13,6 @@ import {
 } from './seo-provider-signals.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
-import {
-  discoverSitemapUrls,
-} from './webflow.js';
-import { getWorkspacePages } from './workspace-data.js';
 import { clearSeoContextCache } from './seo-context.js'; // seo-context-ok: strategy generation must invalidate legacy SEO context caches after writes.
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
@@ -54,11 +37,12 @@ import { WS_EVENTS } from './ws-events.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from './strategy-filters.js';
 import { addActivity } from './activity-log.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
+import { discoverKeywordStrategyPages } from './keyword-strategy-pages.js';
+import { fetchKeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import {
   buildStrategyIntelligenceBlock,
   computeOpportunityScore,
   getPagesNeedingAnalysis,
-  INCREMENTAL_THRESHOLD_DAYS,
 } from './keyword-strategy-helpers.js';
 
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
@@ -248,306 +232,31 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   let responseSent = false;
 
   try {
-    // 1. Resolve site base URL — auto-resolve liveDomain if missing
-    sendProgress('discovery', 'Resolving site URL...', 0.02);
-    let liveDomain = ws.liveDomain || '';
-    if (!liveDomain && token) {
-      try {
-        const domRes = await fetch(`https://api.webflow.com/v2/sites/${ws.webflowSiteId}/custom_domains`, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        });
-        if (domRes.ok) {
-          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
-          const domains = domData.customDomains || [];
-          if (domains.length > 0 && domains[0].url) {
-            const d = domains[0].url;
-            liveDomain = d.startsWith('http') ? d : `https://${d}`;
-            // Persist so we don't re-resolve every time
-            updateWorkspace(ws.id, { liveDomain });
-            log.info(`Auto-resolved liveDomain: ${liveDomain}`);
-          }
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* best-effort */ } // url-fetch-ok
-    }
-    const baseUrl = await resolveBaseUrl({ liveDomain, webflowSiteId: ws.webflowSiteId }, token);
-    log.info(`Using baseUrl: ${baseUrl}`);
+    const {
+      baseUrl,
+      pageInfo,
+      preloadedPageKeywords: _preloadedPageKeywords,
+    } = await discoverKeywordStrategyPages({
+      ws: ws as typeof ws & { webflowSiteId: string },
+      token,
+      strategyMode,
+      maxPagesParam,
+      sendProgress,
+    });
 
-    // 2. Discover pages: sitemap is the SOURCE OF TRUTH for live pages.
-    //    Webflow API is only used for metadata enrichment (SEO title, meta desc).
-    sendProgress('discovery', 'Crawling sitemap for live pages...', 0.05);
-
-    // Build Webflow API metadata lookup (for enrichment only, not page discovery)
-    const wfMetaByPath = new Map<string, { title: string; seoTitle: string; seoDesc: string }>();
-    try {
-      const published = await getWorkspacePages(ws.id, ws.webflowSiteId);
-      for (const p of published) {
-        const pagePath = resolvePagePath(p);
-        wfMetaByPath.set(pagePath, {
-          title: p.title || p.slug || '',
-          seoTitle: p.seo?.title || '',
-          seoDesc: p.seo?.description || '',
-        });
-      }
-      log.info(`Webflow API: ${wfMetaByPath.size} pages with metadata`);
-    } catch (err) {
-      log.info({ err: err }, 'Webflow API metadata fetch failed, continuing without it');
-    }
-
-    // Sitemap = authoritative list of live pages
-    // Filter out utility/thin/legal pages that don't need keyword strategy
-    const SKIP_PATHS = new Set([
-      '/404', '/search', '/password', '/offline', '/thank-you', '/thanks', '/confirmation',
-      // Legal pages — no SEO value to optimize
-      '/privacy', '/privacy-policy', '/terms', '/terms-of-service', '/terms-and-conditions',
-      '/cookie-policy', '/cookies', '/disclaimer', '/legal', '/gdpr', '/ccpa',
-      '/acceptable-use', '/acceptable-use-policy', '/dmca', '/refund-policy', '/returns-policy',
-      // Utility pages
-      '/login', '/signup', '/register', '/reset-password', '/forgot-password',
-      '/unsubscribe', '/opt-out', '/maintenance', '/coming-soon', '/under-construction',
-    ]);
-    const SKIP_PREFIXES = ['/tag/', '/category/', '/author/', '/page/', '/legal/', '/policies/'];
-    const SKIP_SUFFIXES = ['/rss', '/feed', '/rss.xml', '/feed.xml'];
-    const SKIP_PATTERNS = [/\/404$/i, /\/search$/i, /\/password$/i, /\/privacy[-_]?policy/i, /\/terms[-_]?(of[-_]?service|and[-_]?conditions)?$/i, /\/cookie[-_]?policy/i, /\/legal$/i];
-
-    const allPaths = new Set<string>();
-    if (baseUrl) {
-      try {
-        const sitemapUrls = await discoverSitemapUrls(baseUrl);
-        log.info(`Sitemap discovered ${sitemapUrls.length} URLs from ${baseUrl}`);
-        let skippedUtility = 0;
-        for (const url of sitemapUrls) {
-          try {
-            const rawPath = new URL(url).pathname || '/';
-            // Normalize: strip trailing slash (except root)
-            const path = rawPath === '/' ? '/' : rawPath.replace(/\/$/, '');
-
-            // Skip utility pages
-            if (SKIP_PATHS.has(path.toLowerCase())) { skippedUtility++; continue; }
-            if (SKIP_PREFIXES.some(p => path.toLowerCase().startsWith(p))) { skippedUtility++; continue; }
-            if (SKIP_SUFFIXES.some(s => path.toLowerCase().endsWith(s))) { skippedUtility++; continue; }
-            if (SKIP_PATTERNS.some(r => r.test(path))) { skippedUtility++; continue; }
-
-            allPaths.add(path);
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip invalid URLs */ } // url-fetch-ok
-        }
-        if (skippedUtility > 0) log.info(`Skipped ${skippedUtility} utility/index pages`);
-      } catch (err) {
-        log.info({ err: err }, 'Sitemap discovery failed');
-      }
-    }
-    // Fallback: if sitemap found nothing, use Webflow API pages
-    if (allPaths.size === 0 && wfMetaByPath.size > 0) {
-      log.info('Sitemap empty — falling back to Webflow API pages');
-      for (const path of wfMetaByPath.keys()) allPaths.add(path);
-    }
-    sendProgress('discovery', `Found ${allPaths.size} live pages`, 0.12);
-    log.info(`Total live pages: ${allPaths.size}`);
-
-    // --- Page cap: prevent OOM on large sites ---
-    // maxPagesParam: 0 = no cap, otherwise cap at user-chosen limit (200/500/1000)
-    // Even with "All", streaming HTML reads + snippet limits keep memory bounded.
-    let pathArray = Array.from(allPaths);
-    let cappedFromTotal = 0;
-    if (maxPagesParam > 0 && pathArray.length > maxPagesParam) {
-      cappedFromTotal = pathArray.length;
-      // Prioritize: homepage → short paths (key pages) → pages with WF metadata → rest
-      const scorePath = (p: string): number => {
-        if (p === '/') return 0;                            // homepage always first
-        const depth = p.split('/').filter(Boolean).length;
-        const hasWfMeta = wfMetaByPath.has(p) ? 0 : 100;   // prefer pages with metadata
-        return depth * 10 + hasWfMeta;
-      };
-      pathArray.sort((a, b) => scorePath(a) - scorePath(b));
-      pathArray = pathArray.slice(0, maxPagesParam);
-      log.info(`Capped from ${cappedFromTotal} → ${maxPagesParam} pages (prioritized by depth + metadata)`);
-      sendProgress('discovery', `Large site — prioritized top ${maxPagesParam} of ${cappedFromTotal} pages`, 0.13);
-    }
-
-    // Content snippet size: reduce for large sites to control memory
-    const SNIPPET_LIMIT = cappedFromTotal > 0 ? 800 : 1200;
-    const HTML_READ_LIMIT = 100_000; // 100KB max per page — enough for snippet extraction
-
-    // Incremental mode: pre-compute fresh pages BEFORE content fetch to skip wasted I/O.
-    // Pages with analysis_generated_at < INCREMENTAL_THRESHOLD_DAYS old don't need new HTML.
-    let freshPathSet = new Set<string>();
-    let _preloadedPageKeywords: ReturnType<typeof listPageKeywords> | null = null;
-    if (strategyMode === 'incremental') {
-      _preloadedPageKeywords = listPageKeywords(ws.id);
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
-      const cutoffIso = cutoff.toISOString();
-      for (const pk of _preloadedPageKeywords) {
-        if (pk.analysisGeneratedAt && pk.analysisGeneratedAt >= cutoffIso) {
-          freshPathSet.add(pk.pagePath);
-        }
-      }
-      if (freshPathSet.size > 0) {
-        log.info(`Incremental pre-check: ${freshPathSet.size} fresh pages skip content fetch`);
-        sendProgress('discovery', `Incremental: fetching ${pathArray.length - freshPathSet.size} pages (${freshPathSet.size} already fresh)`, 0.135);
-      }
-    }
-
-    // 3. Fetch actual page content for prioritized pages (parallel, batched)
-    // In incremental mode skip fresh pages — their HTML hasn't changed.
-    const pathsToFetch = strategyMode === 'incremental' && freshPathSet.size > 0
-      ? pathArray.filter(p => !freshPathSet.has(p))
-      : pathArray;
-    sendProgress('content', `Fetching content from ${pathsToFetch.length} pages...`, 0.15);
-    const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
-    const contentBatch = 6;
-    for (let i = 0; i < pathsToFetch.length; i += contentBatch) {
-      const chunk = pathsToFetch.slice(i, i + contentBatch);
-      const fetched = Math.min(i + contentBatch, pathsToFetch.length);
-      sendProgress('content', `Fetching page content... ${fetched}/${pathsToFetch.length}`, 0.15 + (fetched / pathsToFetch.length) * 0.30);
-      const contents = await Promise.all(chunk.map(async (pagePath): Promise<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string } | null> => {
-        const wfMeta = wfMetaByPath.get(pagePath);
-        let contentSnippet = '';
-        let htmlTitle = '';
-        let htmlMetaDesc = '';
-        const url = baseUrl ? `${baseUrl}${pagePath === '/' ? '' : pagePath}` : '';
-        if (url) {
-          try {
-            const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
-            if (!htmlRes.ok) {
-              // Non-200 = page doesn't exist on live site (e.g. non-live CMS collection)
-              if (!wfMeta) return null; // Skip sitemap-only pages that 404
-            } else {
-              // Read limited body to prevent OOM on huge pages
-              let html = '';
-              if (htmlRes.body) {
-                const reader = htmlRes.body.getReader();
-                const decoder = new TextDecoder();
-                let bytesRead = 0;
-                while (bytesRead < HTML_READ_LIMIT) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  html += decoder.decode(value, { stream: true });
-                  bytesRead += value.byteLength;
-                }
-                reader.cancel().catch(() => {});
-              } else {
-                html = (await htmlRes.text()).slice(0, HTML_READ_LIMIT);
-              }
-              // Extract title and meta description from HTML for pages without Webflow metadata
-              if (!wfMeta) {
-                const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-                if (titleMatch) htmlTitle = titleMatch[1].trim();
-                const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)
-                  || html.match(/<meta\s+content=["']([^"']+)["']\s+name=["']description["']/i);
-                if (descMatch) htmlMetaDesc = descMatch[1].trim();
-              }
-              contentSnippet = stripHtmlToText(html, { stripHeader: true, maxLength: SNIPPET_LIMIT });
-            }
-          } catch (err) { // url-fetch-ok
-            if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
-            if (!wfMeta) return null; // Skip unreachable sitemap-only pages
-          }
-        }
-        const pathName = pagePath.replace(/^\//, '').replace(/\/$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Home';
-        return {
-          path: pagePath,
-          title: wfMeta?.title || htmlTitle || pathName,
-          seoTitle: wfMeta?.seoTitle || htmlTitle || '',
-          seoDesc: wfMeta?.seoDesc || htmlMetaDesc || '',
-          contentSnippet,
-        };
-      }));
-      pageInfo.push(...contents.filter((c): c is NonNullable<typeof c> => c !== null));
-    }
-    const skipped = pathsToFetch.length - pageInfo.length;
-    if (skipped > 0) log.info(`Filtered out ${skipped} non-live pages (404/unreachable)`);
-
-    // Post-fetch: filter out pages with very thin content (utility/legal pages with < 50 chars)
-    const beforeThinFilter = pageInfo.length;
-    const thinPages = pageInfo.filter(p => p.contentSnippet.length < 50 && p.path !== '/');
-    if (thinPages.length > 0) {
-      log.info(`Thin content pages (< 50 chars): ${thinPages.map(p => p.path).join(', ')}`);
-      // Remove thin pages from the array
-      for (const thin of thinPages) {
-        const idx = pageInfo.indexOf(thin);
-        if (idx >= 0) pageInfo.splice(idx, 1);
-      }
-      log.info(`Removed ${thinPages.length} thin content pages`);
-    }
-
-    const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
-    sendProgress('content', `Fetched ${pageInfo.length} live pages${capNote} (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
-
-    // Incremental mode: re-inject skeleton pageInfo entries for fresh pages that were skipped
-    // during content fetch. They need to be present in pageInfo so getPagesNeedingAnalysis()
-    // puts them in toPreserve — otherwise the synthesis AI sees only stale pages and produces
-    // an incomplete picture of the site (missing content gaps already covered by fresh pages).
-    // Empty contentSnippet is intentional — these pages never go through AI batching;
-    // their keyword data is pulled from existingPageKeywords in the merge step below.
-    if (strategyMode === 'incremental' && _preloadedPageKeywords && freshPathSet.size > 0) {
-      const fetchedPaths = new Set(pageInfo.map(p => p.path));
-      for (const pk of _preloadedPageKeywords) {
-        if (freshPathSet.has(pk.pagePath) && !fetchedPaths.has(pk.pagePath)) {
-          pageInfo.push({
-            path: pk.pagePath,
-            title: pk.pageTitle || '',
-            seoTitle: '',
-            seoDesc: '',
-            contentSnippet: '', // not used — this page goes to toPreserve, not toAnalyze
-          });
-        }
-      }
-      log.info(`Incremental: re-added ${freshPathSet.size} fresh page skeletons for synthesis context`);
-    }
-
-    // 4. Try to gather GSC data if connected
-    sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
-    let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
-    let deviceBreakdown: Awaited<ReturnType<typeof getSearchDeviceBreakdown>> = [];
-    let countryBreakdown: Awaited<ReturnType<typeof getSearchCountryBreakdown>> = [];
-    let periodComparison: Awaited<ReturnType<typeof getSearchPeriodComparison>> | null = null;
-    if (ws.gscPropertyUrl) {
-      try {
-        // Parallel: query+page data, device, country, and period comparison
-        const [qpData, devices, countries, comparison] = await Promise.all([
-          getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90),
-          getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, 28).catch(() => []),
-          getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, 28, 10).catch(() => []),
-          getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, 28).catch(() => null),
-        ]);
-        gscData = qpData;
-        deviceBreakdown = devices;
-        countryBreakdown = countries;
-        periodComparison = comparison;
-        sendProgress('search_data', `Got ${gscData.length} query rows, ${devices.length} devices, ${countries.length} countries from GSC`, 0.50);
-      } catch (err) {
-        if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
-        sendProgress('search_data', 'GSC unavailable — continuing without it', 0.50);
-        log.info('Keyword strategy: GSC data unavailable, proceeding without it');
-      }
-    } else {
-      sendProgress('search_data', 'No GSC connected — skipping', 0.50);
-    }
-
-    // 4b. Try to gather GA4 organic data + conversions if connected
-    let organicLandingPages: Awaited<ReturnType<typeof getGA4LandingPages>> = [];
-    let organicOverview: Awaited<ReturnType<typeof getGA4OrganicOverview>> | null = null;
-    let ga4Conversions: Awaited<ReturnType<typeof getGA4Conversions>> = [];
-    let ga4EventsByPage: Awaited<ReturnType<typeof getGA4EventsByPage>> = [];
-    if (ws.ga4PropertyId) {
-      try {
-        sendProgress('search_data', 'Fetching GA4 organic + conversion data...', 0.51);
-        const [landing, organic, conversions, eventPages] = await Promise.all([
-          getGA4LandingPages(ws.ga4PropertyId, 28, 25, true).catch(() => []),
-          getGA4OrganicOverview(ws.ga4PropertyId, 28).catch(() => null),
-          getGA4Conversions(ws.ga4PropertyId, 28).catch(() => []),
-          getGA4EventsByPage(ws.ga4PropertyId, 28, { limit: 50 }).catch(() => []),
-        ]);
-        organicLandingPages = landing;
-        organicOverview = organic;
-        ga4Conversions = conversions;
-        ga4EventsByPage = eventPages;
-        sendProgress('search_data', `Got ${landing.length} organic landing pages, ${conversions.length} conversion events from GA4`, 0.52);
-      } catch (err) {
-        if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
-        sendProgress('search_data', 'GA4 organic data unavailable — continuing without it', 0.52);
-      }
-    }
+    const {
+      gscData,
+      deviceBreakdown,
+      countryBreakdown,
+      periodComparison,
+      organicLandingPages,
+      organicOverview,
+      ga4Conversions,
+      ga4EventsByPage,
+    } = await fetchKeywordStrategySearchData({
+      ws: ws as typeof ws & { webflowSiteId: string },
+      sendProgress,
+    });
 
     // 5. SEO provider data gathering (based on mode)
     // The keyword pool paradigm: provider data supplies the keyword universe, AI assigns terms to pages.
