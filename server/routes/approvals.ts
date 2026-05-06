@@ -249,10 +249,10 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
 
 // Apply approved items to Webflow
 router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPortalAuth(), async (req, res) => {
-  const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
 
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
   if (!token) return res.status(400).json({ error: 'No Webflow API token' });
