@@ -91,7 +91,7 @@ router.patch('/api/client-actions/:workspaceId/:actionId', requireWorkspaceAcces
     throw err;
   }
   if (!updated) return res.status(404).json({ error: 'Client action not found' });
-  if (req.body.status === 'completed') {
+  if (req.body.status === 'completed' && existing.status !== 'completed') {
     addActivity(req.params.workspaceId, 'client_action_completed', `Completed client action: ${updated.title}`, updated.summary, { actionId: updated.id, sourceType: updated.sourceType });
   }
   broadcastActionUpdate(req.params.workspaceId, req.params.actionId, 'updated');
