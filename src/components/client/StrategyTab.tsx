@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier, Icon, PageHeader } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
+import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
@@ -318,20 +319,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     );
   }
 
-  // Calculate strategy health score
-  const contentGapsFound = strategyData.contentGaps?.length || 0;
-  const quickWinsAvailable = strategyData.quickWins?.length || 0;
-  const keywordGapCount = strategyData.keywordGaps?.length || 0;
-  const newContentTopicCount = contentGapsFound + keywordGapCount;
-  const pagesRanking = strategyData.pageMap.filter(p => p.currentPosition).length;
-  const totalPages = strategyData.pageMap.length;
-  const pagesWithGrowthOpps = strategyData.pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length;
-  
-  // Score: content gaps (40) + quick wins (30) + coverage (30)
-  const contentScore = Math.min(40, contentGapsFound * 4); // 10 gaps = max
-  const quickWinScore = Math.min(30, quickWinsAvailable * 6); // 5 quick wins = max
-  const coverageScore = Math.round((pagesRanking / Math.max(1, totalPages)) * 30);
-  const healthScore = contentScore + quickWinScore + coverageScore;
+  const {
+    contentGapsFound,
+    quickWinsAvailable,
+    keywordGapCount,
+    newContentTopicCount,
+    pagesRanking,
+    totalPages,
+    pagesWithGrowthOpps,
+    contentScore,
+    quickWinScore,
+    coverageScore,
+    healthScore,
+  } = calculateStrategyHealth(strategyData);
 
   const totalPageImprovements = quickWinsAvailable + pagesWithGrowthOpps;
   const priorityKeywordMap = new Map<string, PriorityKeywordItem>();
