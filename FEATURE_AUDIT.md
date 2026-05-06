@@ -4307,3 +4307,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Moves the ranking-data and scoring layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-enrichment.ts`; `tests/contract/seo-provider-boundary.test.ts` (provider-neutral signal boundary moved with enrichment responsibility).
+
+
+### 335. Platform Consolidation — Keyword Strategy Service Split Phase 5
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving persistence/history/broadcast side effects into `server/keyword-strategy-persistence.ts`. The extracted service owns page-keyword table writes, incremental/full replacement semantics, strategy-history snapshots and pruning, workspace strategy blob persistence, strategy-generated activity logging, `STRATEGY_UPDATED` broadcasts, SEO/intelligence cache invalidation, and strategy outcome-action recording.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for page/search/provider input collection, AI synthesis, enrichment, rank seeding, recommendations, and llms.txt regeneration. The persistence service preserves full vs incremental page-map writes, history ordering, activity-after-persistence ordering, broadcast payloads, cache invalidation bridges, and direct/background job compatibility.
+
+**Agency value:** Engineers can review persistence and cache/broadcast correctness without reopening crawl, AI, or enrichment logic. This narrows the last remaining route-split work to tracked-keyword/recommendation/llms.txt follow-ons.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the storage and realtime consistency layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `tests/contract/keyword-strategy-activity-parity.test.ts` (activity/persistence ordering guard now follows the extracted service).
