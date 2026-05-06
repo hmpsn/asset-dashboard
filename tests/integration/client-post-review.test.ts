@@ -11,24 +11,36 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { savePost, getPost, listPostVersions } from '../../server/content-posts-db.js';
+import db from '../../server/db/index.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
 const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
-const { api, postJson, patchJson } = ctx;
+const { api, postJson, patchJson, clearCookies } = ctx;
 
 let testWsId = '';
+let privateWsId = '';
+let otherWsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Post Review Test Workspace');
   testWsId = ws.id;
+
+  const privateWs = createWorkspace('Post Review Protected Workspace');
+  privateWsId = privateWs.id;
+  updateWorkspace(privateWsId, { clientPassword: 'post-review-test' });
+
+  const otherWs = createWorkspace('Post Review Other Workspace');
+  otherWsId = otherWs.id;
 }, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(testWsId);
+  deleteWorkspace(privateWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
@@ -76,19 +88,38 @@ async function createRequest(topic: string, kw: string): Promise<{ id: string; s
  * (Fix 2: "No generated post found") allows the in_progress → post_review transition.
  */
 async function createRequestWithPost(topic: string, kw: string): Promise<{ id: string; status: string; postId: string }> {
-  const req = createContentRequest(testWsId, {
+  return createRequestWithPostForWorkspace(testWsId, topic, kw);
+}
+
+async function createRequestWithPostForWorkspace(
+  workspaceId: string,
+  topic: string,
+  kw: string,
+): Promise<{ id: string; status: string; postId: string }> {
+  const req = createContentRequest(workspaceId, {
     topic, targetKeyword: kw, intent: 'informational', priority: 'medium',
     rationale: '', serviceType: 'full_post',
   });
   const briefId = `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  updateContentRequest(testWsId, req.id, { briefId });
-  const post = makeStubPost(testWsId, briefId);
-  savePost(testWsId, post);
+  updateContentRequest(workspaceId, req.id, { briefId });
+  const post = makeStubPost(workspaceId, briefId);
+  savePost(workspaceId, post);
   return { id: req.id, status: req.status, postId: post.id };
 }
 
 async function setStatus(reqId: string, status: string): Promise<Response> {
   return patchJson(`/api/content-requests/${testWsId}/${reqId}`, { status });
+}
+
+function countActivitiesForRequest(workspaceId: string, requestId: string, type: string): number {
+  const row = db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count
+    FROM activity_log
+    WHERE workspace_id = ?
+      AND type = ?
+      AND metadata LIKE ?
+  `).get(workspaceId, type, `%"requestId":"${requestId}"%`) as { count: number };
+  return row.count;
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -108,6 +139,7 @@ describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { status: string };
     expect(body.status).toBe('delivered');
+    expect(countActivitiesForRequest(testWsId, req.id, 'post_approved')).toBe(1);
   });
 
   it('rejects approve-post from a non-post_review status (e.g. in_progress)', async () => {
@@ -117,6 +149,44 @@ describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
 
     const res = await postJson(`/api/public/content-request/${testWsId}/${req.id}/approve-post`, {});
     expect(res.status).toBe(400);
+  });
+
+  it('requires client auth before approving a protected post review', async () => {
+    const req = await createRequestWithPostForWorkspace(
+      privateWsId,
+      'Protected Approve Test',
+      `protected-approve-${Date.now()}`,
+    );
+    updateContentRequest(privateWsId, req.id, { status: 'in_progress' });
+    updateContentRequest(privateWsId, req.id, { status: 'post_review', postId: req.postId });
+
+    clearCookies();
+    const unauthenticatedRes = await postJson(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {});
+    expect(unauthenticatedRes.status).toBe(401);
+    expect(getContentRequest(privateWsId, req.id)?.status).toBe('post_review');
+    expect(countActivitiesForRequest(privateWsId, req.id, 'post_approved')).toBe(0);
+
+    const loginRes = await postJson(`/api/public/auth/${privateWsId}`, {
+      password: 'post-review-test',
+    });
+    expect(loginRes.status).toBe(200);
+
+    const approvedRes = await postJson(`/api/public/content-request/${privateWsId}/${req.id}/approve-post`, {});
+    expect(approvedRes.status).toBe(200);
+    const approved = await approvedRes.json() as { status: string };
+    expect(approved.status).toBe('delivered');
+    expect(countActivitiesForRequest(privateWsId, req.id, 'post_approved')).toBe(1);
+  });
+
+  it('does not approve a post review through the wrong workspace', async () => {
+    const req = await createRequestWithPost('Cross Workspace Approve Test', `cross-approve-${Date.now()}`);
+    updateContentRequest(testWsId, req.id, { status: 'in_progress' });
+    updateContentRequest(testWsId, req.id, { status: 'post_review', postId: req.postId });
+
+    const crossRes = await postJson(`/api/public/content-request/${otherWsId}/${req.id}/approve-post`, {});
+    expect(crossRes.status).toBe(404);
+    expect(getContentRequest(testWsId, req.id)?.status).toBe('post_review');
+    expect(countActivitiesForRequest(testWsId, req.id, 'post_approved')).toBe(0);
   });
 });
 
@@ -135,6 +205,7 @@ describe('POST /api/public/content-request/:wsId/:id/request-post-changes', () =
     const body = await res.json() as { status: string; clientFeedback: string };
     expect(body.status).toBe('changes_requested');
     expect(body.clientFeedback).toBe('Please make section 2 more detailed.');
+    expect(countActivitiesForRequest(testWsId, req.id, 'post_changes_requested')).toBe(1);
   });
 
   it('rejects request-post-changes from non-post_review status', async () => {
