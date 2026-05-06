@@ -8,6 +8,7 @@ const { api, postJson, patchJson } = ctx;
 
 let wsId = '';
 let privateWsId = '';
+let otherWsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -18,16 +19,26 @@ beforeAll(async () => {
   const privateWs = createWorkspace('Client Actions Private');
   privateWsId = privateWs.id;
   updateWorkspace(privateWsId, { clientPassword: 'client-action-test' });
+
+  const otherWs = createWorkspace('Client Actions Other');
+  otherWsId = otherWs.id;
 });
 
 afterAll(async () => {
-  db.prepare('DELETE FROM client_actions WHERE workspace_id IN (?, ?)').run(wsId, privateWsId);
+  db.prepare('DELETE FROM client_actions WHERE workspace_id IN (?, ?, ?)').run(wsId, privateWsId, otherWsId);
   deleteWorkspace(wsId);
   deleteWorkspace(privateWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
 describe('client action routes', () => {
+  async function listActions(workspaceId: string) {
+    const res = await api(`/api/client-actions/${workspaceId}`);
+    expect(res.status).toBe(200);
+    return await res.json() as Array<{ id: string; status: string; priority: string; updatedAt: string; clientNote?: string }>;
+  }
+
   it('creates and lists a client action from the admin API', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'internal_link',
@@ -47,6 +58,36 @@ describe('client action routes', () => {
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.some((a: { id: string }) => a.id === created.id)).toBe(true);
+  });
+
+  it('rejects invalid create input without inserting a client action', async () => {
+    const before = await listActions(wsId);
+
+    const invalidSourceRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'not_a_real_source',
+      title: 'Invalid action',
+      summary: 'This should not persist.',
+    });
+    expect(invalidSourceRes.status).toBe(400);
+
+    const invalidPriorityRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      title: 'Invalid priority',
+      summary: 'This should not persist either.',
+      priority: 'urgent',
+    });
+    expect(invalidPriorityRes.status).toBe(400);
+
+    const unsupportedStatusRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      title: 'Unsupported status',
+      summary: 'Create must not accept workflow state from callers.',
+      status: 'completed',
+    });
+    expect(unsupportedStatusRes.status).toBe(400);
+
+    const after = await listActions(wsId);
+    expect(after).toHaveLength(before.length);
   });
 
   it('deduplicates active actions by source type and source id', async () => {
@@ -76,6 +117,28 @@ describe('client action routes', () => {
     expect(list.filter((a: { sourceId?: string }) => a.sourceId === sourceId)).toHaveLength(1);
   });
 
+  it('keeps action IDs scoped to their workspace for admin reads and updates', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'keyword_strategy',
+      title: 'Workspace-scoped action',
+      summary: 'This action belongs to the primary workspace only.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+
+    const otherList = await listActions(privateWsId);
+    expect(otherList.some(action => action.id === created.id)).toBe(false);
+
+    const crossPatchRes = await patchJson(`/api/client-actions/${privateWsId}/${created.id}`, {
+      status: 'completed',
+    });
+    expect(crossPatchRes.status).toBe(404);
+
+    const ownerList = await listActions(wsId);
+    const stored = ownerList.find(action => action.id === created.id);
+    expect(stored?.status).toBe('pending');
+  });
+
   it('allows a client to approve a pending action, then blocks duplicate responses', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'content_decay',
@@ -98,6 +161,46 @@ describe('client action routes', () => {
       clientNote: 'Actually no.',
     });
     expect(duplicateRes.status).toBe(409);
+  });
+
+  it('rejects invalid public responses without mutating the pending action', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'content_decay',
+      title: 'Invalid public response',
+      summary: 'This action should remain pending.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+
+    const invalidRes = await patchJson(`/api/public/client-actions/${wsId}/${created.id}/respond`, {
+      status: 'completed',
+      clientNote: 'Trying to skip approval.',
+    });
+    expect(invalidRes.status).toBe(400);
+
+    const stored = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(stored?.status).toBe('pending');
+    expect(stored?.clientNote).toBeUndefined();
+  });
+
+  it('does not let public routes respond to an action through the wrong workspace', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'aeo_change',
+      title: 'Cross-workspace public response',
+      summary: 'This must not be answerable through another workspace.',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+
+    const crossRespondRes = await patchJson(`/api/public/client-actions/${otherWsId}/${created.id}/respond`, {
+      status: 'approved',
+      clientNote: 'Cross-workspace probe.',
+    });
+    expect(crossRespondRes.status).toBe(404);
+
+    const stored = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(stored?.status).toBe('pending');
+    expect(stored?.clientNote).toBeUndefined();
   });
 
   it('treats changes requested as a client-side terminal response until admin reopens it', async () => {
@@ -155,6 +258,34 @@ describe('client action routes', () => {
 
     const reopenCompletedRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'pending' });
     expect(reopenCompletedRes.status).toBe(409);
+  });
+
+  it('rejects invalid admin update values without mutating', async () => {
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      title: 'Invalid update values',
+      summary: 'This action should keep its original priority and status.',
+      priority: 'low',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    const before = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(before).toBeDefined();
+
+    const badStatusRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, {
+      status: 'not_a_status',
+    });
+    expect(badStatusRes.status).toBe(400);
+
+    const badPriorityRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, {
+      priority: 'urgent',
+    });
+    expect(badPriorityRes.status).toBe(400);
+
+    const after = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(after?.status).toBe(before?.status);
+    expect(after?.priority).toBe(before?.priority);
+    expect(after?.updatedAt).toBe(before?.updatedAt);
   });
 
   it('requires client auth for password-protected public action reads', async () => {

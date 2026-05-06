@@ -43,7 +43,9 @@ describe('useDeepLinkFocus', () => {
     await waitFor(() => {
       expect(getByTestId('address-row').scrollIntoView).toHaveBeenCalled();
     });
-    expect(getByTestId('focus-param').textContent).toBe('none');
+    await waitFor(() => {
+      expect(getByTestId('focus-param').textContent).toBe('none');
+    });
   });
 
   it('does nothing when no matching element', async () => {
