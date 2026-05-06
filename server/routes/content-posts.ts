@@ -54,7 +54,7 @@ const log = createLogger('content-posts');
 const aiReviewResultSchema = z.object({
   pass: z.boolean(),
   reason: z.string(),
-}).strict();
+}).strip();
 
 const aiReviewResponseSchema = z.object({
   factual_accuracy: aiReviewResultSchema,
@@ -63,7 +63,12 @@ const aiReviewResponseSchema = z.object({
   no_hallucinations: aiReviewResultSchema,
   meta_optimized: aiReviewResultSchema,
   word_count_target: aiReviewResultSchema,
-}).strict();
+}).strip();
+
+const aiMetaFixResponseSchema = z.object({
+  seoTitle: z.string().trim().min(1),
+  seoMetaDescription: z.string().trim().min(1),
+}).strip();
 
 function markProvenanceItemsForHumanReview(
   review: Record<string, AIReviewResult>,
@@ -625,22 +630,29 @@ ${originalText}`;
       let suggestedText: string;
 
       if (field === 'meta') {
-        let parsed: { seoTitle?: unknown; seoMetaDescription?: unknown } | null;
+        let parsed: unknown;
         try {
-          parsed = parseAIJson<{ seoTitle?: unknown; seoMetaDescription?: unknown }>(rawSuggested);
+          parsed = parseAIJson<unknown>(rawSuggested);
         } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
-        // Guard against AI returning literal `null` or a non-object (`'"a string"'`,
-        // `'42'`) — JSON.parse accepts both but destructuring would throw a TypeError
-        // that the outer catch turns into an opaque 500. Surface the real failure here.
-        if (!parsed || typeof parsed !== 'object') {
+        const parsedResult = aiMetaFixResponseSchema.safeParse(parsed);
+        if (!parsedResult.success) {
+          log.warn({ issues: parsedResult.error.issues }, 'AI meta fix response failed schema validation');
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
-        suggestedText = JSON.stringify({
-          seoTitle: sanitizePlainText(typeof parsed.seoTitle === 'string' ? parsed.seoTitle : ''),
-          seoMetaDescription: sanitizePlainText(typeof parsed.seoMetaDescription === 'string' ? parsed.seoMetaDescription : ''),
-        });
+        const sanitizedMeta = {
+          seoTitle: sanitizePlainText(parsedResult.data.seoTitle),
+          seoMetaDescription: sanitizePlainText(parsedResult.data.seoMetaDescription),
+        };
+        // Sanitization can strip all-tag payloads down to empty strings; keep the
+        // same non-empty contract after sanitizing.
+        const sanitizedResult = aiMetaFixResponseSchema.safeParse(sanitizedMeta);
+        if (!sanitizedResult.success) {
+          log.warn({ issues: sanitizedResult.error.issues }, 'AI meta fix response sanitized to invalid fields');
+          return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        }
+        suggestedText = JSON.stringify(sanitizedResult.data);
       } else {
         suggestedText = sanitizeRichText(rawSuggested);
       }
