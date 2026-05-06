@@ -4,6 +4,14 @@ import { get, post, patch, getOptional } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
+import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
+import {
+  parseAuthInitParams,
+  stripResetTokenFromUrl,
+  stripStripeParamsFromUrl,
+  hasSessionAuth,
+  welcomeSeenKey,
+} from '../lib/client-dashboard-auth';
 import {
   AlertTriangle,
   Target, Zap, Shield, X,
@@ -317,13 +325,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── UI-only state ──
   const clientNavigate = useNavigate();
   const initialTabId = initialTab?.split('/')[0];
-  const tab: ClientTab = (() => {
-    const t = initialTabId;
-    if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
-    if (t === 'brand') return brandTabEnabled ? 'brand' as ClientTab : 'overview';
-    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
-    return 'overview';
-  })();
+  const tab: ResolvedClientTab = resolveClientTab(initialTabId, brandTabEnabled);
   const setTab = (t: ClientTab) => {
     clientNavigate(clientPath(workspaceId, t, betaMode));
   };
@@ -497,8 +499,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         // Fall back to legacy session check
         if (!autoAuthed) {
           if (data.requiresPassword) {
-            const stored = sessionStorage.getItem(`dash_auth_${workspaceId}`);
-            if (stored === 'true') {
+            if (hasSessionAuth(sessionStorage, workspaceId)) {
               setAuthenticated(true);
               loadDashboardData(data);
             }
@@ -515,36 +516,27 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         }
 
         // Show welcome modal on first visit (user-aware key when logged in)
-        const welcomeUserId = resolvedUserId;
-        const welcomeKey = welcomeUserId ? `welcome_seen_${workspaceId}_${welcomeUserId}` : `welcome_seen_${workspaceId}`;
+        const welcomeKey = welcomeSeenKey(workspaceId, resolvedUserId);
         if (!localStorage.getItem(welcomeKey) && !data.onboardingEnabled) {
           setShowWelcome(true);
         }
 
+        const { resetToken: urlResetToken, paymentStatus } = parseAuthInitParams(window.location.search);
+
         // Detect password reset token in URL
-        const params = new URLSearchParams(window.location.search);
-        const urlResetToken = params.get('reset_token');
         if (urlResetToken) {
           setResetToken(urlResetToken);
           setLoginView('reset');
-          const cleanUrl = new URL(window.location.href);
-          cleanUrl.searchParams.delete('reset_token');
-          window.history.replaceState({}, '', cleanUrl.toString());
+          window.history.replaceState({}, '', stripResetTokenFromUrl(window.location.href));
         }
 
         // Detect Stripe payment redirect
-        const paymentStatus = params.get('payment');
         if (paymentStatus === 'success') {
           setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
-          const url = new URL(window.location.href);
-          url.searchParams.delete('payment');
-          url.searchParams.delete('session_id');
-          window.history.replaceState({}, '', url.toString());
+          window.history.replaceState({}, '', stripStripeParamsFromUrl(window.location.href));
         } else if (paymentStatus === 'cancelled') {
           setToast({ message: 'Payment was cancelled. You can try again anytime.', type: 'error' });
-          const url = new URL(window.location.href);
-          url.searchParams.delete('payment');
-          window.history.replaceState({}, '', url.toString());
+          window.history.replaceState({}, '', stripStripeParamsFromUrl(window.location.href));
         }
       })
       .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? `This dashboard is currently unavailable. Please contact ${STUDIO_NAME} for access.` : 'Failed to load dashboard'); setLoading(false); });

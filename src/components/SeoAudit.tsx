@@ -26,7 +26,8 @@ import {
   type SeoAuditResult, type SnapshotSummary,
   SEVERITY_CONFIG,
 } from './audit/types';
-import { computePageScore } from '../../shared/scoring';
+import { applyClientSuppressions } from '../lib/audit-suppression-client';
+import { issueToTaskKey, issueToTaskItem, selectIssuesForBatch } from '../lib/audit-batch';
 import { ReportModal, ReportViewer } from './audit/AuditReportExport';
 import { AuditIssueRow } from './audit/AuditIssueRow';
 import { AuditBatchActions } from './audit/AuditBatchActions';
@@ -220,28 +221,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     finally { setFlagSending(false); }
   };
 
-  const issueToTaskKey = (page: PageSeoResult, issue: SeoIssue) =>
-    `${page.pageId}-${issue.check}-${issue.message.slice(0, 30)}`;
-
-  const issueToTaskItem = (page: PageSeoResult, issue: SeoIssue) => {
-    const fixKey = `${page.pageId}-${issue.check}`;
-    const edited = editedSuggestions[fixKey];
-    const suggestion = edited || issue.suggestedFix;
-    return {
-      title: `[Audit] ${issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'} ${issue.check}: ${issue.message.slice(0, 80)}`,
-      description: `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${suggestion ? `\n\nAI Suggestion: ${suggestion}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`,
-      category: 'seo',
-      priority: issue.severity === 'error' ? 'high' : 'medium',
-      pageUrl: page.slug,
-    };
-  };
-
   const createTaskFromIssue = async (page: PageSeoResult, issue: SeoIssue) => {
     if (!workspaceId) return;
     const taskKey = issueToTaskKey(page, issue);
     setCreatingTask(taskKey);
     try {
-      const item = issueToTaskItem(page, issue);
+      const item = issueToTaskItem(page, issue, editedSuggestions);
       await post('/api/requests', { workspaceId, ...item });
       setCreatedTasks(prev => new Set(prev).add(taskKey));
     } catch (err) { console.error('Failed to create task:', err); }
@@ -252,25 +237,15 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId || !data) return;
     setBatchCreating(true);
     try {
-      const pages = mode === 'filtered' ? filteredPages : data.pages;
-      const items: ReturnType<typeof issueToTaskItem>[] = [];
-      const keys: string[] = [];
-      for (const page of pages) {
-        const issues = mode === 'errors'
-          ? page.issues.filter(i => i.severity === 'error')
-          : mode === 'filtered'
-            ? page.issues
-                .filter(i => severityFilter === 'all' || i.severity === severityFilter)
-                .filter(i => categoryFilter === 'all' || i.category === categoryFilter)
-            : page.issues;
-        for (const issue of issues) {
-          const key = issueToTaskKey(page, issue);
-          if (!createdTasks.has(key)) {
-            items.push(issueToTaskItem(page, issue));
-            keys.push(key);
-          }
-        }
-      }
+      const { items, keys } = selectIssuesForBatch({
+        mode,
+        pages: data.pages,
+        filteredPages,
+        severityFilter,
+        categoryFilter,
+        createdTasks,
+        editedSuggestions,
+      });
       if (items.length === 0) { setBatchCreating(false); return; }
       const result = await post<{ created: number }>('/api/requests/batch', { workspaceId, items });
       setCreatedTasks(prev => {
@@ -425,39 +400,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   // Effective audit data with suppressions applied (filters issues, recalculates scores)
   const effectiveData = useMemo(() => {
     if (!data) return null;
-    const exactSupps = suppressions.filter(s => !s.pagePattern);
-    const patternSupps = suppressions.filter(s => s.pagePattern);
-    const suppSet = new Set(exactSupps.map(s => `${s.check}:${s.pageSlug}`));
-    if (suppSet.size === 0 && patternSupps.length === 0) return data;
-
-    // Simple glob matcher for client-side pattern filtering
-    const patternMatchers = patternSupps.map(s => {
-      const escaped = s.pagePattern!.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-      const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
-      return { check: s.check, regex: new RegExp(`^${regexStr}$`, 'i') };
-    });
-
-    const pages = data.pages.map(page => {
-      const filtered = page.issues.filter(i => {
-        if (suppSet.has(`${i.check}:${page.slug}`)) return false;
-        for (const pm of patternMatchers) {
-          if (pm.check === i.check && pm.regex.test(page.slug)) return false;
-        }
-        return true;
-      });
-      if (filtered.length === page.issues.length) return page;
-      const score = computePageScore(filtered);
-      return { ...page, issues: filtered, score };
-    });
-
-    const errors = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'error').length, 0);
-    const warnings = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'warning').length, 0);
-    const infos = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0);
-    // Exclude noindex pages from site score — they don't affect search rankings
-    const indexedPages = pages.filter(p => !p.noindex);
-    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 100;
-
-    return { ...data, pages, errors, warnings, infos, siteScore };
+    return applyClientSuppressions(data, suppressions);
   }, [data, suppressions]);
 
   // ── Audit view — with sub-tabs ──
