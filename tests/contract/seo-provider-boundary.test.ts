@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 describe('SEO provider boundary', () => {
   it('keeps keyword strategy generation off provider-specific utility imports', () => {
-    const source = readFileSync('server/keyword-strategy-generation.ts', 'utf-8'); // readFile-ok: endpoint migration guard
-    expect(source).toContain("from './seo-provider-signals.js'");
-    expect(source).not.toContain("from './semrush.js'");
+    const generation = readFileSync('server/keyword-strategy-generation.ts', 'utf-8'); // readFile-ok: endpoint migration guard
+    const enrichment = readFileSync('server/keyword-strategy-enrichment.ts', 'utf-8'); // readFile-ok: endpoint migration guard
+    expect(enrichment).toContain("from './seo-provider-signals.js'");
+    expect(generation).not.toContain("from './semrush.js'");
+    expect(enrichment).not.toContain("from './semrush.js'");
   });
 
   it('keeps legacy SEMRush helper exports as provider-neutral re-exports only', () => {

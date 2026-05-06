@@ -4293,3 +4293,17 @@ The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state 
 **Mutual:** Moves the highest-token AI section out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
 
 **Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `tests/contract/ai-dispatch-migration.test.ts` (AI dispatcher guard moved to the synthesis module); `tests/integration/brand-filter-wiring.test.ts` (static wiring assertions split between generation and synthesis responsibilities).
+
+
+### 334. Platform Consolidation — Keyword Strategy Service Split Phase 4
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving post-synthesis enrichment into `server/keyword-strategy-enrichment.ts`. The extracted service owns GSC page metrics, provider volume/KD/CPC and SERP feature enrichment, content-gap metrics and opportunity scoring, SERP targeting recommendations, cannibalization detection, AI topical authority clustering, site keyword metrics, quick-win ROI scoring, and final impact sorting.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for page/search/provider input collection, AI synthesis, persistence/history, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration. The enrichment service preserves existing progress labels, provider bulk lookup caps, GSC-impression fallbacks, zero-volume content-gap retention, and direct/background job compatibility.
+
+**Agency value:** Engineers can change ranking-data enrichment or scoring behavior without reopening AI prompt assembly or persistence code. This makes remaining persistence/history/broadcast extraction smaller and easier to review.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the ranking-data and scoring layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-enrichment.ts`; `tests/contract/seo-provider-boundary.test.ts` (provider-neutral signal boundary moved with enrichment responsibility).
