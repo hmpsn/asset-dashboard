@@ -25,7 +25,7 @@ const router = Router();
 const createRequestSchema = z.object({
   title: z.string().min(1, 'Title is required').max(500),
   description: z.string().min(1, 'Description is required').max(5000),
-  category: z.string().min(1, 'Category is required'),
+  category: z.enum(['bug', 'content', 'design', 'seo', 'feature', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
   pageUrl: z.string().url().optional().or(z.literal('')),
   submittedBy: z.string().max(200).optional(),

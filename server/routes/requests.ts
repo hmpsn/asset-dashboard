@@ -9,6 +9,7 @@ import { broadcast, broadcastToWorkspace } from '../broadcast.js';
 import { STUDIO_NAME } from '../constants.js';
 import { notifyClientTeamResponse, notifyClientStatusChange } from '../email.js';
 import { requestUserCanAccessWorkspace, upload } from '../middleware.js';
+import { validate, z } from '../middleware/validate.js';
 import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
 import {
   listRequests,
@@ -19,10 +20,54 @@ import {
   getRequest,
   getAttachmentsDir,
   type RequestAttachment,
+  type RequestCategory,
+  type RequestPriority,
+  type RequestStatus,
 } from '../requests.js';
 import { getWorkspace, getClientPortalUrl, updatePageState } from '../workspaces.js';
 
 const router = Router();
+
+const requestCategorySchema = z.enum(['bug', 'content', 'design', 'seo', 'feature', 'other']);
+const requestPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent']);
+const requestStatusSchema = z.enum(['new', 'in_review', 'in_progress', 'on_hold', 'completed', 'closed']);
+
+const createRequestSchema = z.object({
+  workspaceId: z.string().min(1, 'workspaceId is required'),
+  title: z.string().trim().min(1, 'title is required').max(500),
+  description: z.string().trim().min(1, 'description is required').max(5000),
+  category: requestCategorySchema.optional().default('seo'),
+  priority: requestPrioritySchema.optional(),
+  pageUrl: z.string().optional(),
+  pageId: z.string().optional(),
+});
+
+const batchCreateRequestSchema = z.object({
+  workspaceId: z.string().min(1, 'workspaceId is required'),
+  items: z.array(z.object({
+    title: z.string().trim().min(1, 'title is required').max(500),
+    description: z.string().trim().min(1, 'description is required').max(5000),
+    category: requestCategorySchema.optional().default('seo'),
+    priority: requestPrioritySchema.optional().default('medium'),
+    pageUrl: z.string().optional(),
+  })).min(1, 'items[] required'),
+});
+
+const bulkUpdateRequestSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, 'ids[] required'),
+  status: requestStatusSchema.optional(),
+  priority: requestPrioritySchema.optional(),
+}).refine(data => data.status !== undefined || data.priority !== undefined, {
+  message: 'status or priority required',
+});
+
+const updateRequestSchema = z.object({
+  status: requestStatusSchema.optional(),
+  priority: requestPrioritySchema.optional(),
+  category: requestCategorySchema.optional(),
+}).refine(data => data.status !== undefined || data.priority !== undefined || data.category !== undefined, {
+  message: 'status, priority, or category required',
+});
 
 // --- Request Attachments ---
 function canAccessRequest(req: import('express').Request, workspaceId: string, res: import('express').Response): boolean {
@@ -43,23 +88,32 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
 }
 
 // Internal: create request (e.g. from audit finding)
-router.post('/api/requests', (req, res) => {
-  const { workspaceId, title, description, category, priority, pageUrl, pageId } = req.body;
-  if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
+router.post('/api/requests', validate(createRequestSchema), (req, res) => {
+  const { workspaceId, title, description, category, priority, pageUrl, pageId } = req.body as {
+    workspaceId: string;
+    title: string;
+    description: string;
+    category: RequestCategory;
+    priority?: RequestPriority;
+    pageUrl?: string;
+    pageId?: string;
+  };
   if (!canAccessRequest(req, workspaceId, res)) return;
-  const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: STUDIO_NAME });
+  const request = createRequest(workspaceId, { title, description, category, priority, pageUrl, pageId, submittedBy: STUDIO_NAME });
   broadcast(ADMIN_EVENTS.REQUEST_CREATED, request);
   broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { id: request.id });
   res.json(request);
 });
 
 // Internal: batch create requests (from audit findings)
-router.post('/api/requests/batch', (req, res) => {
-  const { workspaceId, items } = req.body as { workspaceId: string; items: Array<{ title: string; description: string; category?: string; priority?: string; pageUrl?: string }> };
-  if (!workspaceId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'workspaceId and items[] required' });
+router.post('/api/requests/batch', validate(batchCreateRequestSchema), (req, res) => {
+  const { workspaceId, items } = req.body as {
+    workspaceId: string;
+    items: Array<{ title: string; description: string; category: RequestCategory; priority: RequestPriority; pageUrl?: string }>;
+  };
   if (!canAccessRequest(req, workspaceId, res)) return;
   const created = items.map(item =>
-    createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: STUDIO_NAME })
+    createRequest(workspaceId, { title: item.title, description: item.description, category: item.category, priority: item.priority, pageUrl: item.pageUrl, submittedBy: STUDIO_NAME })
   );
   broadcast(ADMIN_EVENTS.REQUEST_BATCH_CREATED, { count: created.length });
   broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { ids: created.map(r => r.id), batch: true });
@@ -67,10 +121,9 @@ router.post('/api/requests/batch', (req, res) => {
 });
 
 // Internal: bulk update request status
-router.patch('/api/requests/bulk', (req, res) => {
-  const { ids, status, priority } = req.body as { ids: string[]; status?: string; priority?: string };
-  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids[] required' });
-  const updates: Record<string, string> = {};
+router.patch('/api/requests/bulk', validate(bulkUpdateRequestSchema), (req, res) => {
+  const { ids, status, priority } = req.body as { ids: string[]; status?: RequestStatus; priority?: RequestPriority };
+  const updates: { status?: RequestStatus; priority?: RequestPriority } = {};
   if (status) updates.status = status;
   if (priority) updates.priority = priority;
   // Look up each request's workspace before mutating so the update is workspace-scoped.
@@ -109,8 +162,12 @@ router.get('/api/requests/:id', (req, res) => {
 });
 
 // Internal: update request status/priority/category
-router.patch('/api/requests/:id', (req, res) => {
-  const { status, priority, category } = req.body;
+router.patch('/api/requests/:id', validate(updateRequestSchema), (req, res) => {
+  const { status, priority, category } = req.body as {
+    status?: RequestStatus;
+    priority?: RequestPriority;
+    category?: RequestCategory;
+  };
   const prev = getRequest(req.params.id);
   if (!prev) return res.status(404).json({ error: 'Not found' });
   if (!canAccessRequest(req, prev.workspaceId, res)) return;
