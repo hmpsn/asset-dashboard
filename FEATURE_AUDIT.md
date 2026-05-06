@@ -4509,3 +4509,16 @@ The migration preserves PageIntelligence behavior: the parent still owns page-an
 **Mutual:** Further reduces PageIntelligence's dense detail surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
 
 **Files:** `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligenceStrategySection.tsx`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/PageIntelligencePersistedAnalysisSummary.tsx`; `src/components/page-intelligence/PageIntelligencePageActions.tsx`; `src/components/page-intelligence/PageIntelligenceTrackKeywordButton.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 350. Platform Consolidation — PageIntelligence Workflow Hooks Split
+**What it does:** Continues the PageIntelligence feature-tool split by moving parent-owned workflow state into focused hooks. `usePageIntelligenceAnalysis` owns direct page analysis, page-analysis background job rediscovery/progress/cancellation wiring, query invalidation, and analysis fallback/error/next-step state. `usePageIntelligenceKeywordEditing` owns page keyword edit draft/save state, `usePageIntelligenceKeywordTracking` owns tracked keyword hydration/adds, and `usePageIntelligenceSeoCopy` owns SEO copy generation and clipboard feedback state.
+
+The migration preserves PageIntelligence behavior: the parent still coordinates tabs, page filtering/sorting, fix-context auto-expansion, follow-on route navigation, and passes callbacks to the extracted render components. The background job path still uses the shared `useBackgroundTasks` platform with `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS`; no separate job implementation was introduced.
+
+**Agency value:** Engineers can reason about PageIntelligence workflow mutations in small hooks instead of a dense mixed UI/controller component, reducing regression risk for future PageIntelligence and feature-tool split work.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's parent component while preserving the same page-analysis, keyword edit, tracking, SEO copy, and route action behavior.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordEditing.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordTracking.ts`; `src/components/page-intelligence/usePageIntelligenceSeoCopy.ts`; `tests/unit/page-intelligence-page-list.test.ts`.
