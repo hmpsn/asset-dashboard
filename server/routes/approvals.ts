@@ -129,10 +129,9 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
   const { workspaceId, batchId } = req.params;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!ws.clientEmail) return res.status(400).json({ error: 'No client email configured for this workspace' });
-
   const batch = getBatch(workspaceId, batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
+  if (!ws.clientEmail) return res.status(400).json({ error: 'No client email configured for this workspace' });
 
   const pendingItems = batch.items.filter(i => i.status === 'pending');
   if (pendingItems.length === 0) return res.status(400).json({ error: 'No pending items in this batch' });
