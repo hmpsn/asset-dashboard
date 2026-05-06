@@ -31,6 +31,10 @@ function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, u
 
 const CLIENT_VISIBLE_CELL_STATUSES = new Set(['review', 'flagged', 'approved', 'published']);
 
+const sendSamplesSchema = z.object({
+  cellIds: z.array(z.string().trim().min(1)).min(1, 'cellIds array is required'),
+}).strict();
+
 function clientVisibleCells(cells: MatrixCell[]): MatrixCell[] {
   return cells.filter(c => CLIENT_VISIBLE_CELL_STATUSES.has(c.status));
 }
@@ -233,9 +237,8 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', req
  * Admin selects specific cell IDs to send as sample briefs for client review.
  * Creates an approval batch with the selected cells' keyword + URL info.
  */
-router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const { cellIds } = req.body as { cellIds?: string[] };
-  if (!cellIds?.length) return res.status(400).json({ error: 'cellIds array is required' });
+router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWorkspaceAccess('workspaceId'), validate(sendSamplesSchema), (req, res) => {
+  const { cellIds } = req.body as { cellIds: string[] };
 
   try {
     const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
