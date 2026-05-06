@@ -265,6 +265,19 @@ describe('Approvals — CRUD', () => {
     expect(ownerBatch.id).toBe(batchId);
   });
 
+  it('reminder preflight does not mask missing or wrong-workspace batches', async () => {
+    const missingRes = await postJson(`/api/approvals/${testWsId}/batch_missing/remind`, {});
+    expect(missingRes.status).toBe(404);
+
+    const crossReminderRes = await postJson(`/api/approvals/${otherWsId}/${batchId}/remind`, {});
+    expect(crossReminderRes.status).toBe(404);
+
+    const ownerRes = await api(`/api/approvals/${testWsId}/${batchId}`);
+    expect(ownerRes.status).toBe(200);
+    const ownerBatch = await ownerRes.json();
+    expect(ownerBatch.id).toBe(batchId);
+  });
+
   // Delete
   it('DELETE removes the batch', async () => {
     const res = await del(`/api/approvals/${testWsId}/${batchId}`);
