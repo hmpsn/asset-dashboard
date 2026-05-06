@@ -37,6 +37,7 @@ import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('approvals');
 
@@ -64,14 +65,14 @@ const createBatchSchema = z.object({
     currentValue: z.string().optional(),
     proposedValue: z.string().optional(),
     collectionId: z.string().optional(),
-  })).min(1, 'At least one item is required'),
-});
+  }).strict()).min(1, 'At least one item is required'),
+}).strict();
 
 const updateItemSchema = z.object({
   status: z.enum(['approved', 'rejected', 'pending']).optional(),
   clientValue: z.string().optional(),
   clientNote: z.string().max(2000).optional(),
-});
+}).strict();
 
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
@@ -87,7 +88,7 @@ router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId')
     const dashUrl = getClientPortalUrl(ws);
     notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
   }
-  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: batch.id, action: 'created' });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
   res.json(batch);
 });
 
@@ -120,7 +121,7 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
     }
   }
   deleteBatch(workspaceId, batchId);
-  broadcastToWorkspace(workspaceId, 'approval:update', { batchId, action: 'deleted' });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, action: 'deleted' });
   res.json({ ok: true });
 });
 
@@ -242,7 +243,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
         actorInfo);
     }
   }
-  broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, itemId: req.params.itemId, status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: req.params.batchId, itemId: req.params.itemId, status });
   res.json(batch);
 });
 
@@ -308,7 +309,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       { batchId: req.params.batchId, appliedCount: appliedIds.length });
   }
 
-  broadcastToWorkspace(req.params.workspaceId, 'approval:applied', { batchId: req.params.batchId, applied: appliedIds.length });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_APPLIED, { batchId: req.params.batchId, applied: appliedIds.length });
 
   // Record for outcome tracking — only successfully applied meta updates
   try {
