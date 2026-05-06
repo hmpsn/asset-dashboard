@@ -71,6 +71,7 @@ export type ActivityType =
   | 'client_onboarding_submitted'
   | 'client_keyword_feedback'
   | 'client_keyword_tracked'
+  | 'client_keyword_removed'
   | 'client_priorities_updated'
   | 'client_content_gap_vote'
   | 'client_action_sent'
