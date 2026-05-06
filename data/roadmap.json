@@ -75,8 +75,9 @@
           "source": "UI_UX_AUDIT §3",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.",
-          "status": "pending"
+          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.\nShipped / re-audited 2026-05-06: loading-state standardization now exists through shared Skeleton, LoadingState, SectionCardSkeleton, and ProgressIndicator primitives; route-level ChunkFallback remains in App.tsx, background jobs use TaskPanel/useBackgroundTasks, and docs/rules/ui-ux-consistency.md codifies contextual loading and skeleton usage. Remaining future polish can be tracked as specific component migrations rather than this broad standardization item.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 627,
@@ -227,8 +228,9 @@
           "source": "PR #162 typecheck cleanup",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review — confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.",
-          "status": "pending"
+          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review — confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.\nVerified 2026-05-06: server/email-throttle.ts maps client_signal to the internal bucket alongside request_new/content_request/payment_received, which matches intent because client signals notify the agency/admin inbox and should not count toward client email caps.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 584,
@@ -236,8 +238,9 @@
           "source": "PR #162 typecheck cleanup",
           "est": "1h",
           "priority": "P3",
-          "notes": "anomaly-detection.ts:639 and outcome-tracking.ts:329 use `data: newData as never` because applyScoreAdjustment returns Partial<AnalyticsInsight> which doesn't overlap with the narrow discriminated union of InsightDataMap. Fix by making applyScoreAdjustment generic over InsightType so it preserves the data shape through the score adjustment. Blocked on #580.",
-          "status": "pending"
+          "notes": "anomaly-detection.ts:639 and outcome-tracking.ts:329 use `data: newData as never` because applyScoreAdjustment returns Partial<AnalyticsInsight> which doesn't overlap with the narrow discriminated union of InsightDataMap. Fix by making applyScoreAdjustment generic over InsightType so it preserves the data shape through the score adjustment. Blocked on #580.\nShipped / verified 2026-05-06: applyScoreAdjustment is generic over T extends Record<string, unknown> and anomaly-detection.ts/outcome-tracking.ts no longer use `data: newData as never` at the bridge call sites.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": "competitor-snapshot-store-refactor",
@@ -254,8 +257,9 @@
           "source": "TECH DEBT — scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion — no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.",
-          "status": "pending"
+          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion — no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.\nShipped / verified 2026-05-06: server/analytics-intelligence.ts now orders Phase 3A, Phase 3B, Phase 3C, Phase 4, then Phase 5 emerging_keyword and Phase 6 freshness_alert. The deferred pure code-motion item is complete.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": "freshness-detection-direct-test",
@@ -595,8 +599,9 @@
           "source": "Send to Client consistency initiative",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
-          "status": "pending"
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.\nShipped / verified 2026-05-06: AeoReview sends page-level client actions with sourceType 'aeo_change', sourceId `aeo:${page.pageUrl}`, client-ready change filtering, and payload.page for client review.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 610,
@@ -604,8 +609,9 @@
           "source": "Send to Client consistency initiative",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
-          "status": "pending"
+          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.\nShipped / verified 2026-05-06 as a filtered-batch client action: InternalLinks has a Send to Client action that packages the currently filtered link suggestions with sourceType 'internal_link' and summary metadata. It is not a literal per-page button, but the client-reviewable link-suggestion workflow is live.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 611,
@@ -613,8 +619,9 @@
           "source": "Send to Client consistency initiative",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
-          "status": "pending"
+          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.\nShipped / verified 2026-05-06: KeywordStrategy has a Send to Client action with sourceType 'keyword_strategy' that packages mapped pages, quick wins, content gaps, opportunities, and low-hanging fruit into the client action queue.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 612,
@@ -622,8 +629,9 @@
           "source": "Send to Client consistency initiative",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
-          "status": "pending"
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.\nShipped / verified 2026-05-06: RedirectManager sends accepted redirect proposals to the client action queue with sourceType 'redirect_proposal' and source/target rule payloads.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 297,
@@ -631,8 +639,9 @@
           "source": "Send to Client consistency initiative",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
-          "status": "pending"
+          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.\nShipped / verified 2026-05-06: ContentDecay exposes per-page Send to Client on AI refresh recommendation cards and creates sourceType 'content_decay' client actions with the decaying page payload.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 579,
@@ -657,8 +666,9 @@
           "source": "USER REQUEST",
           "est": "4h",
           "priority": "P2",
-          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
-          "status": "pending"
+          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.\nShipped / verified 2026-05-06: startCompetitorMonitoringCron() is started from server/startup.ts; server/intelligence-crons.ts snapshots configured competitor domains, diffs against previous snapshots, writes competitor_alert rows, and upserts competitor_alert insights.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
         },
         {
           "id": 571,
@@ -666,8 +676,9 @@
           "source": "USER REQUEST",
           "est": "3h",
           "priority": "P2",
-          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
-          "status": "pending"
+          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.\nShipped 2026-04-23 under Recommendation Intelligence Tier 1 item #615. adjustKdImpactScore() adjusts recommendation impact by site strength vs keyword difficulty, with unit coverage in tests/unit/recommendations-authority-kd.test.ts. This roadmap duplicate is now closed.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
         },
         {
           "id": 322,
