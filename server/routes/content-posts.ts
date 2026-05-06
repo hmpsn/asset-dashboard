@@ -38,7 +38,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
-import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
 import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
@@ -401,7 +401,7 @@ Return ONLY valid JSON like:
 }`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,

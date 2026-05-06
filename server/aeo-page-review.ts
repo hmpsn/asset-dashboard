@@ -9,7 +9,7 @@
  * to send to the client or action themselves.
  */
 
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
@@ -228,7 +228,7 @@ RULES:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
-  const aiResult = await callOpenAI({
+  const aiResult = await callAI({
     model: 'gpt-4.1',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 5000,

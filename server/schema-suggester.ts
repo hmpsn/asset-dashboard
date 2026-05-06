@@ -3,7 +3,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { createLogger } from './logger.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import type { SchemaValidation } from './schema-validator.js';
@@ -1001,7 +1001,7 @@ REQUIREMENTS:
 Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
-    const aiResult = await callOpenAI({
+    const aiResult = await callAI({
       model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,

@@ -8,7 +8,7 @@ import {
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -661,7 +661,7 @@ Return the complete brief as valid JSON with these fields:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
-  const aiResult = await callOpenAI({
+  const aiResult = await callAI({
     model: 'gpt-4.1',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
@@ -804,7 +804,7 @@ Rules:
 - Do NOT use generic headings like "Introduction" or "Conclusion" — those are handled separately
 - Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
 
-  const aiResult = await callOpenAI({
+  const aiResult = await callAI({
     model: 'gpt-4.1',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
@@ -1204,12 +1204,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const systemInstructions = 'You are an expert SEO content strategist. Generate a comprehensive content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
   const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
 
-  const aiResult = await callOpenAI({
+  const aiResult = await callAI({
     model: 'gpt-4.1',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: prompt },
-    ],
+    system: systemPrompt,
+    messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },

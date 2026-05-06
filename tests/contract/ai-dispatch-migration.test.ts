@@ -5,6 +5,7 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/anomaly-detection.ts', aiImport: "from './ai.js'" },
   { path: 'server/chat-memory.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'" },
+  { path: 'server/keyword-strategy-generation.ts', aiImport: "from './ai.js'" },
   { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/monthly-digest.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-decay.ts', aiImport: "from './ai.js'" },
@@ -15,21 +16,36 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/llms-txt-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/rewrite-chat.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/google.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/jobs.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/public-analytics.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-seo-page-tools.ts', aiImport: "from '../ai.js'" },
 ];
 
 const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/brandscript.ts', aiImport: "from './ai.js'" },
+  { path: 'server/content-brief.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-intelligence.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-refresh.ts', aiImport: "from './ai.js'" },
+  { path: 'server/diagnostic-orchestrator.ts', aiImport: "from './ai.js'" },
   { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'" },
 ];
 
 const migratedParsedJsonTextFiles: Array<{ path: string; aiImport: string }> = [
+  { path: 'server/aeo-page-review.ts', aiImport: "from './ai.js'" },
   { path: 'server/keyword-recommendations.ts', aiImport: "from './ai.js'" },
+  { path: 'server/schema-plan.ts', aiImport: "from './ai.js'" },
+  { path: 'server/schema-suggester.ts', aiImport: "from './ai.js'" },
+  { path: 'server/routes/ai.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/content-posts.ts', aiImport: "from '../ai.js'" },
+  { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'" },
+];
+
+const migratedAnthropicGenerationFiles: Array<{ path: string; aiImport: string }> = [
+  { path: 'server/blueprint-generator.ts', aiImport: "from './ai.js'" },
+  { path: 'server/copy-generation.ts', aiImport: "from './ai.js'" },
 ];
 
 describe('AI dispatch migration', () => {
@@ -68,6 +84,17 @@ describe('AI dispatch migration', () => {
         /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
       );
       expect(source, file.path).not.toContain('callOpenAI({');
+    }
+  });
+
+  it('keeps migrated Anthropic generation paths on callAI provider dispatch', () => {
+    for (const file of migratedAnthropicGenerationFiles) {
+      const source = readFileSync(file.path, 'utf-8');
+      expect(source, file.path).toContain(file.aiImport);
+      expect(source, file.path).toContain('callAI({');
+      expect(source, file.path).toContain("provider: 'anthropic'");
+      expect(source, file.path).not.toContain("from './anthropic-helpers.js'");
+      expect(source, file.path).not.toContain('callAnthropic({');
     }
   });
 });
