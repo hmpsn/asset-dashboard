@@ -21,6 +21,7 @@ const { api, postJson, patchJson, del, clearCookies } = ctx;
 let testWsId = '';
 let otherWsId = '';
 let protectedWsId = '';
+let protectedOtherWsId = '';
 const testSiteId = 'site_approval_test';
 
 beforeAll(async () => {
@@ -32,13 +33,17 @@ beforeAll(async () => {
   const protectedWs = createWorkspace('Approvals Protected Workspace');
   protectedWsId = protectedWs.id;
   updateWorkspace(protectedWsId, { clientPassword: 'approval-test-pw' });
+  const protectedOtherWs = createWorkspace('Approvals Protected Other Workspace');
+  protectedOtherWsId = protectedOtherWs.id;
+  updateWorkspace(protectedOtherWsId, { clientPassword: 'approval-other-test-pw' });
 }, 25_000);
 
 afterAll(async () => {
-  db.prepare('DELETE FROM approval_batches WHERE workspace_id IN (?, ?, ?)').run(testWsId, otherWsId, protectedWsId);
+  db.prepare('DELETE FROM approval_batches WHERE workspace_id IN (?, ?, ?, ?)').run(testWsId, otherWsId, protectedWsId, protectedOtherWsId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
   deleteWorkspace(protectedWsId);
+  deleteWorkspace(protectedOtherWsId);
   await ctx.stopServer();
 });
 
@@ -236,6 +241,52 @@ describe('Approvals — CRUD', () => {
     expect(updatedItem).toBeDefined();
     expect(updatedItem.status).toBe('approved');
     expect(updatedItem.clientNote).toBe('Approved after login.');
+    clearCookies();
+  });
+
+  it('does not let one protected public approval session access another protected workspace', async () => {
+    const createRes = await postJson(`/api/approvals/${protectedOtherWsId}`, {
+      siteId: testSiteId,
+      name: 'Other Protected SEO Changes',
+      items: [
+        {
+          pageId: 'protected_other_page_1',
+          pageSlug: '/protected-other-page',
+          pageTitle: 'Protected Other Page',
+          field: 'seoTitle',
+          currentValue: 'Other Old Title',
+          proposedValue: 'Other New Title',
+        },
+      ],
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    const protectedOtherItemId = created.items[0].id;
+
+    clearCookies();
+    const loginRes = await postJson(`/api/public/auth/${protectedWsId}`, {
+      password: 'approval-test-pw',
+    });
+    expect(loginRes.status).toBe(200);
+
+    const crossListRes = await api(`/api/public/approvals/${protectedOtherWsId}`);
+    expect(crossListRes.status).toBe(401);
+
+    const crossReadRes = await api(`/api/public/approvals/${protectedOtherWsId}/${created.id}`);
+    expect(crossReadRes.status).toBe(401);
+
+    const crossPatchRes = await patchJson(
+      `/api/public/approvals/${protectedOtherWsId}/${created.id}/${protectedOtherItemId}`,
+      { status: 'approved', clientNote: 'Wrong protected workspace.' },
+    );
+    expect(crossPatchRes.status).toBe(401);
+
+    const ownerRes = await api(`/api/approvals/${protectedOtherWsId}/${created.id}`);
+    expect(ownerRes.status).toBe(200);
+    const ownerBatch = await ownerRes.json();
+    const ownerItem = ownerBatch.items.find((i: { id: string }) => i.id === protectedOtherItemId);
+    expect(ownerItem.status).toBe('pending');
+    expect(ownerItem.clientNote).toBeUndefined();
     clearCookies();
   });
 
