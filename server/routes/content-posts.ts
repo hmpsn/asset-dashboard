@@ -43,7 +43,7 @@ import { callAI } from '../ai.js';
 import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
-import type { AIReviewResult, AiFixResult, IssueKey } from '../../shared/types/content.js';
+import type { AIReviewResult, AiFixResult, IssueKey, PostSection } from '../../shared/types/content.js';
 import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
@@ -70,6 +70,70 @@ function markProvenanceItemsForHumanReview(
 
 const generatePostSchema = z.object({
   briefId: z.string({ required_error: 'briefId required' }).trim().min(1, 'briefId required'),
+}).strict();
+
+const postSectionUpdateSchema = z.object({
+  index: z.number().int().min(0),
+  heading: z.string(),
+  content: z.string(),
+  wordCount: z.number().int().min(0),
+  targetWordCount: z.number().int().min(0).optional(),
+  keywords: z.array(z.string()).optional(),
+  status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
+}).strip();
+// Top-level PATCH keys stay strict, but section objects strip unknown fields so
+// legacy/frontend-only metadata cannot block editor saves or persist back to DB.
+
+type PostSectionUpdate = z.infer<typeof postSectionUpdateSchema>;
+
+function isCompletePostSection(section: PostSectionUpdate): section is PostSection {
+  return section.targetWordCount !== undefined
+    && section.keywords !== undefined
+    && section.status !== undefined;
+}
+
+function mergeSectionUpdates(
+  existingSections: PostSection[],
+  sectionUpdates: PostSectionUpdate[],
+): { sections: PostSection[] } | { error: string } {
+  const existingByIndex = new Map(existingSections.map(section => [section.index, section]));
+  const updatesByIndex = new Map<number, PostSectionUpdate>();
+  for (const section of sectionUpdates) {
+    if (updatesByIndex.has(section.index)) {
+      return { error: `Duplicate section index ${section.index}` };
+    }
+    updatesByIndex.set(section.index, section);
+  }
+
+  const merged = existingSections.map((existing) => {
+    const update = updatesByIndex.get(existing.index);
+    if (!update) return existing;
+    const status = update.status ?? existing.status;
+    return {
+      index: existing.index,
+      heading: update.heading,
+      content: update.content,
+      wordCount: update.wordCount,
+      targetWordCount: update.targetWordCount ?? existing.targetWordCount,
+      keywords: update.keywords ?? existing.keywords,
+      status,
+      error: status === 'error' ? existing.error : undefined,
+    };
+  });
+
+  for (const section of sectionUpdates) {
+    if (existingByIndex.has(section.index)) continue;
+    if (!isCompletePostSection(section)) {
+      return { error: `Section ${section.index} is missing targetWordCount, keywords, or status` };
+    }
+    merged.push(section);
+  }
+
+  return { sections: merged };
+}
+
+const regenerateSectionSchema = z.object({
+  sectionIndex: z.number({ required_error: 'sectionIndex required' }).int().min(0),
 }).strict();
 
 // --- Content Post Generator (#194) ---
@@ -115,9 +179,8 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
 });
 
 // Regenerate a single section
-router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requireWorkspaceAccess('workspaceId'), validate(regenerateSectionSchema), async (req, res) => {
   const { sectionIndex } = req.body;
-  if (sectionIndex === undefined) return res.status(400).json({ error: 'sectionIndex required' });
 
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -151,16 +214,7 @@ const updatePostSchema = z.object({
   title: z.string().max(500).optional(),
   metaDescription: z.string().max(500).optional(),
   introduction: z.string().optional(),
-  sections: z.array(z.object({
-    index: z.number(),
-    heading: z.string(),
-    content: z.string(),
-    wordCount: z.number(),
-    targetWordCount: z.number().optional(),
-    keywords: z.array(z.string()).optional(),
-    status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
-    error: z.string().optional(),
-  })).optional(),
+  sections: z.array(postSectionUpdateSchema).optional(),
   conclusion: z.string().optional(),
   seoTitle: z.string().max(200).optional(),
   seoMetaDescription: z.string().max(500).optional(),
@@ -182,6 +236,14 @@ const updatePostSchema = z.object({
 // triggers publish-to-webflow in the background.
 router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(updatePostSchema), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
+  if (!previous) return res.status(404).json({ error: 'Post not found' });
+
+  const updates = { ...req.body };
+  if (req.body.sections !== undefined) {
+    const merged = mergeSectionUpdates(previous.sections, req.body.sections);
+    if ('error' in merged) return res.status(400).json({ error: merged.error });
+    updates.sections = merged.sections;
+  }
 
   // Snapshot before content-changing edits (not status-only changes).
   //
@@ -194,20 +256,17 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   const editedContentFields = contentFields.filter(f => f in req.body);
   const isContentEdit = editedContentFields.length > 0;
   let withinEditCoalesceWindow = false;
-  if (previous && isContentEdit) {
+  if (isContentEdit) {
     const recentVersion = getMostRecentPostVersion(req.params.workspaceId, req.params.postId);
     withinEditCoalesceWindow = !!recentVersion
       && recentVersion.trigger === 'manual_edit'
       && recentVersion.triggerDetail !== 'client_edit'
       && (Date.now() - new Date(recentVersion.createdAt).getTime()) < ADMIN_EDIT_COALESCE_WINDOW_MS;
-    if (!withinEditCoalesceWindow) {
-      snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
-    }
   }
 
   let updated;
   try {
-    updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+    updated = updatePostField(req.params.workspaceId, req.params.postId, updates);
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
@@ -215,9 +274,12 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
+  if (isContentEdit && !withinEditCoalesceWindow) {
+    snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
+  }
 
   // Auto-publish on approval if workspace has publishTarget and post isn't already published
-  if (req.body.status === 'approved' && previous?.status !== 'approved' && !updated.webflowItemId) {
+  if (req.body.status === 'approved' && previous.status !== 'approved' && !updated.webflowItemId) {
     const ws = getWorkspace(req.params.workspaceId);
     if (ws?.publishTarget && ws.webflowSiteId) {
       const token = getTokenForSite(ws.webflowSiteId) || undefined;
