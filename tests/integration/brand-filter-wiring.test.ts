@@ -30,6 +30,10 @@ const keywordStrategyGenerationSrc = fs.readFileSync(
   path.join(serverDir, 'keyword-strategy-generation.ts'),
   'utf-8',
 );
+const keywordStrategySynthesisSrc = fs.readFileSync(
+  path.join(serverDir, 'keyword-strategy-ai-synthesis.ts'),
+  'utf-8',
+);
 const contentBriefSrc = fs.readFileSync(
   path.join(serverDir, 'content-brief.ts'),
   'utf-8',
@@ -117,19 +121,19 @@ afterAll(() => {
 
 describe('strategy generation pipeline — static wiring', () => {
   it('imports filterBrandedKeywords and filterBrandedContentGaps from competitor-brand-filter', () => {
-    expect(keywordStrategyGenerationSrc).toContain(
+    expect(keywordStrategySynthesisSrc).toContain(
       "import { filterBrandedKeywords, filterBrandedContentGaps",
     );
-    expect(keywordStrategyGenerationSrc).toContain('competitor-brand-filter');
+    expect(keywordStrategySynthesisSrc).toContain('competitor-brand-filter');
   });
 
   it('calls filterBrandedKeywords on the keyword pool before AI prompt is built', () => {
     // The call must exist in the shared strategy generation service.
-    expect(keywordStrategyGenerationSrc).toContain('filterBrandedKeywords(keywordPool, competitorDomains)');
+    expect(keywordStrategySynthesisSrc).toContain('filterBrandedKeywords(keywordPool, competitorDomains)');
   });
 
   it('calls filterBrandedContentGaps on the AI-returned content gaps before strategy is saved', () => {
-    expect(keywordStrategyGenerationSrc).toContain('filterBrandedContentGaps(rawContentGaps, competitorDomains)');
+    expect(keywordStrategySynthesisSrc).toContain('filterBrandedContentGaps(rawContentGaps, competitorDomains)');
   });
 
   it('reads competitorDomains from workspace when not provided in request body', () => {
@@ -140,10 +144,10 @@ describe('strategy generation pipeline — static wiring', () => {
   it('uses the filtered content gaps in the final strategy — not the raw AI output', () => {
     // contentGaps in the final strategy object must reference finalContentGaps (which is derived from
     // cleanContentGaps after the declined-keyword hard filter), never rawContentGaps directly
-    expect(keywordStrategyGenerationSrc).toContain('contentGaps: finalContentGaps');
+    expect(keywordStrategySynthesisSrc).toContain('contentGaps: finalContentGaps');
     // Raw gaps must NOT be used directly in the strategy assignment
-    const rawUsageAfterFilter = keywordStrategyGenerationSrc
-      .slice(keywordStrategyGenerationSrc.indexOf('finalContentGaps'))
+    const rawUsageAfterFilter = keywordStrategySynthesisSrc
+      .slice(keywordStrategySynthesisSrc.indexOf('finalContentGaps'))
       .includes('contentGaps: rawContentGaps');
     expect(rawUsageAfterFilter).toBe(false);
   });
@@ -154,22 +158,22 @@ describe('strategy generation pipeline — static wiring', () => {
 describe('content gap analysis sub-pipeline — static wiring', () => {
   it('post-AI hard filter strips branded gaps before strategy is assembled', () => {
     // The comment explains intent; the implementation must follow immediately.
-    expect(keywordStrategyGenerationSrc).toContain(
+    expect(keywordStrategySynthesisSrc).toContain(
       'Post-generation hard filter: remove any content gaps containing competitor brand names',
     );
     // The filter call must be present after the master AI call (callStrategyAI for 'master').
     // We use the specific variable assignment "masterRaw = await callStrategyAI" to locate
     // the master call — not lastIndexOf('callStrategyAI') which would match a later cluster
     // AI call that appears after the filter in the file.
-    const afterMasterIdx = keywordStrategyGenerationSrc.indexOf('masterRaw = await callStrategyAI');
-    const filterCallIdx = keywordStrategyGenerationSrc.indexOf('filterBrandedContentGaps(rawContentGaps');
+    const afterMasterIdx = keywordStrategySynthesisSrc.indexOf('masterRaw = await callStrategyAI');
+    const filterCallIdx = keywordStrategySynthesisSrc.indexOf('filterBrandedContentGaps(rawContentGaps');
     expect(afterMasterIdx).toBeGreaterThan(0); // guard: master call must exist
     expect(filterCallIdx).toBeGreaterThan(afterMasterIdx);
   });
 
   it('branded gaps count is logged so the filtering is observable in prod', () => {
-    expect(keywordStrategyGenerationSrc).toContain('brandedGaps.length > 0');
-    expect(keywordStrategyGenerationSrc).toContain('branded content gaps despite prompt instruction');
+    expect(keywordStrategySynthesisSrc).toContain('brandedGaps.length > 0');
+    expect(keywordStrategySynthesisSrc).toContain('branded content gaps despite prompt instruction');
   });
 });
 
@@ -181,14 +185,14 @@ describe('keyword pool — static wiring', () => {
     // builds the KEYWORD POOL prompt section (semrushBatchRef = `...KEYWORD POOL...`).
     // Note: `let semrushBatchRef = ''` is the declaration; the actual pool-building
     // assignment uses a template literal starting with `\n\nKEYWORD POOL`.
-    const filterIdx = keywordStrategyGenerationSrc.indexOf('filterBrandedKeywords(keywordPool');
-    const promptBuildIdx = keywordStrategyGenerationSrc.indexOf('KEYWORD POOL — VERIFIED search terms');
+    const filterIdx = keywordStrategySynthesisSrc.indexOf('filterBrandedKeywords(keywordPool');
+    const promptBuildIdx = keywordStrategySynthesisSrc.indexOf('KEYWORD POOL — VERIFIED search terms');
     expect(filterIdx).toBeGreaterThan(0);
     expect(promptBuildIdx).toBeGreaterThan(filterIdx);
   });
 
   it('branded keyword removal count is logged', () => {
-    expect(keywordStrategyGenerationSrc).toContain('removed ${brandedRemoved} branded competitor keywords');
+    expect(keywordStrategySynthesisSrc).toContain('removed ${brandedRemoved} branded competitor keywords');
   });
 });
 
