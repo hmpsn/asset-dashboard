@@ -11,7 +11,7 @@ import {
 } from './google-analytics.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath, stripHtmlToText, stripCodeFences } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { getLatestSnapshot } from './reports.js';
 import {
   getQueryPageData,
@@ -983,9 +983,13 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           : m
       );
 
-      const result = await callOpenAI({
+      const system = wrappedMessages[0]?.role === 'system' ? wrappedMessages[0].content : undefined;
+      const aiMessages = (system ? wrappedMessages.slice(1) : wrappedMessages) as Array<{ role: 'user' | 'assistant'; content: string }>;
+
+      const result = await callAI({
         model: 'gpt-4.1-mini',
-        messages: wrappedMessages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+        system,
+        messages: aiMessages,
         maxTokens,
         temperature: 0.3,
         // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer

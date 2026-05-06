@@ -16,7 +16,7 @@ import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import { generateFeaturedImage } from '../content-image.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 
@@ -179,7 +179,7 @@ router.post('/api/webflow/suggest-field-mapping/:siteId', requireWorkspaceSiteAc
     // Use AI to suggest field mappings
     const fieldsDescription = schema.fields.map(f => `- slug: "${f.slug}", displayName: "${f.displayName}", type: "${f.type}"`).join('\n');
 
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-nano',
       messages: [{
         role: 'user',
@@ -206,6 +206,7 @@ Return ONLY the JSON object with the mapping.`,
       }],
       maxTokens: 500,
       temperature: 0.1,
+      responseFormat: { type: 'json_object' },
       feature: 'suggest-field-mapping',
     });
 

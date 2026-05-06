@@ -38,7 +38,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
-import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
 import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
@@ -401,11 +401,12 @@ Return ONLY valid JSON like:
 }`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       temperature: 0.3,
+      responseFormat: { type: 'json_object' },
       feature: 'content-review',
       workspaceId: req.params.workspaceId,
     });
@@ -543,6 +544,7 @@ ${originalText}`;
         workspaceId: req.params.workspaceId,
         maxTokens: 2000,
         temperature: 0.3,
+        ...(field === 'meta' ? { responseFormat: { type: 'json_object' as const } } : {}),
       });
 
       const rawSuggested = aiResult.text.trim();

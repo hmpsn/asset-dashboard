@@ -34,7 +34,7 @@ import {
   getGA4NewVsReturning,
 } from '../google-analytics.js';
 import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from '../helpers.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   fetchSearchOverview,
@@ -84,12 +84,9 @@ async function classifyMessageIntent(
     .join('\n');
   const contextBlock = contextLines ? `Recent conversation:\n${contextLines}\n\n` : '';
 
-  const result = await callOpenAI({
+  const result = await callAI({
     model: 'gpt-4.1-nano',
-    messages: [
-      {
-        role: 'system',
-        content: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
+    system: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
 
 Values:
 - "service_interest" — client wants to hire, engage, or contact the agency. Signals: asking about working together, pricing, getting started, scheduling a call, wanting the team to help with their site, expressing readiness to move forward, asking who they talk to.
@@ -101,7 +98,7 @@ Examples:
 - "Ready to get serious about search" → {"intent": "service_interest"}
 - "What content should I write?" → {"intent": "content_interest"}
 - "Why did my traffic drop?" → {"intent": null}`,
-      },
+    messages: [
       {
         role: 'user',
         content: `${contextBlock}Client message: "${question.slice(0, 500)}"`,
@@ -461,18 +458,15 @@ ${seoContextBlock}
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
-    // Build messages array: system + conversation history + current question
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
-      ...historyMessages.slice(-10), // last 10 messages for context window management
-      { role: 'user', content: question },
-    ];
-
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
-      callOpenAI({
+      callAI({
         model: 'gpt-4.1',
-        messages,
+        system: systemPrompt,
+        messages: [
+          ...historyMessages.slice(-10),
+          { role: 'user', content: question },
+        ],
         temperature: 0.7,
         maxTokens: 1500,
         feature: 'client-search-chat',
