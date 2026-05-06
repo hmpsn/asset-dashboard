@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { SchemaPageCard, type SchemaPageCardProps } from '../../src/components/schema/SchemaPageCard';
+import { groupValidationFindings } from '../../src/components/schema/SchemaPageCardDetails';
 import type { SchemaDeliveryDecision } from '../../shared/types/schema-generation';
 
 const schemaTemplate = {
@@ -72,6 +73,19 @@ function makeProps(overrides: Partial<SchemaPageCardProps> = {}): SchemaPageCard
 }
 
 describe('SchemaPageCard manual schema delivery', () => {
+  it('groups validation findings by field and sorts error groups first', () => {
+    const groups = groupValidationFindings([
+      { severity: 'warning', type: 'Organization', field: 'publisher.logo', message: 'Logo missing', ruleId: 'required-field-missing' },
+      { severity: 'error', type: 'Article', field: 'headline', message: 'Headline missing', ruleId: 'required-field-missing' },
+      { severity: 'warning', type: 'Organization', field: 'publisher.logo', message: 'Logo not crawlable', ruleId: 'url-unreachable' },
+    ]);
+
+    expect(groups.map(([field, findings]) => [field, findings.length])).toEqual([
+      ['headline', 1],
+      ['publisher.logo', 2],
+    ]);
+  });
+
   it('renders manual Webflow schema field instructions and JSON-only copy action', () => {
     const manualDelivery: SchemaDeliveryDecision = {
       method: 'manual-native-schema-field',
