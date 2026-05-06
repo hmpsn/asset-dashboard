@@ -229,6 +229,33 @@ describe('GET /api/public/content-requests/:wsId — postId serialization', () =
   });
 });
 
+describe('GET /api/public/content-posts/:wsId/:postId', () => {
+  it('does not expose an unlinked sibling post that shares the same brief', async () => {
+    const briefId = `brief_post_access_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Post Access Guard', targetKeyword: `post-access-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const linkedPost = makeStubPost(testWsId, briefId);
+    const siblingPost = {
+      ...makeStubPost(testWsId, briefId),
+      id: `post_sibling_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      title: 'Sibling Post Title',
+    };
+    savePost(testWsId, linkedPost);
+    savePost(testWsId, siblingPost);
+    updateContentRequest(testWsId, req.id, { status: 'in_progress' });
+    updateContentRequest(testWsId, req.id, { status: 'post_review', postId: linkedPost.id });
+
+    const linkedRes = await api(`/api/public/content-posts/${testWsId}/${linkedPost.id}`);
+    expect(linkedRes.status).toBe(200);
+
+    const siblingRes = await api(`/api/public/content-posts/${testWsId}/${siblingPost.id}`);
+    expect(siblingRes.status).toBe(403);
+  });
+});
+
 describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
   it('updates sections and snapshots the post version', async () => {
     // Set up in-process: create request, save a post, link them
@@ -336,5 +363,45 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
       body: JSON.stringify({ sections: [{ index: 0, heading: 'H', content: '<p>No.</p>', wordCount: 1 }] }),
     });
     expect(editRes.status).toBe(403);
+  });
+
+  it('does not edit or snapshot an unlinked sibling post that shares the same brief', async () => {
+    const briefId = `brief_edit_access_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Edit Access Guard', targetKeyword: `edit-access-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const linkedPost = makeStubPost(testWsId, briefId);
+    const siblingPost = {
+      ...makeStubPost(testWsId, briefId),
+      id: `post_edit_sibling_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      sections: [
+        {
+          index: 0, heading: 'Sibling Section', content: '<p>Do not change me.</p>',
+          wordCount: 4, targetWordCount: 200, keywords: [], status: 'done' as const,
+        },
+      ],
+    };
+    savePost(testWsId, linkedPost);
+    savePost(testWsId, siblingPost);
+    updateContentRequest(testWsId, req.id, { status: 'in_progress' });
+    updateContentRequest(testWsId, req.id, { status: 'post_review', postId: linkedPost.id });
+
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${siblingPost.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections: [
+          { index: 0, heading: 'Changed', content: '<p>Changed sibling content.</p>', wordCount: 3 },
+        ],
+      }),
+    });
+    expect(editRes.status).toBe(403);
+
+    const persisted = getPost(testWsId, siblingPost.id);
+    expect(persisted?.sections[0].heading).toBe('Sibling Section');
+    expect(persisted?.sections[0].content).toBe('<p>Do not change me.</p>');
+    expect(listPostVersions(testWsId, siblingPost.id)).toHaveLength(0);
   });
 });
