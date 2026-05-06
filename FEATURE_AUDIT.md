@@ -4470,3 +4470,16 @@ The migration preserves PageIntelligence behavior: the parent still owns `useBac
 **Mutual:** Continues reducing PageIntelligence's component surface while keeping the shared background job platform and existing page-analysis UX intact.
 
 **Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePagesHeader.tsx`; `tests/unit/page-intelligence-pages-header.test.ts`.
+
+### 347. Platform Consolidation — PageIntelligence Page List Split
+**What it does:** Extracts the PageIntelligence pages list, collapsed row summary, expanded keyword/analysis detail renderer, edit controls, SEO copy panel mount, and page-level action bar into `src/components/page-intelligence/PageIntelligencePageList.tsx`.
+
+The migration preserves PageIntelligence behavior: the parent still owns `useBackgroundTasks`, `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS` rediscovery/start/cancel wiring, single-page analysis calls, keyword persistence, rank tracking mutations, SEO copy generation, and route navigation. The extracted list receives typed values and callbacks only, including the shared `KeywordEditDraft` contract, and focused tests pin the render branches plus the source boundary so background job ownership does not move.
+
+**Agency value:** Engineers can iterate on the dense page-detail UI without reopening the full PageIntelligence workflow component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's component surface while preserving the same page-analysis, edit, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-page-list.test.ts`; `tests/unit/page-intelligence-page-list-render.test.tsx`.

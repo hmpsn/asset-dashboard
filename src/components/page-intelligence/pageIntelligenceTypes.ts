@@ -49,6 +49,11 @@ export interface SeoCopy {
   changes?: string[];
 }
 
+export interface KeywordEditDraft {
+  primary: string;
+  secondary: string;
+}
+
 export type SortBy = 'priority' | 'position' | 'volume' | 'score';
 export type SortDir = 'asc' | 'desc';
 
