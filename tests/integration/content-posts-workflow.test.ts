@@ -11,6 +11,7 @@ import type { AddressInfo } from 'net';
 import {
   setupWebflowMocks,
   mockWebflowError,
+  mockWebflowSuccess,
   getCapturedRequests,
   resetWebflowMocks,
 } from '../mocks/webflow.js';
@@ -70,6 +71,14 @@ async function patchJson(path: string, body: unknown): Promise<Response> {
   });
 }
 
+async function postJson(path: string, body: unknown): Promise<Response> {
+  return api(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 function makeSection(index: number, overrides: Partial<PostSection> = {}): PostSection {
   return {
     index,
@@ -111,6 +120,25 @@ function seedPost(overrides: Partial<GeneratedPost> = {}): GeneratedPost {
   const post = makePost(overrides);
   savePost(post.workspaceId, post);
   return post;
+}
+
+function configurePublishTarget(): void {
+  updateWorkspace(wsId, {
+    webflowSiteId: 'site_content_posts_workflow',
+    webflowToken: 'wf-token-content-posts',
+    publishTarget: {
+      collectionId: 'collection_content_posts',
+      collectionName: 'Blog Posts',
+      fieldMap: {
+        title: 'name',
+        slug: 'slug',
+        body: 'post-body',
+        metaTitle: 'seo-title',
+        metaDescription: 'seo-description',
+        publishDate: 'published-on',
+      },
+    },
+  });
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 500): Promise<void> {
@@ -237,22 +265,7 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
   });
 
   it('does not stamp Webflow publish metadata when auto-publish item creation fails', async () => {
-    updateWorkspace(wsId, {
-      webflowSiteId: 'site_content_posts_workflow',
-      webflowToken: 'wf-token-content-posts',
-      publishTarget: {
-        collectionId: 'collection_content_posts',
-        collectionName: 'Blog Posts',
-        fieldMap: {
-          title: 'name',
-          slug: 'slug',
-          body: 'post-body',
-          metaTitle: 'seo-title',
-          metaDescription: 'seo-description',
-          publishDate: 'published-on',
-        },
-      },
-    });
+    configurePublishTarget();
     mockWebflowError(/\/collections\/collection_content_posts\/items$/, 500, 'Webflow create failed');
     const post = seedPost({ status: 'review' });
 
@@ -274,6 +287,88 @@ describe('PATCH /api/content-posts/:workspaceId/:postId', () => {
     expect(stored?.status).toBe('approved');
     expect(stored?.webflowItemId).toBeUndefined();
     expect(stored?.webflowCollectionId).toBeUndefined();
+    expect(stored?.publishedAt).toBeUndefined();
+    expect(stored?.publishedSlug).toBeUndefined();
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+});
+
+describe('POST /api/content-posts/:workspaceId/:postId/publish-to-webflow', () => {
+  it('rejects unsupported post statuses before calling Webflow or mutating publish metadata', async () => {
+    configurePublishTarget();
+    const post = seedPost({ status: 'generating' });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {});
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('cannot be published');
+
+    expect(getCapturedRequests()).toHaveLength(0);
+    const stored = getPost(wsId, post.id);
+    expect(stored?.status).toBe('generating');
+    expect(stored?.webflowItemId).toBeUndefined();
+    expect(stored?.webflowCollectionId).toBeUndefined();
+    expect(stored?.publishedAt).toBeUndefined();
+    expect(stored?.publishedSlug).toBeUndefined();
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+
+  it('does not stamp Webflow publish metadata when manual item creation fails', async () => {
+    configurePublishTarget();
+    mockWebflowError(/\/collections\/collection_content_posts\/items$/, 500, 'Webflow create failed');
+    const post = seedPost({ status: 'approved' });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {});
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain('Failed to create CMS item');
+
+    const requests = getCapturedRequests();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      endpoint: '/collections/collection_content_posts/items',
+      method: 'POST',
+      token: 'wf-token-content-posts',
+    });
+
+    const stored = getPost(wsId, post.id);
+    expect(stored?.status).toBe('approved');
+    expect(stored?.webflowItemId).toBeUndefined();
+    expect(stored?.webflowCollectionId).toBeUndefined();
+    expect(stored?.publishedAt).toBeUndefined();
+    expect(stored?.publishedSlug).toBeUndefined();
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
+  });
+
+  it('keeps draft Webflow item metadata but does not mark a post live when manual publish fails', async () => {
+    configurePublishTarget();
+    mockWebflowSuccess(/\/collections\/collection_content_posts\/items$/, { id: 'wf_manual_draft_item' });
+    mockWebflowError(/\/collections\/collection_content_posts\/items\/publish$/, 500, 'Webflow publish failed');
+    const post = seedPost({ status: 'approved' });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {});
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain('Failed to publish CMS item');
+
+    const requests = getCapturedRequests();
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toMatchObject({
+      endpoint: '/collections/collection_content_posts/items',
+      method: 'POST',
+      token: 'wf-token-content-posts',
+    });
+    expect(requests[1]).toMatchObject({
+      endpoint: '/collections/collection_content_posts/items/publish',
+      method: 'POST',
+      token: 'wf-token-content-posts',
+      body: { itemIds: ['wf_manual_draft_item'] },
+    });
+
+    const stored = getPost(wsId, post.id);
+    expect(stored?.status).toBe('approved');
+    expect(stored?.webflowItemId).toBe('wf_manual_draft_item');
+    expect(stored?.webflowCollectionId).toBe('collection_content_posts');
     expect(stored?.publishedAt).toBeUndefined();
     expect(stored?.publishedSlug).toBeUndefined();
     expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
