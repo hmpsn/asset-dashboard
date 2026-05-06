@@ -243,7 +243,7 @@ ${formatKeywordsForPrompt(seo)}${seo?.effectiveBrandVoiceBlock ?? ''}${formatPer
     ];
 
     const aiResult = await callAI({
-      model: 'gpt-5.5',
+      model: 'gpt-5.4',
       system: systemPrompt,
       messages,
       temperature: 0.6,

@@ -461,7 +461,7 @@ ${JSON.stringify(context, null, 2)}`;
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
       callAI({
-        model: 'gpt-5.5',
+        model: 'gpt-5.4',
         system: systemPrompt,
         messages: [
           ...historyMessages.slice(-10),

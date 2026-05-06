@@ -199,7 +199,7 @@ Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
     const aiResult = await callAI({
-      model: 'gpt-5.5',
+      model: 'gpt-5.4',
       system: systemPrompt,
       messages: [{ role: 'user', content: question }],
       temperature: 0.7,

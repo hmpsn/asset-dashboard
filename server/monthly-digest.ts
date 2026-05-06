@@ -255,7 +255,7 @@ Voice rules (follow exactly):
     );
 
     const result = await callAI({
-      model: 'gpt-5.5',
+      model: 'gpt-5.4',
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,

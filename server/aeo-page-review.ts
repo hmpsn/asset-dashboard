@@ -229,7 +229,7 @@ RULES:
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callAI({
-    model: 'gpt-5.5',
+    model: 'gpt-5.4',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 5000,
     temperature: 0.4,

@@ -19,7 +19,7 @@ const log = createLogger('content-posts-ai');
 // AI model config — Claude for creative prose, GPT for structured tasks.
 // Claude produces more natural, less formulaic writing. GPT excels at
 // JSON output, unification editing, and SEO meta generation.
-const CONTENT_MODEL = 'gpt-5.5';         // fallback + structured tasks
+const CONTENT_MODEL = 'gpt-5.4';         // fallback + structured tasks
 const CLAUDE_MODEL = 'claude-sonnet-4-6' as const;
 const CLAUDE_TEMP = 0.7;
 

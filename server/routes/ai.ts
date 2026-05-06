@@ -60,7 +60,7 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
     const maxTokens = assembled.mode === 'analyst' ? 2000 : 3000;
 
     const aiResult = await callAI({
-      model: 'gpt-5.5',
+      model: 'gpt-5.4',
       system: systemPrompt,
       messages: [
         ...historyMessages.slice(-10),
