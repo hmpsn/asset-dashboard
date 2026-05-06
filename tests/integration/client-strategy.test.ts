@@ -45,6 +45,7 @@ let gatedWsId = '';          // seoClientView=false gate tests
 let feedbackWsId = '';       // keyword-feedback mutation tests (has shared password)
 let voteWsId = '';           // content-gap-vote tests (has shared password)
 let isolationWsId = '';      // cross-workspace isolation tests
+let voteSessionToken = '';
 
 // ── Test strategy data ──────────────────────────────────────────────────────
 
@@ -945,6 +946,11 @@ describe('POST /api/public/content-gap-vote — voting', () => {
       password: 'vote-test-pw',
     });
     expect(authRes.status).toBe(200);
+    const setCookie = authRes.headers.getSetCookie?.() || [];
+    const sessionCookie = setCookie.find((cookie: string) => cookie.startsWith(`client_session_${voteWsId}=`));
+    expect(sessionCookie).toBeDefined();
+    voteSessionToken = sessionCookie?.split(';')[0]?.split('=')[1] ?? '';
+    expect(voteSessionToken).not.toBe('');
   });
 
   afterAll(() => {
@@ -1007,6 +1013,28 @@ describe('POST /api/public/content-gap-vote — voting', () => {
 
     const votes = await listContentGapVotes(voteWsId);
     expect(votes[keyword]).toBeUndefined();
+  });
+
+  it('does not allow a client session from another workspace to mutate votes', async () => {
+    const targetWs = createWorkspace('Wrong Workspace Vote Target');
+    try {
+      updateWorkspace(targetWs.id, { clientPassword: 'target-vote-pw' });
+      const res = await fetch(`${ctx.BASE}/api/public/content-gap-vote/${targetWs.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `client_session_${targetWs.id}=${voteSessionToken}`,
+        },
+        body: JSON.stringify({ keyword: 'wrong workspace vote', vote: 'up' }),
+      });
+
+      expect(res.status).toBe(401);
+      const rows = db.prepare('SELECT keyword FROM content_gap_votes WHERE workspace_id = ?').all(targetWs.id);
+      expect(rows).toEqual([]);
+    } finally {
+      cleanContentGapVotes(targetWs.id);
+      deleteWorkspace(targetWs.id);
+    }
   });
 
   it('successfully records an upvote', async () => {
