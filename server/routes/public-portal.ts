@@ -34,7 +34,12 @@ import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { addTrackedKeyword } from '../rank-tracking.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
-import { clientBusinessPrioritySchema } from '../schemas/client-business-priorities.js';
+import {
+  CLIENT_BUSINESS_PRIORITIES_MARKER,
+  clientBusinessPrioritiesBodySchema,
+  clientBusinessPrioritySchema,
+  type ClientBusinessPrioritiesBody,
+} from '../schemas/client-business-priorities.js';
 import {
   bulkKeywordFeedbackSchema,
   contentGapVoteSchema,
@@ -515,31 +520,16 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
   res.json({ priorities, updatedAt: row.updated_at });
 });
 
-router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
+router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { priorities } = req.body as { priorities: { text: string; category: string }[] };
-  if (!Array.isArray(priorities)) return res.status(400).json({ error: 'priorities must be an array' });
-
-  // Validate and sanitize
-  const clean = priorities
-    .filter(p => p.text && typeof p.text === 'string')
-    .slice(0, 10) // Max 10 priorities
-    .map(p => ({
-      text: p.text.trim().slice(0, 500),
-      category: ['growth', 'brand', 'product', 'audience', 'competitive', 'other'].includes(p.category) ? p.category : 'other',
-    }));
+  const { priorities } = req.body as ClientBusinessPrioritiesBody;
+  const clean = priorities.map(p => ({
+    text: p.text,
+    category: p.category,
+  }));
 
   // Upsert into db
   db.prepare(`
@@ -551,25 +541,24 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
   `).run(wsId, JSON.stringify(clean));
 
   // Also inject a summary into workspace businessContext so it's available for AI prompts
-  if (clean.length > 0) {
-    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
-    const existingContext = ws.keywordStrategy?.businessContext || '';
-    const marker = '\n--- CLIENT PRIORITIES ---\n';
-    const base = existingContext.includes(marker)
-      ? existingContext.split(marker)[0]
+  if (ws.keywordStrategy) {
+    const existingContext = ws.keywordStrategy.businessContext || '';
+    const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
+      ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0]
       : existingContext;
-    const newContext = `${base}${marker}${priorityText}`;
+    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
+    const businessContext = priorityText
+      ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}`
+      : base;
 
-    if (ws.keywordStrategy) {
-      updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext: newContext } });
-      // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-      clearSeoContextCache(wsId);
+    updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
+    // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
+    clearSeoContextCache(wsId);
+    invalidateIntelligenceCache(wsId);
+    debouncedStrategyInvalidate(wsId, () => {
       invalidateIntelligenceCache(wsId);
-      debouncedStrategyInvalidate(wsId, () => {
-        invalidateIntelligenceCache(wsId);
-        invalidateSubCachePrefix(wsId, 'slice:seoContext');
-      });
-    }
+      invalidateSubCachePrefix(wsId, 'slice:seoContext');
+    });
   }
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
