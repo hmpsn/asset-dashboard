@@ -148,12 +148,8 @@ export interface ClientActionQueueStats {
 export function createClientAction(input: CreateClientActionInput): ClientAction {
   const now = new Date().toISOString();
   if (input.sourceId) {
-    const existing = stmts().selectActiveBySource.get({
-      workspace_id: input.workspaceId,
-      source_type: input.sourceType,
-      source_id: input.sourceId,
-    }) as ClientActionRow | undefined;
-    if (existing) return rowToAction(existing);
+    const existing = getActiveClientActionBySource(input.workspaceId, input.sourceType, input.sourceId);
+    if (existing) return existing;
   }
 
   const action: ClientAction = {
@@ -184,6 +180,19 @@ export function createClientAction(input: CreateClientActionInput): ClientAction
     updated_at: now,
   });
   return action;
+}
+
+export function getActiveClientActionBySource(
+  workspaceId: string,
+  sourceType: ClientActionSourceType,
+  sourceId: string,
+): ClientAction | null {
+  const row = stmts().selectActiveBySource.get({
+    workspace_id: workspaceId,
+    source_type: sourceType,
+    source_id: sourceId,
+  }) as ClientActionRow | undefined;
+  return row ? rowToAction(row) : null;
 }
 
 export function listClientActions(workspaceId: string): ClientAction[] {

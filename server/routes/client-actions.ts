@@ -4,7 +4,13 @@ import { validate, z } from '../middleware/validate.js';
 import { requireClientPortalAuth, getClientActor } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { createClientAction, listClientActions, updateClientAction, getClientAction } from '../client-actions.js';
+import {
+  createClientAction,
+  listClientActions,
+  updateClientAction,
+  getClientAction,
+  getActiveClientActionBySource,
+} from '../client-actions.js';
 import { getClientPortalUrl, getWorkspace } from '../workspaces.js';
 import { notifyApprovalReady } from '../email.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
@@ -46,6 +52,11 @@ function broadcastActionUpdate(workspaceId: string, actionId: string, action: st
 
 router.post('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createActionSchema), (req, res) => {
   const workspaceId = req.params.workspaceId;
+  const existing = req.body.sourceId
+    ? getActiveClientActionBySource(workspaceId, req.body.sourceType, req.body.sourceId)
+    : null;
+  if (existing) return res.json(existing);
+
   const action = createClientAction({ workspaceId, ...req.body });
   addActivity(workspaceId, 'client_action_sent', `Sent to client: ${action.title}`, action.summary, { actionId: action.id, sourceType: action.sourceType });
   const ws = getWorkspace(workspaceId);

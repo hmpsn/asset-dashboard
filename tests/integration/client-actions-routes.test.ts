@@ -25,6 +25,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  db.prepare('DELETE FROM activity_log WHERE workspace_id IN (?, ?, ?)').run(wsId, privateWsId, otherWsId);
   db.prepare('DELETE FROM client_actions WHERE workspace_id IN (?, ?, ?)').run(wsId, privateWsId, otherWsId);
   deleteWorkspace(wsId);
   deleteWorkspace(privateWsId);
@@ -37,6 +38,17 @@ describe('client action routes', () => {
     const res = await api(`/api/client-actions/${workspaceId}`);
     expect(res.status).toBe(200);
     return await res.json() as Array<{ id: string; status: string; priority: string; updatedAt: string; clientNote?: string }>;
+  }
+
+  function countSentActivitiesForAction(workspaceId: string, actionId: string): number {
+    const row = db.prepare(`
+      SELECT COALESCE(COUNT(*), 0) AS count
+      FROM activity_log
+      WHERE workspace_id = ?
+        AND type = 'client_action_sent'
+        AND metadata LIKE ?
+    `).get(workspaceId, `%"actionId":"${actionId}"%`) as { count: number };
+    return row.count;
   }
 
   it('creates and lists a client action from the admin API', async () => {
@@ -100,6 +112,7 @@ describe('client action routes', () => {
     });
     expect(firstRes.status).toBe(200);
     const first = await firstRes.json();
+    expect(countSentActivitiesForAction(wsId, first.id)).toBe(1);
 
     const secondRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'internal_link',
@@ -111,6 +124,7 @@ describe('client action routes', () => {
     const second = await secondRes.json();
     expect(second.id).toBe(first.id);
     expect(second.title).toBe(first.title);
+    expect(countSentActivitiesForAction(wsId, first.id)).toBe(1);
 
     const listRes = await api(`/api/client-actions/${wsId}`);
     const list = await listRes.json();
