@@ -36,8 +36,37 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/e2e.yml'
 
-  e2e-shard:
+  e2e-build:
     needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-dist
+          path: dist/
+          retention-days: 2
+
+  e2e-shard:
+    needs: [changes, e2e-build]
     if: needs.changes.outputs.e2e == 'true'
     strategy:
       fail-fast: false
@@ -59,6 +88,12 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: e2e-dist
+          path: dist/
+
       - name: Install dependencies
         run: npm ci
 
@@ -77,14 +112,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build frontend
-        run: npm run build
-
       - name: Create data directory
         run: mkdir -p $DATA_DIR
 
       - name: Run Playwright tests
-        run: npx playwright test --shard=${{ matrix.shard }}/2
+        run: npx playwright test --reporter=blob --shard=${{ matrix.shard }}/2
         env:
           CI: true
           JWT_SECRET: e2e-test-secret
@@ -93,28 +125,76 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
+          name: blob-report-shard-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 14
+
+  e2e-merge-report:
+    needs: [changes, e2e-shard]
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download shard blob reports
+        uses: actions/download-artifact@v5
+        with:
+          pattern: blob-report-shard-*
+          path: all-blob-reports/
+          merge-multiple: true
+
+      - name: Merge shard reports
+        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+
+      - name: Upload merged Playwright report
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-merged
           path: playwright-report/
           retention-days: 14
 
   e2e:
     name: e2e
     if: always()
-    needs: [changes, e2e-shard]
+    needs: [changes, e2e-build, e2e-shard, e2e-merge-report]
     runs-on: ubuntu-latest
     steps:
       - name: E2E status check
         env:
           E2E_NEEDED: ${{ needs.changes.outputs.e2e }}
+          BUILD_RESULT: ${{ needs.e2e-build.result }}
           SHARD_RESULT: ${{ needs.e2e-shard.result }}
+          MERGE_RESULT: ${{ needs.e2e-merge-report.result }}
         run: |
           echo "e2e needed: $E2E_NEEDED"
+          echo "build result: $BUILD_RESULT"
           echo "shard result: $SHARD_RESULT"
+          echo "merge result: $MERGE_RESULT"
           if [[ "$E2E_NEEDED" != "true" ]]; then
             echo "Skipping E2E: no E2E-relevant file changes detected."
             exit 0
           fi
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::E2E build job failed"
+            exit 1
+          fi
           if [[ "$SHARD_RESULT" != "success" ]]; then
             echo "::error::E2E shard job failed"
+            exit 1
+          fi
+          if [[ "$MERGE_RESULT" != "success" ]]; then
+            echo "::error::E2E report merge job failed"
             exit 1
           fi
