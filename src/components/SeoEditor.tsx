@@ -29,12 +29,7 @@ import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { resolvePagePath } from '../lib/pathUtils';
-
-interface EditState {
-  seoTitle: string;
-  seoDescription: string;
-  dirty: boolean;
-}
+import type { SeoBulkMode, SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 
 interface Props {
   siteId: string;
@@ -74,7 +69,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   
   // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
-  const [edits, setEdits] = useState<Record<string, EditState>>(() => {
+  const [edits, setEdits] = useState<Record<string, SeoEditState>>(() => {
     try {
       const raw = sessionStorage.getItem(`seo-editor-edits-${siteId}`);
       if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
@@ -99,14 +94,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showCmsOnly, setShowCmsOnly] = useState(false);
-  const [hasUnsaved, setHasUnsaved] = useState(false);
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
-  const [variations, setVariations] = useState<Record<string, { field: string; options: string[]; descOptions?: string[] }>>(() => {
+  const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
     try {
       const raw = sessionStorage.getItem(`seo-editor-vars-${siteId}`);
       if (raw) return JSON.parse(raw);
@@ -234,7 +228,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   });
 
   // Bulk operations state
-  const [bulkMode, setBulkMode] = useState<'idle' | 'pattern' | 'rewrite-preview' | 'rewriting'>('idle');
+  const [bulkMode, setBulkMode] = useState<SeoBulkMode>('idle');
   const [bulkField, setBulkField] = useState<'title' | 'description'>('title');
   const [patternAction, setPatternAction] = useState<'append' | 'prepend'>('append');
   const [patternText, setPatternText] = useState('');
@@ -249,7 +243,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       restoredFromCache.current = false;
       return;
     }
-    const editMap: Record<string, EditState> = {};
+    const editMap: Record<string, SeoEditState> = {};
     for (const p of pages) {
       // Check for saved draft first
       const draftKey = `seo-draft-${workspaceId}-${p.id}`;
@@ -298,11 +292,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     }
   }, [fixContext, pages]);
 
-  useEffect(() => {
-    setHasUnsaved(Object.values(edits).some(e => e.dirty));
-  }, [edits]);
+  const hasUnsaved = useMemo(
+    () => Object.values(edits).some(e => e.dirty),
+    [edits],
+  );
 
-  const updateField = (pageId: string, field: keyof EditState, value: string) => {
+  const updateField = (pageId: string, field: keyof SeoEditState, value: string) => {
     setEdits(prev => ({
       ...prev,
       [pageId]: { ...prev[pageId], [field]: value, dirty: true },

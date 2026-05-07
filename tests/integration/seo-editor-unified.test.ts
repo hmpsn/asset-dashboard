@@ -68,4 +68,48 @@ describe('SeoEditor — unified pages integration contracts', () => {
     expect(items[0].pageId).toBe('p1');
     expect('collectionId' in items[0]).toBe(false);
   });
+
+  it('single-page approval payload can emit both changed fields and omits collectionId', () => {
+    const page = {
+      id: 'p2',
+      title: 'Services',
+      slug: '/services',
+      source: 'static' as const,
+      collectionId: 'col-services',
+      seo: { title: 'Old Title', description: 'Old Description' },
+    };
+    const edit = { seoTitle: 'New Title', seoDescription: 'New Description' };
+
+    const items: Array<{ pageId: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+    if (edit.seoTitle !== (page.seo?.title || '')) {
+      items.push({ pageId: page.id, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
+    }
+    if (edit.seoDescription !== (page.seo?.description || '')) {
+      items.push({ pageId: page.id, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
+    }
+
+    expect(items).toHaveLength(2);
+    expect(items[0].field).toBe('seoTitle');
+    expect(items[1].field).toBe('seoDescription');
+    expect('collectionId' in items[0]).toBe(false);
+    expect('collectionId' in items[1]).toBe(false);
+  });
+
+  it('approval payload excludes unchanged fields', () => {
+    const page = {
+      id: 'p3',
+      title: 'Contact',
+      slug: '/contact',
+      source: 'static' as const,
+      seo: { title: 'Keep Title', description: 'Keep Description' },
+    };
+    const edit = { seoTitle: 'Keep Title', seoDescription: 'New Description' };
+
+    const items: Array<{ field: 'seoTitle' | 'seoDescription' }> = [];
+    if (edit.seoTitle !== (page.seo?.title || '')) items.push({ field: 'seoTitle' });
+    if (edit.seoDescription !== (page.seo?.description || '')) items.push({ field: 'seoDescription' });
+
+    expect(items).toHaveLength(1);
+    expect(items[0].field).toBe('seoDescription');
+  });
 });
