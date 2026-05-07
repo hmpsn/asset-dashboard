@@ -11,20 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     permissions:
       pull-requests: read
-    env:
-      DATA_DIR: /tmp/asset-dashboard-ci
-      LOG_LEVEL: warn
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    outputs:
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v5
 
       - name: Detect E2E-relevant changes
-        id: changes
+        id: filter
         uses: dorny/paths-filter@v4
         with:
           filters: |
@@ -39,57 +36,85 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/e2e.yml'
 
-      - name: E2E skip summary
-        if: steps.changes.outputs.e2e != 'true'
-        run: 'echo "Skipping E2E: no E2E-relevant file changes detected."'
+  e2e-shard:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: read
+    env:
+      DATA_DIR: /tmp/asset-dashboard-ci
+      LOG_LEVEL: warn
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
-        if: steps.changes.outputs.e2e == 'true'
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
-        if: steps.changes.outputs.e2e == 'true'
         run: npm ci
 
       - name: Get Playwright version
-        if: steps.changes.outputs.e2e == 'true'
         id: playwright-version
         run: |
           PLAYWRIGHT_VERSION=$(node -p "require('@playwright/test/package.json').version")
           echo "version=$PLAYWRIGHT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        if: steps.changes.outputs.e2e == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: steps.changes.outputs.e2e == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Build frontend
-        if: steps.changes.outputs.e2e == 'true'
         run: npm run build
 
       - name: Create data directory
-        if: steps.changes.outputs.e2e == 'true'
         run: mkdir -p $DATA_DIR
 
       - name: Run Playwright tests
-        if: steps.changes.outputs.e2e == 'true'
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shard }}/2
         env:
           CI: true
           JWT_SECRET: e2e-test-secret
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() && steps.changes.outputs.e2e == 'true' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
+
+  e2e:
+    name: e2e
+    if: always()
+    needs: [changes, e2e-shard]
+    runs-on: ubuntu-latest
+    steps:
+      - name: E2E status check
+        env:
+          E2E_NEEDED: ${{ needs.changes.outputs.e2e }}
+          SHARD_RESULT: ${{ needs.e2e-shard.result }}
+        run: |
+          echo "e2e needed: $E2E_NEEDED"
+          echo "shard result: $SHARD_RESULT"
+          if [[ "$E2E_NEEDED" != "true" ]]; then
+            echo "Skipping E2E: no E2E-relevant file changes detected."
+            exit 0
+          fi
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::E2E shard job failed"
+            exit 1
+          fi
