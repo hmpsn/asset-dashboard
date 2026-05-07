@@ -10,62 +10,20 @@ import type {
   CalibrationSession,
   VoiceSampleContext,
 } from '../../../shared/types/brand-engine';
-import { PROMPT_TYPE_TO_SECTION_TYPE } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button, cn, ConfirmDialog } from '../ui';
 import { useToast } from '../Toast';
+import {
+  appendUniqueListValue,
+  appendUniqueRequiredTerminology,
+  CONTEXT_TAG_COLORS,
+  CONTEXT_TAG_OPTIONS,
+  defaultDNA,
+  defaultGuardrails,
+  PROMPT_TYPE_OPTIONS,
+  PROMPT_TYPE_TO_CONTEXT,
+} from './voice-tab/voiceTabModel';
 
 type VoiceSection = 'samples' | 'dna' | 'guardrails' | 'calibration';
-
-const CONTEXT_TAG_OPTIONS: { value: VoiceSampleContext; label: string }[] = [
-  { value: 'headline', label: 'Headline' },
-  { value: 'body', label: 'Body' },
-  { value: 'cta', label: 'CTA' },
-  { value: 'about', label: 'About' },
-  { value: 'service', label: 'Service' },
-  { value: 'social', label: 'Social' },
-  { value: 'seo', label: 'SEO' },
-];
-
-const PROMPT_TYPE_OPTIONS = Object.keys(PROMPT_TYPE_TO_SECTION_TYPE);
-
-// Map prompt types to VoiceSampleContext values
-const PROMPT_TYPE_TO_CONTEXT: Record<string, VoiceSampleContext | undefined> = {
-  hero_headline: 'headline',
-  about_intro: 'about',
-  service_body: 'service',
-  cta_copy: 'cta',
-  faq_answer: undefined,
-  testimonial_copy: undefined,
-  blog_intro: 'body',
-  meta_description: 'seo',
-};
-
-const CONTEXT_TAG_COLORS: Record<VoiceSampleContext, string> = {
-  headline: 'bg-teal-500/10 text-teal-400',
-  body: 'bg-blue-500/10 text-blue-400',
-  cta: 'bg-emerald-500/10 text-emerald-400',
-  about: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
-  service: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
-  social: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
-  seo: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
-};
-
-// ─── Module-level defaults ────────────────────────────────────────────────────
-
-const defaultDNA: VoiceDNA = {
-  personalityTraits: [],
-  toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
-  sentenceStyle: '',
-  vocabularyLevel: '',
-  humorStyle: '',
-};
-
-const defaultGuardrails: VoiceGuardrails = {
-  forbiddenWords: [],
-  requiredTerminology: [],
-  toneBoundaries: [],
-  antiPatterns: [],
-};
 
 // ─── Context Tag Badge ────────────────────────────────────────────────────────
 
@@ -298,9 +256,9 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
   };
 
   const addTrait = () => {
-    const trimmed = newTrait.trim();
-    if (!trimmed || dna.personalityTraits.includes(trimmed)) return;
-    setDna(prev => ({ ...prev, personalityTraits: [...prev.personalityTraits, trimmed] }));
+    const { next, added } = appendUniqueListValue(dna.personalityTraits, newTrait);
+    if (!added) return;
+    setDna(prev => ({ ...prev, personalityTraits: next }));
     setNewTrait('');
   };
 
@@ -463,9 +421,9 @@ interface GuardrailsSectionProps {
 }
 
 function addToList(list: string[], setList: (v: string[]) => void, val: string, clearFn: () => void) {
-  const trimmed = val.trim();
-  if (!trimmed || list.includes(trimmed)) return;
-  setList([...list, trimmed]);
+  const { next, added } = appendUniqueListValue(list, val);
+  if (!added) return;
+  setList(next);
   clearFn();
 }
 
@@ -596,13 +554,16 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           <Button
             type="button"
             onClick={() => {
-              const use = newTermUse.trim();
-              const insteadOf = newTermInsteadOf.trim();
-              if (use && insteadOf) {
-                setGr(prev => ({ ...prev, requiredTerminology: [...prev.requiredTerminology, { use, insteadOf }] }));
-                setNewTermUse('');
-                setNewTermInsteadOf('');
-              }
+              const result = appendUniqueRequiredTerminology(
+                gr.requiredTerminology,
+                newTermUse,
+                newTermInsteadOf
+              );
+              if (!result.added) return;
+
+              setGr(prev => ({ ...prev, requiredTerminology: result.next }));
+              setNewTermUse('');
+              setNewTermInsteadOf('');
             }}
             disabled={!newTermUse.trim() || !newTermInsteadOf.trim()}
             variant="primary"
