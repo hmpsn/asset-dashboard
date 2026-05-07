@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FixContext } from '../App';
@@ -16,22 +16,13 @@ import { SeoEditorHeaderActions } from './editor/SeoEditorHeaderActions';
 import { SeoEditorPageList } from './editor/SeoEditorPageList';
 import { SeoEditorWorkflowPanels } from './editor/SeoEditorWorkflowPanels';
 import { resolvePagePath } from '../lib/pathUtils';
-import type { SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
   filterAndSortSeoPages,
 } from './editor/seoEditorDerived';
 import { useSeoEditorApprovalWorkflow } from './editor/useSeoEditorApprovalWorkflow';
 import { useSeoEditorPageWorkflow } from './editor/useSeoEditorPageWorkflow';
 import { useSeoEditorBulkWorkflow } from './editor/useSeoEditorBulkWorkflow';
-import {
-  buildSeoEditsFromPages,
-  persistCachedExpandedPages,
-  persistCachedSeoEdits,
-  persistCachedSeoVariations,
-  readCachedExpandedPages,
-  readCachedSeoEdits,
-  readCachedSeoVariations,
-} from './editor/seoEditorPersistence';
+import { useSeoEditorSessionState } from './editor/useSeoEditorSessionState';
 
 interface Props {
   siteId: string;
@@ -69,36 +60,27 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     return map;
   }, [unified]);
   
-  // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
-  const restoredFromCache = useRef(false);
-  const [edits, setEdits] = useState<Record<string, SeoEditState>>(() => {
-    const cached = readCachedSeoEdits(siteId);
-    restoredFromCache.current = cached.restoredFromCache;
-    return cached.edits;
-  });
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    return readCachedExpandedPages(siteId);
-  });
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [search, setSearch] = useState('');
   const [showCmsOnly, setShowCmsOnly] = useState(false);
-  const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
-    return readCachedSeoVariations(siteId);
+  const {
+    edits,
+    setEdits,
+    expanded,
+    variations,
+    setVariations,
+    previewExpanded,
+    hasUnsaved,
+    toggleExpand,
+    togglePreview,
+  } = useSeoEditorSessionState({
+    siteId,
+    workspaceId,
+    pages,
+    fixContext,
   });
-  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
-
-  // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
-  useEffect(() => {
-    persistCachedSeoEdits(siteId, edits);
-  }, [edits, siteId]);
-  useEffect(() => {
-    persistCachedExpandedPages(siteId, expanded);
-  }, [expanded, siteId]);
-  useEffect(() => {
-    persistCachedSeoVariations(siteId, variations);
-  }, [variations, siteId]);
 
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
@@ -107,40 +89,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     enabled: !!workspaceId,
     staleTime: 30_000,
   });
-
-  // Load drafts and update edits when pages data changes from React Query
-  useEffect(() => {
-    // Skip re-initialization if edits were restored from RQ cache (admin tab switch)
-    if (restoredFromCache.current) {
-      restoredFromCache.current = false;
-      return;
-    }
-    setEdits(buildSeoEditsFromPages(pages, workspaceId));
-  }, [pages, workspaceId]);
-
-  // Auto-expand target page from audit Fix→
-  // Guard on targetRoute so stale fixContext from other tabs doesn't scroll/expand a page unexpectedly.
-  const fixConsumed = useRef(false);
-  // effect-layout-ok -- this sync is intentionally post-paint because it scrolls the target element.
-  useEffect(() => {
-    if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
-      const match = pages.find(p => p.id === fixContext.pageId || p.slug === fixContext.pageSlug);
-      if (match) {
-        fixConsumed.current = true;
-        setExpanded(new Set([match.id]));
-        // Scroll to the page after a tick
-        setTimeout(() => {
-          const el = document.getElementById(`seo-editor-page-${match.id}`);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      }
-    }
-  }, [fixContext, pages]);
-
-  const hasUnsaved = useMemo(
-    () => Object.values(edits).some(e => e.dirty),
-    [edits],
-  );
 
   const {
     saving,
@@ -180,22 +128,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     } finally {
       setPublishing(false);
     }
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const togglePreview = (pageId: string) => {
-    setPreviewExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
-      return next;
-    });
   };
 
   const resetAllTracking = async () => {
