@@ -1,26 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { put, post } from '../api/client';
+import { post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
 } from 'lucide-react';
 import type { FixContext } from '../App';
-import { seoSuggestions, seoBulkJobs } from '../api/seo';
-import { workspaces, jobs } from '../api';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { seoSuggestions } from '../api/seo';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor, usePageJoin } from '../hooks/admin';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-import {
-  filterWritableItems,
-  filterWritableIds,
-  filterPagesNeedingFix,
-  countMissingField,
-} from '../hooks/admin/seoEditorFilters';
 import { StatusBadge, LoadingState, EmptyState, Icon } from './ui';
 import { useToast } from './Toast';
 import { PageEditRow } from './editor/PageEditRow';
@@ -29,28 +19,19 @@ import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { resolvePagePath } from '../lib/pathUtils';
-import type { SeoBulkMode, SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
+import type { SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
   filterAndSortSeoPages,
 } from './editor/seoEditorDerived';
-import {
-  buildBulkRewriteRequestPages,
-  buildBulkSeoUpdate,
-  buildPatternApplyPayload,
-  buildPatternPreviewItems,
-} from './editor/seoEditorBulkHelpers';
 import { useSeoEditorApprovalWorkflow } from './editor/useSeoEditorApprovalWorkflow';
 import { useSeoEditorPageWorkflow } from './editor/useSeoEditorPageWorkflow';
+import { useSeoEditorBulkWorkflow } from './editor/useSeoEditorBulkWorkflow';
 import {
   buildSeoEditsFromPages,
   persistCachedExpandedPages,
-  persistCachedSeoBulkAnalyzeJobId,
-  persistCachedSeoBulkRewriteJobId,
   persistCachedSeoEdits,
   persistCachedSeoVariations,
   readCachedExpandedPages,
-  readCachedSeoBulkAnalyzeJobId,
-  readCachedSeoBulkRewriteJobId,
   readCachedSeoEdits,
   readCachedSeoVariations,
 } from './editor/seoEditorPersistence';
@@ -103,21 +84,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   });
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
-  const [bulkFixing, setBulkFixing] = useState(false);
-  const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showCmsOnly, setShowCmsOnly] = useState(false);
   const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
     return readCachedSeoVariations(siteId);
   });
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-  const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
-    return readCachedSeoBulkAnalyzeJobId(workspaceId);
-  });
-  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(() => {
-    return readCachedSeoBulkRewriteJobId(workspaceId);
-  });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
@@ -131,99 +103,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     persistCachedSeoVariations(siteId, variations);
   }, [variations, siteId]);
 
-  // Persist active bulk job IDs so they survive remount (nav away + back)
-  useEffect(() => {
-    persistCachedSeoBulkAnalyzeJobId(workspaceId, bulkAnalyzeJobId);
-  }, [bulkAnalyzeJobId, workspaceId]);
-  useEffect(() => {
-    persistCachedSeoBulkRewriteJobId(workspaceId, bulkRewriteJobId);
-  }, [bulkRewriteJobId, workspaceId]);
-
-  // On remount, query server to recover progress UI for any restored job IDs
-  const mountAnalyzeJobId = useRef(bulkAnalyzeJobId);
-  const mountRewriteJobId = useRef(bulkRewriteJobId);
-  useEffect(() => {
-    const analyzeId = mountAnalyzeJobId.current;
-    const rewriteId = mountRewriteJobId.current;
-    if (!analyzeId && !rewriteId) return;
-    const TERMINAL = new Set(['done', 'error', 'cancelled']);
-    if (analyzeId) {
-      jobs.get(analyzeId)
-        .then(job => {
-          if (TERMINAL.has(job.status)) { setBulkAnalyzeJobId(null); }
-          else { setBulkAnalyzeProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
-        })
-        .catch(() => setBulkAnalyzeJobId(null));
-    }
-    if (rewriteId) {
-      jobs.get(rewriteId)
-        .then(job => {
-          if (TERMINAL.has(job.status)) { setBulkRewriteJobId(null); }
-          else { setBulkMode('rewriting'); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
-        })
-        .catch(() => setBulkRewriteJobId(null));
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; refs capture initial values
-
-  // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
-  useEffect(() => {
-    setApprovalSelected(new Set());
-  }, [showCmsOnly]);
-
-  // ── WebSocket handlers for background bulk operations ──
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (data: unknown) => {
-      const d = data as { jobId: string; operation: string; done: number; total: number; failed?: number; field?: string };
-      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
-        setBulkAnalyzeProgress({ done: d.done, total: d.total });
-      }
-      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
-        setBulkProgress({ done: d.done, total: d.total });
-      }
-    },
-    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
-      const d = data as { jobId: string; operation: string; analyzed?: number; generated?: number; failed?: number; total: number; field?: string };
-      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
-        setBulkAnalyzeProgress(prev => prev ? { ...prev, done: prev.total } : null);
-        setBulkAnalyzeJobId(null);
-        // Refresh keyword strategy so analyzed badges appear
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
-        setTimeout(() => setBulkAnalyzeProgress(null), 3000);
-      }
-      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
-        const failed = d.failed || 0;
-        const generated = d.generated ?? (d.total - failed);
-        const fieldLabel = d.field === 'both' ? 'title + description' : (d.field || 'title');
-        setBulkResults(
-          failed > 0
-            ? `Generated ${generated}/${d.total} ${fieldLabel} variations (${failed} failed) — review in the suggestions panel.`
-            : `Generated ${generated}/${d.total} ${fieldLabel} variations — review in the suggestions panel.`
-        );
-        setBulkMode('idle');
-        setBulkRewriteJobId(null);
-        setBulkProgress({ done: 0, total: 0 });
-        refetchSuggestions();
-        setTimeout(() => setBulkResults(null), 8000);
-      }
-    },
-    [WS_EVENTS.BULK_OPERATION_FAILED]: (data: unknown) => {
-      const d = data as { jobId: string; operation: string; error: string };
-      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
-        setBulkAnalyzeProgress(null);
-        setBulkAnalyzeJobId(null);
-        setBulkResults('Bulk analysis failed: ' + d.error);
-        setTimeout(() => setBulkResults(null), 5000);
-      }
-      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
-        setBulkMode('idle');
-        setBulkRewriteJobId(null);
-        setBulkProgress({ done: 0, total: 0 });
-        setBulkResults('Bulk rewrite failed: ' + d.error);
-        setTimeout(() => setBulkResults(null), 5000);
-      }
-    },
-  });
-
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
     queryKey: queryKeys.admin.seoSuggestions(workspaceId!),
@@ -231,15 +110,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     enabled: !!workspaceId,
     staleTime: 30_000,
   });
-
-  // Bulk operations state
-  const [bulkMode, setBulkMode] = useState<SeoBulkMode>('idle');
-  const [bulkField, setBulkField] = useState<'title' | 'description'>('title');
-  const [patternAction, setPatternAction] = useState<'append' | 'prepend'>('append');
-  const [patternText, setPatternText] = useState('');
-  const [bulkPreview, setBulkPreview] = useState<Array<{ pageId: string; oldValue: string; newValue: string }>>([]);
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
-  const [bulkSource, setBulkSource] = useState<'pattern' | 'ai'>('pattern');
 
   // Load drafts and update edits when pages data changes from React Query
   useEffect(() => {
@@ -254,6 +124,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // Auto-expand target page from audit Fix→
   // Guard on targetRoute so stale fixContext from other tabs doesn't scroll/expand a page unexpectedly.
   const fixConsumed = useRef(false);
+  // effect-layout-ok -- this sync is intentionally post-paint because it scrolls the target element.
   useEffect(() => {
     if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
       const match = pages.find(p => p.id === fixContext.pageId || p.slug === fixContext.pageSlug);
@@ -299,30 +170,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setLocalAnalyzedPages,
   });
 
-  const analyzeAllPages = async () => {
-    if (!workspaceId) return;
-    const toAnalyze = pages.filter(p => !analyzedPages.has(p.id));
-    if (toAnalyze.length === 0) return;
-    setBulkAnalyzeProgress({ done: 0, total: toAnalyze.length });
-    try {
-      const { jobId } = await seoBulkJobs.bulkAnalyze(workspaceId, {
-        pages: toAnalyze.map(p => ({
-          pageId: p.id,
-          title: p.title,
-          slug: p.slug,
-          publishedPath: p.publishedPath,
-          seoTitle: edits[p.id]?.seoTitle || p.seo?.title || '',
-          seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
-        })),
-      });
-      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId });
-      setBulkAnalyzeJobId(jobId);
-    } catch (err) {
-      console.error('Failed to start bulk analyze:', err);
-      setBulkAnalyzeProgress(null);
-    }
-  };
-
   const handlePublish = async () => {
     setPublishing(true);
     try {
@@ -336,116 +183,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     } finally {
       setPublishing(false);
     }
-  };
-
-  const handleBulkFix = async (field: 'title' | 'description') => {
-    const pagesNeedingFix = filterPagesNeedingFix(pages, field);
-    if (pagesNeedingFix.length === 0) {
-      setBulkResults(`All pages already have ${field === 'title' ? 'SEO titles' : 'meta descriptions'}.`);
-      setTimeout(() => setBulkResults(null), 3000);
-      return;
-    }
-    setBulkFixing(true);
-    setBulkResults(null);
-    try {
-      const data = await post<{ results?: Array<{ applied: boolean }> }>(`/api/webflow/seo-bulk-fix/${siteId}`, {
-        workspaceId,
-        field,
-        pages: pagesNeedingFix.map(p => ({
-          pageId: p.id,
-          title: p.title,
-          currentSeoTitle: p.seo?.title,
-          currentDescription: p.seo?.description,
-        })),
-      });
-      const applied = data.results?.filter((r: { applied: boolean }) => r.applied).length || 0;
-      setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
-      setTimeout(() => setBulkResults(null), 5000);
-    } catch (err) {
-      console.error('SeoEditor operation failed:', err);
-      setBulkResults('Bulk fix failed.');
-    } finally {
-      setBulkFixing(false);
-    }
-  };
-
-  // ── Bulk Pattern Apply ──
-  const previewPattern = () => {
-    if (!patternText.trim()) return;
-    // Exclude CMS pages upfront — their synthetic IDs are rejected by the Webflow API on apply
-    const preview = buildPatternPreviewItems(
-      filterWritableIds(Array.from(approvalSelected), pages),
-      pages,
-      edits,
-      { field: bulkField, action: patternAction, text: patternText },
-    );
-    setBulkPreview(preview);
-    setBulkSource('pattern');
-    setBulkMode('rewrite-preview');
-  };
-
-  const applyPattern = async () => {
-    setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: bulkPreview.length });
-    try {
-      const pagesPayload = buildPatternApplyPayload(bulkPreview, pages);
-      const data = await post<{ results: Array<{ pageId: string; newValue: string; applied: boolean }> }>(
-        `/api/webflow/seo-pattern-apply/${siteId}`,
-        { workspaceId, pages: pagesPayload, field: bulkField, action: patternAction, text: patternText }
-      );
-      const applied = data.results?.filter(r => r.applied).length || 0;
-      setBulkResults(`Pattern applied to ${applied}/${bulkPreview.length} pages.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
-    } catch { setBulkResults('Pattern apply failed.'); }
-    finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
-  };
-
-  // ── Bulk AI Rewrite — background job with WS progress ──
-  const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
-    if (!workspaceId) return;
-    const selectedIds = filterWritableIds(Array.from(approvalSelected), pages);
-    if (selectedIds.length === 0) return;
-    setBulkField(field === 'both' ? 'title' : field);
-    setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: selectedIds.length });
-
-    try {
-      const { jobId } = await seoBulkJobs.bulkRewrite(workspaceId, {
-        siteId,
-        pages: buildBulkRewriteRequestPages(selectedIds, pages, edits),
-        field,
-      });
-      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId });
-      setBulkRewriteJobId(jobId);
-    } catch (err) {
-      console.error('Failed to start bulk rewrite:', err);
-      setBulkMode('idle');
-      setBulkProgress({ done: 0, total: 0 });
-      setBulkResults('Failed to start bulk rewrite.');
-      setTimeout(() => setBulkResults(null), 5000);
-    }
-  };
-
-  const applyBulkRewrite = async () => {
-    // Pre-filter to only static pages — CMS pages have synthetic IDs the Webflow API rejects.
-    // Filtering here (not inside the loop) ensures total/progress counts are accurate.
-    const staticItems = filterWritableItems(bulkPreview, pages);
-    const pageById = new Map(pages.map(page => [page.id, page]));
-    setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: staticItems.length });
-    try {
-      for (const item of staticItems) {
-        const page = pageById.get(item.pageId);
-        if (!page) continue;
-        const seoFields = buildBulkSeoUpdate(bulkField, item.newValue, page, edits[page.id]);
-        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, workspaceId, ...seoFields });
-        setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
-      }
-      setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
-    } catch { setBulkResults('Apply failed.'); }
-    finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };
 
   const toggleExpand = (id: string) => {
@@ -500,6 +237,48 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     toast,
   });
 
+  const {
+    bulkFixing,
+    bulkResults,
+    bulkAnalyzeProgress,
+    bulkMode,
+    bulkField,
+    patternAction,
+    patternText,
+    bulkPreview,
+    bulkProgress,
+    bulkSource,
+    setBulkMode,
+    setBulkField,
+    setPatternAction,
+    setPatternText,
+    setBulkPreview,
+    handleBulkFix,
+    analyzeAllPages,
+    previewPattern,
+    applyPattern,
+    bulkAiRewrite,
+    applyBulkRewrite,
+    cancelAnalyze,
+    cancelRewrite,
+    clearPageTracking,
+    missingTitles,
+    missingDescs,
+  } = useSeoEditorBulkWorkflow({
+    siteId,
+    workspaceId,
+    pages,
+    edits,
+    approvalSelected,
+    analyzedPages,
+    setLocalAnalyzedPages,
+    queryClient,
+    trackJob,
+    cancelJob,
+    refetchSuggestions,
+    refreshStates,
+  });
+
   if (loading) {
     return (
       <LoadingState 
@@ -508,10 +287,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       />
     );
   }
-
-  // CMS pages have synthetic IDs that Webflow API rejects — exclude from actionable counts
-  const missingTitles = countMissingField(pages, 'title');
-  const missingDescs = countMissingField(pages, 'description');
 
   return (
     <div className="space-y-8">
@@ -647,7 +422,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
               <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
               <span className="t-caption-sm text-[var(--brand-text-bright)]">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">Cancel</button>
+              <button onClick={cancelAnalyze} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">Cancel</button>
             </div>
           ) : (
             <button
@@ -672,7 +447,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {/* CMS filter toggle */}
       <div className="flex items-center gap-2">
         <button
-          onClick={() => setShowCmsOnly(prev => !prev)}
+          onClick={() => {
+            setShowCmsOnly(prev => !prev);
+            setApprovalSelected(new Set());
+          }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors border ${
             showCmsOnly
               ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand'
@@ -724,7 +502,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onSetPatternText={setPatternText} onPreviewPattern={previewPattern}
         onApplyPattern={applyPattern} onApplyBulkRewrite={applyBulkRewrite}
         onBulkAiRewrite={bulkAiRewrite}
-        onCancelRewrite={() => { if (bulkRewriteJobId) { cancelJob(bulkRewriteJobId); setBulkRewriteJobId(null); } setBulkMode('idle'); setBulkProgress({ done: 0, total: 0 }); }}
+        onCancelRewrite={cancelRewrite}
         onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
       />
 
@@ -760,12 +538,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
               onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
               onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
-              onClearTracking={workspaceId ? async (pageId) => {
-                try {
-                  await workspaces.deletePageState(workspaceId, pageId);
-                  refreshStates();
-                } catch (err) { console.error('SeoEditor operation failed:', err); }
-              } : undefined}
+              onClearTracking={workspaceId ? clearPageTracking : undefined}
               errorState={errorStates[page.id] || null}
               showPreview={previewExpanded.has(page.id)}
               onTogglePreview={togglePreview}

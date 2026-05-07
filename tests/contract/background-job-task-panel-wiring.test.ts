@@ -6,29 +6,33 @@ function read(path: string): string {
 }
 
 describe('background job task panel wiring', () => {
-  it('tracks direct SEO bulk job starters in SeoEditor', () => {
+  it('tracks SEO bulk job starters through the extracted SeoEditor bulk workflow hook', () => {
     const seoEditor = read('src/components/SeoEditor.tsx');
+    const bulkWorkflow = read('src/components/editor/useSeoEditorBulkWorkflow.ts');
 
     expect(seoEditor).toContain('const { cancelJob, trackJob } = useBackgroundTasks()');
-    expect(seoEditor).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId })');
-    expect(seoEditor).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId })');
-    expect(seoEditor).toContain('setBulkAnalyzeJobId(jobId)');
-    expect(seoEditor).toContain('setBulkRewriteJobId(jobId)');
+    expect(seoEditor).toContain('useSeoEditorBulkWorkflow({');
+    expect(seoEditor).toContain('trackJob,');
+    expect(seoEditor).toContain('cancelJob,');
+    expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId })');
+    expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId })');
+    expect(bulkWorkflow).toContain('setBulkAnalyzeJobId(jobId)');
+    expect(bulkWorkflow).toContain('setBulkRewriteJobId(jobId)');
   });
 
   it('keys SEO bulk websocket updates by both operation and matching jobId', () => {
-    const seoEditor = read('src/components/SeoEditor.tsx');
+    const bulkWorkflow = read('src/components/editor/useSeoEditorBulkWorkflow.ts');
 
-    expect(seoEditor).toContain("d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId");
-    expect(seoEditor).toContain("d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId");
+    expect(bulkWorkflow).toContain("detail.operation === 'bulk-analyze' && detail.jobId === bulkAnalyzeJobId");
+    expect(bulkWorkflow).toContain("detail.operation === 'bulk-rewrite' && detail.jobId === bulkRewriteJobId");
   });
 
   it('enforces CMS write filters before bulk write-capable actions', () => {
-    const seoEditor = read('src/components/SeoEditor.tsx');
+    const bulkWorkflow = read('src/components/editor/useSeoEditorBulkWorkflow.ts');
 
-    expect(seoEditor).toContain('filterPagesNeedingFix(pages, field)');
-    expect(seoEditor).toContain('filterWritableIds(Array.from(approvalSelected), pages)');
-    expect(seoEditor).toContain('filterWritableItems(bulkPreview, pages)');
+    expect(bulkWorkflow).toContain('filterPagesNeedingFix(pages, field)');
+    expect(bulkWorkflow).toContain('filterWritableIds(Array.from(approvalSelected), pages)');
+    expect(bulkWorkflow).toContain('filterWritableItems(bulkPreview, pages)');
   });
 
   it('tracks direct content post generation jobs in ContentBriefs', () => {
