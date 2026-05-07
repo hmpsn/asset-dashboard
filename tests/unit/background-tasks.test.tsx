@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createOptimisticBackgroundJob,
   isTerminalJobStatus,
   jobBelongsToPanel,
   jobMatchesCriteria,
+  upsertBackgroundJob,
   type BackgroundJob,
 } from '../../src/hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 function job(overrides: Partial<BackgroundJob>): BackgroundJob {
   return {
@@ -45,5 +48,34 @@ describe('background task helpers', () => {
     expect(isTerminalJobStatus('done')).toBe(true);
     expect(isTerminalJobStatus('error')).toBe(true);
     expect(isTerminalJobStatus('cancelled')).toBe(true);
+  });
+
+  it('creates a workspace-scoped optimistic job for immediate panel visibility', () => {
+    const optimistic = createOptimisticBackgroundJob(
+      'job-audit-1',
+      BACKGROUND_JOB_TYPES.SEO_AUDIT,
+      { workspaceId: 'ws-1' },
+    );
+
+    expect(optimistic).toMatchObject({
+      id: 'job-audit-1',
+      type: BACKGROUND_JOB_TYPES.SEO_AUDIT,
+      status: 'pending',
+      progress: 0,
+      message: 'Starting SEO Audit...',
+      workspaceId: 'ws-1',
+    });
+  });
+
+  it('upserts websocket or hydrated job updates without losing local entries', () => {
+    const initial = job({ id: 'job-audit-1', type: BACKGROUND_JOB_TYPES.SEO_AUDIT, status: 'pending', workspaceId: 'ws-1' });
+    const updated = job({ id: 'job-audit-1', type: BACKGROUND_JOB_TYPES.SEO_AUDIT, status: 'running', message: 'Scanning pages...', workspaceId: 'ws-1' });
+    const other = job({ id: 'job-other', type: BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR, status: 'running', workspaceId: 'ws-1' });
+
+    expect(upsertBackgroundJob([], initial)).toEqual([initial]);
+    expect(upsertBackgroundJob([initial, other], updated)).toEqual([
+      { ...initial, ...updated },
+      other,
+    ]);
   });
 });

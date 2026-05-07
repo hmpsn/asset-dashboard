@@ -13,6 +13,8 @@ import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
 import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
  *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
@@ -21,6 +23,7 @@ type BriefRoute = typeof BRIEF_ROUTES[number];
 
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
   const postsQ = useAdminPostsList(workspaceId);
@@ -259,7 +262,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const handleGeneratePost = async (briefId: string): Promise<boolean> => {
     setGeneratingPostFor(briefId);
     try {
-      const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      if (skeleton.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
+      }
       queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
       return true;

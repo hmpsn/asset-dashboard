@@ -14,6 +14,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor, usePageJoin } from '../hooks/admin';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import {
   filterWritableItems,
   filterWritableIds,
@@ -44,7 +45,7 @@ interface Props {
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
-  const { cancelJob } = useBackgroundTasks();
+  const { cancelJob, trackJob } = useBackgroundTasks();
   const { toast } = useToast();
   
   // React Query hook replaces manual data fetching
@@ -498,6 +499,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
         })),
       });
+      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId });
       setBulkAnalyzeJobId(jobId);
     } catch (err) {
       console.error('Failed to start bulk analyze:', err);
@@ -632,6 +634,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         }),
         field,
       });
+      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId });
       setBulkRewriteJobId(jobId);
     } catch (err) {
       console.error('Failed to start bulk rewrite:', err);
