@@ -5,7 +5,7 @@ import {
   Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
 } from 'lucide-react';
 import type { FixContext } from '../App';
-import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
+import { seoSuggestions, seoBulkJobs } from '../api/seo';
 import { workspaces, jobs } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -40,9 +40,9 @@ import {
   buildPatternPreviewItems,
 } from './editor/seoEditorBulkHelpers';
 import { useSeoEditorApprovalWorkflow } from './editor/useSeoEditorApprovalWorkflow';
+import { useSeoEditorPageWorkflow } from './editor/useSeoEditorPageWorkflow';
 import {
   buildSeoEditsFromPages,
-  getSeoDraftKey,
   persistCachedExpandedPages,
   persistCachedSeoBulkAnalyzeJobId,
   persistCachedSeoBulkRewriteJobId,
@@ -101,11 +101,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     return readCachedExpandedPages(siteId);
   });
-  const [saving, setSaving] = useState<Set<string>>(new Set());
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [draftSaving, setDraftSaving] = useState<Set<string>>(new Set());
-  const [draftSaved, setDraftSaved] = useState<Set<string>>(new Set());
-  const [aiLoading, setAiLoading] = useState<Record<string, string>>({});
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [bulkFixing, setBulkFixing] = useState(false);
@@ -115,9 +110,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
     return readCachedSeoVariations(siteId);
   });
-  const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-  const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
     return readCachedSeoBulkAnalyzeJobId(workspaceId);
@@ -281,186 +274,30 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     [edits],
   );
 
-  const updateField = (pageId: string, field: keyof SeoEditState, value: string) => {
-    setEdits(prev => ({
-      ...prev,
-      [pageId]: { ...prev[pageId], [field]: value, dirty: true },
-    }));
-  };
-
-  const saveDraft = async (pageId: string) => {
-    const edit = edits[pageId];
-    if (!edit) return;
-    setDraftSaving(prev => new Set(prev).add(pageId));
-    
-    try {
-      // Save to local storage as draft
-      const draftKey = getSeoDraftKey(workspaceId, pageId);
-      const draftData = {
-        seoTitle: edit.seoTitle,
-        seoDescription: edit.seoDescription,
-        savedAt: new Date().toISOString(),
-        pageId,
-        pageSlug: pages.find(p => p.id === pageId)?.slug || '',
-      };
-      localStorage.setItem(draftKey, JSON.stringify(draftData));
-      
-      // Mark as draft saved but keep dirty flag (since not published to Webflow)
-      setDraftSaved(prev => new Set(prev).add(pageId));
-      setTimeout(() => setDraftSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
-    } catch (err) {
-      console.error('Draft save failed:', err);
-      setErrorStates(prev => ({ 
-        ...prev, 
-        [pageId]: { 
-          type: 'validation', 
-          message: 'Failed to save draft locally' 
-        } 
-      }));
-      setTimeout(() => {
-        setErrorStates(prev => { const n = { ...prev }; delete n[pageId]; return n; });
-      }, 5000);
-    } finally {
-      setDraftSaving(prev => { const n = new Set(prev); n.delete(pageId); return n; });
-    }
-  };
-
-  const savePage = async (pageId: string) => {
-    const edit = edits[pageId];
-    if (!edit) return;
-    setSaving(prev => new Set(prev).add(pageId));
-    try {
-      const data = await put<{ success?: boolean; error?: string }>(`/api/webflow/pages/${pageId}/seo`, {
-        siteId,
-        workspaceId,
-        seo: { title: edit.seoTitle, description: edit.seoDescription },
-        openGraph: { title: edit.seoTitle, description: edit.seoDescription },
-      });
-      if (data.success === false) {
-        console.error('Save failed:', data.error);
-        setErrorStates(prev => ({ 
-          ...prev, 
-          [pageId]: { 
-            type: 'validation', 
-            message: `Failed to save SEO: ${data.error || 'Unknown error'}` 
-          } 
-        }));
-        setTimeout(() => {
-          setErrorStates(prev => { 
-            const next = { ...prev }; 
-            delete next[pageId]; 
-            return next; 
-          });
-        }, 5000);
-        return;
-      }
-      setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
-      setSaved(prev => new Set(prev).add(pageId));
-      // Refresh page edit states to reflect the new 'live' status
-      refreshStates();
-      // Invalidate audit cache so the audit reflects updated SEO status
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
-      setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
-    } catch (err) {
-      console.error('Save failed:', err);
-      setErrorStates(prev => ({ 
-        ...prev, 
-        [pageId]: { 
-          type: 'network', 
-          message: 'Network error saving SEO fields. Please check your connection and try again.' 
-        } 
-      }));
-      setTimeout(() => {
-        setErrorStates(prev => { 
-          const next = { ...prev }; 
-          delete next[pageId]; 
-          return next; 
-        });
-      }, 5000);
-    } finally {
-      setSaving(prev => { const n = new Set(prev); n.delete(pageId); return n; });
-    }
-  };
-
-  const aiRewrite = async (pageId: string, field: 'title' | 'description' | 'both') => {
-    const page = pages.find(p => p.id === pageId);
-    if (!page) return;
-    const edit = edits[pageId];
-    setAiLoading(prev => ({ ...prev, [pageId]: field }));
-    try {
-      const data = await post<{
-        text?: string;
-        field: string;
-        variations?: string[];
-        pairs?: Array<{ title: string; description: string }>;
-        titleVariations?: string[];
-        descriptionVariations?: string[];
-      }>('/api/webflow/seo-rewrite', {
-        pageTitle: page.title,
-        currentSeoTitle: edit?.seoTitle || page.seo?.title,
-        currentDescription: edit?.seoDescription || page.seo?.description,
-        field,
-        workspaceId,
-        pagePath: resolvePagePath(page),
-      });
-
-      if (field === 'both' && data.pairs && data.pairs.length > 0) {
-        // Paired mode — show variation picker without overwriting current values
-        setVariations(prev => ({
-          ...prev,
-          [pageId]: { field: 'both', options: data.pairs!.map(p => p.title), descOptions: data.pairs!.map(p => p.description) },
-        }));
-      } else if (data.variations && data.variations.length > 1) {
-        // Show variation picker without overwriting current values
-        setVariations(prev => ({ ...prev, [pageId]: { field, options: data.variations! } }));
-      } else if (data.text) {
-        // Single result (no picker) — apply directly
-        const key = field === 'title' ? 'seoTitle' : 'seoDescription';
-        updateField(pageId, key, data.text);
-      }
-    } catch (err) {
-      console.error('AI rewrite failed:', err);
-    } finally {
-      setAiLoading(prev => { const n = { ...prev }; delete n[pageId]; return n; });
-    }
-  };
-
-
-  const analyzePage = async (pageId: string) => {
-    const page = pages.find(p => p.id === pageId);
-    if (!page || !workspaceId) return;
-    const edit = edits[pageId];
-
-    setAnalyzing(prev => new Set(prev).add(pageId));
-    try {
-      // Step 1: Run keyword analysis
-      const analysis = await keywords.analyze({
-        pageTitle: page.title,
-        seoTitle: edit?.seoTitle || page.seo?.title || '',
-        metaDescription: edit?.seoDescription || page.seo?.description || '',
-        slug: resolvePagePath(page),
-        workspaceId,
-      }) as Record<string, unknown>;
-
-      if (analysis && !analysis.error) {
-        // Step 2: Persist analysis to workspace keyword strategy
-        await keywords.persistAnalysis({
-          workspaceId,
-          pagePath: resolvePagePath(page),
-          analysis,
-        });
-
-        // Instant feedback: mark page as analyzed locally before async refetch completes
-        setLocalAnalyzedPages(prev => new Set(prev).add(pageId));
-        // Refresh strategy query so UI updates; analyzedPages overlay will persist until refetch
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
-      }
-    } catch (err) {
-      console.error('Page analysis failed:', err);
-    } finally {
-      setAnalyzing(prev => { const n = new Set(prev); n.delete(pageId); return n; });
-    }
-  };
+  const {
+    saving,
+    saved,
+    draftSaving,
+    draftSaved,
+    aiLoading,
+    errorStates,
+    analyzing,
+    updateField,
+    saveDraft,
+    savePage,
+    aiRewrite,
+    analyzePage,
+  } = useSeoEditorPageWorkflow({
+    siteId,
+    workspaceId,
+    pages,
+    edits,
+    setEdits,
+    setVariations,
+    queryClient,
+    refreshStates,
+    setLocalAnalyzedPages,
+  });
 
   const analyzeAllPages = async () => {
     if (!workspaceId) return;

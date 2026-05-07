@@ -4748,3 +4748,19 @@ Bug sniffing fix included: select-all logic now checks whether all filtered IDs 
 **Mutual:** Creates the next stable extraction seam while tightening behavior around filtered multi-select approval actions.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorApprovalWorkflow.ts`; `tests/unit/seo-editor-approval-workflow.test.ts`; `tests/contract/seo-editor-approval-extraction.test.ts`; `data/roadmap.json`.
+
+### 367. Platform Consolidation — SeoEditor Page Workflow Hook Extraction (Phase 6)
+**What it does:** Continues SeoEditor decomposition by extracting per-page edit workflow orchestration from `SeoEditor.tsx` into `src/components/editor/useSeoEditorPageWorkflow.ts`. The new hook now owns:
+- per-page loading/status/error state for draft save, page save, AI rewrite, and analyze actions
+- page-level field mutation helper (`updateField`)
+- page-level workflow handlers (`saveDraft`, `savePage`, `aiRewrite`, `analyzePage`)
+
+`SeoEditor.tsx` now delegates page workflow concerns to the hook and keeps section composition, bulk operations, and approval orchestration in the parent shell.
+
+**Agency value:** Reduces a high-churn, side-effect-heavy section of the monolith and makes page workflow behavior easier to inspect and evolve without touching bulk/approval code paths.
+
+**Client value:** No behavior/UI contract changes; page-level save/draft/rewrite/analyze actions keep the same UX and side effects.
+
+**Mutual:** Establishes another clean seam for future SeoEditor shell reduction while preserving current route/API contracts.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorPageWorkflow.ts`; `tests/contract/seo-editor-page-workflow-extraction.test.ts`; `data/roadmap.json`.
