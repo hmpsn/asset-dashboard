@@ -104,7 +104,7 @@ function buildBrandContext(workspaceId: string): string {
   //
   // IMPORTANT: samplesText is DELIBERATELY dropped here — `buildIntelPrompt(['seoContext'])`
   // in `generateDeliverable` (below) already emits a VOICE SAMPLES block via
-  // `buildVoiceProfileContext` in seo-context.ts, which runs for every status including
+  // the SEO context intelligence source, which runs for every status including
   // calibrated. Pushing samplesText a second time would duplicate every sample in the
   // prompt, burning tokens and over-weighting the sample distribution. See PR #168
   // scaled-review finding I4.

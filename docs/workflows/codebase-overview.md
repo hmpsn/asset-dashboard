@@ -30,7 +30,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/index.ts` | Thin startup entry: runs SQLite migrations, creates HTTP server, wires WebSocket (`initWebSocket`), starts schedulers, handles graceful shutdown |
 | `server/ai.ts` | Unified AI dispatcher `callAI()` — routes to OpenAI or Anthropic via `provider` option |
 | `server/workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types, `seoEditTracking` (per-page edit status) |
-| `server/seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()`, `RICH_BLOCKS_PROMPT` — shared AI prompt builders + multi-modal chat instructions |
+| `server/intelligence/seo-context-slice.ts` | Workspace intelligence `seoContext` slice assembly: keyword strategy, page map, knowledge base, personas, and effective brand voice |
+| `server/intelligence/seo-context-source.ts` | Internal SEO context source reads: raw brand docs, knowledge docs, and voice-profile authority fallback |
+| `server/prompt-rich-blocks.ts` | `RICH_BLOCKS_PROMPT` — shared multi-modal chat instructions |
 | `server/chat-memory.ts` | Chat session persistence, `addMessage`, `buildConversationContext`, `generateSessionSummary` |
 | `server/activity-log.ts` | Activity logging, `addActivity`, `ActivityType` union (includes `anomaly_detected`, `anomaly_positive`) |
 | `server/anomaly-detection.ts` | AI anomaly detection: compares current vs previous 28-day period for GSC, GA4, audit. Configurable thresholds. AI summaries via gpt-5.4-mini. Scheduler (12h) + manual trigger. File storage in `.anomalies.json` |
@@ -122,7 +124,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 ## Data Flow Patterns
 
 1. **Cached helpers**: `getAuditTrafficForWorkspace` caches GSC+GA4 traffic per workspace for 5 min
-2. **Shared context builders**: `buildSeoContext`, `buildKeywordMapContext`, `buildKnowledgeBase` in `seo-context.ts` — used by chat, briefs, schema
+2. **Shared context assembly**: `buildWorkspaceIntelligence(...)` + `formatForPrompt(...)`/`buildIntelPrompt(...)` in `workspace-intelligence.ts` — used by chat, briefs, schema
 3. **Activity logging**: `addActivity(workspaceId, type, title, detail)` — all major actions logged
 4. **Chat memory**: `addMessage` → `buildConversationContext` → `generateSessionSummary` (auto after 6+ msgs)
 8. **Content performance** (#31): `handleContentPerformance(wsId)` batch-fetches GSC pages + GA4 landing pages (2 API calls), cross-references with delivered/published content requests. Per-post trend via `getPageTrend()`. Endpoints: `/api/content-performance/:wsId` (admin+public), `/api/content-performance/:wsId/:requestId/trend`
@@ -133,7 +135,7 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 10. **Anomaly detection** (#33): `anomaly-detection.ts` compares current vs previous 28-day GSC (clicks, impressions, CTR, position) + GA4 (users, sessions, bounce, conversions) + audit score snapshots. Configurable thresholds, dedup, AI summaries. Scheduled every 12h. API: `/api/anomalies[/:workspaceId]` (list), `/api/anomalies/:id/dismiss`, `/api/anomalies/:id/acknowledge`, `/api/anomalies/scan` (trigger). Public: `/api/public/anomalies/:workspaceId`
 11. **WebSocket real-time updates** (#139): `broadcastToWorkspace(wsId, event, data)` sends scoped events to subscribed clients. Broadcast callbacks: `initActivityBroadcast` (auto on every `addActivity`), `initAnomalyBroadcast` (on new anomalies), `initStripeBroadcast` (tier upgrades via Stripe). Frontend: `useWorkspaceEvents(wsId, handlers)` hook. Events: `activity:new`, `approval:update`, `approval:applied`, `request:created/update`, `content-request:created/update`, `audit:complete`, `anomalies:update`, `workspace:updated`. The `workspace:updated` event fires on admin workspace edits (tier, settings, feature toggles) and Stripe tier upgrades — client dashboard refetches `/api/public/workspace/:id` on receipt. **Rule**: Every write endpoint exists in both admin (`/api/...`) and client (`/api/public/...`) — both must call `broadcastToWorkspace` with the same event name or the other side won't update in real-time. See `wiring-patterns.md` §11 for checklist.
 12. **Email notifications for anomalies**: `notifyAnomalyAlert()` in `email.ts` — admin gets all critical+warning anomalies, client gets critical-only. Uses queue-based email system with branded `anomaly_alert` template (severity badges, AI summary banner)
-13. **Multi-modal chat** (#22): `RICH_BLOCKS_PROMPT` in `seo-context.ts` teaches AI to emit fenced code blocks (`metric`, `chart`, `datatable`, `sparkline`) with JSON payloads. `RenderMarkdown` in `helpers.tsx` parses these and renders `ChatBlocks.tsx` components. Injected into all 3 chat system prompts.
+13. **Multi-modal chat** (#22): `RICH_BLOCKS_PROMPT` in `prompt-rich-blocks.ts` teaches AI to emit fenced code blocks (`metric`, `chart`, `datatable`, `sparkline`) with JSON payloads. `RenderMarkdown` in `helpers.tsx` parses these and renders `ChatBlocks.tsx` components. Injected into all 3 chat system prompts.
 14. **Admin UX overhaul** (#160-165):
     - **Collapsible sidebar groups** (#160): `App.tsx` — `navGroups` with `collapsedGroups` state (localStorage-persisted Set), `toggleGroup` callback, auto-expand on tab change, badge aggregation on collapsed groups, `ChevronRight` rotation indicator.
     - **Command center enhancements** (#161): `WorkspaceOverview.tsx` — fetches `/api/anomalies`, anomaly aggregation per workspace, priority-sorted attention items (anomalies > requests > approvals > content > work orders > rejected > health > setup), workspace card anomaly badges (red/amber), dynamic features-shipped count.

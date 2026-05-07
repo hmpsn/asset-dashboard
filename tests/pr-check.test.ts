@@ -1908,15 +1908,15 @@ describe('Rule: Admin mutation on client_users missing expectedWorkspaceId param
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)
+// Rule: Bare brand-engine read in seo-context source (use safeBrandEngineRead)
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)', () => {
-  const RULE = 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)';
+describe('Rule: Bare brand-engine read in seo-context source (use safeBrandEngineRead)', () => {
+  const RULE = 'Bare brand-engine read in seo-context source (use safeBrandEngineRead)';
 
   it('flags a bare getVoiceProfile() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",              // 1
         "export function build(ws: string) {",                               // 2
@@ -1933,7 +1933,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('flags a bare listBrandscripts() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { listBrandscripts } from './brandscript.js';",
         "export function build(ws: string) {",
@@ -1949,7 +1949,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('flags a bare listDeliverables() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { listDeliverables } from './brand-identity.js';",
         "export function build(ws: string) {",
@@ -1965,7 +1965,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('respects inline // safe-read-ok hatch on the call line', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -1979,7 +1979,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('respects // safe-read-ok hatch on the line immediately above the call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -1994,7 +1994,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('does not flag a call wrapped in safeBrandEngineRead on the same line', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -2011,7 +2011,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
     // mentions the function with parens for readability; the rule's JSDoc
     // skip (`^\s*\*`) ensures this is not a false positive.
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "/**",
         " * Build the SEO context.",
@@ -2027,7 +2027,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('does not flag line comments that reference the function name with parens', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "export function build(ws: string) {",
         "  // NOTE: listDeliverables(ws) wrapped below for test-env schema guard",
@@ -2038,7 +2038,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not flag functions in files other than server/seo-context.ts', () => {
+  it('does not flag functions in files other than server/intelligence/seo-context-source.ts', () => {
     // Route handlers that call these directly are fine — errors at the
     // request boundary become 500s and surface loudly.
     const file = write(
@@ -2508,15 +2508,14 @@ describe('Rule: TabBar component without ?tab= deep-link support', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: seo-context.ts import restriction (deprecated module)
+// Rule: seo-context.ts import restriction (retired module)
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Prevents new imports of the deprecated seo-context.ts module. Existing
-// callers are grandfathered via the exclude list. New code must use
+// Prevents production imports of the retired seo-context.ts module. New code must use
 // buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts.
 
-describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
-  const RULE = 'seo-context.ts import restriction (deprecated module)';
+describe('Rule: seo-context.ts import restriction (retired module)', () => {
+  const RULE = 'seo-context.ts import restriction (retired module)';
 
   it('flags a single-quoted import of seo-context', () => {
     const file = write(
@@ -2544,7 +2543,7 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
     expect(hits[0].line).toBe(1);
   });
 
-  it('respects inline // seo-context-ok hatch on the import line', () => {
+  it('does not allow inline hatches for retired seo-context imports', () => {
     const file = write(
       uniqPath('rule-seo-context', 'server/grandfathered-inline.ts'),
       lines(
@@ -2553,20 +2552,19 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
       )
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(0);
+    expect(hits).toHaveLength(1);
   });
 
-  it('respects // seo-context-ok on the preceding line', () => {
+  it('flags dynamic imports from the old bridge path', () => {
     const file = write(
-      uniqPath('rule-seo-context', 'server/grandfathered-above.ts'),
+      uniqPath('rule-seo-context', 'server/intelligence/seo-context-slice.ts'),
       lines(
-        "// seo-context-ok — grandfathered caller awaiting migration",  // 1
-        "import { buildSeoContext } from './seo-context.js';",          // 2
-        "export function doStuff() { return buildSeoContext(); }",      // 3
+        "const { buildSeoContext } = await import('../seo-context.js');",
+        "export function bridge() { return buildSeoContext('ws1'); }",
       )
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(0);
+    expect(hits).toHaveLength(1);
   });
 
   it('does not flag files that do not import seo-context', () => {
@@ -2575,18 +2573,6 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
       lines(
         "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",  // 1
         "export function doStuff() { return buildWorkspaceIntelligence('ws1'); }",    // 2
-      )
-    );
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(0);
-  });
-
-  it('allows the workspace intelligence SEO context slice to bridge the deprecated builder', () => {
-    const file = write(
-      uniqPath('rule-seo-context', 'server/intelligence/seo-context-slice.ts'),
-      lines(
-        "const { buildSeoContext } = await import('../seo-context.js');",
-        "export function bridge() { return buildSeoContext('ws1'); }",
       )
     );
     const hits = runRule(RULE, [file]);
@@ -4573,13 +4559,13 @@ describe('Meta: customCheck rule name registry', () => {
     'Constants in sync (STUDIO_NAME, STUDIO_URL)',
     // PR #168 scaled-review follow-ups
     'Admin mutation on client_users missing expectedWorkspaceId param',
-    'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
+    'Bare brand-engine read in seo-context source (use safeBrandEngineRead)',
     // 2026-04-11 test audit follow-up
     'Test body has no assertion or explicit failure throw',
     // PR 2 deep-link guard
     'TabBar component without ?tab= deep-link support',
     // IG-4 seo-context deprecation
-    'seo-context.ts import restriction (deprecated module)',
+    'seo-context.ts import restriction (retired module)',
     // P0 expansion rules
     'requireAuth usage outside allowed route files',
     'Duplicate globally-applied rate limiter in route file',
@@ -6543,8 +6529,8 @@ describe('Rule: styleguide-typography-parity', () => {
 //
 // Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
 // fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch,
-// siteId) and lines with `// schema-context-direct-read-ok` hatches (inline
-// or on the line immediately above).
+// siteId), and supporting legacy hatches for non-identity reads except migrated
+// forbidden fields (`ws.brandVoice`, `ws.keywordStrategy`, `ws.businessProfile`).
 //
 // The fixture files are placed at a path ending in `server/helpers.ts` so
 // the rule's `file.endsWith('server/helpers.ts')` guard accepts them.
@@ -6630,5 +6616,35 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
+  });
+
+  it('flags migrated-forbidden ws.brandVoice even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-brandvoice'),
+      '  ctx.brandVoice = ws.brandVoice; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.brandVoice');
+  });
+
+  it('flags migrated-forbidden ws.keywordStrategy path even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-keywordstrategy'),
+      '  ctx.businessContext = ws.keywordStrategy?.businessContext; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.keywordStrategy');
+  });
+
+  it('flags migrated-forbidden ws.businessProfile even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-businessprofile'),
+      '  ctx._businessProfile = ws.businessProfile; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.businessProfile');
   });
 });

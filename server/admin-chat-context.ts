@@ -29,7 +29,7 @@ import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown,
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, findPageMapEntryByIdentity, getAuditTrafficForWorkspace, resolvePagePath, normalizePageUrl, normalizePath } from './helpers.js';
-import { RICH_BLOCKS_PROMPT } from './seo-context.js';
+import { RICH_BLOCKS_PROMPT } from './prompt-rich-blocks.js';
 import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';

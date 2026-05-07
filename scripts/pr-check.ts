@@ -975,7 +975,7 @@ export const CHECKS: Check[] = [
     // Do-not-reintroduce rule. `formatBrandVoiceForPrompt` was deleted in PR #168
     // because it bypassed voice-profile authority: any caller that grabbed the
     // helper and wrapped the raw `seo?.brandVoice` field silently dropped the
-    // calibrated DNA/samples/guardrails layers that `buildSeoContext` applies
+    // calibrated DNA/samples/guardrails layers that the SEO context source applies
     // via `effectiveBrandVoiceBlock`. The TypeScript signature didn't change
     // when voice profiles were added, so the compiler couldn't catch the bypass
     // — that's why we mechanize the ban here. See CLAUDE.md
@@ -992,7 +992,7 @@ export const CHECKS: Check[] = [
       '.codesight/',
       'scripts/pr-check.ts', // this rule itself references the name
     ],
-    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by buildSeoContext with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by the SEO context source with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
     severity: 'error',
     rationale: 'A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`.',
     claudeMdRef: '#code-conventions',
@@ -1179,8 +1179,8 @@ export const CHECKS: Check[] = [
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/intelligence/seo-context-slice.ts'],
-    message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
+    exclude: [],
+    message: 'buildSeoContext() was retired. Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) or the owned intelligence source/formatter APIs.',
     severity: 'error',
   },
   {
@@ -2492,8 +2492,7 @@ export const CHECKS: Check[] = [
     // the legacy `workspace.brandVoice` + brand-docs block — must go through
     // the `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` helper.
     // PR #168 commit 3c8a6cd factored the helper out of three inline call
-    // sites (`buildSeoContext` no-strategy branch, with-strategy branch, and
-    // the shadow-mode parity check). The shadow-mode copy had drifted,
+    // sites in the old builder. The shadow-mode copy had drifted,
     // missing the `hasExplicitConfig` gate, so draft profiles with voice
     // samples but no saved DNA/guardrails were incorrectly treated as
     // authoritative — silently hiding the legacy brand voice from the
@@ -2506,14 +2505,13 @@ export const CHECKS: Check[] = [
     // go through the helper instead. The only legitimate site is the helper
     // body itself (line 115), which is hatched inline with `// voice-authority-ok`.
     //
-    // Scope: server/seo-context.ts ONLY. Other files don't render a
-    // `voiceProfileBlock` — if this name appears elsewhere in the future it
-    // should also route through the helper.
+    // Scope: server/intelligence/seo-context-source.ts ONLY. This is the
+    // owned module that renders a `voiceProfileBlock`.
     name: 'Inline voice-profile authority check (use isVoiceProfileAuthoritative helper)',
     pattern: 'voiceProfileBlock\\.length',
-    fileGlobs: ['seo-context.ts'],
-    pathFilter: 'server/',
-    displayScope: 'server/seo-context.ts',
+    fileGlobs: ['seo-context-source.ts'],
+    pathFilter: 'server/intelligence/',
+    displayScope: 'server/intelligence/seo-context-source.ts',
     excludeLines: ['// voice-authority-ok'],
     message: 'Do not inline `voiceProfileBlock.length > 0` authority checks. Call `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` — the helper encodes the full calibration + hasExplicitConfig decision so every call site stays in sync. Suppress with // voice-authority-ok only inside the helper definition itself.',
     severity: 'error',
@@ -2523,13 +2521,13 @@ export const CHECKS: Check[] = [
   {
     // Added post-PR #168 scaled-review cleanup (2026-04-11).
     //
-    // Brand-engine reader calls from inside `server/seo-context.ts` must be
+    // Brand-engine reader calls from inside `server/intelligence/seo-context-source.ts` must be
     // wrapped in `safeBrandEngineRead<T>(context, workspaceId, fn, fallback)`.
     // In production the `voice_profiles`, `brandscripts`, and
     // `brand_identity_deliverables` tables always exist because migrations
     // run at startup, but test environments may skip migrations entirely
     // and a missing table throws from `db.prepare()` inside the stmt-cache
-    // initializer — crashing the entire `buildSeoContext` call tree.
+    // initializer — crashing the entire seoContext slice assembly path.
     //
     // The wrapper narrowly swallows `no such table|column` errors (the
     // specific test-env scenario) and re-throws everything else so
@@ -2539,32 +2537,32 @@ export const CHECKS: Check[] = [
     // working in production" — the exact silent-failure class this
     // codebase is trying to eliminate.
     //
-    // Scope: server/seo-context.ts ONLY. Route handlers that call these
+    // Scope: server/intelligence/seo-context-source.ts ONLY. Route handlers that call these
     // functions directly are fine — errors at the request boundary become
     // 500s, which are loud and visible.
     //
     // Functions enforced: `getVoiceProfile`, `listBrandscripts`,
     // `listDeliverables`. Add to the customCheck's `targetFns` set if a new
     // brand-engine reader is introduced with the same schema-missing risk.
-    name: 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
-    fileGlobs: ['seo-context.ts'],
-    pathFilter: 'server/',
-    displayScope: 'server/seo-context.ts',
+    name: 'Bare brand-engine read in seo-context source (use safeBrandEngineRead)',
+    fileGlobs: ['seo-context-source.ts'],
+    pathFilter: 'server/intelligence/',
+    displayScope: 'server/intelligence/seo-context-source.ts',
     // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
     // '// safe-read-ok')` — this `excludeLines` entry is a no-op at runtime
     // but drives the `Escape hatch` column of docs/rules/automated-rules.md
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// safe-read-ok'],
-    message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing buildSeoContext. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
+    message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing seoContext slice assembly. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
     severity: 'error',
-    rationale: 'A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation.',
+    rationale: 'A missing brand-engine table in a non-production env crashes seoContext slice assembly, and an unnarrowed catch would hide real programming bugs as silent degradation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       const targetFns = /\b(getVoiceProfile|listBrandscripts|listDeliverables)\s*\(/;
       for (const file of files) {
-        if (path.basename(file) !== 'seo-context.ts') continue;
-        if (!file.includes(`server${path.sep}seo-context.ts`) && !file.includes('server/seo-context.ts')) continue;
+        if (path.basename(file) !== 'seo-context-source.ts') continue;
+        if (!file.includes(`server${path.sep}intelligence${path.sep}seo-context-source.ts`) && !file.includes('server/intelligence/seo-context-source.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -2872,66 +2870,25 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'seo-context.ts import restriction (deprecated module)',
+    name: 'seo-context.ts import restriction (retired module)',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'server/',
-    // Existing callers that are already imported — these are grandfathered until migrated.
-    // seo-context.ts itself and workspace-intelligence.ts (shadow-mode comparison) are allowed.
-    exclude: [
-      'server/seo-context.ts',
-      'server/workspace-intelligence.ts',
-      'server/intelligence/seo-context-slice.ts',
-      'server/prompt-assembly.ts',
-      'server/admin-chat-context.ts',
-      'server/helpers.ts',
-      'server/copy-review.ts',
-      'server/internal-links.ts',
-      'server/aeo-page-review.ts',
-      'server/deep-diagnostic.ts',
-      'server/schema-generator.ts',
-      'server/content-brief.ts',
-      'server/routes/ai-chat.ts',
-      'server/routes/content-generation.ts',
-      'server/routes/seo-audit.ts',
-      'server/routes/schema-generator.ts',
-      'server/routes/content-matrix.ts',
-      'server/routes/aeo-review.ts',
-      'server/routes/copy-generation.ts',
-      'server/routes/page-strategy.ts',
-      'server/routes/content-brief.ts',
-      'server/routes/ai-rewrite.ts',
-      'server/routes/internal-links.ts',
-      'server/routes/diagnostics.ts',
-      'server/routes/public-analytics.ts',
-      'server/routes/workspaces.ts',
-      'server/routes/voice-calibration.ts',
-      'server/routes/discovery-ingestion.ts',
-      'server/routes/google.ts',
-      'server/routes/webflow-keywords.ts',
-      'server/routes/copy-pipeline.ts',
-      'server/routes/brandscript.ts',
-      'server/routes/brand-identity.ts',
-      'server/routes/jobs.ts',
-      'server/routes/public-portal.ts',
-      'server/routes/keyword-strategy.ts',
-      'tests/',
-    ],
-    excludeLines: ['// seo-context-ok'],
-    message: 'seo-context.ts is deprecated — use buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts instead. Add // seo-context-ok on the import line if this is a grandfathered caller awaiting migration.',
+    exclude: ['tests/'],
+    message: 'seo-context.ts was retired — production server code must use workspace-intelligence.ts, prompt-rich-blocks.ts, or server/intelligence/* owned modules instead.',
     severity: 'error',
-    rationale: 'seo-context.ts is being retired in favor of the unified workspace intelligence system. New callers must use the intelligence assembler.',
+    rationale: 'seo-context.ts has been retired in favor of the unified workspace intelligence system. Keeping bridge imports would silently revive the deprecated cache and authority path.',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const importRe = /from\s+['"][^'"]*seo-context/;
+      const importRe = /(?:from\s+['"][^'"]*seo-context(?:\.js)?['"]|import\s*\(\s*['"][^'"]*seo-context(?:\.js)?['"])/;
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.includes(`${path.sep}tests${path.sep}`) || file.includes('/tests/')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!importRe.test(lines[i])) continue;
-          if (hasHatch(lines, i, '// seo-context-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i] });
         }
       }
@@ -4945,12 +4902,14 @@ export const CHECKS: Check[] = [
     // Identity fields are allowed freely: ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl,
     // ws.siteHasSearch, siteId — these are cheap, stable, and not on any slice.
     //
-    // Legacy direct reads (brandVoice, businessContext, knowledgeBase, personas,
-    // businessProfile) have been grandfathered in with `// schema-context-direct-read-ok`
-    // hatches and are tracked for opportunistic Pattern B migration.
+    // Legacy direct reads for migrated fields are now forbidden:
+    //   - ws.brandVoice
+    //   - ws.keywordStrategy (businessContext path)
+    //   - ws.businessProfile
+    // These may NOT be bypassed with schema-context hatches.
     //
-    // Escape hatch: add `// schema-context-direct-read-ok: <reason>` on the flagged line
-    // or the line immediately above for justified exceptions.
+    // Escape hatch: `// schema-context-direct-read-ok: <reason>` still works for
+    // justified non-identity reads, except for the migrated-forbidden fields above.
     name: 'schema-context-direct-read-not-on-allowlist',
     pattern: '',
     fileGlobs: ['*.ts'],
@@ -4973,6 +4932,11 @@ export const CHECKS: Check[] = [
         'ws.brandLogoUrl',
         'ws.siteHasSearch',
         'siteId',
+      ]);
+      const SCHEMA_CONTEXT_MIGRATED_FORBIDDEN = new Set([
+        'ws.brandVoice',
+        'ws.keywordStrategy',
+        'ws.businessProfile',
       ]);
       const hits: CustomCheckMatch[] = [];
       for (const file of files) {
@@ -5047,21 +5011,25 @@ export const CHECKS: Check[] = [
         for (let i = bodyStart + 1; i < funcEnd; i++) {
           const line = lines[i];
 
-          // Skip lines with the inline hatch (same line or line above).
-          if (hasHatch(lines, i, '// schema-context-direct-read-ok')) continue;
-
           // Pattern: assignment to ctx.X or local const that reads ws.Y or
-          // calls a helper that does direct DB/ws reads (getRawKnowledge,
-          // buildPersonasContext, getInsights, listSites, listSitesCached).
+          // calls a helper that does direct DB/ws reads (getInsights,
+          // listSites, listSitesCached).
           // ws.\w+ matches the first segment — ws.keywordStrategy?.businessContext
           // is flagged via ws.keywordStrategy (which is not in the allow-list).
           const m = line.match(
-            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getRawKnowledge|buildPersonasContext|getInsights|listSites\b|listSitesCached)\b/,
+            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/,
           );
           if (!m) continue;
 
           const rhs = m[1];
+          // Migrated fields are hard-forbidden direct reads (no hatch).
+          if (SCHEMA_CONTEXT_MIGRATED_FORBIDDEN.has(rhs)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+            continue;
+          }
           if (SCHEMA_CONTEXT_ALLOWLIST.has(rhs)) continue;
+          // Skip lines with the inline hatch (same line or line above).
+          if (hasHatch(lines, i, '// schema-context-direct-read-ok')) continue;
 
           hits.push({ file, line: i + 1, text: line.trim() });
         }
@@ -5373,7 +5341,7 @@ const manualChecks = [
   'BRAND_DESIGN_LANGUAGE.md updated if UI changed',
   'Feature flag added if this is a multi-phase feature',
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
-  'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
+  'No production server imports from retired seo-context.ts (run pr-check and grep for seo-context.js)',
   'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
   'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
   'AI-generating endpoints (callCreativeAI/callOpenAI → db write): existence check + INSERT/UPDATE inside db.transaction() — not just the write, the check too',

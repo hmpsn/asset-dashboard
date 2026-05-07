@@ -9,7 +9,6 @@ import { Router } from 'express';
 const router = Router();
 
 import { addTrackedKeyword } from '../rank-tracking.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
@@ -233,7 +232,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
     upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
-      clearSeoContextCache(ws.id);
       invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
@@ -262,7 +260,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
     } as KeywordStrategy;
     updateWorkspace(ws.id, { keywordStrategy: updated });
   }
-  clearSeoContextCache(ws.id);
   invalidateIntelligenceCache(ws.id);
   // Broadcast strategy update so other surfaces (PageIntelligence, SeoEditor, other tabs)
   // invalidate their React Query caches. Without this, pageMap edits from PageIntelligence

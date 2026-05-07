@@ -12,7 +12,6 @@ import {
   updateExtractionStatus, updateExtractionContent,
   SourceAlreadyProcessedError,
 } from '../discovery-ingestion.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
@@ -183,7 +182,6 @@ router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceA
       `${force ? 'Re-extracted' : 'Extracted'} ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`,
     );
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length, replaced: !!force });
-    clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json({ extractions });
   } catch (err) {

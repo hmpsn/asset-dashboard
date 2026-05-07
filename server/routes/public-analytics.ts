@@ -44,7 +44,7 @@ import {
   fetchSearchTypes,
   fetchSearchComparison,
 } from '../analytics-data.js';
-import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';

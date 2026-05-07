@@ -16,7 +16,6 @@ import {
   upsertPageKeywordsBatch,
 } from './page-keywords.js';
 import { getConfiguredProvider, getProviderDisplayName } from './seo-data-provider.js';
-import { clearSeoContextCache } from './seo-context.js'; // seo-context-ok: page analysis must invalidate legacy SEO context caches after page keyword writes.
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
@@ -385,7 +384,6 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
     addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
     // Bridge #5: bulk page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
       invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');

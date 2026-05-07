@@ -39,7 +39,7 @@ The strategy endpoint has 3 phases where data is injected:
 ## 3. Content Briefs (`generateBrief` in `server/content-brief.ts`)
 
 - Pass data via the `context` parameter object
-- Uses `buildSeoContext()` and `buildKeywordMapContext()` from `seo-context.ts`
+- Uses `buildWorkspaceIntelligence({ slices: ['seoContext', 'pageProfile'] })` plus `formatForPrompt()`/`buildIntelPrompt()` for SEO and page-scoped prompt context
 - SEMRush metrics passed as `context.semrushMetrics` and `context.semrushRelated`
 - **Voice DNA injection (Layer 2)**: Brief generation calls `buildSystemPrompt(workspaceId, systemInstructions)` from `server/prompt-assembly.ts`. When a workspace has a calibrated voice profile, `buildSystemPrompt` automatically injects voice DNA and guardrails into the system message — no manual voice-context injection needed in the brief caller.
 - **Workspace learnings injection**: Brief generation also injects workspace learnings via `getWorkspaceLearnings(workspaceId)`, gated on the `outcome-ai-injection` feature flag. When the flag is enabled, learnings are appended to the system prompt via `formatLearningsForPrompt`.
@@ -136,7 +136,7 @@ To add a new anomaly type:
 
 Chat responses can include rich structured blocks via fenced code blocks:
 
-1. **Prompt**: `RICH_BLOCKS_PROMPT` in `seo-context.ts` — injected into all 3 chat system prompts
+1. **Prompt**: `RICH_BLOCKS_PROMPT` in `prompt-rich-blocks.ts` — injected into all 3 chat system prompts
 2. **Block types**: `metric` (stat cards), `chart` (horizontal bars), `datatable` (tables with CSV), `sparkline` (mini charts)
 3. **Parsing**: `RenderMarkdown` in `helpers.tsx` detects fenced blocks with these language tags, parses JSON payload, renders corresponding `ChatBlocks.tsx` component
 4. **Fallback**: Invalid JSON falls back to standard code block rendering
@@ -145,7 +145,7 @@ Chat responses can include rich structured blocks via fenced code blocks:
 To add a new block type:
 1. Add component in `ChatBlocks.tsx`
 2. Add case in `RenderMarkdown` fenced block parser
-3. Add examples in `RICH_BLOCKS_PROMPT`
+3. Add examples in `server/prompt-rich-blocks.ts`
 
 ## 11. WebSocket Real-Time Broadcasts
 

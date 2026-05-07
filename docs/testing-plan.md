@@ -523,7 +523,7 @@ Every server→client data crossing, ranked by risk tier.
 | `server/email-queue.ts` | Email batching, queue persistence | Stateful queue |
 | `server/chat-memory.ts` | Session persistence, summarization | AI + state |
 | `server/admin-chat-context.ts` | Context assembly, question classification | AI prompt construction |
-| `server/seo-context.ts` | SEO context building | Data assembly |
+| `server/intelligence/seo-context-slice.ts` + `server/intelligence/seo-context-source.ts` | SEO context slice assembly | Data assembly |
 | `server/content-subscriptions.ts` | Subscription management | Billing state machine |
 | `server/roi.ts` | ROI calculation, attribution | Complex computation |
 

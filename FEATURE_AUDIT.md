@@ -4613,3 +4613,16 @@ The migration also fixes touched intelligence bugs: `siteInventory` cache keys n
 **Mutual:** Keeps AI context assembly stable while making future client-facing intelligence additions safer, easier to test, and less likely to lose data silently.
 
 **Files:** `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/seo-context-slice.ts`; `server/intelligence/insights-slice.ts`; `server/intelligence/learnings-slice.ts`; `server/intelligence/content-pipeline-slice.ts`; `server/intelligence/client-signals-slice.ts`; `server/intelligence/operational-slice.ts`; `server/intelligence/site-health-slice.ts`; `server/intelligence/site-inventory-slice.ts`; `server/intelligence/page-profile-slice.ts`; `scripts/pr-check.ts`; `tests/unit/workspace-intelligence.test.ts`; `tests/pr-check.test.ts`.
+
+### 358. Platform Consolidation — SEO Context Builder Retirement
+**What it does:** Retires the deleted `server/seo-context.ts` builder after the workspace intelligence decomposition. Rich chat block prompt instructions now live in `server/prompt-rich-blocks.ts`; raw brand/knowledge document reads and voice authority live in `server/intelligence/seo-context-source.ts`; and `assembleSeoContext` now computes `strategy`, raw brand voice, knowledge base, personas, and `effectiveBrandVoiceBlock` without bridging back to the old builder or its separate cache.
+
+The migration replaces old SEO-context cache invalidation with `invalidateIntelligenceCache(workspaceId)`, hardens pr-check so production server code cannot statically or dynamically import the retired module, and completes schema-context Pattern-B migration in `buildSchemaContext`: `businessContext`, `knowledgeBase`, personas, and business profile now come from the already-fetched `seoContext` slice, while dead `ctx.brandVoice` schema context wiring was removed. `seoContext.businessProfile` now preserves both prompt-friendly flattened address text and structured contact metadata (`addressParts`, `foundedDate`, `numberOfEmployees`) so schema generation can stay slice-driven without losing structured fidelity. Voice authority behavior remains pinned with real DB tests for legacy fallback, calibrated-profile authority, draft explicit config authority, and samples-only draft fallback.
+
+**Agency value:** Engineers now have one intelligence/cache path to reason about instead of a deprecated parallel builder with separate invalidation and compatibility return shapes.
+
+**Client value:** N/A — infrastructure-only refactor with preserved AI context behavior.
+
+**Mutual:** Reduces AI prompt drift risk by keeping voice, knowledge, personas, and rich prompt helpers under owned modules with explicit guardrails.
+
+**Files:** `server/intelligence/seo-context-slice.ts`; `server/intelligence/seo-context-source.ts`; `server/prompt-rich-blocks.ts`; `server/workspace-intelligence.ts`; `server/helpers.ts`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/verified-clean-rules.md`; `tests/unit/seo-context-voice-profile.test.ts`; `tests/unit/helpers.buildSchemaContext.test.ts`; `tests/unit/prompt-rich-blocks.test.ts`; `tests/pr-check.test.ts`.
