@@ -4652,3 +4652,14 @@ Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to exp
 **Mutual:** Keeps provider-neutral enrichment logic anchored to a single source module, making future provider additions and migration audits less error-prone.
 
 **Files:** `server/semrush.ts`; `tests/unit/strategy-enrichment.test.ts`; `tests/integration/semrush-routes.test.ts`; `tests/contract/seo-provider-boundary.test.ts`.
+
+### 361. Platform Consolidation — Schema Context Slice Migration Closeout
+**What it does:** Closes the follow-up roadmap item for schema-context Pattern B migration after verifying the functional migration was already completed in the SEO-context retirement PR. `buildSchemaContext` continues to read business context, knowledge base, personas, site keywords, and business profile from `buildWorkspaceIntelligence({ slices: ['seoContext'] })`; this cleanup removes obsolete `schema-context-direct-read-ok` hatch comments from `server/helpers.ts` so only the explicit identity/analytics allow-list remains.
+
+**Agency value:** Reduces false-positive uncertainty during reviews by aligning code comments, roadmap state, and pr-check policy for schema-context data sourcing.
+
+**Client value:** N/A — guardrail/documentation cleanup with no behavior change.
+
+**Mutual:** Keeps the schema-context migration story internally consistent and easier to audit going forward.
+
+**Files:** `server/helpers.ts`; `data/roadmap.json`.
