@@ -19,6 +19,7 @@ jobs:
     env:
       DATA_DIR: /tmp/asset-dashboard-ci
       LOG_LEVEL: warn
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v5
 
@@ -55,7 +56,9 @@ jobs:
       - name: Get Playwright version
         if: steps.changes.outputs.e2e == 'true'
         id: playwright-version
-        run: echo "version=$(node -p \"require('@playwright/test/package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          PLAYWRIGHT_VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$PLAYWRIGHT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         if: steps.changes.outputs.e2e == 'true'
