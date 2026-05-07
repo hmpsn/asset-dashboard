@@ -10,11 +10,19 @@ describe('SEO provider boundary', () => {
     expect(enrichment).not.toContain("from './semrush.js'");
   });
 
-  it('keeps legacy SEMRush helper exports as provider-neutral re-exports only', () => {
+  it('removes legacy SEMRush helper re-export bridge entirely', () => {
     const source = readFileSync('server/semrush.ts', 'utf-8'); // readFile-ok: endpoint migration guard
-    expect(source).toContain("export { trendDirection, parseSerpFeatures, hasSerpOpportunity } from './seo-provider-signals.js';");
+    expect(source).not.toContain("export { trendDirection, parseSerpFeatures, hasSerpOpportunity } from './seo-provider-signals.js';");
     expect(source).not.toContain('const SERP_FEATURE_MAP');
     expect(source).not.toContain('export function trendDirection');
+  });
+
+  it('uses seo-provider-signals directly for utility imports', () => {
+    const enrichmentTest = readFileSync('tests/unit/strategy-enrichment.test.ts', 'utf-8'); // readFile-ok: endpoint migration guard
+    const semrushRouteTest = readFileSync('tests/integration/semrush-routes.test.ts', 'utf-8'); // readFile-ok: endpoint migration guard
+
+    expect(enrichmentTest).toContain("from '../../server/seo-provider-signals.js'");
+    expect(semrushRouteTest).toContain("from '../../server/seo-provider-signals.js'");
   });
 
   it('uses provider-neutral keyword strategy job params while accepting legacy callers', () => {

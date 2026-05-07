@@ -4639,3 +4639,16 @@ Added a contract guard in `tests/contract/keyword-strategy-compat-retirement.tes
 **Mutual:** Keeps keyword strategy generation on the single background-job pathway, making future workflow and reliability changes easier to reason about.
 
 **Files:** `src/api/seo.ts`; `src/api/streamUtils.ts`; `src/main.tsx`; `tests/contract/keyword-strategy-compat-retirement.test.ts`.
+
+### 360. Platform Consolidation — SEO Provider Compatibility Bridge Retirement
+**What it does:** Retires the remaining provider-neutral helper re-export bridge from `server/semrush.ts`. The compatibility export for `trendDirection`, `parseSerpFeatures`, and `hasSerpOpportunity` was removed so new code cannot accidentally treat provider-neutral keyword-signal helpers as Semrush-owned APIs. Remaining touched imports in strategy and Semrush integration tests now import those helpers directly from `server/seo-provider-signals.ts`.
+
+Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to explicitly block reintroducing the `semrush.ts` helper bridge and to require direct provider-neutral helper imports in the touched suites.
+
+**Agency value:** Tightens provider boundaries and reduces drift risk as the platform continues moving from Semrush-specific naming toward the shared `SeoDataProvider` abstraction.
+
+**Client value:** N/A — infrastructure-only cleanup with no user-facing behavior change.
+
+**Mutual:** Keeps provider-neutral enrichment logic anchored to a single source module, making future provider additions and migration audits less error-prone.
+
+**Files:** `server/semrush.ts`; `tests/unit/strategy-enrichment.test.ts`; `tests/integration/semrush-routes.test.ts`; `tests/contract/seo-provider-boundary.test.ts`.

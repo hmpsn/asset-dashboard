@@ -8,8 +8,6 @@ import { isProgrammingError } from './errors.js';
 import { normalizeProviderDate } from './seo-data-provider.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from './constants.js';
 
-export { trendDirection, parseSerpFeatures, hasSerpOpportunity } from './seo-provider-signals.js';
-
 const log = createLogger('semrush');
 
 const SEMRUSH_API_BASE = 'https://api.semrush.com/';
