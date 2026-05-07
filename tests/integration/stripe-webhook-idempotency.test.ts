@@ -39,7 +39,7 @@ vi.mock('../../server/stripe-config.js', () => ({
 // ---------------------------------------------------------------------------
 
 import { handleWebhookEvent, initStripeBroadcast } from '../../server/stripe.js';
-import { createPayment, listPayments, getPaymentBySession } from '../../server/payments.js';
+import { createPayment, listPaymentsBySession, getPaymentByPaymentIntent, getPaymentBySession } from '../../server/payments.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
     expect(payment!.status).toBe('paid');
   });
 
-  it('checkout.session.completed replayed — activity IS double-logged (known gap)', async () => {
+  it('checkout.session.completed replayed — activity is not double-logged', async () => {
     const sessionId = 'cs_test_idemp_act';
 
     createPayment(ws.workspaceId, {
@@ -154,14 +154,11 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
     await handleWebhookEvent(duplicate as never);
     const activityCountAfterSecond = countActivities(ws.workspaceId, 'payment_received');
 
-    // NOTE: Activity IS double-logged on webhook replay — there's no idempotency
-    // guard on addActivity(). This documents the current behavior.
-    // TODO: Add idempotency guard using event.id to prevent duplicate activity entries
     expect(activityCountAfterFirst).toBe(1);
-    expect(activityCountAfterSecond).toBe(2); // double-logged
+    expect(activityCountAfterSecond).toBe(1);
   });
 
-  it('checkout.session.completed replayed — work order double-created (known gap)', async () => {
+  it('checkout.session.completed replayed — work order is not double-created', async () => {
     const sessionId = 'cs_test_idemp_wo';
 
     createPayment(ws.workspaceId, {
@@ -190,11 +187,114 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
     await handleWebhookEvent(duplicate as never);
     const woCountSecond = countWorkOrders(ws.workspaceId);
 
-    // NOTE: Work orders ARE double-created on webhook replay — there's no
-    // idempotency guard on createWorkOrder().
-    // TODO: Add idempotency guard (e.g., check if work order for this payment already exists)
     expect(woCountFirst).toBe(1);
-    expect(woCountSecond).toBe(2); // double-created
+    expect(woCountSecond).toBe(1);
+  });
+
+  it('checkout.session.completed cart replayed — marks all session payments paid and preserves cart work order payment ids', async () => {
+    const sessionId = 'cs_test_idemp_cart';
+    const fixPayment = createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: sessionId,
+      productType: 'fix_meta',
+      amount: 2000,
+      currency: 'usd',
+      status: 'pending',
+    });
+    const schemaPayment = createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: sessionId,
+      productType: 'schema_page',
+      amount: 3900,
+      currency: 'usd',
+      status: 'pending',
+    });
+
+    const event = createWebhookEvent('checkout.session.completed', {
+      id: sessionId,
+      metadata: {
+        workspaceId: ws.workspaceId,
+        cartItems: JSON.stringify([
+          { productType: 'fix_meta', quantity: 1, pageIds: ['/page-1'] },
+          { productType: 'schema_page', quantity: 1, pageIds: ['/page-2'] },
+        ]),
+      },
+      amount_total: 5900,
+      payment_intent: 'pi_test_cart',
+    });
+
+    await handleWebhookEvent(event as never);
+    await handleWebhookEvent(createDuplicateWebhookEvent(event) as never);
+
+    const payments = listPaymentsBySession(ws.workspaceId, sessionId);
+    expect(payments).toHaveLength(2);
+    expect(payments.map(payment => payment.status)).toEqual(['paid', 'paid']);
+    expect(payments.map(payment => payment.stripePaymentIntentId)).toEqual(['pi_test_cart', 'pi_test_cart']);
+
+    const orders = db.prepare('SELECT payment_id, product_type FROM work_orders WHERE workspace_id = ? ORDER BY product_type ASC').all(ws.workspaceId) as Array<{ payment_id: string; product_type: string }>;
+    expect(orders).toHaveLength(2);
+    expect(orders).toContainEqual({ payment_id: fixPayment.id, product_type: 'fix_meta' });
+    expect(orders).toContainEqual({ payment_id: schemaPayment.id, product_type: 'schema_page' });
+  });
+
+  it('checkout.session.completed without payment records skips fulfillment side effects', async () => {
+    const sessionId = 'cs_test_missing_payment_record';
+    const event = createWebhookEvent('checkout.session.completed', {
+      id: sessionId,
+      metadata: {
+        workspaceId: ws.workspaceId,
+        productType: 'fix_meta',
+        pageIds: JSON.stringify(['/page-1']),
+      },
+      amount_total: 2000,
+    });
+
+    await handleWebhookEvent(event as never);
+    await handleWebhookEvent(createDuplicateWebhookEvent(event) as never);
+
+    expect(countPayments(ws.workspaceId)).toBe(0);
+    expect(countActivities(ws.workspaceId, 'payment_received')).toBe(0);
+    expect(countWorkOrders(ws.workspaceId)).toBe(0);
+  });
+
+  it('checkout.session.completed with partial paid records skips duplicate fulfillment', async () => {
+    const sessionId = 'cs_test_partial_paid';
+    createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: sessionId,
+      productType: 'fix_meta',
+      amount: 2000,
+      currency: 'usd',
+      status: 'paid',
+      paidAt: new Date().toISOString(),
+    });
+    createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: sessionId,
+      productType: 'schema_page',
+      amount: 3900,
+      currency: 'usd',
+      status: 'pending',
+    });
+
+    const event = createWebhookEvent('checkout.session.completed', {
+      id: sessionId,
+      metadata: {
+        workspaceId: ws.workspaceId,
+        cartItems: JSON.stringify([
+          { productType: 'fix_meta', quantity: 1, pageIds: ['/page-1'] },
+          { productType: 'schema_page', quantity: 1, pageIds: ['/page-2'] },
+        ]),
+      },
+      amount_total: 5900,
+    });
+
+    await handleWebhookEvent(event as never);
+
+    expect(countActivities(ws.workspaceId, 'payment_received')).toBe(0);
+    expect(countWorkOrders(ws.workspaceId)).toBe(0);
+    const payments = listPaymentsBySession(ws.workspaceId, sessionId);
+    expect(payments.map(payment => payment.status)).toEqual(['paid', 'pending']);
   });
 
   // ── payment_intent.succeeded replayed ──
@@ -204,7 +304,8 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
 
     createPayment(ws.workspaceId, {
       workspaceId: ws.workspaceId,
-      stripeSessionId: piId,
+      stripeSessionId: 'cs_test_idemp_pi',
+      stripePaymentIntentId: piId,
       productType: 'brief_blog',
       amount: 12500,
       currency: 'usd',
@@ -225,8 +326,26 @@ describe('Stripe Webhook Idempotency — FM-10', () => {
 
     // Only one payment, updated to paid
     expect(countPayments(ws.workspaceId)).toBe(1);
-    const payment = getPaymentBySession(ws.workspaceId, piId);
+    const payment = getPaymentByPaymentIntent(ws.workspaceId, piId);
     expect(payment!.status).toBe('paid');
+  });
+
+  it('payment_intent.succeeded without a pending payment skips side effects', async () => {
+    const event = createWebhookEvent('payment_intent.succeeded', {
+      id: 'pi_test_missing_payment',
+      metadata: {
+        workspaceId: ws.workspaceId,
+        productType: 'fix_meta',
+      },
+      amount: 25000,
+    });
+
+    await handleWebhookEvent(event as never);
+    await handleWebhookEvent(createDuplicateWebhookEvent(event) as never);
+
+    expect(countPayments(ws.workspaceId)).toBe(0);
+    expect(countActivities(ws.workspaceId, 'payment_received')).toBe(0);
+    expect(countWorkOrders(ws.workspaceId)).toBe(0);
   });
 
   // ── subscription.deleted replayed ──

@@ -2,7 +2,16 @@
  * Unit tests for server/auth.ts — JWT token generation, verification, and middleware.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { signToken, verifyToken, requireAuth, requireRole, requireWorkspaceAccess, optionalAuth } from '../../server/auth.js';
+import {
+  signToken,
+  verifyToken,
+  requireAuth,
+  requireRole,
+  requireWorkspaceAccess,
+  requireWorkspaceAccessFromQuery,
+  requireWorkspaceAccessFromBody,
+  optionalAuth,
+} from '../../server/auth.js';
 import type { Request, Response, NextFunction } from 'express';
 
 // ── Token helpers ──
@@ -189,6 +198,81 @@ describe('requireWorkspaceAccess', () => {
     const res = mockRes();
     const next = vi.fn();
     const middleware = requireWorkspaceAccess();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('requireWorkspaceAccessFromQuery', () => {
+  it('passes through with omitted query workspaceId for legacy auth', () => {
+    const req = mockReq({ query: {} });
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromQuery();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('returns 403 when a scoped JWT user omits the query workspaceId', () => {
+    const req = mockReq({ query: {} });
+    (req as Record<string, unknown>).user = { role: 'member', workspaceIds: ['ws_allowed'] };
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromQuery();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(res._status).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('requireWorkspaceAccessFromBody', () => {
+  it('passes through when no JWT user is set (legacy auth)', () => {
+    const req = mockReq({ body: { workspaceId: 'ws_1' } });
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromBody();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('returns 403 when body workspaceId is outside the JWT scope', () => {
+    const req = mockReq({ body: { workspaceId: 'ws_forbidden' } });
+    (req as Record<string, unknown>).user = { role: 'member', workspaceIds: ['ws_allowed'] };
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromBody();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(res._status).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a scoped JWT user omits the body workspaceId', () => {
+    const req = mockReq({ body: {} });
+    (req as Record<string, unknown>).user = { role: 'member', workspaceIds: ['ws_allowed'] };
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromBody();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(res._status).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes through when body workspaceId is in the JWT scope', () => {
+    const req = mockReq({ body: { workspaceId: 'ws_allowed' } });
+    (req as Record<string, unknown>).user = { role: 'member', workspaceIds: ['ws_allowed'] };
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromBody();
+    middleware(req, res, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('supports a custom body field name', () => {
+    const req = mockReq({ body: { targetWorkspaceId: 'ws_custom' } });
+    (req as Record<string, unknown>).user = { role: 'member', workspaceIds: ['ws_custom'] };
+    const res = mockRes();
+    const next = vi.fn();
+    const middleware = requireWorkspaceAccessFromBody('targetWorkspaceId');
     middleware(req, res, next as unknown as NextFunction);
     expect(next).toHaveBeenCalled();
   });

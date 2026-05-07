@@ -8,7 +8,8 @@
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callAI } from './ai.js';
+import { parseAIJson } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
@@ -296,8 +297,8 @@ ${kwList}
 Return a JSON array of the keywords in ranked order (best first). Only return the keyword strings:
 ["best keyword", "second best", ...]`;
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1-mini',
+  const result = await callAI({
+    model: 'gpt-5.4-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.2,

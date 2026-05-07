@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import { getBookingUrl, setBookingUrl, clearBookingUrl } from '../studio-config.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/api/settings', (_req, res) => {
   });
 });
 
-router.post('/api/settings/webflow-token', (req, res) => {
+router.post('/api/settings/webflow-token', requireAdminAuth, (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token required' });
 
@@ -37,14 +38,23 @@ router.get('/api/studio-config', (_req, res) => {
   res.json({ bookingUrl: getBookingUrl() ?? '' });
 });
 
-router.patch('/api/studio-config', (req, res) => {
+router.patch('/api/studio-config', requireAdminAuth, (req, res) => {
   const { bookingUrl } = req.body as { bookingUrl?: string };
   if (bookingUrl === undefined) return res.status(400).json({ error: 'bookingUrl required' });
   if (bookingUrl === '') {
     clearBookingUrl();
   } else {
     // Basic URL validation — must be http(s)
-    try { new URL(bookingUrl); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(bookingUrl);
+    } catch (err) {
+      void err;
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
     setBookingUrl(bookingUrl);
   }
   res.json({ ok: true, bookingUrl: bookingUrl || null });

@@ -7,15 +7,16 @@ interface DateRangeSelectorProps {
 
 export function DateRangeSelector({ options, selected, onChange, className }: DateRangeSelectorProps) {
   return (
-    <div className={`flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5 ${className ?? ''}`}>
+    <div className={`flex items-center gap-1 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5 ${className ?? ''}`}>
       {options.map(opt => (
         <button
           key={opt.value}
+          type="button"
           onClick={() => onChange(opt.value)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={`px-3 py-1.5 rounded-md t-caption font-medium transition-colors ${
             selected === opt.value
-              ? 'bg-zinc-700 text-zinc-200'
-              : 'text-zinc-500 hover:text-zinc-300'
+              ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+              : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
           }`}
         >
           {opt.label}
@@ -24,4 +25,3 @@ export function DateRangeSelector({ options, selected, onChange, className }: Da
     </div>
   );
 }
-

@@ -122,36 +122,34 @@ describe('webflow-keywords.ts migration contracts', () => {
   });
 });
 
-// ── webflow-seo.ts (N+1 prevention) ──────────────────────────────────────────
+// ── webflow-seo route N+1 prevention ─────────────────────────────────────────
 
-describe('webflow-seo.ts N+1 prevention contracts', () => {
-  const src = readRoute('webflow-seo.ts');
+describe('webflow SEO route N+1 prevention contracts', () => {
+  const applySrc = readRoute('webflow-seo-apply.ts');
+  const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
 
   it('bulk-fix loop: seoContext assembled before the for-of loop (not inside it)', () => {
     // Pre-assembly must appear before `for (const page of pages)`.
     // If seoContext is assembled inside the loop, 300-page sites fire 300 DB round-trips.
-    const loopIdx = src.indexOf('for (const page of pages)');
+    const loopIdx = applySrc.indexOf('for (const page of pages)');
     expect(loopIdx).toBeGreaterThan(-1);
-    const beforeLoop = src.slice(0, loopIdx);
+    const beforeLoop = applySrc.slice(0, loopIdx);
     expect(beforeLoop).toContain("slices: ['seoContext']");
   });
 
   it('bulk-rewrite loop: seoContext assembled before the batch for-loop (not inside it)', () => {
     // Pre-assembly must appear before `for (let i = 0; i < pages.length`.
-    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
+    const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
     expect(loopIdx).toBeGreaterThan(-1);
-    const beforeLoop = src.slice(0, loopIdx);
-    // Second occurrence of slices: ['seoContext'] — first is bulk-fix, second is bulk-rewrite
-    const firstIdx = beforeLoop.indexOf("slices: ['seoContext']");
-    const secondIdx = beforeLoop.indexOf("slices: ['seoContext']", firstIdx + 1);
-    expect(secondIdx).toBeGreaterThan(-1);
+    const beforeLoop = rewriteSrc.slice(0, loopIdx);
+    expect(beforeLoop).toContain("slices: ['seoContext']");
   });
 
   it('bulk-rewrite loop: pageProfile still assembled per-page with pagePath inside loop', () => {
     // pageProfile is page-specific (optimization issues + recommendations require pagePath).
     // Must remain inside the per-page map callback, not hoisted.
-    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
-    const afterLoop = src.slice(loopIdx);
+    const loopIdx = rewriteSrc.indexOf('for (let i = 0; i < pages.length');
+    const afterLoop = rewriteSrc.slice(loopIdx);
     expect(afterLoop).toContain("slices: ['pageProfile']");
   });
 });
@@ -276,10 +274,10 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
   });
 });
 
-// ── jobs.ts (page-analysis job) ───────────────────────────────────────────────
+// ── page-analysis-job.ts ─────────────────────────────────────────────────────
 
-describe('jobs.ts page-analysis job migration contracts', () => {
-  const src = readRoute('jobs.ts');
+describe('page-analysis-job.ts migration contracts', () => {
+  const src = read('page-analysis-job.ts');
 
   it('requests seoContext + learnings slices for PA job AI context', () => {
     // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
@@ -314,8 +312,8 @@ describe('pageProfile-only callers intentionally omit learnings', () => {
     expect(src).not.toContain("sections: ['seoContext'");
   });
 
-  it('webflow-seo.ts SEO rewrite handlers use pageProfile section only', () => {
-    const src = readRoute('webflow-seo.ts');
+  it('Webflow SEO rewrite handlers use pageProfile section only', () => {
+    const src = `${readRoute('webflow-seo-rewrite.ts')}\n${readRoute('webflow-seo-bulk-rewrite.ts')}`;
     // Both /seo-rewrite and /seo-bulk-rewrite handlers only use formatForPrompt for pageProfile.
     // The keyword/brand voice blocks are assembled manually from seo.* fields.
     expect(src).toContain("sections: ['pageProfile']");
@@ -345,6 +343,7 @@ describe('slices/sections consistency — learnings section requires learnings s
     { label: 'seo-audit.ts', src: read('seo-audit.ts') },
     { label: 'content-decay.ts', src: read('content-decay.ts') },
     { label: 'keyword-recommendations.ts', src: read('keyword-recommendations.ts') },
+    { label: 'page-analysis-job.ts', src: read('page-analysis-job.ts') },
     { label: 'routes/google.ts', src: readRoute('google.ts') },
     { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
     { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
@@ -368,8 +367,8 @@ describe('slices/sections consistency — learnings section requires learnings s
 // ── assembleLearnings feature flag gate ──────────────────────────────────────
 
 describe('assembleLearnings feature flag gate', () => {
-  it('workspace-intelligence.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
-    const src = readFileSync(resolve(serverDir, 'workspace-intelligence.ts'), 'utf-8'); // readFile-ok — contract guard: asserts assembleLearnings checks the outcome-ai-injection feature flag before expensive DB calls, preserving behavioral parity with the old buildSeoContext() gate.
+  it('learnings-slice.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
+    const src = readFileSync(resolve(serverDir, 'intelligence/learnings-slice.ts'), 'utf-8'); // readFile-ok — contract guard: asserts assembleLearnings checks the outcome-ai-injection feature flag before expensive DB calls, preserving behavioral parity with the old buildSeoContext() gate.
     // Feature flag gate must appear INSIDE assembleLearnings, before the expensive DB calls.
     // This ensures behavioral parity with old buildSeoContext() which also gated on this flag.
     const fnStart = src.indexOf('async function assembleLearnings(');

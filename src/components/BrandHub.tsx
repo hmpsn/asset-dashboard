@@ -8,7 +8,10 @@ import {
 import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, ConfirmDialog } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { queryKeys } from '../lib/queryKeys';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import type { AudiencePersona } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
@@ -16,17 +19,6 @@ import { IdentityTab } from './brand/IdentityTab';
 import { PageStrategyTab } from './brand/PageStrategyTab';
 import { BlueprintDetail } from './brand/BlueprintDetail';
 import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
-
-interface AudiencePersona {
-  id: string;
-  name: string;
-  description: string;
-  painPoints: string[];
-  goals: string[];
-  objections: string[];
-  preferredContentFormat?: string;
-  buyingStage?: 'awareness' | 'consideration' | 'decision';
-}
 
 interface WorkspaceData {
   id: string;
@@ -43,9 +35,26 @@ interface Props {
 
 type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity';
 
+function contextJobStorageKey(workspaceId: string, type: string): string {
+  return `brand-hub:${workspaceId}:${type}:jobId`;
+}
+
+function readStoredContextJobId(workspaceId: string, type: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem(contextJobStorageKey(workspaceId, type));
+}
+
+function storeContextJobId(workspaceId: string, type: string, jobId: string | null): void {
+  if (typeof window === 'undefined') return;
+  const key = contextJobStorageKey(workspaceId, type);
+  if (jobId) window.sessionStorage.setItem(key, jobId);
+  else window.sessionStorage.removeItem(key);
+}
+
 export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
 
   // Active tab
   const [activeTab, setActiveTab] = useState<BrandHubTab>('overview');
@@ -68,7 +77,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   // Brand Voice state
   const [brandVoice, setBrandVoice] = useState('');
   const [savingBrandVoice, setSavingBrandVoice] = useState(false);
-  const [generatingBrandVoice, setGeneratingBrandVoice] = useState(false);
+  const [startingBrandVoiceJob, setStartingBrandVoiceJob] = useState(false);
+  const [lastBrandVoiceJobId, setLastBrandVoiceJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION)
+  );
 
   // Sync brand voice textarea from loaded workspace once
   useEffect(() => {
@@ -78,7 +90,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Knowledge Base state
   const [kbDraft, setKbDraft] = useState<string | null>(null);
-  const [generatingKB, setGeneratingKB] = useState(false);
+  const [startingKbJob, setStartingKbJob] = useState(false);
+  const [lastKbJobId, setLastKbJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION)
+  );
 
   // Personas state
   const [showPersonas, setShowPersonas] = useState(false);
@@ -86,7 +101,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [savingPersonas, setSavingPersonas] = useState(false);
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
-  const [generatingPersonas, setGeneratingPersonas] = useState(false);
+  const [startingPersonasJob, setStartingPersonasJob] = useState(false);
+  const [lastPersonasJobId, setLastPersonasJobId] = useState<string | null>(() =>
+    readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION)
+  );
   const [confirmDeletePersona, setConfirmDeletePersona] = useState<AudiencePersona | null>(null);
 
   // Brand voice error + completion state
@@ -95,6 +113,116 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
 
   // Page Strategy state
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
+
+  const activeBrandVoiceJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, workspaceId });
+  const activeKbJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, workspaceId });
+  const activePersonasJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.PERSONA_GENERATION, workspaceId });
+  const completedBrandVoiceJob = lastBrandVoiceJobId ? jobs.find(job => job.id === lastBrandVoiceJobId) : undefined;
+  const completedKbJob = lastKbJobId ? jobs.find(job => job.id === lastKbJobId) : undefined;
+  const completedPersonasJob = lastPersonasJobId ? jobs.find(job => job.id === lastPersonasJobId) : undefined;
+  const generatingBrandVoice = startingBrandVoiceJob || Boolean(activeBrandVoiceJob);
+  const generatingKB = startingKbJob || Boolean(activeKbJob);
+  const generatingPersonas = startingPersonasJob || Boolean(activePersonasJob);
+
+  // effect-layout-ok: route changes swap the workspace whose draft job IDs we should recover.
+  useEffect(() => {
+    setLastBrandVoiceJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION));
+    setLastKbJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION));
+    setLastPersonasJobId(readStoredContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION));
+  }, [workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeBrandVoiceJob && !lastBrandVoiceJobId) {
+      setLastBrandVoiceJobId(activeBrandVoiceJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, activeBrandVoiceJob.id);
+    }
+  }, [activeBrandVoiceJob, lastBrandVoiceJobId, workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeKbJob && !lastKbJobId) {
+      setLastKbJobId(activeKbJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, activeKbJob.id);
+    }
+  }, [activeKbJob, lastKbJobId, workspaceId]);
+
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activePersonasJob && !lastPersonasJobId) {
+      setLastPersonasJobId(activePersonasJob.id);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, activePersonasJob.id);
+    }
+  }, [activePersonasJob, lastPersonasJobId, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedBrandVoiceJob) return;
+    if (completedBrandVoiceJob.status === 'done') {
+      const result = completedBrandVoiceJob.result as { kind?: string; brandVoice?: string; pagesScraped?: number } | undefined;
+      if (result?.kind === 'brandVoice' && typeof result.brandVoice === 'string') {
+        setBrandVoice(result.brandVoice);
+        toast(`Brand voice generated from ${result.pagesScraped ?? 0} pages — review and save`);
+        setShowNextSteps(true);
+      }
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    } else if (completedBrandVoiceJob.status === 'error') {
+      const message = completedBrandVoiceJob.error || completedBrandVoiceJob.message || 'Brand voice generation failed';
+      toast(message, 'error');
+      setBrandVoiceError(message);
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    } else if (completedBrandVoiceJob.status === 'cancelled') {
+      toast('Brand voice generation was cancelled', 'error');
+      setLastBrandVoiceJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, null);
+    }
+  }, [completedBrandVoiceJob, toast, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedKbJob) return;
+    if (completedKbJob.status === 'done') {
+      const result = completedKbJob.result as { kind?: string; knowledgeBase?: string; pagesScraped?: number } | undefined;
+      if (result?.kind === 'knowledgeBase' && typeof result.knowledgeBase === 'string') {
+        setKbDraft(result.knowledgeBase);
+        toast(`Knowledge base generated from ${result.pagesScraped ?? 0} pages — review and save`);
+      }
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    } else if (completedKbJob.status === 'error') {
+      toast(completedKbJob.error || completedKbJob.message || 'Knowledge base generation failed', 'error');
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    } else if (completedKbJob.status === 'cancelled') {
+      toast('Knowledge base generation was cancelled', 'error');
+      setLastKbJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, null);
+    }
+  }, [completedKbJob, toast, workspaceId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedPersonasJob) return;
+    if (completedPersonasJob.status === 'done') {
+      const result = completedPersonasJob.result as { kind?: string; personas?: AudiencePersona[]; pagesScraped?: number } | undefined;
+      if (result?.kind === 'personas' && Array.isArray(result.personas)) {
+        setLocalPersonas(result.personas);
+        toast(`${result.personas.length} personas generated from ${result.pagesScraped ?? 0} pages — review and save`);
+      }
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    } else if (completedPersonasJob.status === 'error') {
+      toast(completedPersonasJob.error || completedPersonasJob.message || 'Persona generation failed', 'error');
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    } else if (completedPersonasJob.status === 'cancelled') {
+      toast('Persona generation was cancelled', 'error');
+      setLastPersonasJobId(null);
+      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null);
+    }
+  }, [completedPersonasJob, toast, workspaceId]);
 
   const saveBrandVoiceHandler = async () => {
     setSavingBrandVoice(true);
@@ -106,19 +234,26 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   };
 
   const generateBrandVoiceHandler = async () => {
-    setGeneratingBrandVoice(true);
+    if (generatingBrandVoice) return;
+    setStartingBrandVoiceJob(true);
     setBrandVoiceError(null);
     setShowNextSteps(false);
     try {
-      const data = await workspaces.generateBrandVoice(workspaceId) as { brandVoice: string; pagesScraped: number };
-      setBrandVoice(data.brandVoice);
-      toast(`Brand voice generated from ${data.pagesScraped} pages — review and save`);
-      setShowNextSteps(true);
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, { workspaceId });
+      if (jobId) {
+        setLastBrandVoiceJobId(jobId);
+        storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, jobId);
+        toast('Brand voice generation started');
+      } else {
+        setBrandVoiceError('Failed to start brand voice generation');
+        toast('Failed to start brand voice generation', 'error');
+      }
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
-      setBrandVoiceError(err instanceof Error ? err.message : 'Brand voice generation failed');
+      const message = err instanceof Error ? err.message : 'Failed to start brand voice generation';
+      toast(message, 'error');
+      setBrandVoiceError(message);
     } finally {
-      setGeneratingBrandVoice(false);
+      setStartingBrandVoiceJob(false);
     }
   };
 
@@ -128,7 +263,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       <PageHeader
         title="Brand & AI Context"
         subtitle="Everything that feeds into AI content generation — voice, knowledge, and audience"
-        icon={<Icon as={Sparkles} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
       />
 
       {/* tab-deeplink-ok — nothing navigates to BrandHub with ?tab= */}
@@ -153,8 +288,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard
         title="Brand Voice & Style"
-        titleIcon={<Icon as={MessageSquare} size="md" className="text-teal-400" />}
-        titleExtra={brandVoice ? <span className="t-caption-sm text-emerald-400 font-medium">(configured)</span> : undefined}
+        titleIcon={<Icon as={MessageSquare} size="md" className="text-accent-brand" />}
+        titleExtra={brandVoice ? <span className="t-caption-sm text-accent-success font-medium">(configured)</span> : undefined}
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">
@@ -183,7 +318,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               type="button"
               onClick={generateBrandVoiceHandler}
               disabled={generatingBrandVoice || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generatingBrandVoice ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="sm" /> Generate from Website</>}
             </button>
@@ -215,7 +350,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             />
           )}
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
+            You can also drop <code className="text-accent-brand">.txt</code> or <code className="text-accent-brand">.md</code> files into the <code className="text-accent-brand">brand-docs/</code> folder in your workspace uploads.
           </p>
         </div>
       </SectionCard>
@@ -223,8 +358,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ KNOWLEDGE BASE ═══ */}
       <SectionCard
         title="Knowledge Base"
-        titleIcon={<Icon as={BookOpen} size="md" className="text-teal-400" />}
-        titleExtra={ws?.knowledgeBase ? <span className="t-caption-sm text-emerald-400 font-medium">(configured)</span> : undefined}
+        titleIcon={<Icon as={BookOpen} size="md" className="text-accent-brand" />}
+        titleExtra={ws?.knowledgeBase ? <span className="t-caption-sm text-accent-success font-medium">(configured)</span> : undefined}
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">Business context for AI — services, capabilities, FAQs, industry info</p>
@@ -248,24 +383,30 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             <button
               type="button"
               onClick={async () => {
-                setGeneratingKB(true);
+                if (generatingKB) return;
+                setStartingKbJob(true);
                 try {
-                  const data = await workspaces.generateKnowledgeBase(workspaceId) as { knowledgeBase: string; pagesScraped: number };
-                  setKbDraft(data.knowledgeBase);
-                  toast(`Knowledge base generated from ${data.pagesScraped} pages — review and save`);
+                  const jobId = await startJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, { workspaceId });
+                  if (jobId) {
+                    setLastKbJobId(jobId);
+                    storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, jobId);
+                    toast('Knowledge base generation started');
+                  } else {
+                    toast('Failed to start knowledge base generation', 'error');
+                  }
                 } catch (err) {
-                  toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                  toast(err instanceof Error ? err.message : 'Failed to start knowledge base generation', 'error');
                 } finally {
-                  setGeneratingKB(false);
+                  setStartingKbJob(false);
                 }
               }}
               disabled={generatingKB || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generatingKB ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
             </button>
             {kbDraft !== null && kbDraft !== (ws?.knowledgeBase || '') && (
-              <span className="t-caption-sm text-amber-400">Unsaved changes — click outside the textarea to save</span>
+              <span className="t-caption-sm text-accent-warning">Unsaved changes — click outside the textarea to save</span>
             )}
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -278,7 +419,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ AUDIENCE PERSONAS ═══ */}
       <SectionCard
         title="Audience Personas"
-        titleIcon={<Icon as={Users} size="md" className="text-blue-400" />}
+        titleIcon={<Icon as={Users} size="md" className="text-accent-info" />}
         action={
           <button
             type="button"
@@ -302,7 +443,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             {(ws?.personas?.length || 0) > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {ws!.personas!.map(p => (
-                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                     {p.name}{p.buyingStage ? ` · ${p.buyingStage}` : ''}
                   </span>
                 ))}
@@ -322,7 +463,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 <div className="flex items-center justify-between px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="t-caption font-medium text-[var(--brand-text-bright)]">{p.name}</span>
-                    {p.buyingStage && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{p.buyingStage}</span>}
+                    {p.buyingStage && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{p.buyingStage}</span>}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -347,7 +488,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                       type="button"
                       aria-label={`Delete persona ${p.name}`}
                       onClick={() => setConfirmDeletePersona(p)}
-                      className="p-1 rounded text-[var(--brand-text-muted)] hover:text-red-400"
+                      className="p-1 rounded text-[var(--brand-text-muted)] hover:text-accent-danger"
                     >
                       <Icon as={Trash2} size="sm" />
                     </button>
@@ -496,19 +637,25 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               <button
                 type="button"
                 onClick={async () => {
-                  setGeneratingPersonas(true);
+                  if (generatingPersonas) return;
+                  setStartingPersonasJob(true);
                   try {
-                    const data = await workspaces.generatePersonas(workspaceId) as { personas: AudiencePersona[]; pagesScraped: number };
-                    setLocalPersonas(data.personas);
-                    toast(`${data.personas.length} personas generated from ${data.pagesScraped} pages — review and save`);
+                    const jobId = await startJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, { workspaceId });
+                    if (jobId) {
+                      setLastPersonasJobId(jobId);
+                      storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, jobId);
+                      toast('Persona generation started');
+                    } else {
+                      toast('Failed to start persona generation', 'error');
+                    }
                   } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+                    toast(err instanceof Error ? err.message : 'Failed to start persona generation', 'error');
                   } finally {
-                    setGeneratingPersonas(false);
+                    setStartingPersonasJob(false);
                   }
                 }}
                 disabled={generatingPersonas || !webflowSiteId}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-blue-500/10 text-accent-info hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {generatingPersonas ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
               </button>
@@ -521,7 +668,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ PAGE STRATEGY ═══ */}
       <SectionCard
         title="Page Strategy"
-        titleIcon={<Icon as={Map} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Map} size="md" className="text-accent-brand" />}
       >
         {selectedBlueprintId ? (
           <div className="space-y-6">
@@ -546,7 +693,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* Info footer */}
       <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] border border-[var(--brand-border)] px-4 py-3">
         <div className="flex items-start gap-2">
-          <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
+          <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 flex-shrink-0" />
           <div className="t-caption-sm text-[var(--brand-text-muted)]">
             <strong className="text-[var(--brand-text)]">How it works:</strong> These three sources — brand voice, knowledge base, and personas — are automatically
             injected into every AI-generated output: content briefs, blog posts, SEO rewrites, and chatbot conversations.

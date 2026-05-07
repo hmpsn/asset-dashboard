@@ -2,15 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
+import type { ClientAction } from '../../../shared/types/client-actions';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
+  ActivityLogItem, RankHistoryEntry, LatestRank,
+  AnnotationItem, AnomalyItem, ContentPlanReviewCell, ApprovalPageKeyword,
 } from '../../components/client/types';
 import type { PricingData } from '../usePayments';
-import type {
-  ActivityLogItem, RankHistoryEntry, LatestRank,
-  AnnotationItem, AnomalyItem, ContentPlanReviewCell,
-} from '../useClientData';
 
 // ── Activity ──────────────────────────────────────────────────────
 export function useClientActivity(wsId: string, enabled: boolean) {
@@ -71,6 +70,15 @@ export function useClientApprovals(wsId: string, enabled: boolean) {
   });
 }
 
+export function useClientActions(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.clientActions(wsId),
+    queryFn: () => getSafe<ClientAction[]>(`/api/public/client-actions/${wsId}`, []),
+    enabled,
+    select: (d) => (Array.isArray(d) ? d : []),
+  });
+}
+
 // ── Client Requests ───────────────────────────────────────────────
 export function useClientRequests(wsId: string, enabled: boolean) {
   return useQuery({
@@ -118,9 +126,6 @@ export function useClientStrategy(wsId: string, enabled: boolean) {
     enabled,
   });
 }
-
-// ── Page Keywords (approval card context, not gated on seoClientView) ──
-export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
 
 export function useClientPageKeywords(wsId: string, enabled: boolean) {
   return useQuery({

@@ -43,6 +43,7 @@ import {
 } from '../mocks/anthropic.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { listSuggestions, saveSuggestion } from '../../server/seo-suggestions.js';
 
 // ---------------------------------------------------------------------------
 // Module-level vi.mock calls (hoisted by Vitest — must be at top level)
@@ -74,6 +75,16 @@ async function startTestServer(): Promise<{ server: http.Server; baseUrl: string
 async function postJson(baseUrl: string, path: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const responseBody = await res.json().catch(() => ({}));
+  return { status: res.status, body: responseBody };
+}
+
+async function patchJson(baseUrl: string, path: string, body: unknown): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -180,10 +191,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
     // (env WEBFLOW_API_TOKEN is not set in test env)
     const orphanSiteId = 'orphan-site-no-token-xyz';
 
-    const { status, body } = await getJson(
-      baseUrl,
-      `/api/webflow/seo-audit/${orphanSiteId}?workspaceId=${ws.workspaceId}`,
-    );
+    const { status, body } = await getJson(baseUrl, `/api/webflow/seo-audit/${orphanSiteId}`);
 
     // FM-2: must return 500 with a descriptive message, NOT 200 with empty pages
     expect(status).toBe(500);
@@ -328,4 +336,131 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   // are omitted here because they require deep mocking of buildWorkspaceIntelligence
   // and its transitive dependencies. These are better covered by dedicated unit tests
   // for the SEO rewrite handler. This file focuses strictly on FM-2 failure modes.
+});
+
+describe('Webflow SEO extracted route coverage', () => {
+  let ws: SeededFullWorkspace;
+  let baseUrl: string;
+  let stopServer: () => void;
+
+  beforeEach(async () => {
+    resetWebflowMocks();
+    resetOpenAIMocks();
+    resetAnthropicMocks();
+    ws = seedWorkspace();
+    const server = await startTestServer();
+    baseUrl = server.baseUrl;
+    stopServer = server.stop;
+  });
+
+  afterEach(async () => {
+    stopServer();
+    ws.cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('selects and applies multiple suggestions for the same page without leaving one pending', async () => {
+    const titleSuggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-shared',
+      pageTitle: 'Shared Page',
+      pageSlug: 'shared-page',
+      field: 'title',
+      currentValue: 'Old title',
+      variations: ['New title A', 'New title B', 'New title C'],
+    });
+    const descSuggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-shared',
+      pageTitle: 'Shared Page',
+      pageSlug: 'shared-page',
+      field: 'description',
+      currentValue: 'Old description',
+      variations: ['New description A', 'New description B', 'New description C'],
+    });
+    mockWebflowSuccess('/pages/page-shared', {});
+
+    const titleSelect = await patchJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/${titleSuggestion.id}`, { selectedIndex: 1 });
+    const descSelect = await patchJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/${descSuggestion.id}`, { selectedIndex: 2 });
+
+    expect(titleSelect.status).toBe(200);
+    expect(descSelect.status).toBe(200);
+
+    const { status, body } = await postJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/apply`, {
+      suggestionIds: [titleSuggestion.id, descSuggestion.id],
+    });
+
+    expect(status).toBe(200);
+    expect((body as { applied?: number; total?: number }).applied).toBe(2);
+    expect((body as { total?: number }).total).toBe(2);
+    expect(listSuggestions(ws.workspaceId)).toHaveLength(0);
+
+    const pageUpdates = getCapturedRequests().filter(req => req.endpoint === '/pages/page-shared' && req.method === 'PUT');
+    expect(pageUpdates).toHaveLength(2);
+    expect(pageUpdates.some(req => JSON.stringify(req.body).includes('New title B'))).toBe(true);
+    expect(pageUpdates.some(req => JSON.stringify(req.body).includes('New description C'))).toBe(true);
+  });
+
+  it('returns a Webflow error instead of marking a suggestion applied when apply fails', async () => {
+    const suggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-webflow-error',
+      pageTitle: 'Broken Page',
+      pageSlug: 'broken-page',
+      field: 'title',
+      currentValue: 'Old title',
+      variations: ['New title A', 'New title B', 'New title C'],
+    });
+    mockWebflowError('/pages/page-webflow-error', 500, 'Webflow down');
+
+    const select = await patchJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/${suggestion.id}`, { selectedIndex: 0 });
+    expect(select.status).toBe(200);
+
+    const { status, body } = await postJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/apply`, {
+      suggestionIds: [suggestion.id],
+    });
+
+    expect(status).toBe(200);
+    expect((body as { applied?: number }).applied).toBe(0);
+    const results = (body as { results?: Array<{ applied: boolean; error?: string }> }).results ?? [];
+    expect(results[0]?.applied).toBe(false);
+    expect(results[0]?.error).toMatch(/500|Webflow down/);
+    expect(listSuggestions(ws.workspaceId).map(s => s.id)).toContain(suggestion.id);
+  });
+
+  it('fetches page HTML from the live domain and returns extracted SEO metadata', async () => {
+    mockWebflowSuccess(`/sites/${ws.webflowSiteId}`, { shortName: 'mock-site' });
+    const originalFetch = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith(baseUrl)) {
+        return originalFetch(input, init);
+      }
+      if (url === 'https://test.example.com/services') {
+        return new Response(`
+          <html>
+            <head>
+              <title>Services SEO Title</title>
+              <meta name="description" content="Services meta description">
+            </head>
+            <body><main><h1>Services</h1><p>Useful service body copy.</p></main></body>
+          </html>
+        `, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      return new Response('', { status: 404 });
+    }) as typeof fetch);
+
+    const { status, body } = await getJson(
+      baseUrl,
+      `/api/webflow/page-html/${ws.webflowSiteId}?workspaceId=${ws.workspaceId}&path=${encodeURIComponent('/services')}`,
+    );
+
+    expect(status).toBe(200);
+    expect((body as { seoTitle?: string }).seoTitle).toBe('Services SEO Title');
+    expect((body as { metaDescription?: string }).metaDescription).toBe('Services meta description');
+    expect((body as { text?: string }).text).toContain('Useful service body copy.');
+  });
 });

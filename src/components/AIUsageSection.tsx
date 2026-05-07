@@ -142,8 +142,8 @@ export function AIUsageSection() {
         <div className="flex items-center justify-between mb-2">
           <span className="t-caption-sm text-[var(--brand-text-muted)]">Daily Cost</span>
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> OpenAI</span>
-            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-sm bg-orange-500 inline-block" /> Anthropic</span>
+            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-[var(--radius-sm)] bg-emerald-500 inline-block" /> OpenAI</span>
+            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-[var(--radius-sm)] bg-orange-500 inline-block" /> Anthropic</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={120}>
@@ -159,16 +159,16 @@ export function AIUsageSection() {
                   <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
                   <div className="px-3 py-1.5 space-y-1">
                     <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Total</span><span className="text-[var(--brand-text-bright)] font-medium">{fmtCost(row.cost)}</span></div>
-                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
-                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-sm)] bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-sm)] bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
                     <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Calls</span><span className="text-[var(--brand-text)]">{row.calls}</span></div>
                     <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Tokens</span><span className="text-[var(--brand-text)]">{fmtTokens(row.totalTokens)}</span></div>
                   </div>
                 </div>
               );
             }} />
-            <Bar dataKey="openaiCost" stackId="cost" fill="#059669" radius={[0, 0, 0, 0]} /> {/* chart-hex-ok — emerald-600 for OpenAI brand */}
-            <Bar dataKey="anthropicCost" stackId="cost" fill="#ea580c" radius={[2, 2, 0, 0]} /> {/* chart-hex-ok — orange-700 for Anthropic brand */}
+            <Bar dataKey="openaiCost" stackId="cost" fill="#059669" radius={[0, 0, 0, 0]} isAnimationActive={false} /> {/* chart-hex-ok — emerald-600 for OpenAI brand */}
+            <Bar dataKey="anthropicCost" stackId="cost" fill="#ea580c" radius={[2, 2, 0, 0]} isAnimationActive={false} /> {/* chart-hex-ok — orange-700 for Anthropic brand */}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -183,9 +183,9 @@ export function AIUsageSection() {
               return (
                 <div key={i} className="flex items-center gap-2">
                   <span className="t-caption-sm text-[var(--brand-text)] w-32 truncate">{FEATURE_LABELS[f.feature] || f.feature}</span>
-                  <div className="flex-1 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${f.provider === 'anthropic' ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                      className={`h-full rounded-[var(--radius-pill)] ${f.provider === 'anthropic' ? 'bg-orange-500' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.max(pct, 1)}%` }}
                     />
                   </div>

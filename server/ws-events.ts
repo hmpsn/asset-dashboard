@@ -27,8 +27,15 @@ export const WS_EVENTS = {
   CONTENT_REQUEST_CREATED: 'content-request:created',
   CONTENT_REQUEST_UPDATE: 'content-request:update',
 
+  // Content pipeline / planner
+  CONTENT_UPDATED: 'content:updated',
+
   // Activity feed (auto-broadcast via initActivityBroadcast)
   ACTIVITY_NEW: 'activity:new',
+
+  // Feedback
+  FEEDBACK_NEW: 'feedback:new',
+  FEEDBACK_UPDATE: 'feedback:update',
 
   // Audit
   AUDIT_COMPLETE: 'audit:complete',
@@ -51,6 +58,8 @@ export const WS_EVENTS = {
 
   // Schema
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
+  SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
+  SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated',
 
   // Outcome tracking
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
@@ -69,6 +78,9 @@ export const WS_EVENTS = {
   // Client signals (PIE Group 1)
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+
+  // Client action queue
+  CLIENT_ACTION_UPDATE: 'client-action:update',
 
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',

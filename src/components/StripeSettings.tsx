@@ -266,7 +266,7 @@ export function StripeSettings() {
                   />
                 </div>
               </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Optional public key reference. Checkout redirects use the Secret Key and Price IDs.</p>
             </div>
             <div className="flex items-center gap-2">
               <button

@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
@@ -14,7 +14,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-pagespeed');
 
 // --- PageSpeed / Core Web Vitals ---
-router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
     const maxPages = parseInt(req.query.maxPages as string) || 5;
@@ -29,13 +29,16 @@ router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceAccessFromQuery(), 
 });
 
 // Load last saved PageSpeed snapshot
-router.get('/api/webflow/pagespeed-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/pagespeed-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getPageSpeed(req.params.siteId);
   res.json(snapshot);
 });
 
 // Single-page PageSpeed test (resolves URL from siteId + slug)
-router.post('/api/webflow/pagespeed-single/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/pagespeed-single/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   try {
     const { siteId } = req.params;
     const { pageSlug, strategy, pageTitle } = req.body;

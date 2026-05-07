@@ -4,7 +4,7 @@
  */
 
 import db from './db/index.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { isProgrammingError } from './errors.js';
@@ -265,12 +265,10 @@ export async function generateSessionSummary(
       .map(m => `${m.role}: ${m.content.slice(0, 300)}`)
       .join('\n');
 
-    const result = await callOpenAI({
-      model: 'gpt-4.1-nano',
-      messages: [
-        { role: 'system', content: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.' },
-        { role: 'user', content: transcript },
-      ],
+    const result = await callAI({
+      model: 'gpt-5.4-nano',
+      system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
+      messages: [{ role: 'user', content: transcript }],
       maxTokens: 150,
       temperature: 0.3,
       feature: 'chat-summary',

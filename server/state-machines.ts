@@ -39,13 +39,14 @@ export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_gene
 
 // ── Generated Post ──
 export const POST_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  generating: ['draft'],
+  generating: ['draft', 'error'],
+  error:      ['draft'],
   draft:      ['review'],
   review:     ['approved', 'draft'],  // draft = send back for edits
   approved:   [],                     // terminal (publish is tracked separately)
 };
 
-export type PostStatus = 'generating' | 'draft' | 'review' | 'approved';
+export type PostStatus = 'generating' | 'draft' | 'review' | 'approved' | 'error';
 
 // ── Work Order ──
 export const WORK_ORDER_TRANSITIONS: Record<string, readonly string[]> = {
@@ -67,6 +68,20 @@ export const CONTENT_SUB_TRANSITIONS: Record<string, readonly string[]> = {
 };
 
 export type ContentSubStatus = 'active' | 'paused' | 'cancelled' | 'past_due' | 'pending';
+
+// ── Client Action ──
+// Manual/agency-executed recommendations sent to the client. A client can make
+// one decision from pending; admins can reopen requested-change items after
+// revising the recommendation, complete accepted/worked items, or archive.
+export const CLIENT_ACTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['approved', 'changes_requested', 'completed', 'archived'],
+  approved: ['completed', 'archived'],
+  changes_requested: ['pending', 'completed', 'archived'],
+  completed: ['archived'],
+  archived: [],
+};
+
+export type ClientActionStateStatus = 'pending' | 'approved' | 'changes_requested' | 'completed' | 'archived';
 
 // ── Briefing Draft ──
 // Weekly client briefing lifecycle (server/briefing-store.ts).

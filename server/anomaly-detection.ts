@@ -22,7 +22,7 @@ import { getSearchPeriodComparison, getTopDroppedGscPage, getTopSpikedGscPage } 
 import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page, getTopSpikedGA4Page } from './google-analytics.js';
 import { listSnapshots } from './reports.js';
 import { addActivity } from './activity-log.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
@@ -496,20 +496,17 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
 
 // --- AI summary generation ---
 
-async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): Promise<string | undefined> {
+async function generateAiSummary(anomalies: Anomaly[], workspaceName: string, workspaceId: string): Promise<string | undefined> {
   if (anomalies.length === 0) return undefined;
   try {
     const details = anomalies.map(a =>
       `[${a.severity.toUpperCase()}] ${a.title} — ${a.description} (source: ${a.source})`
     ).join('\n');
 
-    const result = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    const result = await callAI({
+      model: 'gpt-5.4-mini',
+      system: `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`,
       messages: [
-        {
-          role: 'system',
-          content: `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`,
-        },
         {
           role: 'user',
           content: `Website: ${workspaceName}\n\nDetected anomalies:\n${details}`,
@@ -518,6 +515,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
       maxTokens: 200,
       temperature: 0.5,
       feature: 'anomaly-summary',
+      workspaceId,
     });
     return result.text;
   } catch (err) {
@@ -551,7 +549,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
       const detected = await detectForWorkspace(ws);
       if (detected.length > 0) {
         // Generate AI summary for this workspace's anomalies
-        const summary = await generateAiSummary(detected, ws.name);
+        const summary = await generateAiSummary(detected, ws.name, ws.id);
         if (summary) {
           detected.forEach(a => { a.aiSummary = summary; });
         }

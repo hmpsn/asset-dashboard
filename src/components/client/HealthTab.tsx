@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
-import { MetricRing, Icon} from '../ui';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, ArrowUp, Minus, LayoutList, Layers } from 'lucide-react';
+import { MetricRing, Icon, Button, IconButton, ClickableRow, SectionCard } from '../ui';
 import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
@@ -8,6 +8,10 @@ import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail, CwvStrategyResult } from './types';
 import { STUDIO_NAME } from '../../constants';
 import { post, getSafe } from '../../api/client';
+import {
+  hasContentIssues,
+  buildContentImprovementRequest,
+} from '../../lib/health-tab-content-request';
 
 const ScoreRing = MetricRing;
 
@@ -60,14 +64,7 @@ function checkImpact(check: string): string | null {
   return CHECK_IMPACT[chk] || null;
 }
 
-const CONTENT_ISSUE_CHECKS = ['content-length', 'heading', 'h1', 'h1-missing', 'h1-multiple', 'word-count'];
-function hasContentIssues(issues: { check: string; message: string }[]): boolean {
-  return issues.some(i => {
-    const chk = i.check?.toLowerCase() || '';
-    const msg = i.message?.toLowerCase() || '';
-    return CONTENT_ISSUE_CHECKS.some(c => chk.includes(c)) || msg.includes('thin content') || msg.includes('word');
-  });
-}
+
 
 export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested, actionPlanSlot }: HealthTabProps) {
   // State for accordion sections
@@ -88,15 +85,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     if (!workspaceId || requestedPages.has(page.pageId)) return;
     setRequestingPage(page.pageId);
     try {
-      const wordIssue = page.issues.find(i => i.check?.toLowerCase().includes('content-length'));
-      const wordMatch = wordIssue?.message?.match(/(\d+)\s*words?/i);
-      const wordCount = wordMatch ? parseInt(wordMatch[1], 10) : undefined;
-      await post(`/api/public/content-request/${workspaceId}/from-audit`, {
-        pageSlug: page.slug,
-        pageName: page.page,
-        issues: page.issues.filter(i => hasContentIssues([i])).map(i => i.message),
-        wordCount,
-      });
+      await post(
+        `/api/public/content-request/${workspaceId}/from-audit`,
+        buildContentImprovementRequest(page),
+      );
       setRequestedPages(prev => new Set(prev).add(page.pageId));
       onContentRequested?.();
     } catch { setRequestError(page.pageId); }
@@ -167,15 +159,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-[var(--brand-text)]">Site Health</h2>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">Site Health</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <div className="relative" ref={shareRef}>
-          <button onClick={() => setShareOpen(!shareOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] hover:text-[var(--brand-text)] transition-colors">
-            <Icon as={Share2} size="md" />
+          <Button variant="secondary" size="sm" icon={Share2} onClick={() => setShareOpen(!shareOpen)}>
             Share Report
-          </button>
+          </Button>
           {shareOpen && (
             // pr-check-disable-next-line -- Shareable Reports popover dropdown; positioned absolute, not a content card
             <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-xl)] shadow-xl z-[var(--z-modal)] overflow-hidden">
@@ -190,20 +180,22 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 {reports.map(r => (
                   <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--surface-3)]/50 transition-colors">
                     <div className={`w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center flex-shrink-0 ${r.type === 'audit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
-                      {r.type === 'audit' ? <Icon as={BarChart3} size="md" className="text-emerald-400" /> : <Icon as={FileText} size="md" className="text-blue-400" />}
+                      {r.type === 'audit' ? <Icon as={BarChart3} size="md" className="text-accent-success" /> : <Icon as={FileText} size="md" className="text-accent-info" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{r.title}</div>
+                      <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{r.title}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => copyReportLink(r.permalink, r.id)}
-                        className={`p-1.5 rounded-md transition-colors ${copiedId === r.id ? 'bg-emerald-500/10 text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
-                        title="Copy link">
-                        {copiedId === r.id ? <Icon as={Check} size="md" /> : <Icon as={Link2} size="md" />}
-                      </button>
+                      <IconButton
+                        icon={copiedId === r.id ? Check : Link2}
+                        label="Copy report link"
+                        size="sm"
+                        variant={copiedId === r.id ? 'accent' : 'ghost'}
+                        onClick={() => copyReportLink(r.permalink, r.id)}
+                      />
                       <a href={r.permalink} target="_blank" rel="noopener noreferrer"
-                        className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors" title="Open report">
+                        className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors" title="Open report">
                         <Icon as={ExternalLink} size="md" />
                       </a>
                     </div>
@@ -225,16 +217,16 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           : score >= 50
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        return (
+          <SectionCard>
             <div className="flex items-center gap-4">
-              <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
+              <div className={`t-stat-lg ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
-                <div className="t-body font-medium text-[var(--brand-text)]">Your site's health</div>
-                <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Your site's health</div>
+                <div className="t-body text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
-                <div className={`t-caption ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>
+                <div className={`t-caption ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-accent-success' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]'}`}>
                   {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
                 </div>
               )}
@@ -242,15 +234,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--brand-border)]/50 t-caption">
               <span className="text-[var(--brand-text-muted)]">{auditDetail.audit.totalPages} pages scanned</span>
               <button
+                type="button"
                 onClick={() => { setSeverityFilter(severityFilter === 'error' ? 'all' : 'error'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
-                className={`transition-colors ${severityFilter === 'error' ? 'text-red-300 font-medium' : 'text-red-400 hover:text-red-300'}`}
+                className={`transition-colors ${severityFilter === 'error' ? 'text-accent-danger font-medium' : 'text-accent-danger hover:text-accent-danger'}`}
               >{auditDetail.audit.errors} errors</button>
               <button
+                type="button"
                 onClick={() => { setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
-                className={`transition-colors ${severityFilter === 'warning' ? 'text-amber-300 font-medium' : 'text-amber-400 hover:text-amber-300'}`}
+                className={`transition-colors ${severityFilter === 'warning' ? 'text-accent-warning font-medium' : 'text-accent-warning hover:text-accent-warning'}`}
               >{auditDetail.audit.warnings} warnings</button>
             </div>
-          </div>
+          </SectionCard>
         );
       })()}
 
@@ -260,16 +254,16 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       ) && (() => {
         const { resolved, newIssues } = auditDetail.auditDiff!;
         const scoreDelta = auditDetail.audit.siteScore - auditDetail.previousScore!;
-        const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]';
-        const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
+        const deltaColor = scoreDelta > 0 ? 'text-accent-success' : scoreDelta < 0 ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]';
+        const DeltaIcon = scoreDelta > 0 ? ArrowUp : scoreDelta < 0 ? AlertTriangle : Minus;
         return (
           // pr-check-disable-next-line -- Compact audit-delta status bar; inline row element, not a content card
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption">
             <DeltaIcon className={`w-4 h-4 flex-shrink-0 ${deltaColor}`} />
             <span className="text-[var(--brand-text-muted)]">Since last audit:</span>
-            {resolved > 0 && <span className="text-emerald-400 font-medium">{resolved} resolved</span>}
+            {resolved > 0 && <span className="text-accent-success font-medium">{resolved} resolved</span>}
             {resolved > 0 && newIssues > 0 && <span className="text-[var(--brand-text-faint)]">·</span>}
-            {newIssues > 0 && <span className="text-red-400 font-medium">{newIssues} new</span>}
+            {newIssues > 0 && <span className="text-accent-danger font-medium">{newIssues} new</span>}
             <span className="text-[var(--brand-text-faint)]">·</span>
             <span className={`font-medium ${deltaColor}`}>
               score {auditDetail.previousScore} → {auditDetail.audit.siteScore}
@@ -282,13 +276,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── 2. PAGE SPEED (Always Expanded) ── */}
       {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
         const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-[var(--brand-text-muted)]';
+          r === 'good' ? 'text-accent-success' : r === 'needs-improvement' ? 'text-accent-warning' : r === 'poor' ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]';
         const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
           r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)]/30';
         const assessBadge = (a: CwvStrategyResult['assessment']) =>
-          a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
-          : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
-          : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+          a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-accent-success border-emerald-500/30' }
+          : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-accent-warning border-amber-500/30' }
+          : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-accent-danger border-red-500/30' }
           : { text: 'No Data', cls: 'bg-[var(--surface-3)]/50 text-[var(--brand-text-muted)] border-[var(--brand-border)]/30' };
         const renderStrategy = (label: string, s: CwvStrategyResult) => {
           const badge = assessBadge(s.assessment);
@@ -296,7 +290,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
                 <span className="t-caption font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
-                <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
+                <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">
                 {[
@@ -320,25 +314,24 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
               {!s.fieldDataAvailable && (
                 <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-amber-500/10 border border-amber-500/20">
-                  <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="t-caption-sm text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
+                  <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
+                  <p className="t-caption-sm text-accent-warning">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
                 </div>
               )}
             </div>
           );
         };
-        return ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Icon as={Globe} size="md" className="text-teal-400" />
-              <span className="t-body font-medium text-[var(--brand-text)]">Page Speed &amp; Core Web Vitals</span>
-              <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">Google uses these to rank your site</span>
-            </div>
+        return (
+          <SectionCard
+            title="Page Speed & Core Web Vitals"
+            titleIcon={<Icon as={Globe} size="md" className="text-accent-brand" />}
+            titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">Google uses these to rank your site</span>}
+          >
             <div className="flex gap-4 flex-wrap">
               {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
               {auditDetail.audit.cwvSummary!.desktop && renderStrategy('Desktop', auditDetail.audit.cwvSummary!.desktop)}
             </div>
-          </div>
+          </SectionCard>
         );
       })()}
 
@@ -382,17 +375,15 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* Two-column layout: Fix List | Page Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-              {/* Fix These First */}
-              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2">
-                  <Icon as={AlertTriangle} size="md" className="text-red-400" />
-                  <span className="t-body font-medium text-[var(--brand-text)]">Fix these first</span>
-                </div>
+              <SectionCard
+                title="Fix these first"
+                titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-danger" />}
+                noPadding
+              >
                 <div className="divide-y divide-[var(--brand-border)]/50">
                   {prioritized.length === 0 ? (
                     <div className="px-4 py-6 text-center">
-                      <Icon as={CheckCircle2} size="2xl" className="text-emerald-500/50 mx-auto mb-2" />
+                      <Icon as={CheckCircle2} size="2xl" className="text-accent-success mx-auto mb-2" />
                       <p className="t-caption text-[var(--brand-text-muted)]">No critical issues found!</p>
                     </div>
                   ) : (
@@ -401,7 +392,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       return (
                         <div key={`${item.pageId}-${i}`} className="px-4 py-3">
                           <div className="flex items-start gap-3">
-                            <span className="w-5 h-5 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] flex items-center justify-center flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)] font-medium">{i + 1}</span>
+                            <span className="w-5 h-5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] flex items-center justify-center flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)] font-medium">{i + 1}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
@@ -413,13 +404,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                               )}
                             </div>
                             {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
-                              <button
+                              <Button
+                                size="sm"
                                 onClick={() => requestContentImprovement({ pageId: item.pageId, page: item.page, slug: item.slug, issues: [item.issue] })}
                                 disabled={requestingPage === item.pageId}
-                                className="flex-shrink-0 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors"
+                                className="flex-shrink-0"
                               >
                                 {requestingPage === item.pageId ? '...' : 'Fix'}
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -427,18 +419,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     })
                   )}
                 </div>
-              </div>
+              </SectionCard>
 
-              {/* Page Cards */}
-              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
-                    <span className="t-body font-medium text-[var(--brand-text)]">Pages needing attention</span>
-                  </div>
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>
-                </div>
+              <SectionCard
+                title="Pages needing attention"
+                titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
+                action={<span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>}
+              >
                 <div className="grid grid-cols-1 gap-3">
                   {sortedPages.map(page => {
                     const errs = page.issues.filter(i => i.severity === 'error').length;
@@ -446,21 +433,21 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     const isExpanded = expandedPages.has(page.pageId);
                     return (
                       <div key={page.pageId} className={`rounded-[var(--radius-lg)] border transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50 border-[var(--brand-border-strong)]' : 'bg-[var(--surface-1)]/50 border-[var(--brand-border)]/50 hover:border-[var(--brand-border-strong)]'}`}>
-                        <button
+                        <ClickableRow
                           onClick={() => togglePage(page.pageId)}
-                          className="w-full flex items-center gap-3 p-3 text-left"
+                          className="flex items-center gap-3 p-3"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="t-caption font-medium text-[var(--brand-text)] truncate">{page.page}</div>
                             <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
-                            {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
-                            <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                            {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs}E</span>}
+                            {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns}W</span>}
+                            <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                             <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                           </div>
-                        </button>
+                        </ClickableRow>
                         
                         {/* Expanded issues accordion inside the card */}
                         {isExpanded && (
@@ -487,20 +474,20 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                             </div>
                             {hasContentIssues(page.issues) && workspaceId && (
                               <>
-                                <button
+                                <Button
+                                  icon={FileEdit}
                                   onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                                   disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+                                  className={`mt-3 ${
                                     requestedPages.has(page.pageId)
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                      : 'bg-teal-600 hover:bg-teal-500 text-white'
+                                      ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20'
+                                      : ''
                                   }`}
                                 >
-                                  <Icon as={FileEdit} size="sm" />
                                   {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                                </button>
+                                </Button>
                                 {requestError === page.pageId && (
-                                  <p className="t-caption-sm text-red-400 mt-1">Failed to create request. Please try again.</p>
+                                  <p className="t-caption-sm text-accent-danger mt-1">Failed to create request. Please try again.</p>
                                 )}
                               </>
                             )}
@@ -510,15 +497,16 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     );
                   })}
                 </div>
-                <button 
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
                   }}
-                  className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
+                  className="w-full mt-3 border-dashed"
                 >
                   View all {auditDetail.audit.totalPages} pages
-                </button>
-              </div>
+                </Button>
+              </SectionCard>
             </div>
           </>
         );
@@ -528,20 +516,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {actionPlanSlot}
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
-      {auditDetail.audit.siteWideIssues.length > 0 && ( // pr-check-disable-next-line -- Brand signature radius intentional
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <div className="px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center">
-                <Icon as={Info} size="md" className="text-amber-400" />
-              </div>
-              <div>
-                <div className="t-body font-medium text-[var(--brand-text)]">Site-Wide Issues</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
-              </div>
+      {auditDetail.audit.siteWideIssues.length > 0 && (
+        <SectionCard
+          title="Site-Wide Issues"
+          titleIcon={
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center">
+              <Icon as={Info} size="md" className="text-accent-warning" />
             </div>
-          </div>
-          
+          }
+          titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</span>}
+          noPadding
+        >
           <div className="p-3">
             <div className="flex flex-wrap gap-3">
               {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
@@ -553,12 +538,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 );
               })}
               {auditDetail.audit.siteWideIssues.length > 3 && (
-                <button 
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => toggleSection('site-wide-all')}
-                  className="px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   +{auditDetail.audit.siteWideIssues.length - 3} more
-                </button>
+                </Button>
               )}
             </div>
             
@@ -576,36 +562,35 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
             )}
           </div>
-        </div>
+        </SectionCard>
       )}
-
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <SectionCard noPadding>
           <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-[var(--surface-1)]/50">
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
-              <button onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+              <button type="button" onClick={() => setViewMode('by-page')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={LayoutList} size="sm" /> By Page
               </button>
-              <button onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+              <button type="button" onClick={() => setViewMode('by-fix-type')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={Layers} size="sm" /> By Fix Type
               </button>
             </div>
             {/* Severity filter */}
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               {(['all', 'error', 'warning'] as const).map(s => (
-                <button key={s} onClick={() => setSeverityFilter(s)}
-                  className={`px-3 py-2 min-h-[44px] rounded-md t-caption-sm font-medium transition-colors ${
+                <button key={s} type="button" onClick={() => setSeverityFilter(s)}
+                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                     severityFilter === s ? (s === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                   }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
             {infoIssueCount > 0 && (
               <button
+                type="button"
                 onClick={() => setShowInfoItems(!showInfoItems)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm transition-colors border ${
                   showInfoItems
@@ -632,21 +617,21 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               const isExpanded = expandedPages.has(page.pageId);
               return (
                 <div key={page.pageId} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
-                  <button
+                  <ClickableRow
                     onClick={() => togglePage(page.pageId)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="t-caption font-medium text-[var(--brand-text)] truncate">{page.page}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                      {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                      <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                      {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs} err</span>}
+                      {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns} warn</span>}
+                      <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
-                  </button>
+                  </ClickableRow>
 
                   {isExpanded && (
                     <div className="px-4 pb-3">
@@ -669,20 +654,20 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       </div>
                       {hasContentIssues(page.issues) && workspaceId && (
                         <>
-                          <button
+                          <Button
+                            icon={FileEdit}
                             onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                             disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+                            className={`mt-3 ${
                               requestedPages.has(page.pageId)
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                : 'bg-teal-600 hover:bg-teal-500 text-white'
+                                ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20'
+                                : ''
                             }`}
                           >
-                            <Icon as={FileEdit} size="sm" />
                             {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                          </button>
+                          </Button>
                           {requestError === page.pageId && (
-                            <p className="t-caption-sm text-red-400 mt-1">Failed to create request. Please try again.</p>
+                            <p className="t-caption-sm text-accent-danger mt-1">Failed to create request. Please try again.</p>
                           )}
                         </>
                       )}
@@ -746,9 +731,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   const isExpanded = expandedPages.has(`fix-type-${group.check}`);
                   return (
                     <div key={group.check} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
-                      <button
+                      <ClickableRow
                         onClick={() => togglePage(`fix-type-${group.check}`)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+                        className="flex items-center gap-3 px-4 py-3"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="t-caption font-medium text-[var(--brand-text)]">{group.label}</div>
@@ -756,10 +741,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
+                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-sm)] ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
                           <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         </div>
-                      </button>
+                      </ClickableRow>
 
                       {isExpanded && (
                         <div className="px-4 pb-3">
@@ -783,42 +768,41 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
             );
           })()}
-        </div>
+        </SectionCard>
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors">
+      <SectionCard noPadding>
+        <ClickableRow onClick={() => toggleSection('history')} className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <Icon as={BarChart3} size="md" className="text-[var(--brand-text-muted)]" />
-            <span className="t-body font-medium text-[var(--brand-text)]">History &amp; Details</span>
+            <span className="t-ui font-medium text-[var(--brand-text-bright)]">History &amp; Details</span>
           </div>
           <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
-        </button>
+        </ClickableRow>
         {expandedSections.has('history') && (
           <div className="px-4 pb-4 border-t border-[var(--brand-border)] space-y-4">
             {/* Score History */}
             {auditDetail.scoreHistory.length >= 2 && (
               <div className="pt-4">
-                <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Score History</div>
+                <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-2">Score History</div>
                 <ScoreHistoryChart history={auditDetail.scoreHistory} />
               </div>
             )}
             {/* Category Breakdown */}
             <div>
-              <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Issues by Category</div>
+              <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
                   const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
                   return (
                     <div key={cat} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
+                      <div className="w-2 h-2 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: info.color }} />
                       <span className="t-caption-sm text-[var(--brand-text-muted)] flex-1">{info.label}</span>
                       <div className="flex items-center gap-1.5 t-caption-sm">
-                        {counts.errors > 0 && <span className="text-red-400">{counts.errors}E</span>}
-                        {counts.warnings > 0 && <span className="text-amber-400">{counts.warnings}W</span>}
-                        {counts.infos > 0 && <span className="text-blue-400">{counts.infos}I</span>}
+                        {counts.errors > 0 && <span className="text-accent-danger">{counts.errors}E</span>}
+                        {counts.warnings > 0 && <span className="text-accent-warning">{counts.warnings}W</span>}
+                        {counts.infos > 0 && <span className="text-accent-info">{counts.infos}I</span>}
                       </div>
                     </div>
                   );
@@ -827,21 +811,23 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 
-  if (audit) return ( // pr-check-disable-next-line -- Brand signature radius intentional
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+  if (audit) return (
+    <SectionCard noPadding>
+      <div className="p-6">
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>
-          <div className="t-body font-medium text-[var(--brand-text)]">Site Health Score</div>
+          <div className="t-ui font-medium text-[var(--brand-text-bright)]">Site Health Score</div>
           <div className="t-caption text-[var(--brand-text-muted)]">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
-          <div className="flex gap-3 mt-2"><span className="t-caption text-red-400">{audit.errors} errors</span><span className="t-caption text-amber-400">{audit.warnings} warnings</span></div>
+          <div className="flex gap-3 mt-2"><span className="t-caption text-accent-danger">{audit.errors} errors</span><span className="t-caption text-accent-warning">{audit.warnings} warnings</span></div>
         </div>
       </div>
-    </div>
+      </div>
+    </SectionCard>
   );
 
   return (

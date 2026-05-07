@@ -105,14 +105,14 @@ export function RevenueDashboard() {
         {!confirmPurge ? (
           <button
             onClick={() => setConfirmPurge(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-danger hover:text-accent-danger hover:bg-red-500/10 border border-red-500/20 transition-all"
           >
             <Icon as={Trash2} size="sm" /> Purge All
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="t-caption-sm text-red-400/80 flex items-center gap-1"><Icon as={AlertTriangle} size="sm" /> Delete all {data.totalTransactions} records?</span>
-            <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-semibold text-red-300 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
+            <span className="t-caption-sm text-accent-danger flex items-center gap-1"><Icon as={AlertTriangle} size="sm" /> Delete all {data.totalTransactions} records?</span>
+            <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-semibold text-accent-danger bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
             <button onClick={() => setConfirmPurge(false)} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--surface-3)] transition-all">Cancel</button>
           </div>
         )}
@@ -123,7 +123,7 @@ export function RevenueDashboard() {
         <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={DollarSign} size="sm" /> Total Revenue</div>
-            <div className="text-xl font-bold text-teal-400">{fmtCents(data.totalRevenue)}</div>
+            <div className="text-xl font-bold text-accent-brand">{fmtCents(data.totalRevenue)}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.totalTransactions} transactions</div>
           </div>
         </SectionCard>
@@ -170,7 +170,7 @@ export function RevenueDashboard() {
                     <div className="t-caption text-[var(--brand-text)]">{ws.name}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{ws.count} transactions</div>
                   </div>
-                  <div className="t-caption font-semibold text-teal-400">{fmtCents(ws.revenue)}</div>
+                  <div className="t-caption font-semibold text-accent-brand">{fmtCents(ws.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -188,7 +188,7 @@ export function RevenueDashboard() {
                     <div className="t-caption text-[var(--brand-text)]">{fmtProductType(prod.productType)}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{prod.count} sold</div>
                   </div>
-                  <div className="t-caption font-semibold text-teal-400">{fmtCents(prod.revenue)}</div>
+                  <div className="t-caption font-semibold text-accent-brand">{fmtCents(prod.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -216,13 +216,13 @@ export function RevenueDashboard() {
                   <tr key={tx.id} className="group">
                     <td className="py-2 text-[var(--brand-text)]">{tx.workspaceName}</td>
                     <td className="py-2 text-[var(--brand-text-muted)]">{fmtProductType(tx.productType)}</td>
-                    <td className="py-2 text-teal-400 font-medium text-right">{fmtCents(tx.amount)}</td>
+                    <td className="py-2 text-accent-brand font-medium text-right">{fmtCents(tx.amount)}</td>
                     <td className="py-2 text-[var(--brand-text-muted)] text-right">{new Date(tx.paidAt).toLocaleDateString()}</td>
                     <td className="py-2 text-right">
                       <button
                         onClick={() => handleDelete(tx.id)}
                         disabled={deleting === tx.id}
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--brand-border-hover)] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--brand-border-hover)] hover:text-accent-danger hover:bg-red-500/10 transition-all disabled:opacity-50"
                         title="Delete this transaction"
                       >
                         <Icon as={Trash2} size="sm" />

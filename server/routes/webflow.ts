@@ -27,7 +27,9 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
+import { verifyAdminToken } from '../middleware.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { isProgrammingError } from '../errors.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 const router = Router();
@@ -38,7 +40,11 @@ router.get('/api/queue', (_req, res) => {
 });
 
 // Webflow sites
-router.get('/api/webflow/sites', async (req, res) => {
+router.get('/api/webflow/sites', requireAdminAuth, async (req, res) => {
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (req.user && !verifyAdminToken(adminToken)) {
+    return res.status(401).json({ error: 'Admin authentication required' });
+  }
   try {
     const tokenParam = req.query.token as string | undefined;
     const sites = await listSites(tokenParam || undefined);
@@ -50,7 +56,7 @@ router.get('/api/webflow/sites', async (req, res) => {
 });
 
 // --- Asset Browser ---
-router.get('/api/webflow/assets/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/assets/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId);
     const assets = await listAssets(req.params.siteId, token || undefined);
@@ -61,14 +67,20 @@ router.get('/api/webflow/assets/:siteId', requireWorkspaceAccessFromQuery(), asy
   }
 });
 
-router.patch('/api/webflow/assets/:assetId', async (req, res) => {
+router.patch('/api/webflow/assets/:assetId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { altText, displayName, siteId } = req.body;
   const token = siteId ? getTokenForSite(siteId) : null;
   const result = await updateAsset(req.params.assetId, { altText, displayName }, token || undefined);
   res.json(result);
 });
 
-router.delete('/api/webflow/assets/:assetId', async (req, res) => {
+router.delete('/api/webflow/assets/:assetId', requireWorkspaceSiteAccess({
+  workspace: { source: 'query', name: 'workspaceId' },
+  site: { source: 'query', name: 'siteId' },
+}), async (req, res) => {
   const siteId = req.query.siteId as string;
   const token = siteId ? getTokenForSite(siteId) : null;
   const result = await deleteAsset(req.params.assetId, token || undefined);
@@ -86,7 +98,10 @@ async function runConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => P
 }
 
 // Bulk update alt text
-router.post('/api/webflow/assets/bulk-alt', async (req, res) => {
+router.post('/api/webflow/assets/bulk-alt', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { updates, siteId } = req.body as { updates: Array<{ assetId: string; altText: string }>; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
   const settled = await runConcurrent(updates, 5, u => updateAsset(u.assetId, { altText: u.altText }, token || undefined));
@@ -97,7 +112,10 @@ router.post('/api/webflow/assets/bulk-alt', async (req, res) => {
 });
 
 // Bulk delete assets
-router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
+router.post('/api/webflow/assets/bulk-delete', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { assetIds, siteId } = req.body as { assetIds: string[]; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
   const settled = await runConcurrent(assetIds, 5, id => deleteAsset(id, token || undefined));
@@ -108,7 +126,7 @@ router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
 });
 
 // --- Page SEO Editing ---
-router.get('/api/webflow/pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { siteId } = req.params;
     const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
@@ -122,7 +140,7 @@ router.get('/api/webflow/pages/:siteId', requireWorkspaceAccessFromQuery(), asyn
 });
 
 // All pages (static + CMS) — for Page Analysis and bulk analysis features
-router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/all-pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { siteId } = req.params;
     const token = getTokenForSite(siteId) || undefined;
@@ -170,7 +188,10 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
   }
 });
 
-router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
+router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   // Reject synthetic CMS IDs at the API boundary — these are not real Webflow page IDs
   // and the Webflow API returns 404 for them. Guard here so no frontend call site can
   // inadvertently send them through regardless of whether it remembered to filter.
@@ -197,7 +218,7 @@ router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
   }
 });
 
-router.post('/api/webflow/publish/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/publish/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await publishSite(req.params.siteId, token);

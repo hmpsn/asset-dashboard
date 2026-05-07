@@ -10,7 +10,6 @@ import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
-import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
@@ -18,7 +17,7 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
-import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPersonasForPrompt } from './workspace-intelligence.js';
 
 
 const log = createLogger('helpers');
@@ -131,6 +130,19 @@ export function normalizePageUrl(url: string): string {
   } catch { // catch-ok: malformed URL string — fall through to path-only normalization
   }
   return normalizePath(url);
+}
+
+/** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
+export function matchPageIdentity(a: string, b: string): boolean {
+  return normalizePageUrl(a).toLowerCase() === normalizePageUrl(b).toLowerCase();
+}
+
+/** Find a pageMap entry from a full URL/path/bare slug using exact normalized page identity. */
+export function findPageMapEntryByIdentity<T extends { pagePath: string }>(
+  pageMap: T[],
+  pageIdentity: string,
+): T | undefined {
+  return findPageMapEntry(pageMap, normalizePageUrl(pageIdentity));
 }
 
 // ── Input Validation ──
@@ -347,22 +359,15 @@ export async function buildSchemaContext(
   if (ws) {
     ctx.companyName = ws.name;
     ctx.liveDomain = ws.liveDomain;
-    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
-    ctx.brandVoice = ws.brandVoice;
-    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
-    ctx.businessContext = ws.keywordStrategy?.businessContext;
 
-    // Slice-migration starter (Trajectory 3 → 1; tracked in
-    // data/roadmap.json:schema-context-builder-pattern-b-migration).
-    // PR1 migrates `siteKeywords` and per-page `pageKeywords` to slice consumption.
-    // Other direct reads (brandVoice, businessContext, knowledgeBase, _businessProfile,
-    // _personasBlock) tracked for opportunistic migration; pr-check rule
-    // schema-context-direct-read-not-on-allowlist (Task 13) fires on any new
-    // non-identity direct read.
+    // Schema context now consumes SEO/business data from workspace intelligence.
+    // Remaining direct reads in this function are identity/analytics paths only.
     let schemaIntel: Awaited<ReturnType<typeof buildWorkspaceIntelligence>> | null = null;
     try {
       schemaIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
-    } catch { /* intelligence layer not ready — siteKeywords falls back to undefined */ } // catch-ok
+    } catch (err) {
+      log.warn({ err, workspaceId: ws.id, siteId }, 'buildSchemaContext: intelligence seoContext unavailable');
+    } // catch-ok
 
     // Audit Correction 2: SeoContextSlice field is strategy.siteKeywords (not keywordStrategy.siteKeywords).
     const rawSiteKeywords = schemaIntel?.seoContext?.strategy?.siteKeywords;
@@ -376,6 +381,7 @@ export async function buildSchemaContext(
         ctx.siteKeywords = rawSiteKeywords;
       }
     }
+    ctx.businessContext = schemaIntel?.seoContext?.businessContext;
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
@@ -389,21 +395,29 @@ export async function buildSchemaContext(
       if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
 
-    // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
-    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
-    const rawKB = getRawKnowledge(ws.id);
+    // Knowledge base from workspace intelligence (inline + knowledge-docs/ files)
+    const rawKB = schemaIntel?.seoContext?.knowledgeBase ?? '';
     if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
 
     // Audience personas for richer schema targeting
-    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
-    const personasBlock = buildPersonasContext(ws.id);
+    const personasBlock = formatPersonasForPrompt(schemaIntel?.seoContext?.personas);
     if (personasBlock) ctx._personasBlock = personasBlock;
 
     // Verified business profile for schema grounding (bypasses page content verification)
-    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
-    if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
+    const profile = schemaIntel?.seoContext?.businessProfile;
+    if (profile) {
+      ctx._businessProfile = {
+        phone: profile.phone,
+        email: profile.email,
+        address: profile.addressParts,
+        socialProfiles: profile.socialProfiles,
+        openingHours: profile.openingHours,
+        foundedDate: profile.foundedDate,
+        numberOfEmployees: profile.numberOfEmployees,
+      };
+    }
 
-    ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
+    ctx._siteHasSearch = ws.siteHasSearch === true;
 
   }
   // Fetch analytics maps when requested (for schema generation routes)
@@ -464,8 +478,10 @@ export async function buildSchemaContext(
 
       // Build insights map from intelligence layer (SQLite — synchronous)
       try {
-        // schema-context-direct-read-ok: legacy analytics read; tracked in roadmap schema-context-builder-pattern-b-migration
-        const allInsights = getInsights(ws.id);
+        const insightsWorkspaceId = ctx.workspaceId;
+        if (!insightsWorkspaceId) throw new Error('workspaceId missing while building schema insights map');
+        // schema-context-direct-read-ok: legacy analytics store path (intentionally retained for map-shape parity)
+        const allInsights = getInsights(insightsWorkspaceId);
         insightsMap = new Map();
         // ranking_opportunity pageIds are stored as relative paths after the
         // page-identity normalisation; legacy composite-key form ("path::query")
@@ -659,11 +675,13 @@ export function toInsightPageId(url: string): string {
 
 /**
  * Convert a Webflow audit page object to the canonical relative path used for
- * `analytics_insights.page_id`. Prefers slug (→ /slug), falls back to URL pathname,
- * and finally falls back to the raw pageId (Webflow UUID) as a last resort.
+ * `analytics_insights.page_id`. Prefers the URL pathname because nested Webflow
+ * pages can share leaf slugs, falls back to slug (→ /slug), and finally falls
+ * back to the raw pageId (Webflow UUID) as a last resort.
  * Defensively strips leading slashes from slug to avoid `//foo` from a leading-slash slug.
  */
 export function toAuditFindingPageId(page: { slug: string; url: string; pageId: string }): string {
+  try { if (page.url) return new URL(page.url).pathname; } catch { /* fall through */ }
   if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
-  try { return new URL(page.url).pathname; } catch { return page.pageId; }
+  return page.pageId;
 }

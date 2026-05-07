@@ -60,6 +60,12 @@ const stmts = createStmtCache(() => ({
   selectBySession: db.prepare(
     'SELECT * FROM payments WHERE workspace_id = ? AND stripe_session_id = ?',
   ),
+  selectAllBySession: db.prepare(
+    'SELECT * FROM payments WHERE workspace_id = ? AND stripe_session_id = ? ORDER BY created_at ASC',
+  ),
+  selectByPaymentIntent: db.prepare(
+    'SELECT * FROM payments WHERE workspace_id = ? AND stripe_payment_intent_id = ?',
+  ),
   selectByWorkspace: db.prepare(
     'SELECT * FROM payments WHERE workspace_id = ? ORDER BY created_at DESC',
   ),
@@ -178,5 +184,21 @@ export function getPaymentBySession(
   stripeSessionId: string
 ): PaymentRecord | undefined {
   const row = stmts().selectBySession.get(workspaceId, stripeSessionId) as PaymentRow | undefined;
+  return row ? rowToRecord(row) : undefined;
+}
+
+export function listPaymentsBySession(
+  workspaceId: string,
+  stripeSessionId: string
+): PaymentRecord[] {
+  const rows = stmts().selectAllBySession.all(workspaceId, stripeSessionId) as PaymentRow[];
+  return rows.map(rowToRecord);
+}
+
+export function getPaymentByPaymentIntent(
+  workspaceId: string,
+  stripePaymentIntentId: string
+): PaymentRecord | undefined {
+  const row = stmts().selectByPaymentIntent.get(workspaceId, stripePaymentIntentId) as PaymentRow | undefined;
   return row ? rowToRecord(row) : undefined;
 }

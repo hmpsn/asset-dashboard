@@ -7,10 +7,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { stripCodeFences } from './helpers.js';
-import { callAnthropic } from './anthropic-helpers.js';
+import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { getKeywordOverview, getDomainOrganicKeywords } from './semrush.js';
 import { getBrandscript } from './brandscript.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
+import { getWorkspace } from './workspaces.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import {
   createBlueprint,
   deleteBlueprint,
@@ -120,6 +122,10 @@ export async function generateBlueprint(
   input: BlueprintGenerationInput,
 ): Promise<SiteBlueprint> {
   log.info({ workspaceId, input }, 'Generating blueprint');
+  const workspace = getWorkspace(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'insights', 'learnings', 'clientSignals'],
+    learningsDomain: 'strategy',
+  });
 
   // ── 1. Optional brandscript context ──────────────────────────────────────
   let brandContext = '';
@@ -134,11 +140,14 @@ export async function generateBlueprint(
     }
   }
 
-  // ── 2. Optional domain keyword context from SEMrush ───────────────────────
+  // ── 2. Optional domain keyword context from configured SEO provider ───────
   let keywordContext = '';
   if (input.domain) {
     try {
-      const organicKeywords = await getDomainOrganicKeywords(input.domain, workspaceId, 50);
+      const provider = getConfiguredProvider(workspace?.seoDataProvider);
+      const organicKeywords = provider
+        ? await provider.getDomainKeywords(input.domain, workspaceId, 50)
+        : [];
       if (organicKeywords.length > 0) {
         keywordContext = `\n\nExisting organic keywords for ${input.domain}:\n` +
           organicKeywords.map((k) => `- "${k.keyword}" (vol: ${k.volume}, diff: ${k.difficulty})`).join('\n');
@@ -147,6 +156,13 @@ export async function generateBlueprint(
       log.warn({ err, domain: input.domain }, 'Failed to fetch domain keywords — continuing without');
     }
   }
+
+  const intelligenceContext = formatForPrompt(intel, {
+    verbosity: 'compact',
+    sections: ['insights', 'learnings', 'clientSignals'],
+    learningsDomain: 'strategy',
+    tokenBudget: 2000,
+  });
 
   // ── 3. Build AI prompt and call Claude Sonnet 4 ───────────────────────────
   const prompt = `You are a web strategist for a design studio. Based on the following business context, recommend a complete list of pages for a new website.
@@ -158,6 +174,7 @@ ${input.includeContentPages ? 'Include content/blog pages for SEO opportunity.' 
 
 ${brandContext ? `BRAND CONTEXT (from discovery):\n${brandContext}` : ''}
 ${keywordContext}
+${intelligenceContext ? `\n\nINTELLIGENCE CONTEXT:\n${intelligenceContext}` : ''}
 
 For each recommended page, provide:
 1. name — human-readable page name
@@ -170,8 +187,9 @@ For each recommended page, provide:
 
 Return ONLY a JSON array of objects with these fields. No markdown, no explanation outside the JSON.`;
 
-  const aiResponse = await callAnthropic({
-    model: 'claude-sonnet-4-20250514',
+  const aiResponse = await callAI({
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-6',
     maxTokens: 4000,
     messages: [{ role: 'user', content: prompt }],
     feature: 'blueprint-generation',
@@ -260,9 +278,9 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
 // ── Private keyword enrichment ───────────────────────────────────────────────
 
 /**
- * Non-blocking keyword enrichment: fetches SEMrush metrics for all primary
+ * Non-blocking keyword enrichment: fetches provider metrics for all primary
  * keywords in the blueprint and logs the results. Volume/difficulty data is
- * stored in the SEMrush cache layer — a future phase will write it back to
+ * stored in the provider cache layer — a future phase will write it back to
  * the entry records directly.
  */
 async function enrichKeywords(
@@ -277,13 +295,19 @@ async function enrichKeywords(
   if (keywords.length === 0) return;
 
   try {
-    const metrics = await getKeywordOverview(keywords, workspaceId);
+    const workspace = getWorkspace(workspaceId);
+    const provider = getConfiguredProvider(workspace?.seoDataProvider);
+    if (!provider) {
+      log.info({ blueprintId, keywordCount: keywords.length }, 'Blueprint keyword enrichment skipped — no SEO data provider configured');
+      return;
+    }
+    const metrics = await provider.getKeywordMetrics(keywords, workspaceId);
     log.info(
       { blueprintId, keywordCount: keywords.length, metricsReturned: metrics.length },
       'Blueprint keyword enrichment complete',
     );
   } catch (err) {
-    log.warn({ err, blueprintId }, 'SEMrush keyword overview failed during enrichment');
+    log.warn({ err, blueprintId }, 'SEO provider keyword overview failed during enrichment');
   }
 }
 

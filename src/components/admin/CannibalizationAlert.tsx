@@ -9,15 +9,15 @@ interface Props {
 }
 
 const SEVERITY_CLASSES: Record<CannibalizationWarning['severity'], string> = {
-  high: 'text-red-400 bg-red-500/10 border-red-500/20',
-  medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  low: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  high: 'text-accent-danger bg-red-500/10 border-red-500/20',
+  medium: 'text-accent-warning bg-amber-500/10 border-amber-500/20',
+  low: 'text-accent-info bg-blue-500/10 border-blue-500/20',
 };
 
 const SEVERITY_ICON_COLOR: Record<CannibalizationWarning['severity'], string> = {
-  high: 'text-red-400',
-  medium: 'text-amber-400',
-  low: 'text-blue-400',
+  high: 'text-accent-danger',
+  medium: 'text-accent-warning',
+  low: 'text-accent-info',
 };
 
 /** Strip protocol + domain from a URL, leaving only the path. Falls back to the original string if not a valid URL. */
@@ -46,7 +46,7 @@ export function CannibalizationAlert({ warnings, tier }: Props) {
               key={w.keyword}
               className={`border rounded-[var(--radius-lg)] p-3 ${SEVERITY_CLASSES[w.severity]}`}
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 t-ui">
                 <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${SEVERITY_ICON_COLOR[w.severity]}`} />
                 <span>
                   &ldquo;{w.keyword}&rdquo; targeted by {w.pages.length} pages
@@ -54,7 +54,7 @@ export function CannibalizationAlert({ warnings, tier }: Props) {
               </div>
               <div className="mt-2 ml-6 space-y-0.5">
                 {w.pages.map((page) => (
-                  <div key={page} className="text-xs text-[var(--brand-text)] truncate">
+                  <div key={page} className="t-caption-sm text-[var(--brand-text)] truncate">
                     {toPath(page)}
                   </div>
                 ))}

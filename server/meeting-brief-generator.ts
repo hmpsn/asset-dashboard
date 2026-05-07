@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -147,16 +147,17 @@ Avoid: "Your site health score is 78. You have 12 open insights."
 `.trim(), customPromptNotes);
 
   const prompt = buildBriefPrompt(intel);
-  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-    { role: 'system', content: systemPrompt },
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [
     { role: 'user', content: prompt },
   ];
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1',
+  const result = await callAI({
+    model: 'gpt-5.4',
+    system: systemPrompt,
     messages,
     maxTokens: 2000,
     temperature: 0.3,
+    responseFormat: { type: 'json_object' },
     feature: 'meeting-brief',
     workspaceId,
   });
@@ -172,11 +173,13 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       { role: 'assistant', content: result.text },
       { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
-    const retryResult = await callOpenAI({
-      model: 'gpt-4.1',
+    const retryResult = await callAI({
+      model: 'gpt-5.4',
+      system: systemPrompt,
       messages: retryMessages,
       maxTokens: 2000,
       temperature: 0.1,
+      responseFormat: { type: 'json_object' },
       feature: 'meeting-brief',
       workspaceId,
     });

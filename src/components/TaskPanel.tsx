@@ -1,24 +1,20 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertTriangle, X, ChevronDown, ChevronUp, Activity, StopCircle, Ban } from 'lucide-react';
 import { Icon } from './ui';
 import { useBackgroundTasks, type BackgroundJob } from '../hooks/useBackgroundTasks';
+import { getBackgroundJobLabel, isBackgroundJobCancellable } from '../../shared/types/background-jobs';
 
-const TYPE_LABELS: Record<string, string> = {
-  'seo-audit': 'SEO Audit',
-  'compress': 'Compress Image',
-  'bulk-compress': 'Bulk Compress',
-  'bulk-alt': 'Bulk Alt Text',
-  'bulk-seo-fix': 'Bulk SEO Fix',
-  'sales-report': 'Sales Report',
-  'schema-generator': 'Schema Generator',
-  'keyword-strategy': 'Keyword Strategy',
-  'page-analysis': 'Page Analysis',
-};
+function getWorkspaceIdFromPathname(pathname: string): string | undefined {
+  return pathname.match(/^\/ws\/([^/]+)/)?.[1];
+}
 
 function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: () => void; onCancel: () => void }) {
-  const label = TYPE_LABELS[job.type] || job.type;
+  const label = getBackgroundJobLabel(job.type);
   const isActive = job.status === 'pending' || job.status === 'running';
+  const canCancel = isActive && isBackgroundJobCancellable(job.type);
   const pct = job.total && job.progress != null ? Math.round((job.progress / job.total) * 100) : null;
+  const progressText = job.total && job.progress != null ? `${job.progress}/${job.total}` : null;
 
   return (
     <div className="px-3 py-2.5 border-b border-[var(--brand-border)] last:border-0 group">
@@ -31,70 +27,85 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
           <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{label}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{job.message}</div>
         </div>
-        {isActive && (
-          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all" title="Stop">
+        {canCancel && (
+          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all" title="Stop" aria-label={`Stop ${label}`}>
             <Icon as={StopCircle} size="sm" />
           </button>
         )}
         {!isActive && (
-          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-all">
+          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-all" aria-label={`Dismiss ${label}`}>
             <Icon as={X} size="sm" />
           </button>
         )}
       </div>
-      {isActive && pct != null && (
-        <div className="mt-1.5 h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-teal-500 rounded-full transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
+      {isActive && (pct != null || progressText) && (
+        <div className="mt-1.5 flex items-center gap-2">
+          {pct != null && (
+            <div className="h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden flex-1">
+              <div
+                className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          )}
+          {progressText && <span className="t-micro text-[var(--brand-text-muted)] tabular-nums">{progressText}</span>}
         </div>
       )}
     </div>
   );
 }
 
-export function TaskPanel() {
-  const { jobs, activeJobs, dismissJob, cancelJob, clearDone } = useBackgroundTasks();
+export function TaskPanel({ workspaceId }: { workspaceId?: string }) {
+  const location = useLocation();
+  const { jobsForWorkspace, dismissJob, cancelJob, clearDone } = useBackgroundTasks();
   const [expanded, setExpanded] = useState(false);
+  const visibleWorkspaceId = workspaceId ?? getWorkspaceIdFromPathname(location.pathname);
 
-  const recentJobs = jobs.filter(j => !j.dismissed).slice(0, 10);
-  const doneCount = recentJobs.filter(j => j.status === 'done' || j.status === 'error').length;
+  const scopedJobs = jobsForWorkspace(visibleWorkspaceId);
+  const activeJobs = scopedJobs.filter(j => j.status === 'pending' || j.status === 'running');
+  const recentJobs = scopedJobs.filter(j => !j.dismissed).slice(0, 10);
+  const doneCount = recentJobs.filter(j => j.status === 'done' || j.status === 'error' || j.status === 'cancelled').length;
+  const summary = activeJobs.length > 0
+    ? `${activeJobs.length} task${activeJobs.length > 1 ? 's' : ''} running`
+    : `${doneCount} task${doneCount > 1 ? 's' : ''} completed`;
 
   if (recentJobs.length === 0) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-[var(--z-modal)] w-80">
       {/* Header pill */}
-      <button
-        onClick={() => setExpanded(!expanded)}
+      <div
         className="w-full flex items-center gap-2 px-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-t-[var(--radius-xl)] hover:border-[var(--brand-border-hover)] transition-colors"
         style={!expanded ? { borderRadius: 'var(--radius-xl)' } : undefined}
       >
-        {activeJobs.length > 0 ? (
-          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
-        ) : (
-          <Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />
-        )}
-        <span className="t-caption font-medium text-[var(--brand-text)] flex-1 text-left">
-          {activeJobs.length > 0
-            ? `${activeJobs.length} task${activeJobs.length > 1 ? 's' : ''} running`
-            : `${doneCount} task${doneCount > 1 ? 's' : ''} completed`
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          aria-expanded={expanded}
+          aria-label={`${summary}. ${expanded ? 'Hide' : 'Show'} background tasks`}
+        >
+          {activeJobs.length > 0 ? (
+            <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+          ) : (
+            <Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />
+          )}
+          <span className="t-caption font-medium text-[var(--brand-text)] flex-1 truncate">
+            {summary}
+          </span>
+          {expanded
+            ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
+            : <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" />
           }
-        </span>
+        </button>
         {doneCount > 0 && !expanded && (
           <button
-            onClick={(e) => { e.stopPropagation(); clearDone(); }}
+            onClick={(e) => { e.stopPropagation(); clearDone(visibleWorkspaceId); }}
             className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-1"
           >
             Clear
           </button>
         )}
-        {expanded
-          ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
-          : <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" />
-        }
-      </button>
+      </div>
 
       {/* Expandable list */}
       {expanded && (
@@ -104,7 +115,7 @@ export function TaskPanel() {
           ))}
           {doneCount > 0 && (
             <div className="px-3 py-2 text-center">
-              <button onClick={clearDone} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              <button onClick={() => clearDone(visibleWorkspaceId)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
                 Clear completed
               </button>
             </div>

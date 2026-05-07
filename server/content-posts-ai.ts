@@ -4,8 +4,8 @@
  * unification passes, and SEO meta generation.
  */
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
-import { callOpenAI } from './openai-helpers.js';
-import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
+import { callAI } from './ai.js';
+import { isAnthropicConfigured } from './anthropic-helpers.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -19,8 +19,8 @@ const log = createLogger('content-posts-ai');
 // AI model config — Claude for creative prose, GPT for structured tasks.
 // Claude produces more natural, less formulaic writing. GPT excels at
 // JSON output, unification editing, and SEO meta generation.
-const CONTENT_MODEL = 'gpt-4.1';         // fallback + structured tasks
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514' as const;
+const CONTENT_MODEL = 'gpt-5.4';         // fallback + structured tasks
+const CLAUDE_MODEL = 'claude-sonnet-4-6' as const;
 const CLAUDE_TEMP = 0.7;
 
 /**
@@ -58,6 +58,8 @@ export async function callCreativeAI(opts: {
    * strip markdown code fences from the returned text. Defaults to false.
    */
   json?: boolean;
+  /** Optional caller cancellation signal. */
+  signal?: AbortSignal;
 }): Promise<string> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
   const temperature = opts.temperature ?? CLAUDE_TEMP;
@@ -70,7 +72,8 @@ export async function callCreativeAI(opts: {
 
   if (isAnthropicConfigured()) {
     try {
-      const result = await callAnthropic({
+      const result = await callAI({
+        provider: 'anthropic',
         model: CLAUDE_MODEL,
         system: effectiveSystem,
         messages: [{ role: 'user', content: userPrompt }],
@@ -80,23 +83,26 @@ export async function callCreativeAI(opts: {
         workspaceId,
         maxRetries: 3,      // patient retries — quality over speed
         timeoutMs: 90_000,
+        signal: opts.signal,
       });
       log.info(`[${feature}] Generated with Claude`);
       const text = result.text.trim();
       return json ? stripCodeFence(text) : text;
     } catch (err) {
+      if (opts.signal?.aborted) throw err;
       log.info(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
   }
 
   // Fallback to GPT (or primary if no Anthropic key)
-  const result = await callOpenAI({
+  const result = await callAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
     maxTokens,
     temperature,
     feature,
     workspaceId,
+    signal: opts.signal,
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
   log.info(`[${feature}] Generated with GPT`);
@@ -124,6 +130,10 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
   pillar: 'You are an authority content strategist creating comprehensive hub pages that establish topical authority and drive organic traffic.',
   resource: 'You are an educational content writer creating actionable guides and resources that establish thought leadership.',
 };
+
+interface ContentAIGenerationOptions {
+  signal?: AbortSignal;
+}
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
   blog: `- Open with a specific, concrete scenario, bold claim, or unexpected angle — NOT a generic stat question
@@ -274,6 +284,7 @@ export async function generateIntroduction(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const totalBudget = brief.wordCountTarget || 1800;
   const pageType = brief.pageType || 'blog';
@@ -325,6 +336,7 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     maxTokens: 600,
     feature: 'content-post-intro',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -337,6 +349,7 @@ export async function generateSection(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const sectionTarget = section.wordCount || 300;
   const totalBudget = brief.wordCountTarget || 1800;
@@ -412,6 +425,7 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     maxTokens: Math.max(800, sectionTarget * 2),
     feature: 'content-post-section',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -421,6 +435,7 @@ export async function generateConclusion(
   voiceCtx: string,
   workspaceId: string,
   siteDomain?: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<string> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
@@ -467,6 +482,7 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     maxTokens: 800,
     feature: 'content-post-conclusion',
     workspaceId,
+    signal: options.signal,
   });
 }
 
@@ -496,6 +512,7 @@ export async function generateSeoMeta(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ seoTitle: string; seoMetaDescription: string } | null> {
   const introPlain = stripHtml(post.introduction).slice(0, 500);
   const sectionHeadings = post.sections.map(s => s.heading).join(', ');
@@ -532,13 +549,14 @@ Return valid JSON only:
 }`;
 
   try {
-    const result = await callOpenAI({
+    const result = await callAI({
       model: CONTENT_MODEL,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
       temperature: 0.5,
       feature: 'content-post-seo-meta',
       workspaceId,
+      signal: options.signal,
     });
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
@@ -561,6 +579,7 @@ export async function unifyPost(
   brief: ContentBrief,
   voiceCtx: string,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
@@ -615,6 +634,8 @@ RULES:
 - Introduction: return HTML paragraphs only (no heading)
 - Conclusion: return full HTML including its <h2> heading
 - KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}
+- KEYWORD DENSITY CAP: No keyword phrase should appear more than 4 times in the full article. Count occurrences of each keyword from the brief. Where any exceeds 4, replace the excess with a synonym or rephrase to refer to the concept implicitly — do not simply delete the passage.
+- STRUCTURAL VARIETY: Review how each section is shaped (opening sentence type, prose vs. bullet list, example-first vs. definition-first, etc.). If more than 2 consecutive sections follow the same pattern, rewrite the middle one using a different approach — straight prose, an example-first opening, a comparison, or a short Q&A exchange. Variety should feel natural, not forced.
 
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
@@ -631,20 +652,19 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   log.info(`Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
-  const result = await callOpenAI({
-    model: CONTENT_MODEL,
-    messages: [
-      { role: 'system', content: 'You are a senior editor performing a cohesion and word-count review. Return valid JSON only.' },
-      { role: 'user', content: prompt },
-    ],
+  const rawResult = await callCreativeAI({
+    systemPrompt: 'You are a senior editor performing a cohesion and word-count review.',
+    userPrompt: prompt,
     maxTokens,
     temperature: 0.4,
     feature: 'content-post-unify',
     workspaceId,
+    json: true,
+    signal: options.signal,
   });
 
   try {
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = rawResult.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       log.warn('Unification: no JSON object found in response');
       return null;
@@ -715,7 +735,7 @@ Return ONLY valid JSON in this exact format:
   "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
 }`;
 
-  const result = await callOpenAI({
+  const result = await callAI({
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,

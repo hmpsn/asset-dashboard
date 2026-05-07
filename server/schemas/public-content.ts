@@ -39,19 +39,19 @@ export const submitContentRequestSchema = z.object({
 // POST /api/public/content-request/:workspaceId/:id/decline
 export const declineContentRequestSchema = z.object({
   reason: z.string().max(1000).optional().or(z.literal('')),
-});
+}).strict();
 
 // POST /api/public/content-request/:workspaceId/:id/request-changes
 export const requestChangesSchema = z.object({
   feedback: z.string().max(2000).optional().or(z.literal('')),
-});
+}).strict();
 
 // POST /api/public/content-request/:workspaceId/:id/comment
 // Note: 'author' is intentionally absent — the handler hardcodes 'client' regardless of input
 // (unauthenticated public endpoint). Keeping 'author' in the schema would imply 'team' is accepted.
 export const addCommentSchema = z.object({
   content: z.string().min(1, 'content is required').max(2000),
-});
+}).strict();
 
 // POST /api/public/content-request/:workspaceId/from-audit
 export const fromAuditSchema = z.object({
@@ -62,10 +62,10 @@ export const fromAuditSchema = z.object({
 });
 
 // POST /api/public/content-request/:workspaceId/:id/approve
-export const approveContentRequestSchema = z.object({});
+export const approveContentRequestSchema = z.object({}).strict();
 
 // POST /api/public/content-request/:workspaceId/:id/upgrade
-export const upgradeContentRequestSchema = z.object({});
+export const upgradeContentRequestSchema = z.object({}).strict();
 
 // POST /api/public/tracked-keywords/:workspaceId
 export const addTrackedKeywordSchema = z.object({

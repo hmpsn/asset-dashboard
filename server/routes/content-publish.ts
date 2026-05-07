@@ -16,16 +16,21 @@ import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import { generateFeaturedImage } from '../content-image.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 
 const log = createLogger('content-publish');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
+const publishContentPostSchema = z.object({
+  generateImage: z.boolean().optional(),
+}).strict().default({});
+
 // --- Publish a content post to Webflow CMS ---
-router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), validate(publishContentPostSchema), async (req, res) => {
   const { workspaceId, postId } = req.params;
   const { generateImage } = req.body as { generateImage?: boolean };
 
@@ -113,7 +118,11 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
     // Publish the CMS item to make it live
     const pubResult = await publishCollectionItems(collectionId, [itemId], token);
     if (!pubResult.success) {
-      log.warn(`CMS publish warning for ${itemId}: ${pubResult.error}`);
+      updatePostField(workspaceId, postId, {
+        webflowItemId: itemId,
+        webflowCollectionId: collectionId,
+      });
+      return res.status(500).json({ error: `Failed to publish CMS item: ${pubResult.error}` });
     }
 
     // Update the post record with publish tracking data
@@ -154,7 +163,10 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
 });
 
 // --- Suggest field mapping for a collection ---
-router.post('/api/webflow/suggest-field-mapping/:siteId', async (req, res) => {
+router.post('/api/webflow/suggest-field-mapping/:siteId', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   const { siteId } = req.params;
   const { collectionId } = req.body as { collectionId: string };
 
@@ -172,8 +184,8 @@ router.post('/api/webflow/suggest-field-mapping/:siteId', async (req, res) => {
     // Use AI to suggest field mappings
     const fieldsDescription = schema.fields.map(f => `- slug: "${f.slug}", displayName: "${f.displayName}", type: "${f.type}"`).join('\n');
 
-    const result = await callOpenAI({
-      model: 'gpt-4.1-nano',
+    const result = await callAI({
+      model: 'gpt-5.4-nano',
       messages: [{
         role: 'user',
         content: `Given this Webflow CMS collection schema, suggest which field slugs map to each blog post property. Return ONLY valid JSON.
@@ -199,6 +211,7 @@ Return ONLY the JSON object with the mapping.`,
       }],
       maxTokens: 500,
       temperature: 0.1,
+      responseFormat: { type: 'json_object' },
       feature: 'suggest-field-mapping',
     });
 
@@ -218,7 +231,7 @@ Return ONLY the JSON object with the mapping.`,
 });
 
 // --- Get collections for a site (used by PublishSettings UI) ---
-router.get('/api/webflow/publish-collections/:siteId', async (req, res) => {
+router.get('/api/webflow/publish-collections/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
   try {
     const token = getTokenForSite(siteId) || undefined;
@@ -231,7 +244,10 @@ router.get('/api/webflow/publish-collections/:siteId', async (req, res) => {
 });
 
 // --- Get collection schema (used by PublishSettings UI) ---
-router.get('/api/webflow/publish-schema/:collectionId', async (req, res) => {
+router.get('/api/webflow/publish-schema/:collectionId', requireWorkspaceSiteAccess({
+  workspace: { source: 'query', name: 'workspaceId' },
+  site: { source: 'query', name: 'siteId' },
+}), async (req, res) => {
   const { collectionId } = req.params;
   const { siteId } = req.query as { siteId?: string };
   try {

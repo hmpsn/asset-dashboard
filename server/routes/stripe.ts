@@ -6,7 +6,8 @@ import { Router } from 'express';
 const router = Router();
 
 import { sanitizeString } from '../helpers.js';
-import { checkoutLimiter } from '../middleware.js';
+import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
@@ -22,16 +23,34 @@ import {
   isStripeConfigured,
   createCheckoutSession,
   createCartCheckoutSession,
-  createPaymentIntentForProduct,
   createBillingPortalSession,
   cancelSubscription,
   getProductConfig,
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
+import { getContentRequest } from '../content-requests.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('stripe');
+
+function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: import('express').Response): boolean {
+  if (productType !== 'post_polished') return true;
+  if (!contentRequestId) {
+    res.status(409).json({ error: 'Full-post upgrades require an approved brief request' });
+    return false;
+  }
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) {
+    res.status(404).json({ error: 'Content request not found' });
+    return false;
+  }
+  if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+    res.status(409).json({ error: 'Only approved brief requests can be upgraded to a full post' });
+    return false;
+  }
+  return true;
+}
 
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
@@ -69,34 +88,10 @@ router.delete('/api/stripe/config', requireAdminAuth, (_req, res) => {
   res.json({ ok: true });
 });
 
-// Publishable key (safe for frontend — needed for Stripe Elements)
+// Publishable key (safe for frontend; retained for config/status compatibility)
 router.get('/api/stripe/publishable-key', (_req, res) => {
   const pk = getStripePublishableKey();
   res.json({ publishableKey: pk || null });
-});
-
-// Create a PaymentIntent (for Stripe Elements inline form)
-router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, res) => {
-  if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
-  const { workspaceId, productType, contentRequestId, topic, targetKeyword } = req.body;
-  if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
-
-  try {
-    const result = await createPaymentIntentForProduct({
-      workspaceId,
-      productType: sanitizeString(productType, 50) as import('../payments.js').ProductType,
-      contentRequestId: contentRequestId ? sanitizeString(contentRequestId, 100) : undefined,
-      topic: topic ? sanitizeString(topic, 200) : undefined,
-      targetKeyword: targetKeyword ? sanitizeString(targetKeyword, 200) : undefined,
-    });
-    res.json(result);
-  } catch (err) {
-    log.error({ err: err }, 'PaymentIntent error');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create payment intent' });
-  }
 });
 
 // --- Stripe Payments ---
@@ -111,6 +106,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
   if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
+  if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
 
   // Build redirect URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -199,12 +195,12 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
 });
 
 // List payments for a workspace (admin)
-router.get('/api/stripe/payments/:workspaceId', (req, res) => {
+router.get('/api/stripe/payments/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listPayments(req.params.workspaceId));
 });
 
 // Client checks payment status after redirect
-router.get('/api/public/stripe/status/:workspaceId/:sessionId', (req, res) => {
+router.get('/api/public/stripe/status/:workspaceId/:sessionId', requireClientPortalAuth(), (req, res) => {
   const payments = listPayments(req.params.workspaceId);
   const payment = payments.find(p => p.stripeSessionId === req.params.sessionId);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
@@ -217,7 +213,7 @@ router.get('/api/stripe/products', (_req, res) => {
 });
 
 // Get a single payment record (admin)
-router.get('/api/stripe/payments/:workspaceId/:paymentId', (req, res) => {
+router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const payment = getPayment(req.params.workspaceId, req.params.paymentId);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
   res.json(payment);
@@ -233,7 +229,7 @@ router.get('/api/public/roi/:workspaceId', (req, res) => {
 // --- Subscription Management ---
 
 // Create a Stripe Billing Portal session (client self-service: update payment, cancel)
-router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (req, res) => {
+router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
@@ -252,7 +248,7 @@ router.post('/api/public/billing-portal/:workspaceId', checkoutLimiter, async (r
 });
 
 // Cancel subscription (graceful — at period end)
-router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, async (req, res) => {
+router.post('/api/public/cancel-subscription/:workspaceId', checkoutLimiter, requireAuthenticatedClientPortalAuth(), async (req, res) => {
   if (!isStripeConfigured()) return res.status(503).json({ error: 'Stripe is not configured' });
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);

@@ -8,6 +8,7 @@ import path from 'path';
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
+import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -170,7 +171,8 @@ function getCacheDir(workspaceId: string): string {
 }
 
 function getCachePath(workspaceId: string, key: string): string {
-  return path.join(getCacheDir(workspaceId), `${key}.json`);
+  const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(getCacheDir(workspaceId), `${safeKey}.json`);
 }
 
 function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | null {
@@ -686,10 +688,19 @@ export class DataForSeoProvider implements SeoDataProvider {
   // ── getKeywordGap — same approach as semrush: compare domain keywords ──
   async getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordGapEntry[]> {
     const allGaps: KeywordGapEntry[] = [];
+    let clientKwSet: Set<string> | null = null;
 
-    for (const comp of competitorDomains.slice(0, 3)) {
+    const getClientKeywordSet = async (): Promise<Set<string>> => {
+      if (!clientKwSet) {
+        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database);
+        clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+      }
+      return clientKwSet;
+    };
+
+    for (const comp of competitorDomains.slice(0, MAX_COMPETITORS)) {
       const cleanComp = cleanDomain(comp);
-      const cacheKey = `gap_${database}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}`;
+      const cacheKey = `gap_${database}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
       const cached = readCache<KeywordGapEntry[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
 
       if (cached) {
@@ -698,12 +709,11 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
 
       try {
-        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, limit, database);
-        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database);
-        const clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database);
+        const clientKeywords = await getClientKeywordSet();
 
         const gaps: KeywordGapEntry[] = compKeywords
-          .filter(ck => !clientKwSet.has(ck.keyword.toLowerCase()))
+          .filter(ck => !clientKeywords.has(ck.keyword.toLowerCase()))
           .filter(ck => ck.volume > 0)
           .sort((a, b) => b.volume - a.volume)
           .slice(0, limit)

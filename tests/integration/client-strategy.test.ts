@@ -29,6 +29,7 @@ import {
 } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
+import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap } from '../../shared/types/workspace.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
@@ -44,6 +45,7 @@ let gatedWsId = '';          // seoClientView=false gate tests
 let feedbackWsId = '';       // keyword-feedback mutation tests (has shared password)
 let voteWsId = '';           // content-gap-vote tests (has shared password)
 let isolationWsId = '';      // cross-workspace isolation tests
+let voteSessionToken = '';
 
 // ── Test strategy data ──────────────────────────────────────────────────────
 
@@ -64,6 +66,11 @@ function buildStrategy(overrides?: Partial<KeywordStrategy>): KeywordStrategy {
         rationale: 'High search volume, no existing coverage',
         volume: 3200,
         difficulty: 38,
+        trendDirection: 'rising',
+        serpFeatures: ['featured_snippet', 'people_also_ask'],
+        competitorProof: 'competitor.com ranks #3',
+        questionKeywords: ['how to audit technical seo'],
+        opportunityScore: 87,
       },
       {
         topic: 'Link Building Strategies',
@@ -114,9 +121,32 @@ function cleanKeywordFeedback(workspaceId: string) {
   db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ?').run(workspaceId);
 }
 
+/** Delete rank-tracking config rows for a workspace. */
+function cleanRankTracking(workspaceId: string) {
+  db.prepare('DELETE FROM rank_tracking_config WHERE workspace_id = ?').run(workspaceId);
+}
+
 /** Delete all content_gap_votes rows for a workspace. */
 function cleanContentGapVotes(workspaceId: string) {
   db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ?').run(workspaceId);
+}
+
+/** Delete all client_business_priorities rows for a workspace. */
+function cleanBusinessPriorities(workspaceId: string) {
+  db.prepare('DELETE FROM client_business_priorities WHERE workspace_id = ?').run(workspaceId);
+}
+
+async function listKeywordFeedback(workspaceId: string) {
+  const res = await api(`/api/public/keyword-feedback/${workspaceId}`);
+  expect(res.status).toBe(200);
+  return await res.json() as Array<{ keyword: string; status: string; reason?: string | null; source?: string }>;
+}
+
+async function listContentGapVotes(workspaceId: string) {
+  const res = await api(`/api/public/content-gap-votes/${workspaceId}`);
+  expect(res.status).toBe(200);
+  const body = await res.json() as { votes: Record<string, string> };
+  return body.votes;
 }
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -187,17 +217,18 @@ beforeAll(async () => {
   });
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanKeywordFeedback(strategyWsId);
   cleanKeywordFeedback(feedbackWsId);
   cleanContentGapVotes(voteWsId);
+  cleanBusinessPriorities(strategyWsId);
   db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(strategyWsId);
   deleteWorkspace(strategyWsId);
   deleteWorkspace(gatedWsId);
   deleteWorkspace(feedbackWsId);
   deleteWorkspace(voteWsId);
   deleteWorkspace(isolationWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── GET /api/public/seo-strategy/:workspaceId ───────────────────────────────
@@ -262,6 +293,43 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(techGap).toBeDefined();
     expect(techGap.volume).toBe(3200);
     expect(techGap.difficulty).toBe(38);
+  });
+
+  it('contentGaps preserve client-facing enrichment fields', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    const body = await res.json();
+
+    const techGap = body.contentGaps.find((g: { targetKeyword: string }) => g.targetKeyword === 'technical seo checklist');
+    expect(techGap).toBeDefined();
+    expect(techGap.trendDirection).toBe('rising');
+    expect(techGap.serpFeatures).toEqual(['featured_snippet', 'people_also_ask']);
+    expect(techGap.competitorProof).toBe('competitor.com ranks #3');
+    expect(techGap.questionKeywords).toEqual(['how to audit technical seo']);
+    expect(techGap.opportunityScore).toBe(87);
+  });
+
+  it('business priorities endpoint normalizes string and object rows', async () => {
+    db.prepare(`
+      INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(workspace_id) DO UPDATE SET
+        priorities = excluded.priorities,
+        updated_at = datetime('now')
+    `).run(strategyWsId, JSON.stringify([
+      'Launch APAC market',
+      { text: 'Expand brand awareness', category: 'brand' },
+      { text: '   ', category: 'growth' },
+    ]));
+
+    const res = await api(`/api/public/business-priorities/${strategyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.priorities).toEqual([
+      { text: 'Launch APAC market', category: 'other' },
+      { text: 'Expand brand awareness', category: 'brand' },
+    ]);
+    expect(body.updatedAt).toBeTruthy();
   });
 
   it('quickWins array preserves client-safe fields only (no roiScore)', async () => {
@@ -443,7 +511,8 @@ describe('GET /api/public/seo-strategy — brand keyword filtering', () => {
     const body = await res.json();
 
     // The strategy was stored with branded gaps (as generation would normally filter them)
-    // The public endpoint must not add semrushMode or other internal admin-only fields
+    // The public endpoint must not add SEO data mode/provider internals
+    expect(body.seoDataMode).toBeUndefined();
     expect(body.semrushMode).toBeUndefined();
     expect(body.keywordPool).toBeUndefined();
     expect(body.decayingPages).toBeUndefined();
@@ -540,6 +609,16 @@ describe('GET /api/public/keyword-feedback — list feedback', () => {
 // ── POST /api/public/keyword-feedback — submit feedback (auth required) ─────
 
 describe('POST /api/public/keyword-feedback — submit feedback', () => {
+  async function createAuthedFeedbackWorkspace(name: string) {
+    const ws = createWorkspace(name);
+    updateWorkspace(ws.id, { clientPassword: 'strict-feedback-pw' });
+    const authRes = await postJson(`/api/public/auth/${ws.id}`, {
+      password: 'strict-feedback-pw',
+    });
+    expect(authRes.status).toBe(200);
+    return ws.id;
+  }
+
   // Authenticate once before all mutation tests in this describe block
   beforeAll(async () => {
     // feedbackWsId has clientPassword='feedback-test-pw' set in outer beforeAll
@@ -552,6 +631,7 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
 
   afterAll(() => {
     cleanKeywordFeedback(feedbackWsId);
+    cleanRankTracking(feedbackWsId);
   });
 
   it('returns 401 without a session cookie', async () => {
@@ -598,6 +678,71 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects whitespace-only keywords without inserting an empty row', async () => {
+    const wsId = await createAuthedFeedbackWorkspace('Strict Empty Feedback WS');
+    try {
+      const before = await listKeywordFeedback(wsId);
+
+      const res = await postJson(`/api/public/keyword-feedback/${wsId}`, {
+        keyword: '   ',
+        status: 'approved',
+      });
+      expect(res.status).toBe(400);
+
+      const after = await listKeywordFeedback(wsId);
+      expect(after).toHaveLength(before.length);
+      expect(after.find(row => row.keyword === '')).toBeUndefined();
+    } finally {
+      cleanKeywordFeedback(wsId);
+      deleteWorkspace(wsId);
+    }
+  });
+
+  it('rejects unsupported feedback fields without changing existing feedback', async () => {
+    const wsId = await createAuthedFeedbackWorkspace('Strict Unsupported Feedback WS');
+    const keyword = `strict feedback ${Date.now()}`;
+    try {
+      const createRes = await postJson(`/api/public/keyword-feedback/${wsId}`, {
+        keyword,
+        status: 'approved',
+        source: 'content_gap',
+      });
+      expect(createRes.status).toBe(200);
+
+      const invalidRes = await postJson(`/api/public/keyword-feedback/${wsId}`, {
+        keyword,
+        status: 'declined',
+        declinedBy: 'spoofed@example.com',
+      });
+      expect(invalidRes.status).toBe(400);
+
+      const stored = (await listKeywordFeedback(wsId)).find(row => row.keyword === keyword);
+      expect(stored?.status).toBe('approved');
+    } finally {
+      cleanKeywordFeedback(wsId);
+      deleteWorkspace(wsId);
+    }
+  });
+
+  it('rejects unsupported feedback source values without inserting a row', async () => {
+    const wsId = await createAuthedFeedbackWorkspace('Strict Source Feedback WS');
+    const keyword = `bad source ${Date.now()}`;
+    try {
+      const res = await postJson(`/api/public/keyword-feedback/${wsId}`, {
+        keyword,
+        status: 'requested',
+        source: 'admin_override',
+      });
+      expect(res.status).toBe(400);
+
+      const stored = (await listKeywordFeedback(wsId)).find(row => row.keyword === keyword);
+      expect(stored).toBeUndefined();
+    } finally {
+      cleanKeywordFeedback(wsId);
+      deleteWorkspace(wsId);
+    }
+  });
+
   it('successfully approves a keyword and persists to DB', async () => {
     const res = await postJson(`/api/public/keyword-feedback/${feedbackWsId}`, {
       keyword: 'seo audit tool',
@@ -617,6 +762,9 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     const stored = list.find((r: { keyword: string }) => r.keyword === 'seo audit tool');
     expect(stored).toBeDefined();
     expect(stored.status).toBe('approved');
+
+    const tracked = getTrackedKeywords(feedbackWsId);
+    expect(tracked.some(item => item.query === 'seo audit tool')).toBe(true);
   });
 
   it('successfully declines a keyword with a reason', async () => {
@@ -703,6 +851,7 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
 
   afterAll(() => {
     cleanKeywordFeedback(bulkWsId);
+    cleanRankTracking(bulkWsId);
     deleteWorkspace(bulkWsId);
   });
 
@@ -762,28 +911,28 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
 
     expect(gammaRow).toBeDefined();
     expect(gammaRow.status).toBe('requested');
+
+    const tracked = getTrackedKeywords(bulkWsId);
+    expect(tracked.some(item => item.query === 'bulk keyword alpha')).toBe(true);
+    expect(tracked.some(item => item.query === 'bulk keyword beta')).toBe(false);
+    expect(tracked.some(item => item.query === 'bulk keyword gamma')).toBe(false);
   });
 
-  it('skips items with invalid status in the batch (transaction-safe)', async () => {
-    // The server silently skips invalid items per the implementation's `continue` guard
+  it('rejects invalid batch items without writing partial feedback', async () => {
+    const validKeyword = `valid item ${Date.now()}`;
+    const badKeyword = `bad status item ${Date.now()}`;
     const res = await postJson(`/api/public/keyword-feedback/${bulkWsId}/bulk`, {
       keywords: [
-        { keyword: 'valid item', status: 'approved' },
-        { keyword: 'bad status item', status: 'invalid_status' },
+        { keyword: validKeyword, status: 'approved' },
+        { keyword: badKeyword, status: 'invalid_status' },
       ],
     });
-    // Server returns 200 and counts all submitted (even if some skipped)
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
 
-    const listRes = await api(`/api/public/keyword-feedback/${bulkWsId}`);
-    const list = await listRes.json();
-
-    // 'valid item' should be stored
-    const validRow = list.find((r: { keyword: string }) => r.keyword === 'valid item');
-    expect(validRow).toBeDefined();
-
-    // 'bad status item' should NOT be stored (server skips it)
-    const badRow = list.find((r: { keyword: string }) => r.keyword === 'bad status item');
+    const list = await listKeywordFeedback(bulkWsId);
+    const validRow = list.find(row => row.keyword === validKeyword);
+    const badRow = list.find(row => row.keyword === badKeyword);
+    expect(validRow).toBeUndefined();
     expect(badRow).toBeUndefined();
   });
 });
@@ -797,6 +946,11 @@ describe('POST /api/public/content-gap-vote — voting', () => {
       password: 'vote-test-pw',
     });
     expect(authRes.status).toBe(200);
+    const setCookie = authRes.headers.getSetCookie?.() || [];
+    const sessionCookie = setCookie.find((cookie: string) => cookie.startsWith(`client_session_${voteWsId}=`));
+    expect(sessionCookie).toBeDefined();
+    voteSessionToken = sessionCookie?.split(';')[0]?.split('=')[1] ?? '';
+    expect(voteSessionToken).not.toBe('');
   });
 
   afterAll(() => {
@@ -827,11 +981,60 @@ describe('POST /api/public/content-gap-vote — voting', () => {
   });
 
   it('returns 400 when vote is an invalid value', async () => {
+    const before = await listContentGapVotes(voteWsId);
     const res = await postJson(`/api/public/content-gap-vote/${voteWsId}`, {
       keyword: 'technical seo',
       vote: 'maybe', // not in up|down|none
     });
     expect(res.status).toBe(400);
+    const after = await listContentGapVotes(voteWsId);
+    expect(after).toEqual(before);
+  });
+
+  it('rejects whitespace-only vote keywords without inserting an empty vote', async () => {
+    const res = await postJson(`/api/public/content-gap-vote/${voteWsId}`, {
+      keyword: '   ',
+      vote: 'up',
+    });
+    expect(res.status).toBe(400);
+
+    const votes = await listContentGapVotes(voteWsId);
+    expect(votes['']).toBeUndefined();
+  });
+
+  it('rejects unsupported vote fields before recording the vote', async () => {
+    const keyword = `strict vote ${Date.now()}`;
+    const res = await postJson(`/api/public/content-gap-vote/${voteWsId}`, {
+      keyword,
+      vote: 'up',
+      status: 'approved',
+    });
+    expect(res.status).toBe(400);
+
+    const votes = await listContentGapVotes(voteWsId);
+    expect(votes[keyword]).toBeUndefined();
+  });
+
+  it('does not allow a client session from another workspace to mutate votes', async () => {
+    const targetWs = createWorkspace('Wrong Workspace Vote Target');
+    try {
+      updateWorkspace(targetWs.id, { clientPassword: 'target-vote-pw' });
+      const res = await fetch(`${ctx.BASE}/api/public/content-gap-vote/${targetWs.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `client_session_${targetWs.id}=${voteSessionToken}`,
+        },
+        body: JSON.stringify({ keyword: 'wrong workspace vote', vote: 'up' }),
+      });
+
+      expect(res.status).toBe(401);
+      const rows = db.prepare('SELECT keyword FROM content_gap_votes WHERE workspace_id = ?').all(targetWs.id);
+      expect(rows).toEqual([]);
+    } finally {
+      cleanContentGapVotes(targetWs.id);
+      deleteWorkspace(targetWs.id);
+    }
   });
 
   it('successfully records an upvote', async () => {

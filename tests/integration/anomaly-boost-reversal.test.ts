@@ -33,13 +33,13 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   // Clean up test data and restore flag to default
   db.prepare('DELETE FROM anomalies WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM analytics_insights WHERE workspace_id = ?').run(testWsId);
   setFlagOverride('bridge-anomaly-boost', null);
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 /**

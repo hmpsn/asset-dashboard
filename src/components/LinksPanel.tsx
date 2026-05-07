@@ -49,7 +49,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
             <button
               key={t.id}
               onClick={() => handleTabChange(t.id)}
-              className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+              className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
             >
               <Icon as={t.icon} size="md" />
               {t.label}
@@ -60,15 +60,15 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
 
       {/* Tab content */}
       {activeTab === 'redirects' && (
-        <RedirectManager key={`redirects-${siteId}`} siteId={siteId} />
+        <RedirectManager key={`redirects-${siteId}`} siteId={siteId} workspaceId={workspaceId} />
       )}
       {activeTab === 'internal' && (
         <InternalLinks key={`internal-${siteId}`} siteId={siteId} workspaceId={workspaceId} />
       )}
       {activeTab === 'dead-links' && (
         <ErrorBoundary>
-          <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
-            <LinkChecker siteId={siteId} />
+          <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
+            <LinkChecker siteId={siteId} workspaceId={workspaceId} />
           </Suspense>
         </ErrorBoundary>
       )}

@@ -51,8 +51,8 @@ beforeAll(async () => {
   cleanupGrowth = growth.cleanup;
 }, 30_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   cleanupFree?.();
   cleanupGrowth?.();
 });

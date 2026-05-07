@@ -6,7 +6,6 @@
 
 import db from './db/index.js';
 import { createLogger } from './logger.js';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('google-auth');
 
@@ -160,7 +159,12 @@ export async function exchangeCode(code: string, siteId: string): Promise<{ succ
 
 export async function getValidToken(siteId: string): Promise<string | null> {
   // Try per-site token first, fall back to global token
-  const tokens = loadTokenForSite(siteId) || (siteId !== GLOBAL_KEY ? loadTokenForSite(GLOBAL_KEY) : null);
+  let tokenOwnerSiteId = siteId;
+  let tokens = loadTokenForSite(siteId);
+  if (!tokens && siteId !== GLOBAL_KEY) {
+    tokens = loadTokenForSite(GLOBAL_KEY);
+    tokenOwnerSiteId = GLOBAL_KEY;
+  }
   if (!tokens) return null;
 
   // If token is still valid (with 5 min buffer)
@@ -192,7 +196,7 @@ export async function getValidToken(siteId: string): Promise<string | null> {
       expires_in: number;
     };
 
-    saveTokenForSite(siteId, {
+    saveTokenForSite(tokenOwnerSiteId, {
       ...tokens,
       access_token: data.access_token,
       expires_at: Date.now() + (data.expires_in * 1000),
@@ -200,7 +204,7 @@ export async function getValidToken(siteId: string): Promise<string | null> {
 
     return data.access_token;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'google-auth/getValidToken: programming error');
+    log.warn({ err }, 'google-auth/getValidToken: token refresh failed');
     return null;
   }
 }

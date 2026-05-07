@@ -1,16 +1,14 @@
 /**
  * public-analytics routes — extracted from server/index.ts
+ *
+ * @reads analytics_insights, search_console, google_analytics, chat_memory, workspaces, snapshots, workspace_intelligence, studio_config
+ * @writes chat_memory, activities
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';
-import { verifyAdminToken, APP_PASSWORD } from '../middleware.js';
+import { verifyAdminToken, APP_PASSWORD, requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
-
-const log = createLogger('public-analytics');
-
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import {
   addMessage,
@@ -36,7 +34,7 @@ import {
   getGA4NewVsReturning,
 } from '../google-analytics.js';
 import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from '../helpers.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   fetchSearchOverview,
@@ -46,12 +44,12 @@ import {
   fetchSearchTypes,
   fetchSearchComparison,
 } from '../analytics-data.js';
-import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
-import { getWorkspace, getBrandName } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace, getBrandName } from '../workspaces.js';
 import { getOrComputeInsights } from '../analytics-intelligence.js';
 import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
@@ -65,9 +63,15 @@ import { getBookingUrl } from '../studio-config.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { isProgrammingError } from '../errors.js';
 
+const log = createLogger('public-analytics');
+
+const router = Router();
+
+router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
+
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
-// Uses gpt-4.1-nano (cheapest model) for a simple JSON classification.
+// Uses gpt-5.4-nano (cheapest model) for a simple JSON classification.
 // Returns null on any failure — intent detection must never block chat.
 async function classifyMessageIntent(
   question: string,
@@ -80,12 +84,9 @@ async function classifyMessageIntent(
     .join('\n');
   const contextBlock = contextLines ? `Recent conversation:\n${contextLines}\n\n` : '';
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1-nano',
-    messages: [
-      {
-        role: 'system',
-        content: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
+  const result = await callAI({
+    model: 'gpt-5.4-nano',
+    system: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
 
 Values:
 - "service_interest" — client wants to hire, engage, or contact the agency. Signals: asking about working together, pricing, getting started, scheduling a call, wanting the team to help with their site, expressing readiness to move forward, asking who they talk to.
@@ -97,7 +98,7 @@ Examples:
 - "Ready to get serious about search" → {"intent": "service_interest"}
 - "What content should I write?" → {"intent": "content_interest"}
 - "Why did my traffic drop?" → {"intent": null}`,
-      },
+    messages: [
       {
         role: 'user',
         content: `${contextBlock}Client message: "${question.slice(0, 500)}"`,
@@ -257,7 +258,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
   if (!question) return res.status(400).json({ error: 'question required' });
 
   // Rate limit check — always enforced (betaMode is cosmetic, not a rate-limit bypass)
-  const tier = ws.tier || 'free';
+  const tier = computeEffectiveTier(ws);
   const rl = checkChatRateLimit(ws.id, tier, sessionId);
   if (!rl.allowed) {
     return res.status(429).json({
@@ -457,18 +458,15 @@ ${seoContextBlock}
 Current data context:
 ${JSON.stringify(context, null, 2)}`;
 
-    // Build messages array: system + conversation history + current question
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
-      ...historyMessages.slice(-10), // last 10 messages for context window management
-      { role: 'user', content: question },
-    ];
-
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
-      callOpenAI({
-        model: 'gpt-4.1',
-        messages,
+      callAI({
+        model: 'gpt-5.4',
+        system: systemPrompt,
+        messages: [
+          ...historyMessages.slice(-10),
+          { role: 'user', content: question },
+        ],
         temperature: 0.7,
         maxTokens: 1500,
         feature: 'client-search-chat',

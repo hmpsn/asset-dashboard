@@ -96,7 +96,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
         )}
       >
         <div className={cn(
-          'w-2 h-2 rounded-full shrink-0',
+          'w-2 h-2 rounded-[var(--radius-pill)] shrink-0',
           selected ? 'bg-emerald-400' : 'bg-[var(--brand-border-hover)]'
         )} />
         <div className="truncate flex-1 text-left">
@@ -105,7 +105,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
             <div className="t-caption-sm text-[var(--brand-text-muted)] truncate leading-tight">{selected.webflowSiteName}</div>
           )}
         </div>
-        <Icon as={ChevronDown} size="md" className={cn('shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-[var(--brand-text-muted)]')} />
+        <Icon as={ChevronDown} size="md" className={cn('shrink-0 transition-transform', open ? 'rotate-180 text-accent-brand' : 'text-[var(--brand-text-muted)]')} />
       </button>
 
       {open && (
@@ -124,7 +124,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <div className={cn(
-                        'w-2 h-2 rounded-full shrink-0',
+                        'w-2 h-2 rounded-[var(--radius-pill)] shrink-0',
                         ws.webflowSiteId ? 'bg-emerald-400' : 'bg-[var(--brand-text-muted)]'
                       )} />
                       <span className="t-body truncate">{ws.name}</span>
@@ -163,7 +163,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-[var(--z-modal)] py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
-                            className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-accent-danger hover:bg-red-500/10 transition-colors"
                           >
                             <Icon as={Trash2} size="sm" /> Delete workspace
                           </button>
@@ -178,7 +178,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                       <p className="t-caption text-[var(--brand-text-muted)] mb-1">Paste a Webflow API token for this workspace:</p>
                       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
                         Get one at{' '}
-                        <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
+                        <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-accent-brand hover:text-accent-brand inline-flex items-center gap-0.5">
                           webflow.com <Icon as={ExternalLink} size="xs" />
                         </a>
                       </p>
@@ -209,10 +209,10 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                           {loadingSites ? '...' : 'Go'}
                         </button>
                       </div>
-                      {tokenError && <p className="t-caption text-red-400/80 mb-1">{tokenError}</p>}
+                      {tokenError && <p className="t-caption text-accent-danger mb-1">{tokenError}</p>}
                       {loadingSites && (
                         <div className="flex items-center gap-2 t-caption text-[var(--brand-text-muted)] py-1">
-                          <div className="w-3 h-3 border border-[var(--brand-border)] border-t-[var(--brand-text-muted)] rounded-full animate-spin" />
+                          <div className="w-3 h-3 border border-[var(--brand-border)] border-t-[var(--brand-text-muted)] rounded-[var(--radius-pill)] animate-spin" />
                           Loading sites...
                         </div>
                       )}
@@ -229,7 +229,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                               }}
                               className="flex items-center gap-2 w-full px-2 py-1.5 text-left t-caption hover:bg-[var(--surface-3)] rounded transition-colors"
                             >
-                              <Icon as={Globe} size="sm" className="text-teal-400 shrink-0" />
+                              <Icon as={Globe} size="sm" className="text-accent-brand shrink-0" />
                               <span className="truncate">{site.displayName}</span>
                             </button>
                           ))}

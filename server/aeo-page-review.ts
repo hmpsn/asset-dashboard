@@ -9,63 +9,21 @@
  * to send to the client or action themselves.
  */
 
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
 import { stripHtmlToText, stripCodeFences } from './helpers.js';
+import { z } from './middleware/validate.js';
+import type { AeoEffort, AeoPageReview, AeoSiteReview } from '../shared/types/aeo.js';
+import {
+  AEO_CHANGE_TYPES,
+  AEO_EFFORTS,
+  countAeoQuickWins,
+  estimateAeoChangesMinutes,
+} from '../shared/types/aeo.js';
 
 const log = createLogger('aeo-review');
-
-// ─── Types ────────────────────────────────────────────────────────
-
-export type AeoChangeType =
-  | 'rewrite_intro'       // Restructure opening to answer-first
-  | 'add_author'          // Add author byline / credentials
-  | 'add_date'            // Add last-updated date
-  | 'add_section'         // Add a new content section
-  | 'add_citations'       // Add specific citations / references
-  | 'add_schema'          // Add or fix structured data
-  | 'add_faq'             // Add or restructure FAQ section
-  | 'add_comparison'      // Add comparison table
-  | 'add_definition'      // Add definition block for key terms
-  | 'restructure_content' // Move hidden content, reorder sections
-  | 'remove_dark_pattern' // Remove popup / autoplay / interstitial
-  | 'copy_edit';          // Rewrite specific copy for clarity / neutrality
-
-export type AeoEffort = 'quick' | 'moderate' | 'significant';
-
-export interface AeoPageChange {
-  id: string;
-  changeType: AeoChangeType;
-  location: string;           // Where on the page (e.g., "Below the H1", "Section 3: Our Process")
-  currentContent?: string;    // What's currently there (excerpt)
-  suggestedChange: string;    // What to change it to / what to add
-  rationale: string;          // Why this matters for AEO
-  effort: AeoEffort;
-  priority: 'high' | 'medium' | 'low';
-  aeoImpact: string;         // Specific AEO benefit (e.g., "Makes intro extractable by LLMs")
-}
-
-export interface AeoPageReview {
-  pageUrl: string;
-  pageTitle: string;
-  reviewedAt: string;
-  overallScore: number;       // 0-100 AEO readiness score
-  summary: string;            // 2-3 sentence executive summary for admin
-  changes: AeoPageChange[];
-  quickWinCount: number;
-  estimatedTimeMinutes: number; // Total estimated implementation time
-}
-
-export interface AeoSiteReview {
-  workspaceId: string;
-  generatedAt: string;
-  pages: AeoPageReview[];
-  sitewideSummary: string;
-  totalChanges: number;
-  quickWins: number;
-}
 
 // ─── Page Content Extraction ──────────────────────────────────────
 
@@ -133,6 +91,65 @@ function formatAuditIssues(issues: SeoIssue[]): string {
   return aeoIssues.map(i => `- [${i.severity.toUpperCase()}] ${i.check}: ${i.message}\n  Recommendation: ${i.recommendation}`).join('\n');
 }
 
+const normalizeAeoEffort = (value: unknown): AeoEffort => {
+  if (typeof value !== 'string') return 'moderate';
+  const normalized = value.toLowerCase().trim();
+  if (normalized.startsWith('quick')) return 'quick';
+  if (normalized.startsWith('significant')) return 'significant';
+  if (normalized.startsWith('moderate')) return 'moderate';
+  return 'moderate';
+};
+
+const aeoPageChangeSchema = z.object({
+  id: z.string().optional(),
+  changeType: z.enum(AEO_CHANGE_TYPES).catch('copy_edit'),
+  location: z.string().catch('Page content'),
+  currentContent: z.string().optional(),
+  suggestedChange: z.string().catch('Review this page section and update the copy for clearer answer-engine readability.'),
+  rationale: z.string().catch('Improves answer-engine readability.'),
+  effort: z.preprocess(normalizeAeoEffort, z.enum(AEO_EFFORTS)),
+  priority: z.enum(['high', 'medium', 'low']).catch('medium'),
+  aeoImpact: z.string().catch('Improves the page structure for AI answer extraction.'),
+  verifiedSourceEvidence: z.string().optional(),
+  requiresSourceResearch: z.boolean().optional(),
+});
+
+const aeoReviewSchema = z.object({
+  overallScore: z.number().min(0).max(100).catch(0),
+  summary: z.string().catch('AEO review completed.'),
+  changes: z.array(aeoPageChangeSchema).catch([]),
+  quickWinCount: z.number().int().min(0).optional(),
+  estimatedTimeMinutes: z.number().int().min(0).optional(),
+});
+
+export function normalizeAeoReviewResponse(raw: unknown): Pick<AeoPageReview, 'overallScore' | 'summary' | 'changes' | 'quickWinCount' | 'estimatedTimeMinutes'> {
+  const parsed = aeoReviewSchema.parse(raw);
+  const changes = parsed.changes.map((change, i) => {
+    const verifiedSourceEvidence = change.verifiedSourceEvidence?.trim();
+    const requiresSourceResearch =
+      change.changeType === 'add_citations' && !verifiedSourceEvidence
+        ? true
+        : change.requiresSourceResearch === true;
+    return {
+      ...change,
+      id: change.id || `change-${i}`,
+      verifiedSourceEvidence: verifiedSourceEvidence || undefined,
+      requiresSourceResearch,
+      suggestedChange: requiresSourceResearch
+        ? `Research needed before client handoff: verify authoritative source evidence for this citation recommendation. ${change.suggestedChange}`
+        : change.suggestedChange,
+    };
+  });
+
+  return {
+    overallScore: parsed.overallScore,
+    summary: parsed.summary,
+    changes,
+    quickWinCount: parsed.quickWinCount ?? countAeoQuickWins(changes),
+    estimatedTimeMinutes: parsed.estimatedTimeMinutes ?? estimateAeoChangesMinutes(changes),
+  };
+}
+
 // ─── Single Page Review ───────────────────────────────────────────
 
 export async function reviewPage(
@@ -183,9 +200,11 @@ Generate a JSON review with specific, implementable changes. Each change should 
       "currentContent": "Exact excerpt of what's currently there (if applicable, max 200 chars)",
       "suggestedChange": "SPECIFIC replacement text, new section content, or detailed instruction. For copy rewrites, write the actual replacement copy. For structural changes, describe the exact HTML/content change needed.",
       "rationale": "Why this matters for AEO specifically — how does this change affect AI citation likelihood?",
-      "effort": "quick (< 15 min)|moderate (15-60 min)|significant (1+ hours)",
+      "effort": "quick|moderate|significant",
       "priority": "high|medium|low",
-      "aeoImpact": "Specific AEO benefit (e.g., 'Makes the direct answer extractable as a cited snippet by LLMs')"
+      "aeoImpact": "Specific AEO benefit (e.g., 'Makes the direct answer extractable as a cited snippet by LLMs')",
+      "verifiedSourceEvidence": "Exact evidence already present in the page content, knowledge base, business context, or audit issue that supports this recommendation. Empty string if no source evidence was provided.",
+      "requiresSourceResearch": false
     }
   ],
   "quickWinCount": number of changes with effort="quick",
@@ -196,22 +215,25 @@ RULES:
 - Generate 3-10 changes depending on how many issues the page has
 - For "rewrite_intro" changes: write the ACTUAL replacement intro paragraph (2-3 sentences that directly answer the page's implied question, then 3-5 key bullets)
 - For "add_author" changes: if the knowledge base has staff info, suggest the specific person and their credentials. If not, describe what the byline should contain
-- For "add_citations" changes: suggest SPECIFIC authoritative sources to cite (name the organization, journal, or .gov resource relevant to the topic). Don't just say "add citations" — say "cite ADA.org guidelines on [topic]" or "reference CDC data on [topic]"
+- For "add_citations" changes: only name a specific organization, journal, .gov resource, statistic, or claim when the page content, knowledge base, business context, or audit issue already contains supporting evidence. Put that exact evidence in verifiedSourceEvidence and set requiresSourceResearch=false.
+- If source evidence is not present in the provided context, do not invent a source. Set requiresSourceResearch=true and write suggestedChange as a research task for the agency team to verify authoritative sources before client handoff.
 - For "add_definition" changes: write the actual definition block content (term, definition, common misconceptions, related terms)
 - For "add_comparison" changes: specify the exact table columns, row headers, and what data types to include
 - For "copy_edit" changes: provide the current text AND the replacement text
 - Every suggestedChange should be concrete enough that a copywriter could implement it without further research
+- Exception: source/citation recommendations without verifiedSourceEvidence must explicitly say research is required before implementation
 - Priority should reflect AEO impact: "high" = directly affects whether AI systems cite this page, "medium" = improves trust signals, "low" = nice-to-have polish
 - overallScore: 0-30 = critical AEO gaps, 30-60 = has basics but missing key signals, 60-80 = good but could improve, 80-100 = well-optimized for AI citation
 - Be specific about WHICH section headings, paragraphs, or elements need to change — reference them by name from the page structure
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
-  const aiResult = await callOpenAI({
-    model: 'gpt-4.1',
+  const aiResult = await callAI({
+    model: 'gpt-5.4',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 5000,
     temperature: 0.4,
+    responseFormat: { type: 'json_object' },
     feature: 'aeo-review',
     workspaceId,
   });
@@ -226,18 +248,13 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     throw new Error('Failed to parse AEO review response');
   }
 
+  const normalized = normalizeAeoReviewResponse(parsed);
+
   return {
     pageUrl,
     pageTitle,
     reviewedAt: new Date().toISOString(),
-    overallScore: (parsed.overallScore as number) || 0,
-    summary: (parsed.summary as string) || '',
-    changes: ((parsed.changes as AeoPageChange[]) || []).map((c, i) => ({
-      ...c,
-      id: c.id || `change-${i}`,
-    })),
-    quickWinCount: (parsed.quickWinCount as number) || 0,
-    estimatedTimeMinutes: (parsed.estimatedTimeMinutes as number) || 0,
+    ...normalized,
   };
 }
 

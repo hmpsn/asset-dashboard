@@ -1,13 +1,14 @@
 /**
  * workspaces routes — extracted from server/index.ts
+ *
+ * @reads workspaces, approvals, requests, content_requests, work_orders, content_matrices, client_signals, churn_signals, workspace_pages, page_states, client_users, audit_suppressions
+ * @writes workspaces, page_states, client_users, audit_suppressions, activities, bridge_invalidation, workspace_page_cache
  */
 import { Router } from 'express';
 
 const router = Router();
 
 import bcrypt from 'bcryptjs';
-import type * as WebScraper from '../web-scraper.js';
-import type * as OpenAIHelpers from '../openai-helpers.js';
 import express from 'express';
 import { listBatches } from '../approvals.js';
 import { validate, z } from '../middleware/validate.js';
@@ -23,15 +24,12 @@ import {
 } from '../client-users.js';
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
-import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
-import { resolveBaseUrl } from '../url-helpers.js';
-import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { applySuppressionsToAudit } from '../helpers.js';
+import { callAI } from '../ai.js';
+import { parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
-import {
-  discoverSitemapUrls,
-} from '../webflow.js';
-import { getWorkspacePages, invalidatePageCache } from '../workspace-data.js';
+import { invalidatePageCache } from '../workspace-data.js';
 import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
@@ -50,26 +48,54 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
-import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
-import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { isProgrammingError } from '../errors.js';
-import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
+import {
+  startWorkspaceContextGenerationJob,
+  workspaceContextJobErrorResponse,
+} from '../workspace-context-generation-job.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const log = createLogger('workspaces');
 
+const MEMBER_RESTRICTED_WORKSPACE_FIELDS = new Set([
+  'webflowSiteId',
+  'webflowSiteName',
+  'webflowToken',
+  'liveDomain',
+  'gscPropertyUrl',
+  'ga4PropertyId',
+  'publishTarget',
+  'seoDataProvider',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'billingMode',
+  'tier',
+  'trialEndsAt',
+]);
+
+function hasMemberRestrictedWorkspaceUpdate(updates: Record<string, unknown>): boolean {
+  return Object.keys(updates).some(key => MEMBER_RESTRICTED_WORKSPACE_FIELDS.has(key));
+}
+
 // Workspaces
-router.get('/api/workspaces', (_req, res) => {
-  const workspaces = listWorkspaces().map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
+function listVisibleWorkspaces(req: express.Request): Workspace[] {
+  const workspaces = listWorkspaces();
+  if (!req.user || req.user.role === 'owner') return workspaces;
+  const allowed = new Set(req.user.workspaceIds ?? []);
+  return workspaces.filter(ws => allowed.has(ws.id));
+}
+
+router.get('/api/workspaces', (req, res) => {
+  const workspaces = listVisibleWorkspaces(req).map(ws => ({ ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword }));
   res.json(workspaces);
 });
 
 // Workspace overview: aggregated metrics for all workspaces
-router.get('/api/workspace-overview', (_req, res) => {
-  const workspaces = listWorkspaces();
+router.get('/api/workspace-overview', (req, res) => {
+  const workspaces = listVisibleWorkspaces(req);
   const overview = workspaces.map(ws => {
     // Audit
     let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
@@ -189,6 +215,9 @@ router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
 
 router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) => {
   const updates = { ...req.body };
+  if (req.user && req.user.role !== 'owner' && hasMemberRestrictedWorkspaceUpdate(updates)) {
+    return res.status(403).json({ error: 'Owner access is required to update workspace integration settings' });
+  }
   // When unlinking, clear the token too
   if (updates.webflowSiteId === null || updates.webflowSiteId === '') {
     updates.webflowToken = '';
@@ -222,12 +251,14 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
           }
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: PATCH /api/workspaces/:id: programming error'); /* best-effort live domain resolution */ }
+    } catch (err) {
+      // url-fetch-ok: best-effort live domain resolution
+      if (isProgrammingError(err)) log.warn({ err }, 'workspaces: PATCH /api/workspaces/:id: programming error');
+    }
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
-  clearSeoContextCache(req.params.id); // Invalidate cached AI context
-  invalidateIntelligenceCache(req.params.id);
+  invalidateIntelligenceCache(req.params.id); // Invalidate cached AI context
   // Bridge #11: debounced cascade — re-invalidates intelligence cache 2s later to catch any
   // cache repopulation that occurred between the immediate clear above and this deferred pass.
   debouncedSettingsCascade(req.params.id, () => {
@@ -248,60 +279,6 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   broadcast(ADMIN_EVENTS.WORKSPACE_DELETED, { id: req.params.id });
   res.json({ ok: true });
 });
-
-// --- Shared: scrape website pages for AI analysis ---
-async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
-  const { scrapeUrls }: typeof WebScraper = await import('../web-scraper.js'); // dynamic-import-ok
-
-  const token = getTokenForSite(ws.webflowSiteId!) || undefined;
-  const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: ws.webflowSiteId! }, token);
-  if (!baseUrl) throw new Error('Could not determine site URL');
-
-  const published = await getWorkspacePages(ws.id, ws.webflowSiteId!);
-
-  const priorityPatterns = [
-    /^\/?$/, /about/i, /who-we-are/i, /our-story/i, /team/i,
-    /service/i, /solution/i, /what-we-do/i, /offer/i,
-    /work/i, /portfolio/i, /case-stud/i, /project/i, /client/i,
-    /contact/i, /location/i, /blog/i, /insight/i, /resource/i,
-  ];
-
-  const prioritized: string[] = [];
-  const rest: string[] = [];
-
-  for (const p of published) {
-    const pagePath = resolvePagePath(p);
-    const url = baseUrl + pagePath;
-    if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
-    else rest.push(url);
-  }
-
-  try {
-    const sitemapUrls = await discoverSitemapUrls(baseUrl);
-    for (const url of sitemapUrls) {
-      try {
-        const pagePath = new URL(url).pathname;
-        if (!prioritized.includes(url) && !rest.includes(url)) {
-          if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
-          else rest.push(url);
-        }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* skip */ }
-    }
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* sitemap unavailable */ }
-
-  const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
-  if (urlsToScrape.length === 0) throw new Error('No pages found to scrape');
-
-  const scraped = await scrapeUrls(urlsToScrape, 3);
-  if (scraped.length === 0) throw new Error('Could not scrape any pages');
-
-  const pagesSummary = scraped.map(p => {
-    const headingsStr = p.headings.slice(0, 10).map(h => `${'#'.repeat(h.level)} ${h.text}`).join('\n');
-    return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nDescription: ${p.metaDescription}\nHeadings:\n${headingsStr}\nContent excerpt:\n${p.bodyText.slice(0, 1500)}`;
-  }).join('\n\n');
-
-  return { scraped, pagesSummary };
-}
 
 // --- Business Profile (verified business data for schema generation) ---
 const businessProfileSchema = z.object({
@@ -362,17 +339,14 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     if (bizContext) contextParts.push(`Business context: ${bizContext}`);
     if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
 
-    const result = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    const result = await callAI({
+      model: 'gpt-5.4-mini',
       feature: 'intelligence-profile-autofill',
       workspaceId: ws.id,
       temperature: 0.3,  // low temperature for consistent JSON output
       maxTokens: 300,    // response is a small JSON object
+      system: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
-        },
         {
           role: 'user',
           content: `Based on this website context, suggest a business intelligence profile:\n\n${contextParts.join('\n\n')}\n\nRespond with JSON: {"industry": "string", "goals": ["string", ...], "targetAudience": "string"}`,
@@ -397,260 +371,37 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
   }
 });
 
+// --- Legacy aliases: BrandHub now starts these through /api/jobs; keep these routes as job-start compatibility shims. ---
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
-
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
-    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
-  }
-
   try {
-    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
-
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a business analyst. Given scraped website content, extract a structured knowledge base that an AI content writer and chatbot can use to understand this business. Be specific and factual — only include information that is clearly stated or strongly implied on the website.`,
-        },
-        {
-          role: 'user',
-          content: `Analyze the following website content and produce a structured business knowledge base.
-
-${pagesSummary}
-
-Generate a knowledge base in this exact format (fill in what you find, leave sections empty with "Not found on website" if the information isn't available):
-
-BUSINESS OVERVIEW:
-- Company name: [name]
-- Industry: [industry/vertical]
-- Location: [city, state/country if mentioned]
-- Business type: [agency, SaaS, local service, e-commerce, etc.]
-- Years in business: [if mentioned]
-- Team size: [if mentioned]
-
-SERVICES & OFFERINGS:
-[List each service/product with a 1-sentence description]
-
-TARGET AUDIENCE:
-- Primary audience: [who they serve]
-- Industries served: [list industries/verticals mentioned]
-- Company sizes: [SMB, enterprise, etc. if mentioned]
-
-DIFFERENTIATORS & VALUE PROPS:
-[List what makes them unique — awards, methodology, technology, guarantees, etc.]
-
-CASE STUDIES & RESULTS:
-[List any specific client work, results, metrics, or testimonials mentioned. Include client names, industries, and outcomes with real numbers if available.]
-
-BRAND VOICE & TONE:
-[Describe the writing style observed across the site — formal/casual, technical/approachable, etc.]
-
-KEY TOPICS & EXPERTISE:
-[List the main topics, technologies, or domains they demonstrate expertise in]
-
-IMPORTANT DETAILS:
-[Any other relevant business information — certifications, partnerships, tools used, process descriptions, pricing model, etc.]
-
-Be concise but specific. Use bullet points. Only include information actually found on the website — never fabricate.`,
-        },
-      ],
-      maxTokens: 2000,
-      temperature: 0.3,
-      feature: 'knowledge-base-gen',
-      workspaceId: ws.id,
-      timeoutMs: 90_000,
-    });
-
-    res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
+    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, req.params.id);
+    res.json(started);
   } catch (err) {
-    decrementUsage(ws.id, 'strategy_generations');
-    log.error({ err: err }, 'Operation failed');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
+    const response = workspaceContextJobErrorResponse(err);
+    res.status(response.status).json(response.body);
   }
 });
 
 // --- Auto-generate brand voice from website crawl ---
 router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess(), async (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
-
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
-    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
-  }
-
   try {
-    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
-
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a brand strategist and copywriting expert. Given scraped website content, analyze the writing style, tone, and voice patterns used across the site. Be specific and evidence-based — only describe patterns you actually observe in the content.`,
-        },
-        {
-          role: 'user',
-          content: `Analyze the following website content and produce a comprehensive brand voice guide that an AI content writer can follow to match this brand's writing style.
-
-${pagesSummary}
-
-Generate a brand voice guide covering these areas:
-
-TONE & PERSONALITY:
-- Overall tone: [e.g. professional, casual, authoritative, friendly, etc.]
-- Personality traits: [3-5 adjectives that describe the brand's character]
-- Formality level: [formal / semi-formal / casual / conversational]
-
-WRITING STYLE:
-- Sentence structure: [short & punchy / long & detailed / mixed]
-- Vocabulary level: [technical jargon / industry terms / plain language / mix]
-- Person/perspective: [first person "we" / second person "you" / third person]
-- Active vs passive voice: [preference observed]
-
-MESSAGING PATTERNS:
-- How they describe their services: [direct claims / benefit-led / story-driven]
-- How they address the reader: [as a peer / as an expert to client / as a helper]
-- CTAs and persuasion style: [soft / direct / urgency-driven / value-led]
-- Common phrases or language patterns: [list any recurring phrases, slogans, or distinctive word choices]
-
-DO's:
-[5-8 specific writing guidelines based on what the brand does well]
-
-DON'Ts:
-[5-8 things to avoid based on what's absent or contrary to the brand's style]
-
-EXAMPLE PHRASES:
-[5-10 short phrases or sentences lifted directly from the site that exemplify the brand voice]
-
-Be specific and actionable. An AI writer should be able to follow this guide to produce copy that sounds like it belongs on this website.`,
-        },
-      ],
-      maxTokens: 2000,
-      temperature: 0.4,
-      feature: 'brand-voice-gen',
-      workspaceId: ws.id,
-      timeoutMs: 90_000,
-    });
-
-    try {
-      if (!getActionBySource('brand_voice', req.params.id)) recordAction({ // recordAction-ok: req.params.id is workspaceId (workspaces route)
-        workspaceId: req.params.id,
-        actionType: 'voice_calibrated',
-        sourceType: 'brand_voice',
-        sourceId: req.params.id,
-        pageUrl: null,
-        targetKeyword: null,
-        baselineSnapshot: { captured_at: new Date().toISOString() },
-        attribution: 'platform_executed',
-      });
-    } catch (err) {
-      log.warn({ err }, 'Failed to record outcome action for brand voice update');
-    }
-
-    res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
+    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, req.params.id);
+    res.json(started);
   } catch (err) {
-    decrementUsage(ws.id, 'strategy_generations');
-    log.error({ err: err }, 'Operation failed');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
+    const response = workspaceContextJobErrorResponse(err);
+    res.status(response.status).json(response.body);
   }
 });
 
 // --- Auto-generate audience personas from website crawl ---
 router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), async (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
-
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
-    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
-  }
-
   try {
-    const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
-
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a marketing strategist. Given scraped website content, identify the distinct audience segments this business targets. Be specific and evidence-based — only identify personas that are clearly implied by the website's messaging, services, case studies, or content.`,
-        },
-        {
-          role: 'user',
-          content: `Analyze the following website content and identify 2-5 distinct audience personas this business targets.
-
-${pagesSummary}
-
-Return ONLY a valid JSON array of persona objects. No markdown, no explanation — just the JSON array.
-
-Each persona object must have exactly these fields:
-{
-  "name": "Short persona name (e.g. 'Marketing Director', 'Small Business Owner')",
-  "description": "1-2 sentence description of who this person is",
-  "painPoints": ["pain point 1", "pain point 2", "pain point 3"],
-  "goals": ["goal 1", "goal 2", "goal 3"],
-  "objections": ["likely objection 1", "likely objection 2"],
-  "preferredContentFormat": "e.g. case studies, how-to guides, comparison articles",
-  "buyingStage": "awareness" or "consideration" or "decision"
-}
-
-Rules:
-- Identify 2-5 personas based on evidence from the website (who the services target, case study clients, language used)
-- Each persona should be distinct — different roles, industries, or needs
-- Pain points, goals, and objections should be specific to THIS business's offerings
-- If buying stage isn't clear, default to "consideration"
-- ONLY return the JSON array, nothing else`,
-        },
-      ],
-      maxTokens: 2500,
-      temperature: 0.4,
-      feature: 'personas-gen',
-      workspaceId: ws.id,
-      timeoutMs: 90_000,
-    });
-
-    // Parse the AI response as JSON
-    let personas;
-    try {
-      const { parseAIJson }: typeof OpenAIHelpers = await import('../openai-helpers.js'); // dynamic-import-ok
-      personas = parseAIJson<Array<{
-        name: string; description: string; painPoints: string[]; goals: string[];
-        objections: string[]; preferredContentFormat?: string; buyingStage?: string;
-      }>>(aiResult.text);
-    } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error');
-      decrementUsage(ws.id, 'strategy_generations');
-      return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
-    }
-
-    if (!Array.isArray(personas) || personas.length === 0) {
-      decrementUsage(ws.id, 'strategy_generations');
-      return res.status(500).json({ error: 'AI did not return valid personas — try again' });
-    }
-
-    // Add IDs and normalize
-    const normalized = personas.slice(0, 5).map((p, i) => ({
-      id: `persona_${Date.now()}_${i}`,
-      name: p.name || `Persona ${i + 1}`,
-      description: p.description || '',
-      painPoints: Array.isArray(p.painPoints) ? p.painPoints : [],
-      goals: Array.isArray(p.goals) ? p.goals : [],
-      objections: Array.isArray(p.objections) ? p.objections : [],
-      preferredContentFormat: p.preferredContentFormat || undefined,
-      buyingStage: (['awareness', 'consideration', 'decision'].includes(p.buyingStage || '') ? p.buyingStage : 'consideration') as 'awareness' | 'consideration' | 'decision',
-    }));
-
-    res.json({ personas: normalized, pagesScraped: scraped.length });
+    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, req.params.id);
+    res.json(started);
   } catch (err) {
-    decrementUsage(ws.id, 'strategy_generations');
-    log.error({ err: err }, 'Operation failed');
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
+    const response = workspaceContextJobErrorResponse(err);
+    res.status(response.status).json(response.body);
   }
 });
 

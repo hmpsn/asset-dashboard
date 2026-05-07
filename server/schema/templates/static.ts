@@ -3,16 +3,30 @@
  * Each emits the typed primary node + BreadcrumbList only.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
+import type { SemanticPageData } from '../../../shared/types/page-elements.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
   pageData: PageData;
   businessProfile?: BusinessProfile | null;
+  semantics?: SemanticPageData;
 }
 
 export function buildAboutPageSchema(input: StaticInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const { semantics } = input;
+  const staffNodes: Array<Record<string, unknown>> = (semantics?.staff ?? []).map((s, i) => dropUndefined({
+    '@type': 'Person' as const,
+    '@id': `${pageData.canonicalUrl}#person-${i}`,
+    'name': s.name,
+    'jobTitle': s.jobTitle,
+    'hasCredential': s.credentials,
+    'image': filterHttpUrls([s.image ?? ''])[0],
+    'worksFor': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
+      ? localBusinessRef(baseUrl)
+      : orgRef(baseUrl),
+  }));
   const primary = dropUndefined({
     '@type': 'AboutPage',
     '@id': `${pageData.canonicalUrl}#aboutpage`,
@@ -26,27 +40,71 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
-  return withBreadcrumb(primary, pageData);
+  const nodes: Array<Record<string, unknown>> = [primary, ...staffNodes];
+  return withBreadcrumb(nodes, pageData);
 }
 
 export function buildContactPageSchema(input: StaticInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const { semantics } = input;
+  const phone = semantics?.phone || input.businessProfile?.phone;
+  const email = semantics?.email || input.businessProfile?.email;
+  const semanticsAddress = semantics?.address ? dropUndefined({
+    '@type': 'PostalAddress' as const,
+    'streetAddress': semantics.address.street,
+    'addressLocality': semantics.address.city,
+    'addressRegion': semantics.address.state,
+    'postalCode': semantics.address.postalCode,
+    'addressCountry': semantics.address.country,
+  }) : undefined;
+  const openingHoursSpec = semantics?.hours?.length
+    ? semantics.hours.map(h => dropUndefined({
+        '@type': 'OpeningHoursSpecification' as const,
+        'dayOfWeek': h.dayOfWeek,
+        'opens': h.opens,
+        'closes': h.closes,
+      }))
+    : undefined;
+  const hasAddress = !!(input.businessProfile?.address?.street || input.businessProfile?.address?.city);
   const primary = dropUndefined({
     '@type': 'ContactPage',
     '@id': `${pageData.canonicalUrl}#contactpage`,
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
-    // ContactPage: only link to LocalBusiness when address has at least one locating field.
-    // Falls back to undefined (not orgRef) — a ContactPage without a LocalBusiness has no meaningful mainEntity.
-    'mainEntity': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
-      ? localBusinessRef(baseUrl)
-      : undefined,
+    // Only link to LocalBusiness when address has at least one locating field.
+    'mainEntity': hasAddress ? localBusinessRef(baseUrl) : undefined,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
-  return withBreadcrumb(primary, pageData);
+  // Emit contact properties on a LocalBusiness/Organization sibling node —
+  // telephone/email/address/openingHoursSpecification are not valid on ContactPage (a WebPage subtype).
+  const hasContactData = !!(phone || email || semanticsAddress || openingHoursSpec);
+  const nodes: Array<Record<string, unknown>> = [primary];
+  if (hasContactData) {
+    const contactEntity = hasAddress
+      ? dropUndefined({
+          '@type': 'LocalBusiness' as const,
+          '@id': `${baseUrl}/#localbusiness`,
+          'name': pageData.publisher.name,
+          'url': baseUrl,
+          'telephone': phone,
+          'email': email,
+          'address': semanticsAddress,
+          'openingHoursSpecification': openingHoursSpec,
+        })
+      : dropUndefined({
+          '@type': 'Organization' as const,
+          '@id': `${baseUrl}/#organization`,
+          'name': pageData.publisher.name,
+          'url': baseUrl,
+          'telephone': phone,
+          'email': email,
+        });
+    nodes.push(contactEntity);
+  }
+  return withBreadcrumb(nodes, pageData);
 }
 
 export function buildCollectionPageSchema(input: StaticInput & {

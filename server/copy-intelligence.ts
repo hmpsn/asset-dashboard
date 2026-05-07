@@ -3,12 +3,18 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { getVoiceProfile, updateVoiceProfile } from './voice-calibration.js';
 import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 
 const log = createLogger('copy-intelligence');
+const INTELLIGENCE_PATTERN_TYPES = new Set<IntelligencePatternType>([
+  'terminology',
+  'tone',
+  'structure',
+  'keyword_usage',
+]);
 
 // ── Statement cache ──
 
@@ -70,6 +76,10 @@ function rowToPattern(row: CopyIntelligenceRow): CopyIntelligencePattern {
     active: Boolean(row.active),
     createdAt: row.created_at,
   };
+}
+
+function isIntelligencePatternType(value: unknown): value is IntelligencePatternType {
+  return typeof value === 'string' && INTELLIGENCE_PATTERN_TYPES.has(value as IntelligencePatternType);
 }
 
 // ── Public API ──
@@ -136,7 +146,7 @@ const MISSING_SCHEMA_RE = /no such (table|column)/i;
 
 /**
  * Safe wrapper for voice-calibration reads — tables may not exist in test envs
- * or before brand-engine migrations have run. Mirrors the pattern in seo-context.ts.
+ * or before brand-engine migrations have run. Mirrors the SEO context source pattern.
  */
 function safeVoiceRead<T>(context: string, wsId: string, fn: () => T, fallback: T): T {
   try {
@@ -264,8 +274,8 @@ Return only valid JSON, no markdown.`;
 
   let result;
   try {
-    result = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    result = await callAI({
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       feature: 'copy-intelligence',
@@ -294,6 +304,6 @@ Return only valid JSON, no markdown.`;
   }
 
   return extracted
-    .filter(p => p.patternType && p.pattern)
+    .filter(p => isIntelligencePatternType(p.patternType) && typeof p.pattern === 'string' && p.pattern.length > 0)
     .map(p => addPattern(wsId, { patternType: p.patternType, pattern: p.pattern, source: 'extracted' }));
 }

@@ -10,21 +10,39 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientSignal } from '../../server/client-signals-store.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
 
 const ctx = createTestContext(13298);
 const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
+let scopedUserId = '';
+let scopedUserToken = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Client Signals Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Client Signals Other Workspace');
+  otherWsId = otherWs.id;
+  const scopedUser = await createUser(
+    'client-signals-scoped-user@test.local',
+    'ScopedPass1!',
+    'Client Signals Scoped User',
+    'member',
+    [testWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
+  deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  deleteWorkspace(otherWsId);
+  await ctx.stopServer();
 });
 
 describe('GET /api/client-signals/:workspaceId', () => {
@@ -152,6 +170,40 @@ describe('GET /api/client-signals/detail/:id', () => {
   it('returns 404 for unknown signal id', async () => {
     const res = await api('/api/client-signals/detail/nonexistent-signal-xyz');
     expect(res.status).toBe(404);
+  });
+});
+
+describe('Client signal ID routes — scoped JWT workspace guards', () => {
+  const scopedHeaders = () => ({ Authorization: `Bearer ${scopedUserToken}` });
+
+  it('rejects reading a signal owned by another workspace', async () => {
+    const signal = createClientSignal({
+      workspaceId: otherWsId,
+      workspaceName: 'Other Signal WS',
+      type: 'service_interest',
+      chatContext: [{ role: 'user', content: 'hidden detail' }],
+      triggerMessage: 'hidden detail',
+    });
+
+    const res = await api(`/api/client-signals/detail/${signal.id}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects status updates for a signal owned by another workspace', async () => {
+    const signal = createClientSignal({
+      workspaceId: otherWsId,
+      workspaceName: 'Other Signal WS',
+      type: 'service_interest',
+      chatContext: [],
+      triggerMessage: 'hidden status update',
+    });
+
+    const res = await ctx.api(`/api/client-signals/${signal.id}/status`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'reviewed' }),
+    });
+    expect(res.status).toBe(403);
   });
 });
 

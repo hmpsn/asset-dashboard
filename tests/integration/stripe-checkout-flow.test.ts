@@ -9,7 +9,6 @@
  * Tested functions (server/stripe.ts):
  *   - createCheckoutSession
  *   - createCartCheckoutSession
- *   - createPaymentIntentForProduct
  *   - isStripeConfigured
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -20,10 +19,8 @@ import {
   mockCustomerCreate,
   mockCustomerRetrieve,
   mockCustomerRetrieveNotFound,
-  mockPaymentIntentCreate,
   resetStripeMocks,
   mockCheckoutSessionsCreate,
-  mockPaymentIntentsCreate,
 } from '../mocks/stripe.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
@@ -52,7 +49,6 @@ vi.mock('../../server/stripe-config.js', () => ({
 import {
   createCheckoutSession,
   createCartCheckoutSession,
-  createPaymentIntentForProduct,
   isStripeConfigured,
 } from '../../server/stripe.js';
 import { listPayments, getPaymentBySession } from '../../server/payments.js';
@@ -170,22 +166,6 @@ describe('Stripe Checkout Flow — FM-2 Phantom Success', () => {
     expect(payments.length).toBe(0);
   });
 
-  // ── Test 5: PaymentIntent creation — Stripe API error, no payment record ──
-
-  it('paymentIntent API error — no payment record created', async () => {
-    mockPaymentIntentsCreate.mockRejectedValue(new Error('PaymentIntent creation failed'));
-
-    await expect(
-      createPaymentIntentForProduct({
-        workspaceId: ws.workspaceId,
-        productType: 'brief_blog',
-      }),
-    ).rejects.toThrow('PaymentIntent creation failed');
-
-    const payments = listPayments(ws.workspaceId);
-    expect(payments.length).toBe(0);
-  });
-
   // ── Test 6: Stripe not configured — throws before any API call ───────────
 
   it('isStripeConfigured returns true when secret key is mocked', () => {
@@ -257,29 +237,6 @@ describe('Stripe Checkout Flow — FM-2 Phantom Success', () => {
     const briefPayment = payments.find(p => p.productType === 'brief_blog');
     expect(briefPayment).toBeDefined();
     expect(briefPayment!.amount).toBe(12500);
-  });
-
-  // ── Test 8: Successful PaymentIntent — record uses PI id as session id ────
-
-  it('successful paymentIntent — record created with PI id as stripeSessionId', async () => {
-    mockPaymentIntentCreate({ id: 'pi_test_intent_001', client_secret: 'pi_test_intent_001_secret_abc', amount: 12500 });
-
-    const result = await createPaymentIntentForProduct({
-      workspaceId: ws.workspaceId,
-      productType: 'brief_blog',
-    });
-
-    expect(result.paymentIntentId).toBe('pi_test_intent_001');
-    expect(result.clientSecret).toBe('pi_test_intent_001_secret_abc');
-    expect(result.amount).toBe(12500);
-
-    // Payment record uses PI id stored in the stripeSessionId field (per code comment)
-    const payment = getPaymentBySession(ws.workspaceId, 'pi_test_intent_001');
-    expect(payment).toBeDefined();
-    expect(payment!.stripeSessionId).toBe('pi_test_intent_001');
-    expect(payment!.productType).toBe('brief_blog');
-    expect(payment!.status).toBe('pending');
-    expect(payment!.amount).toBe(12500);
   });
 
   // ── Test 9: Cart checkout — empty cart throws before any API call ─────────

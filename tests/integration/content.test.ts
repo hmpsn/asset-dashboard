@@ -20,6 +20,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
 import { createTestContext } from './helpers.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
 const ctx = createTestContext(13203);
 const { api, postJson, patchJson, del } = ctx;
@@ -35,8 +36,8 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
 });
 
 // Seed a brief directly via SQLite (since generateBrief requires OpenAI)
@@ -99,8 +100,10 @@ function seedPost(id: string, briefId: string): void {
 }
 
 function cleanup(): void {
+  db.prepare('DELETE FROM jobs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(testWsId);
+  db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(testWsId);
 }
 
 afterAll(() => {
@@ -169,6 +172,34 @@ describe('Content Briefs API', () => {
     expect(html).toContain('Updated Brief Title');
   });
 
+  it('send-to-client creates a fresh review request for a repeated keyword', async () => {
+    const oldRequest = createContentRequest(testWsId, {
+      topic: 'Old request',
+      targetKeyword: 'integration test keyword',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'Previously completed request',
+      initialStatus: 'requested',
+      dedupe: false,
+    });
+    updateContentRequest(testWsId, oldRequest.id, { status: 'published' });
+
+    const res = await api(`/api/content-briefs/${testWsId}/${briefId}/send-to-client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://app.example.test' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.requestId).not.toBe(oldRequest.id);
+
+    const request = getContentRequest(testWsId, body.requestId);
+    expect(request).toBeDefined();
+    expect(request?.briefId).toBe(briefId);
+    expect(request?.status).toBe('client_review');
+    expect(getContentRequest(testWsId, oldRequest.id)?.status).toBe('published');
+  });
+
   it('DELETE /api/content-briefs/:wsId/:briefId removes brief', async () => {
     const res = await del(`/api/content-briefs/${testWsId}/${briefId}`);
     expect(res.status).toBe(200);
@@ -230,11 +261,244 @@ describe('Content Posts API', () => {
     expect(body.status).toBe('review');
   });
 
+  it('PATCH /api/content-posts/:wsId/:postId rejects arbitrary statuses without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      status: 'published',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.status).toBe(before.status);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects invalid workflow transitions without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      status: 'generating',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid post transition/);
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.status).toBe(before.status);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects invalid workflow transitions without snapshotting content edits', async () => {
+    const invalidPostId = 'post_invalid_transition_content_' + Date.now();
+    const invalidBriefId = 'brief_invalid_transition_content_' + Date.now();
+    seedBrief(invalidBriefId);
+    seedPost(invalidPostId, invalidBriefId);
+
+    const beforePostRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}`);
+    const beforePost = await beforePostRes.json();
+    const beforeVersionsRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}/versions`);
+    const beforeVersions = await beforeVersionsRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${invalidPostId}`, {
+      title: 'Should Not Save',
+      status: 'generating',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid post transition/);
+
+    const afterPostRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}`);
+    const afterPost = await afterPostRes.json();
+    expect(afterPost.title).toBe(beforePost.title);
+    expect(afterPost.status).toBe(beforePost.status);
+    expect(afterPost.updatedAt).toBe(beforePost.updatedAt);
+
+    const afterVersionsRes = await api(`/api/content-posts/${testWsId}/${invalidPostId}/versions`);
+    const afterVersions = await afterVersionsRes.json();
+    expect(afterVersions).toHaveLength(beforeVersions.length);
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects publish metadata spoofing', async () => {
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      webflowItemId: 'spoofed-item',
+      webflowCollectionId: 'spoofed-collection',
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      publishedSlug: 'spoofed-slug',
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Unrecognized key/);
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.webflowItemId).toBeUndefined();
+    expect(after.webflowCollectionId).toBeUndefined();
+    expect(after.publishedAt).toBeUndefined();
+    expect(after.publishedSlug).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId merges section edits without dropping stored metadata', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+    const beforeSection = before.sections[0];
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Edited Section',
+          content: '<p>This should keep stored metadata</p>',
+          wordCount: 42,
+          createdAt: 'spoofed-section-created-at',
+        },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sections).toHaveLength(before.sections.length);
+    expect(body.sections[0]).toMatchObject({
+      index: 0,
+      heading: 'Edited Section',
+      content: '<p>This should keep stored metadata</p>',
+      wordCount: 42,
+      targetWordCount: beforeSection.targetWordCount,
+      keywords: beforeSection.keywords,
+      status: beforeSection.status,
+    });
+    expect(body.sections[0].createdAt).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId clears stale section errors when status recovers', async () => {
+    const errorPostId = 'post_section_error_recovery_' + Date.now();
+    const errorBriefId = 'brief_section_error_recovery_' + Date.now();
+    seedBrief(errorBriefId);
+    seedPost(errorPostId, errorBriefId);
+    db.prepare('UPDATE content_posts SET sections = ? WHERE workspace_id = ? AND id = ?').run(
+      JSON.stringify([
+        {
+          index: 0,
+          heading: 'Section 1',
+          content: '<p>Section 1 content</p>',
+          wordCount: 150,
+          targetWordCount: 300,
+          keywords: ['test'],
+          status: 'error',
+          error: 'Generation timed out',
+        },
+      ]),
+      testWsId,
+      errorPostId,
+    );
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${errorPostId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Recovered Section',
+          content: '<p>Recovered content</p>',
+          wordCount: 12,
+          status: 'done',
+        },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sections[0]).toMatchObject({
+      index: 0,
+      heading: 'Recovered Section',
+      status: 'done',
+    });
+    expect(body.sections[0].error).toBeUndefined();
+  });
+
+  it('PATCH /api/content-posts/:wsId/:postId rejects malformed sections without mutating', async () => {
+    const beforeRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const before = await beforeRes.json();
+
+    const res = await patchJson(`/api/content-posts/${testWsId}/${postId}`, {
+      sections: [
+        {
+          index: 0,
+          heading: 'Malformed Section',
+          content: '<p>This should not be stored</p>',
+          wordCount: -1,
+        },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const after = await afterRes.json();
+    expect(after.sections).toEqual(before.sections);
+    expect(after.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('POST /api/content-posts/:wsId/:postId/regenerate-section rejects non-integer indexes without mutating', async () => {
+    const beforePostRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const beforePost = await beforePostRes.json();
+    const beforeVersionsRes = await api(`/api/content-posts/${testWsId}/${postId}/versions`);
+    const beforeVersions = await beforeVersionsRes.json();
+
+    const res = await postJson(`/api/content-posts/${testWsId}/${postId}/regenerate-section`, {
+      sectionIndex: 0.5,
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+
+    const afterVersionsRes = await api(`/api/content-posts/${testWsId}/${postId}/versions`);
+    const afterVersions = await afterVersionsRes.json();
+    expect(afterVersions).toHaveLength(beforeVersions.length);
+
+    const afterPostRes = await api(`/api/content-posts/${testWsId}/${postId}`);
+    const afterPost = await afterPostRes.json();
+    expect(afterPost.sections).toEqual(beforePost.sections);
+    expect(afterPost.updatedAt).toBe(beforePost.updatedAt);
+  });
+
   it('POST /api/content-posts/:wsId/generate without briefId returns 400', async () => {
     const res = await postJson(`/api/content-posts/${testWsId}/generate`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('briefId required');
+  });
+
+  it('POST /api/content-posts/:wsId/generate starts a background job and returns a post skeleton', async () => {
+    const genBriefId = `brief_post_gen_${Date.now()}`;
+    seedBrief(genBriefId);
+
+    const res = await postJson(`/api/content-posts/${testWsId}/generate`, { briefId: genBriefId });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toMatch(/^post_/);
+    expect(body.briefId).toBe(genBriefId);
+    expect(body.status).toBe('generating');
+    expect(typeof body.jobId).toBe('string');
+
+    const jobRes = await api(`/api/jobs/${body.jobId}`);
+    expect(jobRes.status).toBe(200);
+    const job = await jobRes.json();
+    expect(job.type).toBe('content-post-generation');
+    expect(job.workspaceId).toBe(testWsId);
+    expect(typeof job.progress).toBe('number');
+    expect(job.total).toBeGreaterThan(0);
   });
 
   it('GET /api/content-posts/:wsId/:postId/export/markdown returns markdown', async () => {

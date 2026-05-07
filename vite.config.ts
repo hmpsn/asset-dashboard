@@ -56,7 +56,6 @@ export default defineConfig(async () => ({
       output: {
         manualChunks(id: string) {
           if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/') || id.includes('node_modules/react-router-dom/')) return 'react-vendor';
-          if (id.includes('node_modules/@stripe/')) return 'stripe';
         },
       },
     },
@@ -99,13 +98,13 @@ export default defineConfig(async () => ({
         'scripts/**',
         '**/*.test.{ts,tsx}',
       ],
-      // Baseline 2026-04-11: lines 17.3%, branches 12.1%, functions 10.8%, stmts 16.2%
+      // Baseline 2026-05-05 (staging): lines 28.6%, branches 21.4%, functions 20.4%, stmts 26.9%
       // Thresholds = baseline - 5pts. Ratchet up as coverage improves.
       thresholds: {
-        lines: 12,
-        branches: 7,
-        functions: 6,
-        statements: 11,
+        lines: 24,
+        branches: 16,
+        functions: 15,
+        statements: 22,
       },
     },
   },

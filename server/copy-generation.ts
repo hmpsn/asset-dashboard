@@ -3,7 +3,7 @@
 
 import { createLogger } from './logger.js';
 import { stripCodeFences } from './helpers.js';
-import { callAnthropic } from './anthropic-helpers.js';
+import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listDeliverables } from './brand-identity.js';
@@ -102,8 +102,9 @@ ${context}`;
 
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
-  const response = await callAnthropic({
-    model: 'claude-sonnet-4-20250514',
+  const response = await callAI({
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-6',
     maxTokens: 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: `Generate copy for "${entry.name}" (${entry.pageType} page). Return only valid JSON.` }],
@@ -202,8 +203,9 @@ ${context}`;
 
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
-  const response = await callAnthropic({
-    model: 'claude-sonnet-4-20250514',
+  const response = await callAI({
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-6',
     maxTokens: 2000,
     system: systemPrompt,
     messages: [{ role: 'user', content: 'Regenerate this section. Return only valid JSON.' }],

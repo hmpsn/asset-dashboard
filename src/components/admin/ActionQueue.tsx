@@ -16,10 +16,10 @@ interface Props {
 
 // Severity badge colors following Four Laws of Color
 const severityBadge = {
-  critical: 'bg-red-500/8 text-red-400/80 border-red-500/20',
-  warning: 'bg-amber-500/8 text-amber-400/80 border-amber-500/20',
-  opportunity: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  positive: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  critical: 'bg-red-500/8 text-accent-danger border-red-500/20',
+  warning: 'bg-amber-500/8 text-accent-warning border-amber-500/20',
+  opportunity: 'bg-blue-500/10 text-accent-info border-blue-500/20',
+  positive: 'bg-emerald-500/10 text-accent-success border-emerald-500/20',
 } as const;
 
 export function ActionQueue({ workspaceId }: Props) {
@@ -76,14 +76,14 @@ export function ActionQueue({ workspaceId }: Props) {
                 className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
                   {item.severity}
                 </span>
-                <span className="text-sm text-[var(--brand-text-bright)] flex-1 text-left truncate">
+                <span className="t-caption-sm text-[var(--brand-text-bright)] flex-1 text-left truncate">
                   {item.pageTitle ?? item.pageId ?? 'Unknown page'}
                 </span>
                 {/* Impact score — blue for data */}
-                <span className="text-xs text-blue-400 font-mono shrink-0">
+                <span className="t-caption-sm text-accent-info font-mono shrink-0">
                   {item.impactScore ?? 0}
                 </span>
                 {isExpanded ? (
@@ -96,7 +96,7 @@ export function ActionQueue({ workspaceId }: Props) {
               {/* Expanded resolution panel */}
               {isExpanded && (
                 <div className="px-3 pb-3 space-y-3 border-t border-[var(--brand-border)] pt-3">
-                  <p className="text-xs text-[var(--brand-text)]">
+                  <p className="t-caption-sm text-[var(--brand-text)]">
                     Type: <span className="text-[var(--brand-text-bright)]">{item.insightType}</span>
                     {' · '}Domain: <span className="text-[var(--brand-text-bright)]">{item.domain ?? '—'}</span>
                   </p>
@@ -107,7 +107,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     placeholder="Add a resolution note (optional)..."
                     value={note}
                     onChange={e => setNoteInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                    className="w-full text-xs bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
+                    className="w-full t-caption-sm bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
                   />
 
                   {/* Resolution buttons — teal for actions */}
@@ -115,7 +115,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     <button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'in_progress', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
                     >
                       <Clock className="w-3 h-3" />
                       In Progress
@@ -123,7 +123,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     <button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'resolved', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 text-accent-brand hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
                     >
                       <CheckCircle className="w-3 h-3" />
                       Mark Resolved

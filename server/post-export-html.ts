@@ -33,8 +33,8 @@ export function renderPostHTML(post: GeneratedPost): string {
   const updatedDate = new Date(post.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const metaDesc = post.seoMetaDescription || post.metaDescription;
   const titleTag = post.seoTitle || post.title;
-  const statusLabel = post.status === 'approved' ? 'Approved' : post.status === 'review' ? 'In Review' : 'Draft';
-  const statusColor = post.status === 'approved' ? '#16a34a' : post.status === 'review' ? '#b45309' : '#64748b';
+  const statusLabel = post.status === 'approved' ? 'Approved' : post.status === 'review' ? 'In Review' : post.status === 'error' ? 'Failed' : 'Draft';
+  const statusColor = post.status === 'approved' ? '#16a34a' : post.status === 'review' ? '#b45309' : post.status === 'error' ? '#dc2626' : '#64748b';
 
   // Build table of contents from sections
   const toc: string[] = [];

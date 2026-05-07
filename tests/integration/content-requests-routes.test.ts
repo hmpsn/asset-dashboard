@@ -11,9 +11,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
 const ctx = createTestContext(13218);
-const { api, patchJson, del } = ctx;
+const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
 
@@ -23,9 +24,9 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Content Requests — list', () => {
@@ -54,6 +55,104 @@ describe('Content Requests — update', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Request not found');
+  });
+});
+
+describe('Public content request lifecycle guards', () => {
+  function createRequest(keyword: string, status: 'requested' | 'client_review' | 'approved' | 'delivered') {
+    const request = createContentRequest(testWsId, {
+      topic: `Reliability ${keyword}`,
+      targetKeyword: `${keyword} ${Date.now()} ${Math.random()}`,
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'Regression guard',
+      serviceType: 'brief_only',
+      initialStatus: status === 'requested' ? 'requested' : 'brief_generated',
+      dedupe: false,
+    });
+    if (status === 'client_review') return updateContentRequest(testWsId, request.id, { status: 'client_review' })!;
+    if (status === 'approved') return updateContentRequest(testWsId, request.id, { status: 'approved' })!;
+    if (status === 'delivered') return updateContentRequest(testWsId, request.id, { status: 'delivered' })!;
+    return request;
+  }
+
+  it('rejects client brief approval before client_review', async () => {
+    const request = createRequest('requested', 'requested');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/approve`, {});
+    expect(res.status).toBe(409);
+    expect(getContentRequest(testWsId, request.id)?.status).toBe('requested');
+  });
+
+  it('allows client brief approval from client_review', async () => {
+    const request = createRequest('client-review', 'client_review');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/approve`, {});
+    expect(res.status).toBe(200);
+    expect(getContentRequest(testWsId, request.id)?.status).toBe('approved');
+  });
+
+  it('rejects unsupported approval fields before changing brief status', async () => {
+    const request = createRequest('strict-approve', 'client_review');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/approve`, {
+      status: 'delivered',
+    });
+    expect(res.status).toBe(400);
+    expect(getContentRequest(testWsId, request.id)?.status).toBe('client_review');
+  });
+
+  it('rejects unsupported change-request fields before storing feedback', async () => {
+    const request = createRequest('strict-changes', 'client_review');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/request-changes`, {
+      feedback: 'Please adjust the keyword angle.',
+      status: 'approved',
+    });
+    expect(res.status).toBe(400);
+    const unchanged = getContentRequest(testWsId, request.id);
+    expect(unchanged?.status).toBe('client_review');
+    expect(unchanged?.clientFeedback).toBeUndefined();
+  });
+
+  it('upgrades only approved brief-only requests into full-post work', async () => {
+    const request = createRequest('upgrade', 'approved');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/upgrade`, {});
+    expect(res.status).toBe(200);
+    const updated = getContentRequest(testWsId, request.id);
+    expect(updated?.serviceType).toBe('full_post');
+    expect(updated?.status).toBe('in_progress');
+    expect(updated?.upgradedAt).toBeDefined();
+  });
+
+  it('rejects unsupported upgrade fields before changing service workflow state', async () => {
+    const request = createRequest('strict-upgrade', 'approved');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/upgrade`, {
+      status: 'published',
+      serviceType: 'full_post',
+    });
+    expect(res.status).toBe(400);
+    const unchanged = getContentRequest(testWsId, request.id);
+    expect(unchanged?.status).toBe('approved');
+    expect(unchanged?.serviceType).toBe('brief_only');
+    expect(unchanged?.upgradedAt).toBeUndefined();
+  });
+
+  it('rejects delivered brief upgrade attempts', async () => {
+    const request = createRequest('delivered', 'delivered');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/upgrade`, {});
+    expect(res.status).toBe(409);
+    const unchanged = getContentRequest(testWsId, request.id);
+    expect(unchanged?.status).toBe('delivered');
+    expect(unchanged?.serviceType).toBe('brief_only');
+  });
+
+  it('rejects unsupported decline fields before changing request state', async () => {
+    const request = createRequest('strict-decline', 'requested');
+    const res = await postJson(`/api/public/content-request/${testWsId}/${request.id}/decline`, {
+      reason: 'Not a fit.',
+      status: 'published',
+    });
+    expect(res.status).toBe(400);
+    const unchanged = getContentRequest(testWsId, request.id);
+    expect(unchanged?.status).toBe('requested');
+    expect(unchanged?.declineReason).toBeUndefined();
   });
 });
 

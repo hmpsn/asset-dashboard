@@ -1,5 +1,8 @@
 /**
  * content-requests routes — extracted from server/index.ts
+ *
+ * @reads content_requests, content_posts, content_matrices, page_keywords, workspaces, workspace_pages, search_console, google_analytics, content_decay
+ * @writes content_requests, content_briefs, content_posts, page_states, activities
  */
 import { Router } from 'express';
 

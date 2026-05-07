@@ -90,6 +90,12 @@ export function useUpdateMyData(wsId: string) {
 
 ---
 
+## Route Read/Write Contracts
+
+High-churn route modules declare file-level `@reads` and `@writes` tags near the top of the file. Use comma-separated table/store names, or `none` when a side is intentionally empty. The enforced convention and initial route set live in [route-read-write-contracts.md](./route-read-write-contracts.md).
+
+---
+
 ## WebSocket Event Wiring (Complete Checklist)
 
 When a mutation needs real-time updates, wire both halves:

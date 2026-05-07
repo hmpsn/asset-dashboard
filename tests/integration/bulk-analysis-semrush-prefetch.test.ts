@@ -34,10 +34,10 @@ describe('prefetchSemrushForTopPages — bulk analysis enrichment', () => {
   // runs — that's how the orphaned-server-holds-port feedback loop got created
   // in the first place. Always reach stopServer + resetModules even on the
   // sad path.
-  afterAll(async () => { cleanup?.(); ctx.stopServer(); vi.resetModules(); });
+  afterAll(async () => { cleanup?.(); await ctx.stopServer(); vi.resetModules(); });
 
   it('returns a Map keyed by page path with REAL KEYWORD DATA blocks for pages with primary keywords', async () => {
-    const { prefetchSemrushForTopPages } = await import('../../server/routes/jobs.js');
+    const { prefetchSemrushForTopPages } = await import('../../server/page-analysis-job.js');
     const cache = await prefetchSemrushForTopPages(wsId, 10);
     expect(cache.get('/plumbing')).toContain('REAL KEYWORD DATA');
     expect(cache.get('/plumbing')).toContain('best plumber');

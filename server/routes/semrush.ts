@@ -8,10 +8,13 @@ const router = Router();
 import {
   isSemrushConfigured, estimateCreditCost, clearSemrushCache,
 } from '../semrush.js';
-import { getConfiguredProvider, getBacklinksProvider, listProviders } from '../seo-data-provider.js';
+import { getConfiguredProvider, getBacklinksProvider, listProviders, isAnyProviderConfigured } from '../seo-data-provider.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
+import { MAX_COMPETITORS } from '../constants.js';
+import { cleanCompetitorDomains, filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import fs from 'fs';
 import path from 'path';
 import { isProgrammingError } from '../errors.js';
@@ -19,7 +22,7 @@ import { isProgrammingError } from '../errors.js';
 const log = createLogger('semrush-routes');
 
 // --- Competitive Intelligence Hub ---
-router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
+router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const competitors = (req.query.competitors as string || '').split(',').map(d => d.trim()).filter(Boolean);
   if (competitors.length === 0) return res.status(400).json({ error: 'competitors query param required (comma-separated domains)' });
@@ -34,16 +37,17 @@ router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   try {
-    // Fetch domain overviews in parallel (my domain + up to 3 competitors)
+    // Fetch domain overviews in parallel (my domain + configured competitor cap)
     // Use backlinks-specific provider which falls back to SEMRush if DataForSEO lacks subscription
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
-    const allDomains = [myDomain, ...competitors.slice(0, 3)];
+    const cappedCompetitors = competitors.slice(0, MAX_COMPETITORS);
+    const allDomains = [myDomain, ...cappedCompetitors];
     const [overviews, backlinks, keywordGaps] = await Promise.all([
       Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),
       blProvider
         ? Promise.all(allDomains.map(d => blProvider.getBacklinksOverview(d, workspaceId).catch(() => null)))
         : Promise.resolve(allDomains.map(() => null)),
-      provider.getKeywordGap(myDomain, competitors.slice(0, 3), workspaceId, 30).catch(() => []),
+      provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30).catch(() => []),
     ]);
 
     // Get top keywords for each domain (parallel, limit 20 for speed)
@@ -67,7 +71,7 @@ router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
 });
 
 // --- Competitor Auto-Discovery ---
-router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) => {
+router.get('/api/semrush/discover-competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -79,10 +83,7 @@ router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) =>
 
   try {
     const competitors = await provider.getCompetitors(myDomain, ws.id, 10);
-    // Filter out the site's own domain and subdomains
-    const filtered = competitors.filter(c =>
-      !c.domain.includes(myDomain) && !myDomain.includes(c.domain)
-    );
+    const filtered = filterDiscoveredCompetitors(competitors, myDomain);
     res.json({ competitors: filtered, domain: myDomain });
   } catch (err) {
     log.error({ err }, 'Competitor discovery failed');
@@ -91,7 +92,7 @@ router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) =>
 });
 
 // --- Save competitor domains to workspace ---
-router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
+router.post('/api/semrush/competitors/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -99,12 +100,8 @@ router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
   const domainList = domains || competitors;
   if (!Array.isArray(domainList)) return res.status(400).json({ error: 'domains must be an array of domain strings' });
 
-  // Clean and deduplicate
-  const cleaned = [...new Set(
-    domainList
-      .map(d => d.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase())
-      .filter(Boolean)
-  )];
+  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const cleaned = cleanCompetitorDomains(domainList, myDomain).slice(0, MAX_COMPETITORS);
 
   updateWorkspace(ws.id, { competitorDomains: cleaned });
   res.json({ competitors: cleaned });
@@ -112,7 +109,7 @@ router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
 
 // --- SEMRush Utilities ---
 router.get('/api/semrush/status', (_req, res) => {
-  res.json({ configured: isSemrushConfigured() });
+  res.json({ configured: isAnyProviderConfigured() });
 });
 
 // Unified SEO data provider status
@@ -125,19 +122,19 @@ router.post('/api/semrush/estimate', (req, res) => {
   res.json({ credits: estimateCreditCost({ mode: mode || 'quick', competitorCount, keywordCount }) });
 });
 
-router.delete('/api/semrush/cache/:workspaceId', (req, res) => {
+router.delete('/api/semrush/cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   clearSemrushCache(req.params.workspaceId);
   res.json({ ok: true });
 });
 
 // GET-based cache clear (browser-friendly — just visit this URL)
-router.get('/api/semrush/clear-cache/:workspaceId', (req, res) => {
+router.get('/api/semrush/clear-cache/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   clearSemrushCache(req.params.workspaceId);
   res.json({ ok: true, message: 'SEMRush cache cleared. Go back and click Refresh on Competitive Intelligence.' });
 });
 
 // --- Diagnostic: verify domain resolution + cache without calling SEMRush API ---
-router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
+router.get('/api/semrush/diagnose/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 

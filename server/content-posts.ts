@@ -8,6 +8,13 @@ import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import db from './db/index.js';
+import { addActivity } from './activity-log.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { createJob, getJob, hasActiveJob, registerAbort, unregisterAbort, updateJob } from './jobs.js';
+import { WS_EVENTS } from './ws-events.js';
+import { abortableDelay, isAbortSignalAborted, throwIfSignalAborted } from './abort-helpers.js';
+import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 
 // Re-export everything from sub-modules for backward compatibility
 export * from './content-posts-db.js';
@@ -32,25 +39,43 @@ import {
 } from './content-posts-ai.js';
 
 const log = createLogger('content-posts');
-/**
- * Generate a full blog post from a content brief.
- * Generates intro, each section, and conclusion sequentially.
- * Saves progress after each section so partial results are available.
- */
-export async function generatePost(
+const GENERATION_CANCELLED_MESSAGE = 'Generation cancelled by user';
+
+export interface ContentPostGenerationJobStart {
+  jobId: string;
+  postId: string;
+  post: GeneratedPost;
+}
+
+interface RunContentPostGenerationJobOptions {
+  workspaceId: string;
+  brief: ContentBrief;
+  postId: string;
+  jobId: string;
+}
+
+export interface ContentPostGenerationProgress {
+  message: string;
+  progress: number;
+  total: number;
+}
+
+interface GeneratePostOptions {
+  signal?: AbortSignal;
+  onProgress?: (progress: ContentPostGenerationProgress) => void;
+}
+
+export function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-posts', ...payload });
+}
+
+export function createPostSkeleton(
   workspaceId: string,
   brief: ContentBrief,
-  existingPostId?: string,
-): Promise<GeneratedPost> {
-  const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  const voiceCtx = await buildVoiceContext(workspaceId);
-
-  // Resolve the site's live domain for internal link URLs
-  const ws = getWorkspace(workspaceId);
-  const siteDomain = ws?.liveDomain || undefined;
-
-  // Initialize post with pending sections
-  const post: GeneratedPost = {
+  postId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+): GeneratedPost {
+  const now = new Date().toISOString();
+  return {
     id: postId,
     workspaceId,
     briefId: brief.id,
@@ -72,43 +97,266 @@ export async function generatePost(
     targetWordCount: brief.wordCountTarget || 1800,
     status: 'generating',
     unificationStatus: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function contentPostGenerationTotalSteps(brief: ContentBrief): number {
+  // One step per outline section, plus intro, conclusion, unification, and SEO metadata.
+  return brief.outline.length + 4;
+}
+
+export function createContentPostGenerationJob(
+  workspaceId: string,
+  brief: ContentBrief,
+): ContentPostGenerationJobStart {
+  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, workspaceId);
+  if (activeJob) {
+    throw new Error(`Content post generation already running for this workspace: ${activeJob.id}`);
+  }
+
+  const started = db.transaction(() => {
+    const skeleton = createPostSkeleton(workspaceId, brief);
+    savePost(workspaceId, skeleton);
+    const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, {
+      message: `Generating post for "${brief.targetKeyword}"...`,
+      workspaceId,
+      total: contentPostGenerationTotalSteps(brief),
+    });
+    return { jobId: job.id, postId: skeleton.id, post: skeleton };
+  })();
+  notifyContentUpdated(workspaceId, {
+    postId: started.postId,
+    briefId: brief.id,
+    jobId: started.jobId,
+    action: 'post_generation_started',
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    postId: started.postId,
+    status: started.post.status,
+    jobId: started.jobId,
+  });
+  return started;
+}
+
+export function markPostGenerationFailed(
+  workspaceId: string,
+  brief: ContentBrief,
+  postId: string,
+  error: unknown,
+): GeneratedPost | undefined {
+  const failed = getPost(workspaceId, postId);
+  if (!failed) return undefined;
+
+  const message = error instanceof Error ? error.message : 'Generation failed';
+  failed.status = 'error';
+  failed.unificationStatus = 'failed';
+  failed.unificationNote = message;
+  failed.updatedAt = new Date().toISOString();
+  failed.sections = failed.sections.map(section =>
+    section.status === 'done' ? section : { ...section, status: 'error', error: message },
+  );
+  savePost(workspaceId, failed);
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Content generation failed for "${brief.targetKeyword}"`,
+    message,
+    { postId: failed.id, briefId: brief.id, action: 'post_generation_failed' },
+  );
+  notifyContentUpdated(workspaceId, {
+    postId: failed.id,
+    briefId: brief.id,
+    action: 'post_generation_failed',
+    status: failed.status,
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    postId: failed.id,
+    status: failed.status,
+  });
+  return failed;
+}
+
+export function markPostGenerationCancelled(
+  workspaceId: string,
+  brief: ContentBrief,
+  postId: string,
+): GeneratedPost | undefined {
+  const cancelled = getPost(workspaceId, postId);
+  if (!cancelled) return undefined;
+
+  const message = GENERATION_CANCELLED_MESSAGE;
+  cancelled.status = 'error';
+  cancelled.unificationStatus = 'skipped';
+  cancelled.unificationNote = message;
+  cancelled.updatedAt = new Date().toISOString();
+  cancelled.sections = cancelled.sections.map(section =>
+    section.status === 'done' ? section : { ...section, status: 'error', error: message },
+  );
+  savePost(workspaceId, cancelled);
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Content generation cancelled for "${brief.targetKeyword}"`,
+    message,
+    { postId: cancelled.id, briefId: brief.id, action: 'post_generation_cancelled' },
+  );
+  notifyContentUpdated(workspaceId, {
+    postId: cancelled.id,
+    briefId: brief.id,
+    action: 'post_generation_cancelled',
+    status: cancelled.status,
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+    postId: cancelled.id,
+    status: cancelled.status,
+  });
+  return cancelled;
+}
+
+export function runContentPostGenerationJob({
+  workspaceId,
+  brief,
+  postId,
+  jobId,
+}: RunContentPostGenerationJobOptions): void {
+  void (async () => {
+    const abortController = registerAbort(jobId);
+    const total = contentPostGenerationTotalSteps(brief);
+    try {
+      updateJob(jobId, { status: 'running', message: 'Preparing content context...', progress: 0, total });
+      const generated = await generatePost(workspaceId, brief, postId, {
+        signal: abortController.signal,
+        onProgress: (progress) => {
+          updateJob(jobId, {
+            status: 'running',
+            message: progress.message,
+            progress: progress.progress,
+            total: progress.total,
+          });
+        },
+      });
+      addActivity(
+        workspaceId,
+        'post_generated',
+        `Content generated for "${brief.targetKeyword}"`,
+        `Title: ${brief.suggestedTitle}`,
+      );
+      notifyContentUpdated(workspaceId, {
+        postId: generated.id,
+        briefId: brief.id,
+        jobId,
+        action: 'post_generated',
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+        postId: generated.id,
+        status: generated.status,
+        jobId,
+      });
+      updateJob(jobId, {
+        status: 'done',
+        result: { postId: generated.id, briefId: brief.id, post: generated },
+        message: `Post generated — ${generated.totalWordCount} words`,
+        progress: total,
+        total,
+      });
+    } catch (err) {
+      if (abortController.signal.aborted) {
+        log.info({ workspaceId, postId, jobId }, 'Content post generation job cancelled');
+        const cancelled = markPostGenerationCancelled(workspaceId, brief, postId);
+        const current = getJob(jobId);
+        if (current?.status !== 'cancelled') {
+          updateJob(jobId, {
+            status: 'cancelled',
+            result: { postId, briefId: brief.id, status: cancelled?.status ?? 'error' },
+            message: 'Post generation cancelled',
+          });
+        }
+        return;
+      }
+      log.error({ err, workspaceId, postId, jobId }, 'Content post generation job failed');
+      const failed = markPostGenerationFailed(workspaceId, brief, postId, err);
+      updateJob(jobId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        result: { postId, briefId: brief.id, status: failed?.status ?? 'error' },
+        message: 'Post generation failed',
+      });
+    } finally {
+      unregisterAbort(jobId);
+    }
+  })();
+}
+
+/**
+ * Generate a full blog post from a content brief.
+ * Generates intro, each section, and conclusion sequentially.
+ * Saves progress after each section so partial results are available.
+ */
+export async function generatePost(
+  workspaceId: string,
+  brief: ContentBrief,
+  existingPostId?: string,
+  options: GeneratePostOptions = {},
+): Promise<GeneratedPost> {
+  const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const totalSteps = contentPostGenerationTotalSteps(brief);
+  let completedSteps = 0;
+  const reportProgress = (message: string, progress = completedSteps) => {
+    options.onProgress?.({ message, progress, total: totalSteps });
   };
 
-  // Only save initial skeleton if not already saved by the caller
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+  reportProgress('Preparing content context...', 0);
+  const voiceCtx = await buildVoiceContext(workspaceId);
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+
+  // Resolve the site's live domain for internal link URLs
+  const ws = getWorkspace(workspaceId);
+  const siteDomain = ws?.liveDomain || undefined;
+
   const existingPost = getPost(workspaceId, postId);
+  const post = existingPost ?? createPostSkeleton(workspaceId, brief, postId);
   if (!existingPost) {
     savePost(workspaceId, post);
   }
 
   // 1. Generate introduction
+  reportProgress('Writing introduction...', completedSteps);
   try {
-    post.introduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain);
+    throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+    post.introduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal });
     post.updatedAt = new Date().toISOString();
     savePost(workspaceId, post);
   } catch (err) {
+    if (isAbortSignalAborted(options.signal)) throw err;
     post.introduction = `*[Introduction generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
   }
+  completedSteps += 1;
 
   // 2. Generate each body section sequentially
   const completedSections: string[] = [];
   for (let i = 0; i < brief.outline.length; i++) {
+    throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+    reportProgress(`Writing section ${i + 1} of ${brief.outline.length}...`, completedSteps);
     post.sections[i].status = 'generating';
     savePost(workspaceId, post);
 
     // Pace API calls to avoid rate limits (Claude RPM caps)
-    if (i > 0) await new Promise(r => setTimeout(r, 2000));
+    if (i > 0) await abortableDelay(2000, options.signal, GENERATION_CANCELLED_MESSAGE);
 
     try {
+      throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
       const content = await generateSection(
-        brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain,
+        brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain, { signal: options.signal },
       );
       post.sections[i].content = content;
       post.sections[i].wordCount = countHtmlWords(content);
       post.sections[i].status = 'done';
       completedSections.push(content);
     } catch (err) {
+      if (isAbortSignalAborted(options.signal)) throw err;
       post.sections[i].status = 'error';
       post.sections[i].error = err instanceof Error ? err.message : 'Generation failed';
       post.sections[i].content = `*[Section generation failed: ${post.sections[i].error}]*`;
@@ -117,25 +365,32 @@ export async function generatePost(
 
     post.updatedAt = new Date().toISOString();
     savePost(workspaceId, post);
+    completedSteps += 1;
   }
 
   // 3. Generate conclusion
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+  reportProgress('Writing conclusion...', completedSteps);
   try {
-    post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain);
+    post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal });
   } catch (err) {
+    if (isAbortSignalAborted(options.signal)) throw err;
     post.conclusion = `*[Conclusion generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
   }
+  completedSteps += 1;
 
   post.updatedAt = new Date().toISOString();
   savePost(workspaceId, post);
 
   // 4. Unification pass — review the full post for cohesion, smooth transitions, consistent voice, and word count correction
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+  reportProgress('Unifying draft...', completedSteps);
   post.unificationStatus = 'pending';
   savePost(workspaceId, post);
 
   try {
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
-    const unified = await unifyPost(post, brief, voiceCtx, workspaceId);
+    const unified = await unifyPost(post, brief, voiceCtx, workspaceId, { signal: options.signal });
     if (unified) {
       if (unified.introduction) post.introduction = unified.introduction;
       for (let i = 0; i < post.sections.length; i++) {
@@ -157,23 +412,30 @@ export async function generatePost(
       log.warn(`Unification skipped for ${postId}`);
     }
   } catch (err) {
+    if (isAbortSignalAborted(options.signal)) throw err;
     post.unificationStatus = 'failed';
     post.unificationNote = `Unification error: ${err instanceof Error ? err.message : 'Unknown'}`;
     log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
+  completedSteps += 1;
 
   // 5. Generate SEO title tag and meta description
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
+  reportProgress('Generating SEO metadata...', completedSteps);
   try {
-    const seoMeta = await generateSeoMeta(post, brief, workspaceId);
+    const seoMeta = await generateSeoMeta(post, brief, workspaceId, { signal: options.signal });
     if (seoMeta) {
       post.seoTitle = seoMeta.seoTitle;
       post.seoMetaDescription = seoMeta.seoMetaDescription;
       log.info(`SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
     }
   } catch (err) {
+    if (isAbortSignalAborted(options.signal)) throw err;
     log.warn({ err: err }, 'SEO meta generation failed (non-critical)');
   }
+  completedSteps += 1;
+  reportProgress('Finalizing post draft...', completedSteps);
 
   // Finalize
   post.totalWordCount = countHtmlWords(post.introduction)

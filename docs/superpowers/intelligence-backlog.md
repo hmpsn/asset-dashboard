@@ -71,15 +71,13 @@ These fields have placeholder values in the assembler but could be populated fro
 
 ---
 
-### 6. `clientSignals.portalUsage`
+### 6. `clientSignals.portalUsage` — ✅ DONE (PR #180)
 
-**Currently:** Always `null`.
+**Status:** Completed. Populates from recent client activity summaries and feature-specific client activity events.
 
-**What's needed:** If client portal login events or page views are logged anywhere (activity log?), count recent sessions.
+**Note:** `pageViews` represents distinct calendar days with client portal activity, not literal page views.
 
 **Value:** Engagement signal. Clients who never log in are churn risks regardless of SEO performance.
-
-**Effort:** ~1-2h depending on whether events are already tracked.
 
 ---
 
@@ -198,7 +196,7 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 | 3 | cannibalizationWarnings alerts | 2-3h | Medium-High | Post-3B |
 | 4 | ~~avgResponseTime wiring~~ | ~~1h~~ | ~~Medium~~ | ✅ PR #180 |
 | 5 | Deprecate seo-context.ts | 1h | Cleanup | Phase 4 |
-| 6 | portalUsage wiring | 1-2h | Medium | Post-3B |
+| 6 | ~~portalUsage wiring~~ | ~~1-2h~~ | ~~Medium~~ | ✅ PR #180 |
 | 7 | ~~linkHealth wiring~~ | ~~2h~~ | ~~Medium~~ | ✅ PR #180 |
 | 8 | actionBacklog escalation | 1-2h | Medium | Post-3B |
 | 9 | SEO audit + cannibalization | 1h | Medium | Post-3B |

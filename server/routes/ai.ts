@@ -13,12 +13,12 @@ import {
   generateSessionSummary,
 } from '../chat-memory.js';
 import {
-  callOpenAI,
   getTokenUsage,
   getTimeSaved,
   getUsageByDay,
   getUsageByFeature,
 } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getSemrushUsage, getSemrushByDay } from '../semrush.js';
 import { getDataForSeoUsage, getDataForSeoByDay } from '../providers/dataforseo-provider.js';
 import { getWorkspace } from '../workspaces.js';
@@ -56,18 +56,16 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
     // Build the system prompt based on the assembled context and chat mode
     const systemPrompt = buildSystemPrompt(ws, assembled, dataDays, priorContext);
 
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
-      ...historyMessages.slice(-10),
-      { role: 'user', content: question },
-    ];
-
     // Content review and page analysis may need more tokens for detailed feedback
     const maxTokens = assembled.mode === 'analyst' ? 2000 : 3000;
 
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages,
+    const aiResult = await callAI({
+      model: 'gpt-5.4',
+      system: systemPrompt,
+      messages: [
+        ...historyMessages.slice(-10),
+        { role: 'user', content: question },
+      ],
       temperature: 0.6,
       maxTokens,
       feature: 'admin-chat',

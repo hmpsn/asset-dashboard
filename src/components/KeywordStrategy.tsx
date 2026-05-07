@@ -4,7 +4,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
+  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, Send,
 } from 'lucide-react';
 import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
@@ -22,7 +22,10 @@ import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
+import { clientActions } from '../api/clientActions';
 import { queryKeys } from '../lib/queryKeys';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
@@ -51,7 +54,9 @@ interface Props {
 
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const queryClient = useQueryClient();
-  const [generating, setGenerating] = useState(false);
+  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
+  const [startingStrategyJob, setStartingStrategyJob] = useState(false);
+  const [lastStartedJobId, setLastStartedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // React Query hook replaces manual data fetching
@@ -62,23 +67,27 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // when page_keywords rows exist but no strategy blob — that case must render as "no strategy yet"
   // in this component, while still exposing pageMap via Page Intelligence separately.
   const isRealStrategy = strategy?.generatedAt != null;
-  const semrushAvailableFromHook = keywordData?.semrushAvailable || false;
+  const seoDataAvailableFromHook = keywordData?.seoDataAvailable || false;
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
-  const [semrushAvailable, setSemrushAvailable] = useState(semrushAvailableFromHook);
-  const [semrushMode, setSemrushMode] = useState<'none' | 'quick' | 'full'>('none');
+  const [seoDataAvailable, setSeoDataAvailable] = useState(seoDataAvailableFromHook);
+  const [seoDataMode, setSeoDataMode] = useState<'none' | 'quick' | 'full'>('none');
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(true);
-  const [progressStep, setProgressStep] = useState('');
-  const [progressDetail, setProgressDetail] = useState('');
-  const [progressPct, setProgressPct] = useState(0);
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [sentToClient, setSentToClient] = useState(false);
+  const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
+  const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
+  const generating = startingStrategyJob || Boolean(activeStrategyJob);
+  const displayedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
@@ -100,25 +109,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       .catch(() => {});
   }, [workspaceId]);
 
-  const stepLabels: Record<string, string> = {
-    discovery: 'Discovering pages',
-    content: 'Fetching page content',
-    search_data: 'Search Console data',
-    semrush: 'Keyword intelligence',
-    ai: 'AI analysis',
-    enrichment: 'Enriching data',
-    complete: 'Complete',
-  };
-
-
-  // Initialize SEMRush availability from React Query hook
+  // Initialize SEO provider availability from React Query hook
   useEffect(() => {
-    if (semrushAvailableFromHook) {
-      setSemrushAvailable(true);
-      // Default to quick mode when SEMRush is available
-      setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
+    setSeoDataAvailable(seoDataAvailableFromHook);
+    if (seoDataAvailableFromHook) {
+      // Default to quick mode when an SEO data provider is available
+      setSeoDataMode(prev => prev === 'none' ? 'quick' : prev);
+    } else {
+      setSeoDataMode('none');
     }
-  }, [semrushAvailableFromHook]);
+  }, [seoDataAvailableFromHook]);
 
   // Load saved competitor domains from React Query hook data
   useEffect(() => {
@@ -132,67 +132,60 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     if (strategy?.businessContext && !businessContext) {
       setBusinessContext(strategy.businessContext);
     }
-    if (strategy?.semrushMode && strategy.semrushMode !== 'none') {
-      setSemrushMode(strategy.semrushMode);
+    const savedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+    if (savedSeoDataMode && savedSeoDataMode !== 'none') {
+      setSeoDataMode(savedSeoDataMode);
     }
   }, [strategy]);
 
+  // effect-layout-ok: active background jobs can predate this component mount.
+  useEffect(() => {
+    if (activeStrategyJob && !lastStartedJobId) {
+      setLastStartedJobId(activeStrategyJob.id);
+    }
+  }, [activeStrategyJob, lastStartedJobId]);
+
+  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
+  useEffect(() => {
+    if (!completedStartedJob) return;
+    if (completedStartedJob.status === 'done') {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      setShowNextSteps(true);
+      setLastStartedJobId(null);
+    } else if (completedStartedJob.status === 'error') {
+      setError(completedStartedJob.error || completedStartedJob.message || 'Failed to generate strategy');
+      setLastStartedJobId(null);
+    } else if (completedStartedJob.status === 'cancelled') {
+      setError('Strategy generation was cancelled');
+      setLastStartedJobId(null);
+    }
+  }, [completedStartedJob, queryClient, workspaceId]);
+
   const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
-    setGenerating(true);
+    if (generating) return;
+    setStartingStrategyJob(true);
     setShowNextSteps(false);
     setError(null);
-    setProgressStep('');
-    setProgressDetail('');
-    setProgressPct(0);
     try {
       const compList = competitors.trim() ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean) : undefined;
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        body: JSON.stringify({
-          mode: strategyMode,
-          businessContext: businessContext.trim() || undefined,
-          semrushMode: semrushAvailable ? semrushMode : 'none',
-          competitorDomains: compList,
-          maxPages: maxPages || undefined,
-        }),
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
+        mode: strategyMode,
+        workspaceId,
+        businessContext: businessContext.trim() || undefined,
+        seoDataMode: seoDataAvailable ? seoDataMode : 'none',
+        competitorDomains: compList,
+        maxPages: maxPages || undefined,
       });
-
-      if (!res.ok || !res.body) {
-        // Non-streaming error response (429, 400, 500, etc.) or no streaming support
-        const data = await res.json();
-        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); }
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE events from buffer
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); setShowNextSteps(true); break; }
-            if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
-          } catch (err) { console.error('KeywordStrategy operation failed:', err); }
-        }
+      if (jobId) {
+        setLastStartedJobId(jobId);
+      } else {
+        setError('Failed to start keyword strategy generation');
       }
     } catch (err) {
       console.error('KeywordStrategy operation failed:', err);
       setError('Failed to generate strategy');
     } finally {
-      setGenerating(false);
-      setProgressStep('');
+      setStartingStrategyJob(false);
     }
   };
 
@@ -208,26 +201,26 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   const positionColor = (pos?: number) => {
     if (!pos) return 'text-[var(--brand-text-muted)]';
-    if (pos <= 3) return 'text-emerald-400';
-    if (pos <= 10) return 'text-teal-400';
-    if (pos <= 20) return 'text-amber-400';
-    return 'text-red-400';
+    if (pos <= 3) return 'text-accent-success';
+    if (pos <= 10) return 'text-accent-brand';
+    if (pos <= 20) return 'text-accent-warning';
+    return 'text-accent-danger';
   };
 
   const difficultyColor = (kd?: number) => {
     if (kd === undefined) return 'text-[var(--brand-text-muted)]';
-    if (kd <= 30) return 'text-emerald-400';
-    if (kd <= 50) return 'text-amber-400';
-    if (kd <= 70) return 'text-orange-400';
-    return 'text-red-400';
+    if (kd <= 30) return 'text-accent-success';
+    if (kd <= 50) return 'text-accent-warning';
+    if (kd <= 70) return 'text-accent-orange';
+    return 'text-accent-danger';
   };
 
   const intentColor = (intent?: string) => {
     switch (intent) {
-      case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-      case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-      case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+      case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
+      case 'informational': return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
+      case 'transactional': return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+      case 'navigational': return 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20';
       default: return 'text-[var(--brand-text)] bg-zinc-500/10 border-zinc-500/20'; // raw-zinc-ok
     }
   };
@@ -253,6 +246,35 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     .filter((p: PageKeywordMap) => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
     .sort((a: PageKeywordMap, b: PageKeywordMap) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
+
+  const sendStrategyToClient = async () => {
+    if (!strategy) return;
+    setSendingToClient(true);
+    setError(null);
+    try {
+      await clientActions.create(workspaceId, {
+        sourceType: 'keyword_strategy',
+        sourceId: `keyword-strategy:${strategy.generatedAt || new Date().toISOString()}`,
+        title: 'Keyword strategy recommendations',
+        summary: `Review the current keyword strategy: ${filteredPageMap.length} mapped page${filteredPageMap.length !== 1 ? 's' : ''}, ${lowHangingFruit.length} low-hanging opportunity${lowHangingFruit.length !== 1 ? 'ies' : 'y'}, and ${(strategy.contentGaps?.length ?? 0)} content gap${(strategy.contentGaps?.length ?? 0) !== 1 ? 's' : ''}.`,
+        priority: lowHangingFruit.length > 0 || (strategy.contentGaps?.length ?? 0) > 0 ? 'high' : 'medium',
+        payload: {
+          generatedAt: strategy.generatedAt,
+          pageMap: filteredPageMap,
+          quickWins: strategy.quickWins ?? [],
+          contentGaps: strategy.contentGaps ?? [],
+          opportunities: strategy.opportunities ?? [],
+          lowHangingFruit,
+        },
+      });
+      setSentToClient(true);
+    } catch (err) {
+      console.error('KeywordStrategy operation failed:', err);
+      setError('Failed to send keyword strategy to client');
+    } finally {
+      setSendingToClient(false);
+    }
+  };
 
   const intentCounts = filteredPageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
     const intent = p.searchIntent || 'unknown';
@@ -302,6 +324,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               Update changed pages
             </button>
           )}
+          {isRealStrategy && (
+            <button
+              onClick={sendStrategyToClient}
+              disabled={sendingToClient || sentToClient}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50 t-caption font-medium"
+            >
+              <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
+              {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
+            </button>
+          )}
           <button
             onClick={() => generateStrategy('full')}
             disabled={generating}
@@ -330,12 +362,12 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
-            <Icon as={Briefcase} size="md" className="text-teal-400" />
+            <Icon as={Briefcase} size="md" className="text-accent-brand" />
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
-                {maxPages > 0 ? `${semrushMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${semrushMode !== 'none' ? ' · ' : ''}All pages`}
+                {seoDataMode !== 'none' ? `SEO data: ${seoDataMode}` : ''}
+                {maxPages > 0 ? `${seoDataMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${seoDataMode !== 'none' ? ' · ' : ''}All pages`}
                 {businessContext ? ` · Context set` : ''}
                 {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
               </span>
@@ -349,7 +381,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {providerList.filter(p => p.configured).length > 1 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="md" className="text-teal-400" />
+                  <Icon as={BarChart3} size="md" className="text-accent-brand" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -362,7 +394,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       }}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         (activeProvider || 'semrush') === p.name
-                          ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                          ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
                           : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
                     >
@@ -376,26 +408,26 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
                   {(activeProvider || 'semrush') === 'dataforseo'
                     ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
-                    : 'SEMRush: subscription-based. Traditional keyword intelligence provider.'}
+                    : 'SEMRush: subscription-based traditional keyword intelligence provider.'}
                 </p>
               </div>
             )}
 
-            {/* SEMRush Mode */}
-            {semrushAvailable && (
+            {/* SEO Data Mode */}
+            {seoDataAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="md" className="text-orange-400" />
-                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
+                  <Icon as={BarChart3} size="md" className="text-accent-orange" />
+                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {(['none', 'quick', 'full'] as const).map(mode => (
                     <button
                       key={mode}
-                      onClick={() => setSemrushMode(mode)}
+                      onClick={() => setSeoDataMode(mode)}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                        semrushMode === mode
-                          ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
+                        seoDataMode === mode
+                          ? 'border-orange-500/50 bg-orange-500/10 text-accent-orange'
                           : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
                     >
@@ -409,38 +441,44 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from SEMRush.'}
-                  {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
-                  {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEMRush API credits used.'}
+                  {seoDataMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from your configured SEO provider.'}
+                  {seoDataMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
+                  {seoDataMode === 'none' && 'Uses AI + Google Search Console data only. No SEO provider credits used.'}
                 </p>
               </div>
             )}
 
             {/* Competitor Domains */}
-            {semrushAvailable && (
+            {seoDataAvailable && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <Icon as={Users} size="md" className="text-orange-400" />
+                    <Icon as={Users} size="md" className="text-accent-orange" />
                     <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
                   <button
                     onClick={async () => {
                       setDiscoveringCompetitors(true);
+                      setDiscoverError(null);
                       try {
                         const result = await keywords.discoverCompetitors(workspaceId);
                         if (result?.competitors?.length) {
                           const domains = result.competitors.slice(0, 5).map(c => c.domain);
                           setCompetitors(domains.join(', '));
                           await keywords.saveCompetitors(workspaceId, domains);
+                        } else {
+                          setDiscoverError('No organic competitors were found for this domain.');
                         }
-                      } catch { /* ignore */ }
-                      setDiscoveringCompetitors(false);
+                      } catch (err: any) {
+                        setDiscoverError(err?.message || 'Failed to discover competitors. Check that your domain is set and an SEO provider is configured.');
+                      } finally {
+                        setDiscoveringCompetitors(false);
+                      }
                     }}
                     disabled={discoveringCompetitors}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-accent-orange font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
                   >
-                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-orange-400" />}
+                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-accent-orange" />}
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
                   </button>
                 </div>
@@ -451,14 +489,15 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   placeholder="e.g. competitor1.com, competitor2.com"
                   className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
                 />
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses SEMRush to find your organic competitors. These persist between strategy runs.</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses your configured SEO data provider to find organic competitors. These persist between strategy runs.</p>
+                {discoverError && <p className="t-caption-sm text-accent-danger mt-1">{discoverError}</p>}
               </div>
             )}
 
             {/* Page Limit */}
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <Icon as={FileText} size="md" className="text-teal-400" />
+                <Icon as={FileText} size="md" className="text-accent-brand" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
               </div>
               <div className="grid grid-cols-4 gap-3">
@@ -468,7 +507,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     onClick={() => setMaxPages(cap)}
                     className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                       maxPages === cap
-                        ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                        ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
                         : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                     }`}
                   >
@@ -495,7 +534,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 onClick={() => setContextOpen(!contextOpen)}
                 className="flex items-center gap-1.5 mb-1"
               >
-                <Icon as={Briefcase} size="md" className="text-teal-400" />
+                <Icon as={Briefcase} size="md" className="text-accent-brand" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
                 <Icon as={contextOpen ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
               </button>
@@ -521,9 +560,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {/* Progress Indicator */}
       <ProgressIndicator
         status={generating ? 'running' : 'idle'}
-        step={progressStep ? (stepLabels[progressStep] || progressStep) : undefined}
-        detail={progressDetail || undefined}
-        percent={generating && progressPct > 0 ? Math.round(progressPct * 100) : undefined}
+        step={activeStrategyJob?.message || (startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
+        percent={activeStrategyJob?.total ? Math.round(((activeStrategyJob.progress ?? 0) / activeStrategyJob.total) * 100) : undefined}
       />
 
       {error && (
@@ -569,10 +607,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* ── Unvalidated Strategy Warning ── */}
           {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
-              <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="t-caption text-amber-300/90 leading-relaxed">
-                <strong className="text-amber-300">This strategy was generated without keyword volume validation.</strong>{' '}
-                Keywords, volume, and difficulty data may not reflect real search demand. Enable SEMRush integration for validated keyword recommendations.
+              <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
+              <div className="t-caption text-accent-warning leading-relaxed">
+                <strong className="text-accent-warning">This strategy was generated without keyword volume validation.</strong>{' '}
+                Keywords, volume, and difficulty data may not reflect real search demand. Enable an SEO data provider for validated keyword recommendations.
               </div>
             </div>
           )}
@@ -591,7 +629,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               title="Ranking Distribution"
               titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>}
             >
-              <div className="flex h-4 rounded-full overflow-hidden bg-[var(--surface-3)]">
+              <div className="flex h-4 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)]">
                 {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
                 {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
                 {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
@@ -599,18 +637,18 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 {notRankingCount > 0 && <div className="bg-[var(--surface-3)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-3)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500 inline-block" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500 inline-block" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500 inline-block" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60 inline-block" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
                   <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Search Intent Mix</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <span key={intent} className={`t-caption-sm px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
+                      <span key={intent} className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(intent)}`}>
                         {intent} ({count})
                       </span>
                     ))}
@@ -660,21 +698,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <CompetitiveIntel
             workspaceId={workspaceId}
             competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-            semrushAvailable={semrushAvailable}
+            seoDataAvailable={seoDataAvailable}
             cachedKeywordGaps={strategy?.keywordGaps}
           />
 
           {/* ── Site Keywords ── */}
           <SectionCard
             title="Site Target Keywords"
-            titleIcon={<Icon as={Target} size="md" className="text-teal-400" />}
+            titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
           >
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
                 const tracked = trackedKeywords.has(kw);
                 return (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded t-caption-sm text-teal-300">
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded t-caption-sm text-accent-brand">
                     {kw}
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
@@ -685,9 +723,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <button
                       onClick={() => trackKeyword(kw)}
                       title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
-                      className={`ml-0.5 transition-colors ${tracked ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-teal-400'}`}
+                      className={`ml-0.5 transition-colors ${tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
                     >
-                      {tracked ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Plus} size="sm" />}
+                      {tracked ? <Icon as={Check} size="sm" className="text-accent-success" /> : <Icon as={Plus} size="sm" />}
                     </button>
                   </span>
                 );
@@ -699,7 +737,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {strategy.opportunities.length > 0 && (
             <SectionCard
               title="Keyword Opportunities"
-              titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
+              titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
             >
               <p className="text-[var(--brand-text-muted)] t-caption-sm mb-2">
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
@@ -707,7 +745,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 t-caption-sm text-teal-400 font-bold">{i + 1}</span>
+                    <span className="w-4 h-4 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 t-caption-sm text-accent-brand font-bold">{i + 1}</span>
                     {opp}
                   </div>
                 ))}
@@ -718,18 +756,18 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* How it works */}
           <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
             <div className="flex items-start gap-2">
-              <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
+              <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 flex-shrink-0" />
               <div className="t-caption-sm text-[var(--brand-text-muted)]">
                 <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
-                Use <strong className="text-teal-400">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
-                {strategy.semrushMode && strategy.semrushMode !== 'none' && (
-                  <span className="block mt-1 text-orange-400/80">
-                    SEMRush data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
+                Use <strong className="text-accent-brand">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
+                {displayedSeoDataMode && displayedSeoDataMode !== 'none' && (
+                  <span className="block mt-1 text-accent-orange">
+                    SEO provider data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>
                 )}
                 {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.currentPosition) && (
-                  <span className="block mt-1 text-amber-400/80">
+                  <span className="block mt-1 text-accent-warning">
                     Tip: Connect Google Search Console to see ranking positions and get data-driven keyword suggestions.
                   </span>
                 )}

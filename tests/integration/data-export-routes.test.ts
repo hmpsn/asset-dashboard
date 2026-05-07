@@ -196,7 +196,7 @@ beforeAll(async () => {
   });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   // Guard: only clean up rows for workspaces that were actually seeded.
   // If beforeAll failed (e.g. EADDRINUSE), wsAId/wsBId remain '' and
   // cleanSeedData('') would be a no-op — but cleanupWorkspaces would be
@@ -210,7 +210,7 @@ afterAll(() => {
     cleanSeedData(wsBId);
   }
   cleanupWorkspaces?.();
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

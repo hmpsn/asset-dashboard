@@ -1,11 +1,14 @@
 /**
  * public-portal routes — extracted from server/index.ts
+ *
+ * @reads workspaces, snapshots, keyword_feedback, client_business_priorities, content_gap_votes, copy_sections, briefing_store, recommendations, stripe_products, search_console, google_analytics
+ * @writes workspaces, keyword_feedback, rank_tracking_config, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 
 const router = Router();
 
-import { z } from '../middleware/validate.js';
+import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
@@ -22,17 +25,45 @@ import { computeOpportunityScore } from './keyword-strategy.js';
 import type { BriefingRecommendation } from '../../shared/types/briefing.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
-import { parseJsonFallback } from '../db/json-validation.js';
+import { parseJsonSafeArray } from '../db/json-validation.js';
 import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
+import { addTrackedKeyword } from '../rank-tracking.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import {
+  CLIENT_BUSINESS_PRIORITIES_MARKER,
+  clientBusinessPrioritiesBodySchema,
+  clientBusinessPrioritySchema,
+  type ClientBusinessPrioritiesBody,
+} from '../schemas/client-business-priorities.js';
+import {
+  bulkKeywordFeedbackSchema,
+  contentGapVoteSchema,
+  keywordFeedbackSchema,
+  type BulkKeywordFeedbackBody,
+  type ContentGapVoteBody,
+  type KeywordFeedbackBody,
+} from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-portal');
+
+const requireClientStrategyMutationAuth: RequestHandler = (req, res, next) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  res.locals.clientEmail = clientPayload?.email;
+  next();
+};
 
 // --- Public Client Dashboard API (no auth required) ---
 router.get('/api/public/workspace/:id', (req, res) => {
@@ -186,6 +217,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       onboardingCompleted: true,
     });
 
+    // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
     addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
@@ -207,7 +239,7 @@ router.get('/api/public/tier/:id', (req, res) => {
   res.json({
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free' && trialDaysRemaining > 0,
+    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
     trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
   });
@@ -320,7 +352,7 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
             trafficMap[pagePath].impressions += p.impressions;
           } catch { /* skip malformed URLs */ } // catch-ok
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ } // url-fetch-ok
     }
 
     if (ws.ga4PropertyId) {
@@ -337,7 +369,7 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
 
     res.json(trafficMap);
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error');
+    if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); // url-fetch-ok
     else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -354,24 +386,13 @@ router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
 });
 
 // Client: submit keyword feedback (approve/decline)
-router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMutationAuth, validate(keywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { keyword, status, reason, source } = req.body;
-  if (!keyword || !status || !['approved', 'declined', 'requested'].includes(status)) {
-    return res.status(400).json({ error: 'keyword and status (approved|declined|requested) required' });
-  }
+  const { keyword, status, reason, source } = req.body as KeywordFeedbackBody;
   const kw = keyword.toLowerCase().trim();
-  const declinedBy = clientPayload?.email || 'client';
+  const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
 
   db.prepare(`
     INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
@@ -381,31 +402,24 @@ router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
       reason = excluded.reason,
       declined_by = excluded.declined_by,
       updated_at = datetime('now')
-  `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy);
+  `).run(ws.id, kw, status, reason || null, source, declinedBy);
+
+  if (status === 'approved') addTrackedKeyword(ws.id, kw);
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
+  // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
 // Client: bulk feedback
-router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
+router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrategyMutationAuth, validate(bulkKeywordFeedbackSchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const { keywords } = req.body;
-  if (!Array.isArray(keywords) || keywords.length === 0) {
-    return res.status(400).json({ error: 'keywords array required' });
-  }
-  const declinedBy = clientPayload?.email || 'client';
+  const { keywords } = req.body as BulkKeywordFeedbackBody;
+  const declinedBy = typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client';
 
   const stmt = db.prepare(`
     INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
@@ -417,16 +431,64 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
       updated_at = datetime('now')
   `);
 
-  const insert = db.transaction((items: { keyword: string; status: string; reason?: string; source?: string }[]) => {
+  const insert = db.transaction((items: KeywordFeedbackBody[]) => {
     for (const item of items) {
-      if (!item.keyword || !['approved', 'declined', 'requested'].includes(item.status)) continue;
-      stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', declinedBy);
+      const kw = item.keyword.toLowerCase().trim();
+      stmt.run(ws.id, kw, item.status, item.reason || null, item.source, declinedBy);
+      if (item.status === 'approved') addTrackedKeyword(ws.id, kw);
     }
   });
   insert(keywords);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
   res.json({ updated: keywords.length });
+});
+
+// Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
+// broadcast-ok: keyword feedback is internal strategy input, not live workspace content; local UI updates optimistically.
+router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const rawKeyword =
+    typeof req.query.keyword === 'string'
+      ? req.query.keyword
+      : typeof req.body?.keyword === 'string'
+        ? req.body.keyword
+        : '';
+  const keyword = rawKeyword.toLowerCase().trim();
+  if (!keyword) return res.status(400).json({ error: 'keyword required' });
+
+  const removeFeedback = db.transaction(() => {
+    const existing = db.prepare('SELECT status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, keyword) as { status: string; source: string | null } | undefined;
+    if (!existing) {
+      return { existing: undefined, deleted: false };
+    }
+
+    const result = db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, keyword);
+    return { existing, deleted: result.changes > 0 };
+  });
+  const { existing, deleted } = removeFeedback();
+
+  if (!existing || !deleted) {
+    return res.json({ deleted: keyword, existed: false });
+  }
+
+  log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
+  // client-visibility-ok: this activity is for internal audit history, not client timeline display.
+  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${existing.status})`, 'Via client portal');
+  res.json({ deleted: keyword, existed: true });
 });
 
 // ── Client Business Priorities ──────────────────────────
@@ -441,35 +503,32 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
   const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
   if (!row) return res.json({ priorities: [], updatedAt: null });
 
-  const priorities = parseJsonFallback(row.priorities, []);
+  const priorities = parseJsonSafeArray(
+    row.priorities,
+    clientBusinessPrioritySchema,
+    { workspaceId: wsId, field: 'priorities', table: 'client_business_priorities' },
+  ).map(priority => {
+    if (typeof priority === 'string') {
+      return { text: priority.trim(), category: 'other' };
+    }
+    return {
+      text: priority.text.trim(),
+      category: priority.category?.trim() || 'other',
+    };
+  }).filter(priority => priority.text.length > 0);
   res.json({ priorities, updatedAt: row.updated_at });
 });
 
-router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
+router.post('/api/public/business-priorities/:workspaceId', requireClientStrategyMutationAuth, validate(clientBusinessPrioritiesBodySchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { priorities } = req.body as { priorities: { text: string; category: string }[] };
-  if (!Array.isArray(priorities)) return res.status(400).json({ error: 'priorities must be an array' });
-
-  // Validate and sanitize
-  const clean = priorities
-    .filter(p => p.text && typeof p.text === 'string')
-    .slice(0, 10) // Max 10 priorities
-    .map(p => ({
-      text: p.text.trim().slice(0, 500),
-      category: ['growth', 'brand', 'product', 'audience', 'competitive', 'other'].includes(p.category) ? p.category : 'other',
-    }));
+  const { priorities } = req.body as ClientBusinessPrioritiesBody;
+  const clean = priorities.map(p => ({
+    text: p.text,
+    category: p.category,
+  }));
 
   // Upsert into db
   db.prepare(`
@@ -481,28 +540,28 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
   `).run(wsId, JSON.stringify(clean));
 
   // Also inject a summary into workspace businessContext so it's available for AI prompts
-  if (clean.length > 0) {
-    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
-    const existingContext = ws.keywordStrategy?.businessContext || '';
-    const marker = '\n--- CLIENT PRIORITIES ---\n';
-    const base = existingContext.includes(marker)
-      ? existingContext.split(marker)[0]
+  if (ws.keywordStrategy) {
+    const existingContext = ws.keywordStrategy.businessContext || '';
+    const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
+      ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0]
       : existingContext;
-    const newContext = `${base}${marker}${priorityText}`;
+    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
+    const businessContext = priorityText
+      ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}`
+      : base;
 
-    if (ws.keywordStrategy) {
-      updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext: newContext } });
-      // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-      clearSeoContextCache(wsId);
+    updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
+    // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
+    invalidateIntelligenceCache(wsId);
+    debouncedStrategyInvalidate(wsId, () => {
       invalidateIntelligenceCache(wsId);
-      debouncedStrategyInvalidate(wsId, () => {
-        invalidateIntelligenceCache(wsId);
-        invalidateSubCachePrefix(wsId, 'slice:seoContext');
-      });
-    }
+      invalidateSubCachePrefix(wsId, 'slice:seoContext');
+    });
   }
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
+  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { businessPriorities: clean });
+  // client-visibility-ok: business-priority edits are internal strategy signals, not client timeline content.
   addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
   res.json({ saved: clean.length });
 });
@@ -557,9 +616,9 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
 
   // businessProfile feeds into workspace-intelligence.ts (base.businessProfile → AI prompts).
   // Flush caches immediately so AI chat/strategy use the updated data.
-  clearSeoContextCache(wsId);
   invalidateIntelligenceCache(wsId);
   broadcastToWorkspace(wsId, WS_EVENTS.WORKSPACE_UPDATED, { businessProfile: ws.businessProfile });
+  // client-visibility-ok: business-profile edits are internal audit history, not client timeline content.
   addActivity(wsId, 'client_profile_updated', 'Client updated business profile', 'Via client portal');
   log.info(`Client updated business profile for workspace ${wsId}`);
   res.json({ businessProfile: ws.businessProfile });
@@ -568,25 +627,12 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
 // ── Content Gap Voting ──────────────────────────
 // Clients can upvote content gaps to signal priority
 
-router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
+router.post('/api/public/content-gap-vote/:workspaceId', requireClientStrategyMutationAuth, validate(contentGapVoteSchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
-  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const { keyword, vote } = req.body as { keyword: string; vote: 'up' | 'down' | 'none' };
-  if (!keyword || !['up', 'down', 'none'].includes(vote)) {
-    return res.status(400).json({ error: 'keyword and vote (up/down/none) required' });
-  }
-
+  const { keyword, vote } = req.body as ContentGapVoteBody;
   const kw = keyword.toLowerCase().trim();
 
   // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
@@ -606,11 +652,13 @@ router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
           vote = excluded.vote,
           voted_by = excluded.voted_by,
           updated_at = datetime('now')
-      `).run(wsId, kw, vote, clientPayload?.email || 'client');
+      `).run(wsId, kw, vote, typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client');
     }
   });
   recordVote();
 
+  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, vote });
+  // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
   res.json({ ok: true });
 });
@@ -644,6 +692,23 @@ function toClientSection(s: { id: string; entryId: string; sectionPlanItemId: st
     updatedAt: s.updatedAt,
   };
 }
+
+const copySuggestionSchema = z.object({
+  originalText: z.string().trim().min(1, 'originalText is required').max(5000),
+  suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
+}).strict();
+
+const requireClientCopyReviewAuth: RequestHandler = (req, res, next) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+};
 
 // List blueprint entries with their copy status
 router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
@@ -704,16 +769,8 @@ router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', (req, res) =
 });
 
 // Client approves a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
@@ -734,6 +791,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, re
   }
 
   broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
   addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
   log.info({ wsId, sectionId }, 'Client approved copy section');
   // Strip internal-only fields before returning to client
@@ -741,25 +799,14 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, re
 });
 
 // Client suggests an edit on a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res) => {
   const wsId = req.params.workspaceId;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
   const { originalText, suggestedText } = req.body;
-  if (!originalText || !suggestedText) {
-    return res.status(400).json({ error: 'originalText and suggestedText are required' });
-  }
 
   // Only client_review sections accept suggestions via the client portal
   const existing = getSection(sectionId, wsId);
@@ -768,14 +815,15 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
   }
 
   const section = addClientSuggestion(sectionId, wsId, {
-    originalText: String(originalText).slice(0, 5000),
-    suggestedText: String(suggestedText).slice(0, 5000),
+    originalText,
+    suggestedText,
   });
   if (!section) {
     return res.status(400).json({ error: 'Could not add suggestion. Section not found.' });
   }
 
   broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
   addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
   log.info({ wsId, sectionId }, 'Client suggested copy edit');
   // Strip internal-only fields before returning to client
@@ -839,7 +887,20 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
       serpTargeting: gap.serpTargeting,
       opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
     }))
-    .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+    .sort((a, b) => {
+      // Three-bucket sort (matches keyword-strategy.ts content gap ordering):
+      //   2 = Positive volume OR GSC-proven impressions — confirmed demand
+      //   1 = Unenriched (null/undefined) — not yet checked, potential
+      //   0 = Zero volume with no impressions — confirmed no demand
+      const getBundle = (g: typeof a) => {
+        if (g.volume == null) return { bucket: 1, vol: 0 };
+        if (g.volume > 0) return { bucket: 2, vol: g.volume };
+        if ((g.impressions ?? 0) > 0) return { bucket: 2, vol: g.impressions! };
+        return { bucket: 0, vol: 0 };
+      };
+      const ab = getBundle(a), bb = getBundle(b);
+      return bb.bucket - ab.bucket || bb.vol - ab.vol || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
+    })
     .slice(0, 5);
 
   // The summary's "N opportunities to consider" reflects the FULL gap pool,

@@ -32,9 +32,9 @@ beforeAll(async () => {
   updateWorkspace(testWsId, { webflowSiteId: testSiteId });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('E2E: Workspace → Report → Action Items', () => {

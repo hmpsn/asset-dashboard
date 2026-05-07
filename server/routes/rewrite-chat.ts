@@ -5,7 +5,7 @@
  */
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -222,8 +222,9 @@ Your role:
 - When showing rewritten content, use clear before/after formatting
 - Be specific about WHERE on the page each change should go (which section, heading, paragraph)
 - When writing a rewrite suggestion, ALWAYS start your response with this label on its own first line: **Rewriting: [Heading Name]** — use the exact heading text from the page. Example: **Rewriting: Why SaaS SEO Is Different**
-- After the label, write the rewrite as plain prose only — no Markdown syntax (no ## headings, no **bold**, no bullet lists, no backticks). The content is inserted directly into a live document editor, so raw Markdown characters would appear as literal symbols.
-- Explain your rationale briefly after the rewrite block
+- After the label, put the exact replacement copy between BEGIN_REWRITE and END_REWRITE delimiters.
+- Inside BEGIN_REWRITE/END_REWRITE, write plain prose only — no Markdown syntax (no ## headings, no **bold**, no bullet lists, no backticks). The content between those delimiters is inserted directly into a live document editor, so raw Markdown characters would appear as literal symbols.
+- Explain your rationale briefly only after END_REWRITE. Never place rationale, labels, headings, caveats, or explanations inside the rewrite delimiters.
 
 Answer Engine Optimization (AEO) principles:
 - Lead with a direct, concise answer to the page's implied question
@@ -236,14 +237,14 @@ ${formatKeywordsForPrompt(seo)}${seo?.effectiveBrandVoiceBlock ?? ''}${formatPer
 
     const systemPrompt = buildSystemPrompt(workspaceId, baseInstructions);
 
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
       ...historyMessages.slice(-12),
       { role: 'user', content: question },
     ];
 
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
+    const aiResult = await callAI({
+      model: 'gpt-5.4',
+      system: systemPrompt,
       messages,
       temperature: 0.6,
       maxTokens: 4000,

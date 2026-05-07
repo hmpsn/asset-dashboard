@@ -13,8 +13,8 @@ describe('Button', () => {
   it('defaults to primary variant + md size', () => {
     render(<Button>Go</Button>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-teal-600');
-    expect(btn.className).toContain('to-emerald-600');
+    expect(btn.className).toContain('from-[var(--teal)]');
+    expect(btn.className).toContain('to-[var(--emerald)]');
     expect(btn.className).toContain('px-4');
     expect(btn.className).toContain('py-2');
   });
@@ -25,11 +25,11 @@ describe('Button', () => {
       render(<Button variant={variant}>X</Button>);
       const btn = screen.getByRole('button');
       const expected: Record<string, string> = {
-        primary: 'from-teal-600',
-        secondary: 'bg-zinc-800',
+        primary: 'from-[var(--teal)]',
+        secondary: 'bg-[var(--surface-3)]',
         ghost: 'bg-transparent',
-        danger: 'bg-red-600',
-        link: 'text-teal-400',
+        danger: 'bg-[var(--red)]',
+        link: 'text-[var(--teal)]',
       };
       expect(btn.className).toContain(expected[variant]);
     },

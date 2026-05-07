@@ -1,6 +1,7 @@
 import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { SectionCard } from '../ui/SectionCard';
 import { chartDotStroke, CHART_SERIES_COLORS, scoreColor } from '../ui/constants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,7 +15,7 @@ function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; pa
       <div className="px-3 py-1.5 space-y-1">
         {metrics.map(m => (
           <div key={m.key} className="flex justify-between t-caption-sm">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
             <span className="text-[var(--brand-text-bright)] font-medium">{m.fmt ? m.fmt(row[m.key]) : (typeof row[m.key] === 'number' ? row[m.key].toLocaleString() : row[m.key])}</span>
           </div>
         ))}
@@ -42,7 +43,7 @@ export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; 
           { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
           { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
         ]} />} />
-        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -53,8 +54,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="t-caption-sm text-blue-400">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="t-caption-sm text-teal-400">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-blue-400" /><span className="t-caption-sm text-accent-info">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-teal-400" /><span className="t-caption-sm text-accent-brand">Impressions</span></div>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -77,8 +78,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
             { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
             { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
           ]} />} />
-          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
-          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
           {anns?.map(ann => {
             const idx = data.findIndex(d => d.date === ann.date);
             if (idx < 0) return null;
@@ -120,14 +121,14 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
                 <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
                 <div className="px-3 py-1.5">
                   <div className="flex justify-between t-caption-sm">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: sc }} />Score</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: sc }} />Score</span>
                     <span className="text-[var(--brand-text-bright)] font-medium">{score}/100</span>
                   </div>
                 </div>
               </div>
             );
           }} />
-          <Area type="monotone" dataKey="siteScore" stroke={CHART_SERIES_COLORS.emerald} strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.emerald, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area type="monotone" dataKey="siteScore" stroke={CHART_SERIES_COLORS.emerald} strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.emerald, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex justify-between t-caption-sm text-[var(--brand-text-muted)] mt-1">
@@ -146,7 +147,7 @@ export function RenderMarkdown({ text }: { text: string }) {
      .replace(/https?:\/\/\S+/g, '')
      .replace(/\*\*(.+?)\*\*/g, '<b class="text-[var(--brand-text-bright)]">$1</b>')
      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-[var(--brand-text)]">$1</em>')
-     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text)] t-caption-sm">$1</code>');
+     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded-[var(--radius-sm)] text-[var(--brand-text)] t-caption-sm">$1</code>');
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
   const elements: React.ReactElement[] = [];
@@ -243,15 +244,15 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Headings — strip bold markers inside (GPT sends ## **Overview**)
     if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={elements.length} className="t-caption font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
       idx++; continue;
     }
     if (trimmed.startsWith('## ')) {
-      elements.push(<h3 key={elements.length} className="t-body font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-page font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
       idx++; continue;
     }
     if (trimmed.startsWith('# ')) {
-      elements.push(<h3 key={elements.length} className="t-body font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-page font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
       idx++; continue;
     }
 
@@ -259,7 +260,7 @@ export function RenderMarkdown({ text }: { text: string }) {
     if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
       const content = trimmed.slice(2);
       elements.push(
-        <div key={elements.length} className="flex gap-1.5 t-caption-sm text-[var(--brand-text)]" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+        <div key={elements.length} className="flex gap-1.5 t-body text-[var(--brand-text)]" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
           <span className="text-[var(--brand-text-muted)] shrink-0 mt-px">•</span>
           <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
         </div>
@@ -272,7 +273,7 @@ export function RenderMarkdown({ text }: { text: string }) {
       const content = trimmed.replace(/^\d+\.\s/, '');
       const num = trimmed.match(/^(\d+)\./)?.[1];
       elements.push(
-        <div key={elements.length} className="flex gap-1.5 t-caption-sm text-[var(--brand-text)] mt-0.5" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
+        <div key={elements.length} className="flex gap-1.5 t-body text-[var(--brand-text)] mt-0.5" style={{ marginLeft: indent > 0 ? 12 : 0 }}>
           <span className="text-[var(--brand-text-muted)] shrink-0 w-4 text-right">{num}.</span>
           <span dangerouslySetInnerHTML={{ __html: inlineMd(content) }} />
         </div>
@@ -285,7 +286,7 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Regular paragraph
     elements.push(
-      <p key={elements.length} className="t-caption-sm text-[var(--brand-text)] leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />
+      <p key={elements.length} className="t-body text-[var(--brand-text)] leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }} />
     );
     idx++;
   }
@@ -299,23 +300,22 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   items: Array<{ label: string; value: string; sub: string }>;
 }) {
   const colorMap: Record<string, { text: string }> = {
-    amber: { text: 'text-amber-400' }, emerald: { text: 'text-emerald-400' },
-    teal: { text: 'text-teal-400' }, blue: { text: 'text-blue-400' },
-    red: { text: 'text-red-400' }, orange: { text: 'text-orange-400' },
+    amber: { text: 'text-accent-warning' }, emerald: { text: 'text-accent-success' },
+    teal: { text: 'text-accent-brand' }, blue: { text: 'text-accent-info' },
+    red: { text: 'text-accent-danger' },
   };
   const c = colorMap[color] || colorMap.amber;
-  // pr-check-disable-next-line -- InsightCard uses brand signature radius as a standalone card surface
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+    <SectionCard>
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
-        <span className={`t-caption font-medium ${c.text}`}>{title}</span>
+        <span className={`t-ui font-medium ${c.text}`}>{title}</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{count} queries</span>
       </div>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{desc}</p>
       <div className="space-y-1.5">
         {items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)]/30">
+          <div key={i} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
             <span className="text-[var(--brand-text)] truncate mr-2">{item.label}</span>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[var(--brand-text-muted)]">{item.sub}</span>
@@ -324,6 +324,6 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
           </div>
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }

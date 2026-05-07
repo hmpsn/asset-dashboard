@@ -1401,6 +1401,28 @@ describe('Rule: Assembled-but-never-rendered slice fields', () => {
     expect(hits.some(h => h.text.includes('brandVoice'))).toBe(false);
   });
 
+  it('finds formatter bodies in concatenated extracted formatter modules', () => {
+    const typesSrc = lines(
+      "export interface PageElementSlice {",
+      "  pagePath: string;",
+      "  catalog: PageElementCatalog;",
+      "}",
+    );
+    const serverSrc = lines(
+      "function formatPageElementsSection(slice: PageElementSlice) {",
+      "  return `${slice.pagePath}: ${slice.catalog.videos.length}`;",
+      "}",
+    );
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    expect(hits.some(h => h.text.includes('pagePath'))).toBe(false);
+    expect(hits.some(h => h.text.includes('catalog'))).toBe(false);
+  });
+
+  it('diff scope includes the extracted workspace intelligence formatter module', () => {
+    const rule = CHECKS.find(c => c.name === 'Assembled-but-never-rendered slice fields');
+    expect(rule?.fileGlobs).toContain('formatters.ts');
+  });
+
   it('emits a "formatter not found" hit when the format*Section function is missing', () => {
     const typesSrc = lines(
       "export interface SeoContextSlice {",
@@ -1886,15 +1908,15 @@ describe('Rule: Admin mutation on client_users missing expectedWorkspaceId param
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)
+// Rule: Bare brand-engine read in seo-context source (use safeBrandEngineRead)
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)', () => {
-  const RULE = 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)';
+describe('Rule: Bare brand-engine read in seo-context source (use safeBrandEngineRead)', () => {
+  const RULE = 'Bare brand-engine read in seo-context source (use safeBrandEngineRead)';
 
   it('flags a bare getVoiceProfile() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",              // 1
         "export function build(ws: string) {",                               // 2
@@ -1911,7 +1933,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('flags a bare listBrandscripts() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { listBrandscripts } from './brandscript.js';",
         "export function build(ws: string) {",
@@ -1927,7 +1949,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('flags a bare listDeliverables() call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { listDeliverables } from './brand-identity.js';",
         "export function build(ws: string) {",
@@ -1943,7 +1965,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('respects inline // safe-read-ok hatch on the call line', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -1957,7 +1979,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('respects // safe-read-ok hatch on the line immediately above the call', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -1972,7 +1994,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('does not flag a call wrapped in safeBrandEngineRead on the same line', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "import { getVoiceProfile } from './brand-engine.js';",
         "export function build(ws: string) {",
@@ -1989,7 +2011,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
     // mentions the function with parens for readability; the rule's JSDoc
     // skip (`^\s*\*`) ensures this is not a false positive.
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "/**",
         " * Build the SEO context.",
@@ -2005,7 +2027,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 
   it('does not flag line comments that reference the function name with parens', () => {
     const file = write(
-      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      uniqPath('rule-safe-read', 'server/intelligence/seo-context-source.ts'),
       lines(
         "export function build(ws: string) {",
         "  // NOTE: listDeliverables(ws) wrapped below for test-env schema guard",
@@ -2016,7 +2038,7 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not flag functions in files other than server/seo-context.ts', () => {
+  it('does not flag functions in files other than server/intelligence/seo-context-source.ts', () => {
     // Route handlers that call these directly are fine — errors at the
     // request boundary become 500s and surface loudly.
     const file = write(
@@ -2486,15 +2508,14 @@ describe('Rule: TabBar component without ?tab= deep-link support', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: seo-context.ts import restriction (deprecated module)
+// Rule: seo-context.ts import restriction (retired module)
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Prevents new imports of the deprecated seo-context.ts module. Existing
-// callers are grandfathered via the exclude list. New code must use
+// Prevents production imports of the retired seo-context.ts module. New code must use
 // buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts.
 
-describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
-  const RULE = 'seo-context.ts import restriction (deprecated module)';
+describe('Rule: seo-context.ts import restriction (retired module)', () => {
+  const RULE = 'seo-context.ts import restriction (retired module)';
 
   it('flags a single-quoted import of seo-context', () => {
     const file = write(
@@ -2522,7 +2543,7 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
     expect(hits[0].line).toBe(1);
   });
 
-  it('respects inline // seo-context-ok hatch on the import line', () => {
+  it('does not allow inline hatches for retired seo-context imports', () => {
     const file = write(
       uniqPath('rule-seo-context', 'server/grandfathered-inline.ts'),
       lines(
@@ -2531,20 +2552,19 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
       )
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(0);
+    expect(hits).toHaveLength(1);
   });
 
-  it('respects // seo-context-ok on the preceding line', () => {
+  it('flags dynamic imports from the old bridge path', () => {
     const file = write(
-      uniqPath('rule-seo-context', 'server/grandfathered-above.ts'),
+      uniqPath('rule-seo-context', 'server/intelligence/seo-context-slice.ts'),
       lines(
-        "// seo-context-ok — grandfathered caller awaiting migration",  // 1
-        "import { buildSeoContext } from './seo-context.js';",          // 2
-        "export function doStuff() { return buildSeoContext(); }",      // 3
+        "const { buildSeoContext } = await import('../seo-context.js');",
+        "export function bridge() { return buildSeoContext('ws1'); }",
       )
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(0);
+    expect(hits).toHaveLength(1);
   });
 
   it('does not flag files that do not import seo-context', () => {
@@ -3894,7 +3914,7 @@ describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(
 
   it('flags bare `/${page.slug}` template literal', () => {
     const file = write(
-      uniqPath('rule-bare-slug', 'server/webflow-seo.ts'),
+      uniqPath('rule-bare-slug', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'export function getPagePath(page: { slug: string }) {',
         '  const pagePath = `/${page.slug}`;',
@@ -4006,7 +4026,7 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
 
   it('flags `resolvePagePath(page) || undefined`', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'const basePath = resolvePagePath(page) || undefined;',
       )
@@ -4028,7 +4048,7 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
 
   it('does NOT flag `tryResolvePagePath(page)` (the correct API)', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo-jobs.ts'),
       lines(
         'const basePath = tryResolvePagePath(page);',
       )
@@ -4343,6 +4363,179 @@ describe('Rule: SectionCard titleExtra with ml-auto (use action prop)', () => {
   });
 });
 
+describe('Rule: Background generation in high-churn routes must be allowlisted', () => {
+  const RULE = 'Background generation in high-churn routes must be allowlisted';
+
+  it('flags unallowlisted post-response generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(req.params.workspaceId, brief).then(() => {});',
+        '});',
+      )
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags unallowlisted multiline post-response generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(',
+        '    req.params.workspaceId,',
+        '    brief,',
+        '  ).then(() => {});',
+        '});',
+      )
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects inline // background-generation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  generatePost(req.params.workspaceId, brief).then(() => {}); // background-generation-ok — legacy skeleton flow',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // background-generation-ok on the line above', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-briefs.ts'),
+      lines(
+        "router.post('/api/content-briefs/:workspaceId/generate-post', async (req, res) => {",
+        '  res.json({ started: true });',
+        '  // background-generation-ok — legacy skeleton flow',
+        '  generatePost(req.params.workspaceId, brief).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag awaited generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/workspaces.ts'),
+      lines(
+        "router.post('/api/workspaces/:id/generate-brand-voice', async (req, res) => {",
+        '  const result = await generateBrandVoice(req.params.id);',
+        '  res.json(result);',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows canonical jobs route background workers', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/jobs.ts'),
+      lines(
+        "router.post('/api/jobs', async (req, res) => {",
+        "  const job = createJob('schema-generator', { message: 'Generating...' });",
+        '  res.json({ jobId: job.id });',
+        '  generateSchemaSuggestions().then(() => updateJob(job.id, { status: "done" }));',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('requires site-level hatch for legacy content-posts skeleton generation', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-posts.ts'),
+      lines(
+        "router.post('/api/content-posts/:workspaceId/generate', async (req, res) => {",
+        "  res.json({ status: 'generating' });",
+        '  // background-generation-ok — legacy skeleton flow',
+        '  generatePost(req.params.workspaceId, brief, postId).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not let a legacy callee allowlist hide new content-posts call sites', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/content-posts.ts'),
+      lines(
+        "router.post('/api/content-posts/:workspaceId/future-generate', async (req, res) => {",
+        "  res.json({ status: 'generating' });",
+        '  generatePost(req.params.workspaceId, brief, postId).then(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('allows audited site-specific follow-up signatures without broad callee allowlists', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {",
+        '  res.json(strategy);',
+        "  queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');",
+        '  generateRecommendations(ws.id)',
+        '    .catch(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags the same legacy callee when the call site text is new', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId/new-follow-up', async (req, res) => {",
+        '  res.json(strategy);',
+        "  queueLlmsTxtRegeneration(req.params.workspaceId, 'keyword_strategy_updated');",
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('requires site-level hatches for legacy keyword-strategy post-response regeneration', () => {
+    const file = write(
+      uniqPath('rule-background-generation', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {",
+        '  res.json(strategy);',
+        '  // background-generation-ok — legacy llms.txt refresh',
+        "  queueLlmsTxtRegeneration(req.params.workspaceId, 'keyword_strategy_updated');",
+        '  // background-generation-ok — legacy recommendations refresh',
+        '  generateRecommendations(req.params.workspaceId).catch(() => {});',
+        '});',
+      )
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4366,13 +4559,13 @@ describe('Meta: customCheck rule name registry', () => {
     'Constants in sync (STUDIO_NAME, STUDIO_URL)',
     // PR #168 scaled-review follow-ups
     'Admin mutation on client_users missing expectedWorkspaceId param',
-    'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
+    'Bare brand-engine read in seo-context source (use safeBrandEngineRead)',
     // 2026-04-11 test audit follow-up
     'Test body has no assertion or explicit failure throw',
     // PR 2 deep-link guard
     'TabBar component without ?tab= deep-link support',
     // IG-4 seo-context deprecation
-    'seo-context.ts import restriction (deprecated module)',
+    'seo-context.ts import restriction (retired module)',
     // P0 expansion rules
     'requireAuth usage outside allowed route files',
     'Duplicate globally-applied rate limiter in route file',
@@ -4398,6 +4591,10 @@ describe('Meta: customCheck rule name registry', () => {
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)
     'useWorkspaceEvents handler for centralized event',
+    // Platform consolidation Phase 1 (2026-05-04)
+    'Background generation in high-churn routes must be allowlisted',
+    // Bug guardrail sweep (2026-05-03)
+    'Route read/write contract annotations',
     // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
     'roadmap.json item ID uniqueness',
     // Design-system enforcement rules (Phase 1, PR #277)
@@ -4510,10 +4707,9 @@ describe('Meta: customCheck rule name registry', () => {
 // noisy as "legitimately clean" — a reviewer has to consciously accept
 // every ✓ by adding a row to the allowlist.
 //
-// Performance: pr-check --all takes ~30-60s on the full repo (customCheck rules
-// scan many files). The test has a 120s timeout to absorb CI variance on slower
-// machines — bumped from 60s after the codebase grew enough to push scan time
-// past the original limit.
+// Performance: pr-check --all takes ~30-120s on the full repo (customCheck rules
+// scan many files). The test has a larger timeout than the subprocess so a
+// slow scan fails with captured pr-check output instead of a Vitest timeout.
 
 describe('Meta: pr-check --all status parity with verified-clean allowlist', () => {
   it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', () => {
@@ -4553,7 +4749,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 120_000,
+        timeout: 240_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -4673,7 +4869,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 130_000);
+  }, 260_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -4724,6 +4920,40 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
       )
     );
     // BULK_OPERATION_PROGRESS is intentionally NOT in useWsInvalidation.ts
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags a raw string handler for a centralized event', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        "    'activity:new': () => {",
+        '      // duplicate invalidation with no WS_EVENTS import',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('suppresses a raw string handler with inline // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        "    'activity:new': () => {}, // ws-invalidation-ok — client route local refresh",
+        '  });',
+        '}',
+      )
+    );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
@@ -4788,6 +5018,159 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
         '    [WS_EVENTS.STRATEGY_UPDATED]: () => {},',
         '  });',
         '});',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Route read/write contract annotations', () => {
+  const RULE = 'Route read/write contract annotations';
+
+  it('flags a required high-churn route file with no contract tags', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "import { Router } from 'express';",
+        'const router = Router();',
+        "router.get('/:workspaceId', (_req, res) => res.json({ ok: true }));",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits.map((hit) => hit.text).sort()).toEqual([
+      'missing @reads contract',
+      'missing @writes contract',
+    ]);
+  });
+
+  it('accepts a required route file with well-formed @reads and @writes tags', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * Route contract:',
+        ' * @reads: workspaces, page_keywords',
+        ' * @writes: page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags malformed contract values', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads TODO',
+        ' * @writes page_keywords?',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].text).toContain('malformed route contract value');
+  });
+
+  it('flags empty contract values', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads',
+        ' * @writes page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('<empty>');
+  });
+
+  it('accepts none as an explicit empty-side contract value', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @reads workspaces',
+        ' * @writes none',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('requires contract tags near the top of the route file', () => {
+    const filler = Array.from({ length: 42 }, (_, index) => `// filler ${index}`);
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        "import { Router } from 'express';",
+        ...filler,
+        '/* @reads workspaces */',
+        '/* @writes page_keywords */',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map((hit) => hit.text).sort()).toEqual([
+      'missing @reads contract',
+      'missing @writes contract',
+    ]);
+  });
+
+  it('does not treat @readsOnly as a valid contract tag', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '/**',
+        ' * @readsOnly cached helper docs',
+        ' * @writes page_keywords',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map((hit) => hit.text)).toEqual(['missing @reads contract']);
+  });
+
+  it('does NOT require contracts for route files outside the initial enforced set', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/small-route.ts'),
+      lines(
+        "import { Router } from 'express';",
+        'const router = Router();',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('still validates malformed tags in non-required route files', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/small-route.ts'),
+      lines(
+        '/**',
+        ' * @reads TODO',
+        ' * @writes none',
+        ' */',
+        "import { Router } from 'express';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('TODO');
+  });
+
+  it('suppresses with file-level // route-contract-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-route-contract', 'server/routes/keyword-strategy.ts'),
+      lines(
+        '// route-contract-ok — generated route file scheduled for deletion',
+        "import { Router } from 'express';",
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
@@ -6146,8 +6529,8 @@ describe('Rule: styleguide-typography-parity', () => {
 //
 // Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
 // fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch,
-// siteId) and lines with `// schema-context-direct-read-ok` hatches (inline
-// or on the line immediately above).
+// siteId), and supporting legacy hatches for non-identity reads except migrated
+// forbidden fields (`ws.brandVoice`, `ws.keywordStrategy`, `ws.businessProfile`).
 //
 // The fixture files are placed at a path ending in `server/helpers.ts` so
 // the rule's `file.endsWith('server/helpers.ts')` guard accepts them.
@@ -6233,5 +6616,35 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     );
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
+  });
+
+  it('flags migrated-forbidden ws.brandVoice even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-brandvoice'),
+      '  ctx.brandVoice = ws.brandVoice; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.brandVoice');
+  });
+
+  it('flags migrated-forbidden ws.keywordStrategy path even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-keywordstrategy'),
+      '  ctx.businessContext = ws.keywordStrategy?.businessContext; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.keywordStrategy');
+  });
+
+  it('flags migrated-forbidden ws.businessProfile even with hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'forbidden-businessprofile'),
+      '  ctx._businessProfile = ws.businessProfile; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.businessProfile');
   });
 });

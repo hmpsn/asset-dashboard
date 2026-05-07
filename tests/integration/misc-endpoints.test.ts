@@ -14,22 +14,79 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
+import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
+import db from '../../server/db/index.js';
 
 const ctx = createTestContext(13209);
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
+let scopedUserId = '';
+let scopedUserToken = '';
+let clientUserId = '';
+let clientUserToken = '';
+const ownedSiteId = 'site_guard_owned';
+const otherSiteId = 'site_guard_other';
+
+function cleanKeywordFeedback(workspaceId: string) {
+  db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ?').run(workspaceId);
+}
+
+async function listAdminKeywordFeedback(workspaceId: string, token: string) {
+  const res = await api(`/api/webflow/keyword-feedback/${workspaceId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(res.status).toBe(200);
+  return await res.json() as Array<{ keyword: string; status: string; source?: string | null }>;
+}
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Misc Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Misc Other Test Workspace');
+  otherWsId = otherWs.id;
+  updateWorkspace(testWsId, {
+    webflowSiteId: ownedSiteId,
+    webflowToken: 'site-guard-owned-token',
+    gscPropertyUrl: 'https://owned.example.com/',
+  });
+  updateWorkspace(otherWsId, {
+    webflowSiteId: otherSiteId,
+    webflowToken: 'site-guard-other-token',
+    gscPropertyUrl: 'https://other.example.com/',
+  });
+  const scopedUser = await createUser(
+    'misc-scoped-user@test.local',
+    'ScopedPass1!',
+    'Misc Scoped User',
+    'member',
+    [testWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+  const clientUser = await createClientUser(
+    'misc-billing-client@test.local',
+    'ClientPass1!',
+    'Misc Billing Client',
+    testWsId,
+    'client_member',
+  );
+  clientUserId = clientUser.id;
+  clientUserToken = signClientToken(clientUser);
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
+  cleanKeywordFeedback(testWsId);
+  cleanKeywordFeedback(otherWsId);
+  deleteClientUser(clientUserId, testWsId);
+  deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  deleteWorkspace(otherWsId);
+  await ctx.stopServer();
 });
 
 describe('Miscellaneous read-only endpoints', () => {
@@ -144,8 +201,392 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
   });
 });
 
+describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
+  const scopedHeaders = () => ({ Authorization: `Bearer ${scopedUserToken}` });
+  let otherSubscriptionId = '';
+
+  it('rejects Google annotation reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/google/annotations/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('filters workspace list responses to the JWT-scoped workspaces', async () => {
+    const res = await api('/api/workspaces', { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ id: string }>;
+    expect(body.some(ws => ws.id === testWsId)).toBe(true);
+    expect(body.some(ws => ws.id === otherWsId)).toBe(false);
+  });
+
+  it('filters workspace overview responses to the JWT-scoped workspaces', async () => {
+    const res = await api('/api/workspace-overview', { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ id: string }>;
+    expect(body.some(ws => ws.id === testWsId)).toBe(true);
+    expect(body.some(ws => ws.id === otherWsId)).toBe(false);
+  });
+
+  it('rejects Google search data reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(
+      `/api/google/search-overview/${otherSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Google search data reads when a scoped user pairs their workspace with another GSC property', async () => {
+    const res = await api(
+      `/api/google/search-overview/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://other.example.com/')}`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Stripe payment reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/stripe/payments/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects passwordless billing portal access without an authenticated actor', async () => {
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects subscription cancellation without an authenticated actor', async () => {
+    const res = await ctx.api(`/api/public/cancel-subscription/${testWsId}`, { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows authenticated client users through the billing portal guard', async () => {
+    const res = await ctx.api(`/api/public/billing-portal/${testWsId}`, {
+      method: 'POST',
+      headers: { Cookie: `client_user_token_${testWsId}=${clientUserToken}` },
+    });
+    expect(res.status).toBe(503);
+  });
+
+  it('rejects keyword strategy reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/keyword-strategy/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows keyword strategy reads for the JWT-scoped workspace', async () => {
+    const res = await api(`/api/webflow/keyword-strategy/${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).not.toBe(403);
+  });
+
+  it('rejects keyword strategy patches for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-strategy/${otherWsId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteKeywords: [] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects keyword feedback mutations for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${otherWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: 'cross workspace keyword', status: 'approved' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects whitespace-only admin keyword feedback before inserting an empty row', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: '   ', status: 'approved' }),
+    });
+    expect(res.status).toBe(400);
+
+    const rows = await listAdminKeywordFeedback(testWsId, scopedUserToken);
+    expect(rows.find(row => row.keyword === '')).toBeUndefined();
+  });
+
+  it('rejects unsupported admin keyword feedback fields before changing existing feedback', async () => {
+    const keyword = `admin strict ${Date.now()}`;
+    const createRes = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, status: 'approved', source: 'content_gap' }),
+    });
+    expect(createRes.status).toBe(200);
+
+    const invalidRes = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, status: 'declined', adminOverride: true }),
+    });
+    expect(invalidRes.status).toBe(400);
+
+    const row = (await listAdminKeywordFeedback(testWsId, scopedUserToken)).find(item => item.keyword === keyword);
+    expect(row?.status).toBe('approved');
+  });
+
+  it('rejects unsupported admin bulk feedback sources without partial writes', async () => {
+    const validKeyword = `admin valid ${Date.now()}`;
+    const badKeyword = `admin bad source ${Date.now()}`;
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${testWsId}/bulk`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keywords: [
+          { keyword: validKeyword, status: 'approved', source: 'content_gap' },
+          { keyword: badKeyword, status: 'requested', source: 'admin_override' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(400);
+
+    const rows = await listAdminKeywordFeedback(testWsId, scopedUserToken);
+    expect(rows.find(row => row.keyword === validKeyword)).toBeUndefined();
+    expect(rows.find(row => row.keyword === badKeyword)).toBeUndefined();
+  });
+
+  it('rejects Webflow asset reads when the workspace query is outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/assets/site_guard_test?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow asset mutations when the body workspace is outside the JWT scope', async () => {
+    const res = await ctx.api('/api/webflow/assets/asset_guard_test', {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ altText: 'Blocked', siteId: 'site_guard_test', workspaceId: otherWsId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects workspace uploads when the route workspace is outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/upload/${otherWsId}`, {
+      method: 'POST',
+      headers: scopedHeaders(),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow asset reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/assets/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects workspace integration relinking by scoped users', async () => {
+    const res = await ctx.api(`/api/workspaces/${testWsId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webflowSiteId: otherSiteId, gscPropertyUrl: 'https://other.example.com/' }),
+    });
+    expect(res.status).toBe(403);
+    expect(getWorkspace(testWsId)?.webflowSiteId).toBe(ownedSiteId);
+    expect(getWorkspace(testWsId)?.gscPropertyUrl).toBe('https://owned.example.com/');
+  });
+
+  it('rejects global Webflow site listing for scoped JWT users', async () => {
+    const res = await api('/api/webflow/sites', { headers: scopedHeaders() });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects Webflow page SEO mutations when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/webflow/pages/page_guard_test/seo', {
+      method: 'PUT',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: otherSiteId, workspaceId: testWsId, seo: { title: 'Blocked' } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow organize routes when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/organize-preview/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects CMS item publish when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/webflow/collections/collection_guard_test/publish', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: otherSiteId, workspaceId: testWsId, itemIds: ['item_guard_test'] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects schema publish when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api(`/api/webflow/schema-publish/${otherSiteId}?workspaceId=${testWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageId: 'page_guard_test', schema: { '@context': 'https://schema.org', '@type': 'WebPage', name: 'Blocked' } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects CMS image scans when the workspace query is outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/cms-images/site_guard_test?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects alt text generation when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api(`/api/webflow/${testWsId}/generate-alt/asset_guard_test`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: 'https://example.com/image.jpg', siteId: otherSiteId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects background jobs when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/jobs', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'seo-audit', params: { workspaceId: testWsId, siteId: otherSiteId } }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content publish settings reads when a scoped user pairs their workspace with another site', async () => {
+    const res = await api(`/api/webflow/publish-collections/${otherSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows owned workspace-site pairs through the site guard before route validation', async () => {
+    const res = await api(`/api/webflow/schema-validations/${ownedSiteId}?workspaceId=${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects pending schema reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/pending-schemas/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects SEMRush workspace routes outside the JWT scope', async () => {
+    const headers = scopedHeaders();
+    const checks = await Promise.all([
+      api(`/api/semrush/competitive-intel/${otherWsId}?competitors=example.com`, { headers }),
+      api(`/api/semrush/discover-competitors/${otherWsId}`, { headers }),
+      ctx.api(`/api/semrush/competitors/${otherWsId}`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains: ['example.com'] }),
+      }),
+      ctx.api(`/api/semrush/cache/${otherWsId}`, { method: 'DELETE', headers }),
+      api(`/api/semrush/clear-cache/${otherWsId}`, { headers }),
+      api(`/api/semrush/diagnose/${otherWsId}`, { headers }),
+    ]);
+    expect(checks.map(res => res.status)).toEqual([403, 403, 403, 403, 403, 403]);
+  });
+
+  it('rejects backlink reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/backlinks/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows smart-name for an owned site and then returns normal validation errors', async () => {
+    const res = await ctx.api('/api/smart-name', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: ownedSiteId, workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects smart-name when a scoped user pairs their workspace with another site', async () => {
+    const res = await ctx.api('/api/smart-name', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originalName: 'blocked.jpg', siteId: otherSiteId, workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows SEO copy generation for an owned workspace and then returns normal validation errors', async () => {
+    const res = await ctx.api('/api/webflow/seo-copy', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: testWsId }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects SEO copy generation for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api('/api/webflow/seo-copy', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: otherWsId, pagePath: '/' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content subscription reads by id when the row belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+    otherSubscriptionId = sub.id;
+
+    const res = await api(`/api/content-subscription/${sub.id}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content subscription updates by id when the row belongs to another workspace', async () => {
+    if (!otherSubscriptionId) {
+      const sub = createContentSubscription(otherWsId, {
+        plan: 'content_starter',
+        postsPerMonth: 2,
+        priceUsd: 499,
+        status: 'active',
+      });
+      otherSubscriptionId = sub.id;
+    }
+
+    const res = await ctx.api(`/api/content-subscription/${otherSubscriptionId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'paused' }),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, otherSubscriptionId);
+    otherSubscriptionId = '';
+  });
+
+  it('rejects content subscription deletes by id when the row belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+
+    const res = await ctx.api(`/api/content-subscription/${sub.id}`, {
+      method: 'DELETE',
+      headers: scopedHeaders(),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, sub.id);
+  });
+
+  it('rejects delivered-count updates when the subscription belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+
+    const res = await ctx.api(`/api/content-subscription/${sub.id}/delivered`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: 1 }),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, sub.id);
+  });
+});
+
 describe('Requests CRUD via API', () => {
   let requestId = '';
+  let otherRequestId = '';
 
   it('GET /api/requests returns 200 with array', async () => {
     const res = await api('/api/requests');
@@ -173,6 +614,76 @@ describe('Requests CRUD via API', () => {
   it('POST /api/requests without required fields returns 400', async () => {
     const res = await postJson('/api/requests', {});
     expect(res.status).toBe(400);
+  });
+
+  it('rejects scoped JWT access to another workspace request by id', async () => {
+    const createRes = await postJson('/api/requests', {
+      workspaceId: otherWsId,
+      title: 'Other workspace request',
+      description: 'Should not be visible to scoped user',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    otherRequestId = created.id;
+
+    const headers = { Authorization: `Bearer ${scopedUserToken}` };
+    const getRes = await api(`/api/requests/${otherRequestId}`, { headers });
+    expect(getRes.status).toBe(403);
+
+    const patchRes = await ctx.api(`/api/requests/${otherRequestId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' }),
+    });
+    expect(patchRes.status).toBe(403);
+
+    const deleteRes = await ctx.api(`/api/requests/${otherRequestId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    expect(deleteRes.status).toBe(403);
+  });
+
+  it('rejects scoped JWT bulk update without mutating accessible requests first', async () => {
+    const accessibleRes = await postJson('/api/requests', {
+      workspaceId: testWsId,
+      title: 'Scoped bulk accessible request',
+      description: 'Should remain pending after forbidden bulk update',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(accessibleRes.status).toBe(200);
+    const accessible = await accessibleRes.json();
+
+    const forbiddenRes = await postJson('/api/requests', {
+      workspaceId: otherWsId,
+      title: 'Scoped bulk forbidden request',
+      description: 'Should block the whole bulk update',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(forbiddenRes.status).toBe(200);
+    const forbidden = await forbiddenRes.json();
+
+    const bulkRes = await ctx.api('/api/requests/bulk', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${scopedUserToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids: [accessible.id, forbidden.id], status: 'completed' }),
+    });
+    expect(bulkRes.status).toBe(403);
+
+    const checkRes = await api(`/api/requests/${accessible.id}`);
+    expect(checkRes.status).toBe(200);
+    const checked = await checkRes.json();
+    expect(checked.status).not.toBe('completed');
+
+    await del(`/api/requests/${accessible.id}`);
+    await del(`/api/requests/${forbidden.id}`);
   });
 
   it('GET /api/requests/:id returns the created request', async () => {
@@ -203,5 +714,11 @@ describe('Requests CRUD via API', () => {
   it('GET /api/requests/:id after delete returns 404', async () => {
     const res = await api(`/api/requests/${requestId}`);
     expect(res.status).toBe(404);
+  });
+
+  afterAll(async () => {
+    if (otherRequestId) {
+      await del(`/api/requests/${otherRequestId}`);
+    }
   });
 });

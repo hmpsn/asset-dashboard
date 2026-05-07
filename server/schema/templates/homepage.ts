@@ -3,12 +3,12 @@
  * that all other pages reference via @id, never duplicating.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined } from './helpers.js';
+import { breadcrumbRef, dropUndefined } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
   pageData: PageData;
-  /** Optional — when present, sameAs and foundedDate are emitted on the Organization node. */
+  /** Optional — when present, sameAs and foundingDate are emitted on the Organization node. */
   businessProfile?: BusinessProfile | null;
   /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
   siteHasSearch?: boolean;
@@ -28,7 +28,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
-    'foundedDate': businessProfile?.foundedDate,
+    'foundingDate': businessProfile?.foundedDate,
     'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
@@ -52,5 +52,17 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     } : {}),
   };
 
-  return { '@context': 'https://schema.org', '@graph': [organization, website] };
+  const webPage = dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${baseUrl}/#webpage`,
+    'url': baseUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': { '@id': `${baseUrl}/#website` },
+    'about': { '@id': `${baseUrl}/#organization` },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(baseUrl, pageData.breadcrumbs),
+  });
+
+  return { '@context': 'https://schema.org', '@graph': [organization, website, webPage] };
 }

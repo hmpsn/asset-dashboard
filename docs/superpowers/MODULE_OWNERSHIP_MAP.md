@@ -45,7 +45,7 @@ Each intelligence slice is a "column" of the platform brain. Files can appear un
 | `routes/keyword-strategy.ts` | Keyword strategy CRUD + signals endpoint |
 | `routes/backlinks.ts` | Backlink profile data from SEMRush |
 | `routes/webflow-keywords.ts` | Page keyword assignments + cannibalization checks |
-| `routes/webflow-seo.ts` | SEO field editing (title, meta, H1) + AI rewrite |
+| `routes/webflow-seo-*.ts` | SEO field editing, audit, AI rewrite, and bulk job starts |
 | `routes/webflow-analysis.ts` | Page-level SEO analysis |
 | `routes/semrush.ts` | SEMRush data proxy (keyword metrics, related keywords) |
 | `routes/rank-tracking.ts` | Keyword rank tracking CRUD + history |
@@ -308,7 +308,7 @@ Each intelligence slice is a "column" of the platform brain. Files can appear un
 | Hook | File | API Endpoint |
 |------|------|-------------|
 | `useClientAuth()` | `hooks/useClientAuth.ts` | `/api/public/auth/:wsId` |
-| `useClientData()` | `hooks/useClientData.ts` | Aggregates all client data |
+| `useClientSearch()` / `useClientGA4()` / `useClient*()` | `hooks/client/` | Client portal React Query data domains |
 | `useChat()` | `hooks/useChat.ts` | `/api/public/search-chat/:wsId` |
 
 ---

@@ -21,8 +21,8 @@ export interface SegmentedControlProps {
 }
 
 const SIZE: Record<SegmentedControlSize, string> = {
-  sm: 'px-2 py-1 text-[11px]',
-  md: 'px-3 py-1.5 text-xs',
+  sm: 'px-2 py-1 t-caption-sm',
+  md: 'px-3 py-1.5 t-caption',
 };
 
 export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>(
@@ -86,7 +86,7 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
         role="radiogroup"
         aria-label={label}
         className={cn(
-          'inline-flex bg-zinc-900 border border-zinc-800 rounded-md p-0.5',
+          'inline-flex bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-md p-0.5',
           className,
         )}
       >
@@ -112,7 +112,9 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
               className={cn(
                 'rounded-sm transition-colors font-medium',
                 SIZE[size],
-                active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200',
+                active
+                  ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]',
                 opt.disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
               )}
             >

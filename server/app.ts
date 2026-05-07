@@ -10,13 +10,14 @@ import { getWorkspace } from './workspaces.js';
 import { getUploadRoot, getOptRoot } from './data-dir.js';
 import { constructWebhookEvent, handleWebhookEvent } from './stripe.js';
 import { verifyToken as verifyJwtToken, optionalAuth } from './auth.js';
-import { verifyClientToken } from './client-users.js';
 import {
   publicApiLimiter,
   publicWriteLimiter,
   globalPublicLimiter,
   verifyAdminToken,
   verifyClientSession,
+  internalJwtCanAccessWorkspace,
+  verifyClientUserTokenForWorkspace,
 } from './middleware.js';
 import { fingerprintMiddleware } from './middleware/fingerprint.js';
 import { getPresence } from './websocket.js';
@@ -73,6 +74,7 @@ import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
+import clientActionsRouter from './routes/client-actions.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import brandscriptRoutes from './routes/brandscript.js';
 import voiceCalibrationRoutes from './routes/voice-calibration.js';
@@ -217,6 +219,8 @@ export function createApp(): express.Express {
       if (req.path === '/api/auth/login' && req.method === 'POST') return next();
       if (req.path === '/api/auth/check') return next();
       if (req.path.startsWith('/api/auth/setup') || req.path === '/api/auth/user-login') return next();
+      // Allow unauthenticated feature-flags GET for client-side gating.
+      if (req.path === '/api/feature-flags' && req.method === 'GET') return next();
       // Allow Google OAuth callback (Google redirects here without our auth token)
       if (req.path === '/api/google/callback') return next();
       // Allow public report and client routes
@@ -243,18 +247,11 @@ export function createApp(): express.Express {
     if (!ws || !ws.clientPassword) return next();
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
     if (adminToken && verifyAdminToken(adminToken)) return next();
-    const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
-    if (jwtToken) {
-      const jwtPayload = verifyJwtToken(jwtToken);
-      if (jwtPayload) return next();
-    }
+    if (internalJwtCanAccessWorkspace(req, workspaceId)) return next();
     const sessionToken = req.cookies?.[`client_session_${workspaceId}`];
     if (sessionToken && verifyClientSession(workspaceId, sessionToken)) return next();
     const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
-    if (clientToken) {
-      const payload = verifyClientToken(clientToken);
-      if (payload && payload.workspaceId === workspaceId) return next();
-    }
+    if (verifyClientUserTokenForWorkspace(workspaceId, clientToken)) return next();
     return res.status(401).json({ error: 'Authentication required. Please log in to the dashboard.' });
   });
 
@@ -319,6 +316,7 @@ export function createApp(): express.Express {
   app.use(debugRouter);
   app.use(suggestedBriefsRouter);
   app.use(clientSignalsRouter);
+  app.use(clientActionsRouter);
   app.use(meetingBriefRouter);
   app.use(brandscriptRoutes);
   app.use(voiceCalibrationRoutes);

@@ -40,10 +40,10 @@ beforeAll(async () => {
   wsOtherId = wsB.workspaceId;
   cleanupA = wsA.cleanup;
   cleanupB = wsB.cleanup;
-});
+}, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   cleanupA?.();
   cleanupB?.();
 });

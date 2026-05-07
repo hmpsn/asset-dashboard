@@ -62,9 +62,9 @@ interface Props {
 
 
 function difficultyColor(d: string): string {
-  if (d === 'low') return 'text-emerald-400';
-  if (d === 'medium') return 'text-amber-400';
-  return 'text-red-400';
+  if (d === 'low') return 'text-accent-success';
+  if (d === 'medium') return 'text-accent-warning';
+  return 'text-accent-danger';
 }
 
 function intentIcon(intent: string): string {
@@ -87,16 +87,17 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`)
+    const workspaceParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${workspaceParam}`)
       .then(data => setPages(data))
       .catch(() => {
         // Fallback to static-only endpoint if all-pages not available
-        get<PageMeta[]>(`/api/webflow/pages/${siteId}`)
+        get<PageMeta[]>(`/api/webflow/pages/${siteId}${workspaceParam}`)
           .then(data => setPages(data))
           .catch(() => setPages([]));
       })
       .finally(() => setLoading(false));
-  }, [siteId]);
+  }, [siteId, workspaceId]);
 
   const analyzePage = async (page: PageMeta) => {
     setAnalyzing(prev => new Set(prev).add(page.id));
@@ -108,7 +109,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       try {
         const pagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : '';
         if (pagePath) {
-          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
           pageContent = result.text || '';
         }
       } catch (err) { console.error('KeywordAnalysis operation failed:', err); }
@@ -194,7 +195,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--brand-text-muted)]">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
         <p className="text-sm">Loading pages...</p>
       </div>
     );
@@ -209,20 +210,20 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
         <div className="text-sm text-[var(--brand-text)]">
           <span className="font-medium text-[var(--brand-text-bright)]">{pages.length}</span> pages
           {pages.some(p => p.source === 'cms') && (
-            <span className="t-caption-sm text-teal-400 ml-1">({pages.filter(p => p.source === 'cms').length} CMS)</span>
+            <span className="t-caption-sm text-accent-brand ml-1">({pages.filter(p => p.source === 'cms').length} CMS)</span>
           )}
         </div>
         {analyzedCount > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-teal-400">
+          <span className="text-xs px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/30 text-accent-brand">
             {analyzedCount}/{pages.length} analyzed
           </span>
         )}
         <div className="flex-1" />
         {bulkProgress ? (
           <div className="flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
             <span className="text-xs text-[var(--brand-text)]">{bulkProgress.done}/{bulkProgress.total} pages...</span>
-            <button onClick={() => { cancelBulkRef.current = true; }} className="t-caption-sm text-red-400 hover:text-red-300">Cancel</button>
+            <button onClick={() => { cancelBulkRef.current = true; }} className="t-caption-sm text-accent-danger hover:text-accent-danger">Cancel</button>
           </div>
         ) : (
           <Button
@@ -265,7 +266,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
               >
                 {isAnalyzing ? (
-                  <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin shrink-0" />
                 ) : isExpanded ? (
                   <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                 ) : (
@@ -275,7 +276,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.title}</span>
                     {page.source === 'cms' && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 shrink-0" /* arbitrary-text-ok */>CMS</span>
+                      <span className="t-micro px-1 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/15 text-accent-brand border border-teal-500/20 shrink-0">CMS</span>
                     )}
                   </div>
                   <div className="text-xs text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
@@ -311,14 +312,14 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             {kw.optimizationScore}
                             <span className="text-xs font-normal text-[var(--brand-text-muted)]">/100</span>
                           </div>
-                          <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
+                          <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className={`h-full rounded-[var(--radius-pill)] ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
+                            <span className="w-6 h-6 rounded-[var(--radius-pill)] bg-teal-500/20 text-accent-brand flex items-center justify-center text-xs font-bold">
                               {intentIcon(kw.searchIntent)}
                             </span>
                             <div>
@@ -339,7 +340,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {/* Primary keyword */}
                       <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon as={Target} size="md" className="text-teal-400" />
+                          <Icon as={Target} size="md" className="text-accent-brand" />
                           <span className="text-xs font-medium text-[var(--brand-text-bright)]">Primary Keyword</span>
                         </div>
                         <div className="text-sm font-semibold text-[var(--brand-text-bright)] mb-2">{kw.primaryKeyword}</div>
@@ -350,11 +351,11 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             return (
                               <div key={key} className="flex items-center gap-1">
                                 {present ? (
-                                  <Icon as={CheckCircle} size="sm" className="text-emerald-400" />
+                                  <Icon as={CheckCircle} size="sm" className="text-accent-success" />
                                 ) : (
-                                  <Icon as={AlertCircle} size="sm" className="text-red-400" />
+                                  <Icon as={AlertCircle} size="sm" className="text-accent-danger" />
                                 )}
-                                <span className={`t-caption-sm ${present ? 'text-emerald-400' : 'text-red-400'}`}>
+                                <span className={`t-caption-sm ${present ? 'text-accent-success' : 'text-accent-danger'}`}>
                                   {labels[key]}
                                 </span>
                               </div>
@@ -367,12 +368,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Tag} size="md" className="text-blue-400" />
+                            <Icon as={Tag} size="md" className="text-accent-info" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.secondaryKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-accent-info">
                                 {k}
                               </span>
                             ))}
@@ -380,12 +381,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={TrendingUp} size="md" className="text-emerald-400" />
+                            <Icon as={TrendingUp} size="md" className="text-accent-success" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success">
                                 {k}
                               </span>
                             ))}
@@ -397,12 +398,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {kw.competitorKeywords.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Zap} size="md" className="text-amber-400" />
+                            <Icon as={Zap} size="md" className="text-accent-warning" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.competitorKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-accent-warning">
                                 {k}
                               </span>
                             ))}
@@ -414,13 +415,13 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {kw.contentGaps.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={AlertCircle} size="md" className="text-orange-400" />
+                            <Icon as={AlertCircle} size="md" className="text-accent-orange" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
                           </div>
                           <ul className="space-y-1">
                             {kw.contentGaps.map((gap, i) => (
                               <li key={i} className="text-xs text-[var(--brand-text)] flex items-start gap-1.5">
-                                <span className="text-orange-400 mt-0.5">•</span> {gap}
+                                <span className="text-accent-orange mt-0.5">•</span> {gap}
                               </li>
                             ))}
                           </ul>
@@ -432,7 +433,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         {kw.optimizationIssues.length > 0 && (
                           <div className="bg-[var(--surface-2)] rounded-[var(--radius-lg)] p-3 border border-red-500/20">
                             <div className="flex items-center gap-2 mb-2">
-                              <Icon as={AlertCircle} size="md" className="text-red-400" />
+                              <Icon as={AlertCircle} size="md" className="text-accent-danger" />
                               <span className="text-xs font-medium text-[var(--brand-text-bright)]">Issues</span>
                             </div>
                             <ul className="space-y-1">
@@ -445,7 +446,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         {kw.recommendations.length > 0 && (
                           <div className="bg-[var(--surface-2)] rounded-[var(--radius-lg)] p-3 border border-emerald-500/20">
                             <div className="flex items-center gap-2 mb-2">
-                              <Icon as={Sparkles} size="md" className="text-emerald-400" />
+                              <Icon as={Sparkles} size="md" className="text-accent-success" />
                               <span className="text-xs font-medium text-[var(--brand-text-bright)]">Recommendations</span>
                             </div>
                             <ul className="space-y-1">
@@ -461,7 +462,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {cs && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-3">
-                            <Icon as={BarChart3} size="md" className="text-cyan-400" />
+                            <Icon as={BarChart3} size="md" className="text-accent-cyan" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">
@@ -473,7 +474,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                               <div className="flex items-center gap-3">
                                 <MetricRing score={cs.readabilityScore} size={64} noAnimation />
                                 <div>
-                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-emerald-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-accent-success' : cs.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
                                     {cs.readabilityScore}
                                   </div>
                                   <div className="t-label text-[var(--brand-text-muted)]">Readability</div>
@@ -496,8 +497,8 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                               <div className="t-label text-[var(--brand-text-muted)] mb-1.5">Top Words in Content</div>
                               <div className="flex flex-wrap gap-1">
                                 {cs.topKeywords.slice(0, 10).map((kw, i) => (
-                                  <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                                    {kw.word} <span className="text-cyan-600">({kw.density}%)</span>
+                                  <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan">
+                                    {kw.word} <span className="text-accent-cyan">({kw.density}%)</span>
                                   </span>
                                 ))}
                               </div>
@@ -507,11 +508,11 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                           {/* Title/desc length */}
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
-                              {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
+                              {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-accent-success" /> : <Icon as={AlertCircle} size="sm" className="text-accent-warning" />}
                               <span className="t-caption-sm text-[var(--brand-text)]">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
+                              {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-accent-success" /> : <Icon as={AlertCircle} size="sm" className="text-accent-warning" />}
                               <span className="t-caption-sm text-[var(--brand-text)]">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">

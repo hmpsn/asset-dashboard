@@ -1,10 +1,15 @@
 /**
  * Vitest global setup — runs once before any worker threads start.
- * Ensures SQLite migrations are applied before parallel tests begin,
- * avoiding SQLITE_BUSY errors from concurrent migration attempts.
+ *
+ * DB migrations now run from tests/db-setup.ts after each worker has selected
+ * an isolated DATA_DIR. This file still exports cleanup helpers used by tests;
+ * those helpers import the DB only inside worker contexts after db-setup ran.
  */
-import db from '../server/db/index.js';
-import { runMigrations } from '../server/db/index.js';
+
+const dbModule = process.env.ASSET_DASHBOARD_TEST_DATA_DIR_SET === '1'
+  ? await import('../server/db/index.js')
+  : null;
+const db = dbModule?.default;
 
 /**
  * Tables that seed fixtures populate. Truncated between test suites
@@ -26,7 +31,7 @@ const SEED_TABLES = [
 // and it has no `workspace_id` column. Cleanup is handled by per-fixture cleanup() closures.
 
 export function setup() {
-  runMigrations();
+  // Per-worker DB setup happens in tests/db-setup.ts.
 }
 
 /**
@@ -34,6 +39,9 @@ export function setup() {
  * that use seed fixtures to prevent data leaking into other test files.
  */
 export function cleanSeedData(workspaceId?: string): void {
+  if (!db) {
+    throw new Error('cleanSeedData() must be called from a Vitest worker after tests/db-setup.ts has run');
+  }
   // Guard: empty string is a no-op. An unset variable passed as '' must never
   // fall through to the full-cleanup branch and wipe other tests' workspaces.
   if (workspaceId === '') return;

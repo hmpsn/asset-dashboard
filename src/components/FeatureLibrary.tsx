@@ -11,9 +11,9 @@ type ViewMode = 'painPoint' | 'category';
 
 const TIER_STYLES: Record<FeatureTier, string> = {
   free: 'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)] border-[var(--brand-text-muted)]/20',
-  growth: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-  premium: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-  admin: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+  growth: 'bg-teal-500/15 text-accent-brand border-teal-500/20',
+  premium: 'bg-teal-500/15 text-accent-brand border-teal-500/20',
+  admin: 'bg-accent-brand-soft text-accent-brand border-accent-brand-soft',
 };
 
 const TIER_LABELS: Record<FeatureTier, string> = {
@@ -35,7 +35,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
         <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] leading-tight">{feature.title}</h3>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {feature.impact !== 'low' && (
-            <span className={`w-2 h-2 rounded-full ${IMPACT_DOT[feature.impact]}`} title={`${feature.impact} impact`} />
+            <span className={`w-2 h-2 rounded-[var(--radius-pill)] ${IMPACT_DOT[feature.impact]}`} title={`${feature.impact} impact`} />
           )}
           {feature.clientFacing && (
             <span title="Client-facing" className="inline-flex">
@@ -108,7 +108,7 @@ export default function FeatureLibrary() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <PageHeader title="Feature Library" subtitle="Loading..." icon={<Icon as={Layers} size="lg" className="text-teal-400" />} />
+        <PageHeader title="Feature Library" subtitle="Loading..." icon={<Icon as={Layers} size="lg" className="text-accent-brand" />} />
       </div>
     );
   }
@@ -118,7 +118,7 @@ export default function FeatureLibrary() {
       <PageHeader
         title="Feature Library"
         subtitle={`${allFeatures.length} curated features — internal sales reference`}
-        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
       />
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -137,7 +137,7 @@ export default function FeatureLibrary() {
             onClick={() => setView('painPoint')}
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
-              view === 'painPoint' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+              view === 'painPoint' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Pain Point
@@ -146,7 +146,7 @@ export default function FeatureLibrary() {
             onClick={() => setView('category')}
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
-              view === 'category' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+              view === 'category' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Platform Area
@@ -165,7 +165,7 @@ export default function FeatureLibrary() {
           {grouped.map(group => (
             <div key={group.label}>
               <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3 flex items-center gap-2">
-                <span className="w-1 h-4 bg-teal-500 rounded-full" />
+                <span className="w-1 h-4 bg-teal-500 rounded-[var(--radius-pill)]" />
                 {group.label}
                 <span className="text-[var(--brand-text-dim)] font-normal">({group.features.length})</span>
               </h2>

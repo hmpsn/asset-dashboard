@@ -214,6 +214,10 @@ describe('validateForGoogleRichResults', () => {
         datePosted: '2026-03-01',
         description: 'We are hiring...',
         hiringOrganization: { '@type': 'Organization', name: 'Acme Corp' },
+        jobLocation: {
+          '@type': 'Place',
+          address: { '@type': 'PostalAddress', addressLocality: 'Austin', addressRegion: 'TX' },
+        },
       }],
     };
     const result = validateForGoogleRichResults(schema);

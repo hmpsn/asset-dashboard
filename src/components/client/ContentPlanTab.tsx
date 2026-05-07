@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Layers, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, Icon} from '../ui';
+import { SectionCard, Badge, EmptyState, Icon, Button, ClickableRow } from '../ui';
 import { MatrixProgressView } from './MatrixProgressView';
 import { contentPlanReview } from '../../api/content';
+import { queryKeys } from '../../lib/queryKeys';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
 
 interface ContentPlanTabProps {
@@ -11,28 +13,27 @@ interface ContentPlanTabProps {
 }
 
 export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
-  const [plans, setPlans] = useState<ContentMatrix[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [selectedMatrixId, setSelectedMatrixId] = useState<string | null>(null);
 
-  const loadPlans = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await contentPlanReview.getPlans(workspaceId);
-      setPlans(data as ContentMatrix[]);
-      // Auto-select if only one plan
-      if (Array.isArray(data) && data.length === 1) {
-        setSelectedMatrixId((data[0] as ContentMatrix).id);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load content plans');
-    }
-    setLoading(false);
-  }, [workspaceId]);
+  const plansQuery = useQuery({
+    queryKey: queryKeys.client.contentPlan(workspaceId),
+    queryFn: () => contentPlanReview.getPlans(workspaceId) as Promise<ContentMatrix[]>,
+    enabled: !!workspaceId,
+  });
 
-  useEffect(() => { loadPlans(); }, [workspaceId, loadPlans]);
+  const plans = plansQuery.data ?? [];
+  const loading = plansQuery.isLoading;
+  const singlePlanId = plansQuery.data?.length === 1 ? plansQuery.data[0].id : null;
+  const loadPlans = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
+  }, [queryClient, workspaceId]);
+
+  useEffect(() => {
+    if (singlePlanId && !selectedMatrixId) {
+      setSelectedMatrixId(singlePlanId);
+    }
+  }, [singlePlanId, selectedMatrixId]);
 
   const handleCellPreview = useCallback((_cell: MatrixCell) => {
     void _cell; // Preview is handled internally by MatrixProgressView's modal
@@ -43,13 +44,15 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     try {
       await contentPlanReview.flagCell(workspaceId, selectedMatrixId, cellId, comment);
       setToast({ message: 'Feedback submitted', type: 'success' });
-      // Reload to get updated data
       const updated = await contentPlanReview.getPlan(workspaceId, selectedMatrixId);
-      setPlans(prev => prev.map(p => p.id === selectedMatrixId ? updated as ContentMatrix : p));
+      queryClient.setQueryData<ContentMatrix[]>(
+        queryKeys.client.contentPlan(workspaceId),
+        prev => (prev ?? []).map(p => p.id === selectedMatrixId ? updated as ContentMatrix : p),
+      );
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : 'Failed to submit feedback', type: 'error' });
     }
-  }, [workspaceId, selectedMatrixId, setToast]);
+  }, [workspaceId, selectedMatrixId, setToast, queryClient]);
 
   const handleDownload = useCallback((format: 'docx' | 'pdf') => {
     window.open(`/api/export/${workspaceId}/matrices?format=${format === 'docx' ? 'csv' : 'json'}`, '_blank');
@@ -58,19 +61,19 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
         <span className="t-body text-[var(--brand-text-muted)]">Loading content plans…</span>
       </div>
     );
   }
 
-  if (error) {
+  if (plansQuery.error) {
     return (
       <EmptyState
         icon={AlertTriangle}
         title="Couldn't load content plans"
-        description={error}
-        action={<button onClick={loadPlans} className="t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">Retry</button>}
+        description={plansQuery.error instanceof Error ? plansQuery.error.message : 'Failed to load content plans'}
+        action={<Button onClick={loadPlans} size="sm">Retry</Button>}
       />
     );
   }
@@ -92,12 +95,13 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     return (
       <div className="space-y-3">
         {plans.length > 1 && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSelectedMatrixId(null)}
-            className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           >
             ← All Content Plans
-          </button>
+          </Button>
         )}
         <MatrixProgressView
           workspaceId={workspaceId}
@@ -115,7 +119,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     <div className="space-y-4">
       <SectionCard
         title="Your Content Plans"
-        titleIcon={<Icon as={Layers} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Layers} size="md" className="text-accent-brand" />}
       >
         <div className="space-y-2">
           {plans.map(plan => {
@@ -125,15 +129,15 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
             const progress = total > 0 ? Math.round((published / total) * 100) : 0;
 
             return (
-              <button
+              <ClickableRow
                 key={plan.id}
                 onClick={() => setSelectedMatrixId(plan.id)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
+                className="flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <div className="min-w-0">
-                    <span className="t-body font-medium text-[var(--brand-text)] group-hover:text-white transition-colors truncate block">
+                    <span className="t-ui font-medium text-[var(--brand-text-bright)] transition-colors truncate block">
                       {plan.name}
                     </span>
                     <span className="t-caption text-[var(--brand-text-muted)]">
@@ -145,11 +149,11 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                   {inReview > 0 && (
                     <Badge label={`${inReview} needs review`} color="blue" />
                   )}
-                  <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                    <div className="h-full bg-teal-500/50 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                  <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                    <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
-              </button>
+              </ClickableRow>
             );
           })}
         </div>

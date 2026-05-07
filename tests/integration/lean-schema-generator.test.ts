@@ -15,6 +15,7 @@ vi.mock('../../server/ai.js', () => ({
 }));
 
 import { generateLeanSchema } from '../../server/schema/generator.js';
+import { validateForGoogleRichResults } from '../../server/schema-validator.js';
 import { callAI } from '../../server/ai.js';
 
 const baseInput = {
@@ -59,14 +60,14 @@ describe('generateLeanSchema', () => {
     expect(graph[0]['@type']).toBe('Article');
   });
 
-  it('emits Organization + WebSite for the homepage', async () => {
+  it('emits Organization + WebSite + WebPage for the homepage', async () => {
     const out = await generateLeanSchema({
       ...baseInput,
       pageMeta: { title: 'Home', slug: '', publishedPath: '/', seo: undefined },
     });
     const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
     const types = graph.map(n => n['@type']);
-    expect(types).toEqual(['Organization', 'WebSite']);
+    expect(types).toEqual(['Organization', 'WebSite', 'WebPage']);
   });
 
   it('produces validationErrors=undefined on clean output', async () => {
@@ -74,13 +75,13 @@ describe('generateLeanSchema', () => {
     expect(out.validationErrors).toBeUndefined();
   });
 
-  it('emits exactly 2 nodes (primary + breadcrumb) for non-homepage pages', async () => {
+  it('emits a typed primary node, WebPage sibling, and breadcrumb for Service pages', async () => {
     const out = await generateLeanSchema({
       ...baseInput,
       pageMeta: { ...baseInput.pageMeta, publishedPath: '/services/design' },
     });
-    const graph = (out.suggestedSchemas[0].template['@graph'] as unknown[]);
-    expect(graph.length).toBe(2);
+    const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
+    expect(graph.map(n => n['@type'])).toEqual(['Service', 'WebPage', 'BreadcrumbList']);
   });
 
   it('never emits duplicate WebPage nodes (the bug we are fixing)', async () => {
@@ -247,16 +248,20 @@ describe('paid-grade output (Pillar 2)', () => {
     expect(items[items.length - 1].name).toBe('Privacy Policy');
   });
 
-  it('emits isPartOf, breadcrumb, inLanguage on the primary node', async () => {
+  it('emits breadcrumb/inLanguage on Service and isPartOf on its WebPage sibling', async () => {
     const out = await generateLeanSchema({
       ...baseInput,
       pageMeta: { ...baseInput.pageMeta, publishedPath: '/services/design' },
       workspace: { ...baseInput.workspace, defaultLocale: 'en' },
     });
-    const node = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'Service')!;
+    const webPage = graph.find(n => n['@type'] === 'WebPage')!;
+    expect(node.isPartOf).toBeUndefined();
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/design#breadcrumb' });
     expect(node.inLanguage).toBe('en');
+    expect(webPage.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(webPage.about).toEqual({ '@id': 'https://example.com/services/design#service' });
   });
 
   it('CMS Article gets datePublished + author from cmsFieldData', async () => {
@@ -615,5 +620,134 @@ describe('lean schema generator — PR2 enrichment', () => {
     expect(service.mainEntity).toMatchObject({ '@type': 'Table' });
     expect(graph.filter(n => n['@type'] === 'Review')).toHaveLength(2);
     db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+});
+
+describe('lean schema generator — plan role quality gates', () => {
+  it('preserves LocalBusiness output when a local homepage is explicitly overridden', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { title: 'Home', slug: '', publishedPath: '/', seo: { description: 'Family care.' } },
+      pageKindOverride: 'Homepage',
+      schemaRoleOverride: { role: 'homepage', source: 'site-plan' },
+      workspace: {
+        ...baseInput.workspace,
+        businessProfile: {
+          address: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+        },
+      },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.map(n => n['@type'])).toContain('LocalBusiness');
+    expect(out.generationDiagnostics?.roleSource).toBe('site-plan');
+  });
+
+  it('lets an explicit generic role force WebPage output for blog-like URLs', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/blog/thank-you' },
+      pageKindOverride: 'WebPage',
+      schemaRoleOverride: { role: 'generic', source: 'site-plan' },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0]['@type']).toBe('WebPage');
+    expect(graph.some(n => n['@type'] === 'BlogPosting')).toBe(false);
+  });
+
+  it('emits Product offers only from visible price/currency data', async () => {
+    const priced = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><h1>Starter Plan</h1><p>Starter $29 per month for teams.</p></main>',
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/products/starter', seo: { description: 'Starter product.' } },
+      schemaRoleOverride: { role: 'product', source: 'site-plan' },
+    });
+    const pricedGraph = priced.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const product = pricedGraph.find(n => n['@type'] === 'Product')!;
+    expect(product.offers).toEqual(expect.arrayContaining([expect.objectContaining({ '@type': 'Offer', price: '29', priceCurrency: 'USD' })]));
+    expect(priced.generationDiagnostics?.skippedSchemaTypes).toEqual([]);
+
+    const unpriced = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><h1>Starter Plan</h1><p>Contact us for pricing.</p></main>',
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/products/starter', seo: { description: 'Starter product.' } },
+      schemaRoleOverride: { role: 'product', source: 'site-plan' },
+    });
+    const unpricedGraph = unpriced.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(unpricedGraph.find(n => n['@type'] === 'Product')?.offers).toBeUndefined();
+    expect(unpriced.generationDiagnostics?.skippedSchemaTypes).toContainEqual(expect.objectContaining({ type: 'Offer' }));
+  });
+
+  it('gates FAQPage, HowTo, VideoObject, pricing Offer, ProfilePage, and unsupported rich roles with diagnostics', async () => {
+    const faq = await generateLeanSchema({
+      ...baseInput,
+      html: `<main>
+        <details><summary>What is included?</summary><p>Everything.</p></details>
+        <details><summary>Can I cancel?</summary><p>Yes.</p></details>
+      </main>`,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/faq' },
+      schemaRoleOverride: { role: 'faq', source: 'site-plan' },
+    });
+    expect((faq.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>).some(n => n['@type'] === 'FAQPage')).toBe(true);
+
+    const howto = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><h1>How to launch</h1><ol><li>Create your plan</li><li>Configure settings</li><li>Publish the site</li></ol></main>',
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/guides/launch', lastPublished: '2026-05-01T00:00:00Z' },
+      schemaRoleOverride: { role: 'howto', source: 'site-plan' },
+    });
+    expect((howto.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>).some(n => n['@type'] === 'HowTo')).toBe(true);
+
+    const video = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><iframe title="Demo video" src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe></main>',
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/videos/demo', lastPublished: '2026-05-01T00:00:00Z' },
+      schemaRoleOverride: { role: 'video', source: 'site-plan' },
+    });
+    expect((video.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>).some(n => n['@type'] === 'VideoObject')).toBe(true);
+
+    const pricing = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><h1>Pricing</h1><p>Growth $99 per month.</p></main>',
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/pricing' },
+      schemaRoleOverride: { role: 'pricing', source: 'site-plan' },
+    });
+    expect((pricing.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>).some(n => n['@type'] === 'Offer')).toBe(true);
+
+    const author = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, title: 'Jane Smith', publishedPath: '/authors/jane-smith', seo: { description: 'Jane writes about analytics.' } },
+      schemaRoleOverride: { role: 'author', source: 'site-plan' },
+    });
+    expect((author.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>).some(n => n['@type'] === 'ProfilePage')).toBe(true);
+
+    const event = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/events/summit' },
+      schemaRoleOverride: { role: 'event', source: 'site-plan' },
+    });
+    expect((event.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0]['@type']).toBe('WebPage');
+    expect(event.generationDiagnostics?.skippedSchemaTypes).toContainEqual(expect.objectContaining({ type: 'Event' }));
+  });
+
+  it('aligns generated diagnostics with the publish validator status', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/products/starter', seo: { description: 'Starter product.' } },
+      html: '<main><p>Starter $29 monthly.</p></main>',
+      schemaRoleOverride: { role: 'product', source: 'site-plan' },
+    });
+    const validation = validateForGoogleRichResults(out.suggestedSchemas[0].template);
+    expect(out.generationDiagnostics?.validationStatus).toBe(validation.status);
+  });
+
+  it('reports inactive plan status as a per-page diagnostic when generation auto-detects', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      inactivePlanStatus: 'draft',
+    });
+    expect(out.generationDiagnostics?.skippedSchemaTypes).toContainEqual(expect.objectContaining({
+      type: 'SchemaSitePlan',
+      reason: expect.stringContaining('draft'),
+    }));
   });
 });

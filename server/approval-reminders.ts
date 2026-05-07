@@ -21,13 +21,19 @@ async function sendApprovalReminderEmail(
   pendingCount: number,
   staleDays: number,
   dashboardUrl?: string
-) {
-  if (!isEmailConfigured()) return;
+): Promise<boolean> {
+  if (!isEmailConfigured()) return false;
   const { subject, html } = renderApprovalReminder({ workspaceName, batchName, pendingCount, staleDays, dashboardUrl });
   await sendEmail(clientEmail, subject, html);
+  return true;
 }
 
-async function checkStaleApprovals() {
+export async function checkStaleApprovals() {
+  if (!isEmailConfigured()) {
+    pruneReminders('-7 days');
+    return;
+  }
+
   const workspaces = listWorkspaces();
   const now = Date.now();
 
@@ -68,7 +74,8 @@ async function checkStaleApprovals() {
 
       log.info(`Sending reminder for batch "${batch.name}" to ${ws.clientEmail} (${staleDays} days stale)`);
       try {
-        await sendApprovalReminderEmail(ws.clientEmail, ws.name, batch.name, pendingItems.length, staleDays, dashUrl);
+        const sent = await sendApprovalReminderEmail(ws.clientEmail, ws.name, batch.name, pendingItems.length, staleDays, dashUrl);
+        if (!sent) continue;
         recordSend(ws.clientEmail, 'action', 'approval_reminder', ws.id, 1);
         upsertReminder(key);
       } catch (err) {

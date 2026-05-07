@@ -12,7 +12,7 @@ import { callAnthropic } from './anthropic-helpers.js';
 export interface AICallOptions {
   /** Provider to use. Defaults to 'openai'. */
   provider?: 'openai' | 'anthropic';
-  /** Model override. Defaults to provider's default (gpt-4.1-mini / claude-sonnet-4). */
+  /** Model override. Defaults to provider's default (gpt-5.4-mini / claude-sonnet-4-6). */
   model?: string;
   /** System prompt (mapped to OpenAI system message or Anthropic system field). */
   system?: string;
@@ -26,6 +26,14 @@ export interface AICallOptions {
   feature: string;
   /** Workspace ID for cost attribution. */
   workspaceId?: string;
+  /** Optional request timeout. */
+  timeoutMs?: number;
+  /** Max retry attempts on 429/5xx. Defaults to provider helper behavior. */
+  maxRetries?: number;
+  /** Optional caller cancellation signal. Composed with provider timeout. */
+  signal?: AbortSignal;
+  /** OpenAI-only structured response mode. */
+  responseFormat?: { type: 'json_object' };
 }
 
 export interface AICallResult {
@@ -49,6 +57,9 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       temperature: rest.temperature,
       feature: rest.feature,
       workspaceId: rest.workspaceId,
+      maxRetries: rest.maxRetries,
+      timeoutMs: rest.timeoutMs,
+      signal: rest.signal,
     });
     return {
       text: result.text,
@@ -68,6 +79,10 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     temperature: rest.temperature,
     feature: rest.feature,
     workspaceId: rest.workspaceId,
+    maxRetries: rest.maxRetries,
+    timeoutMs: rest.timeoutMs,
+    signal: rest.signal,
+    responseFormat: rest.responseFormat,
   });
 
   return {

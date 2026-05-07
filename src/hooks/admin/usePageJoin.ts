@@ -40,12 +40,13 @@ export function usePageJoin(
 } {
   // ── Fetch Webflow pages (all-pages with CMS, falling back to static-only) ──
   const pagesQuery = useQuery({
-    queryKey: queryKeys.admin.pageJoinPages(siteId),
+    queryKey: queryKeys.admin.pageJoinPages(siteId, workspaceId),
     queryFn: async (): Promise<PageMeta[]> => {
+      const workspaceParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
       try {
-        return await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`);
+        return await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${workspaceParam}`);
       } catch {
-        return get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
+        return get<PageMeta[]>(`/api/webflow/pages/${siteId}${workspaceParam}`);
       }
     },
     staleTime: 5 * 60 * 1000,

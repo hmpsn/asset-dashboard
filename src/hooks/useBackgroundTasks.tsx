@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
-import { get, post, del } from '../api/client';
+import { ApiError, get, post, del } from '../api/client';
+import type { BackgroundJobType } from '../../shared/types/background-jobs';
 
 export interface BackgroundJob {
   id: string;
@@ -20,11 +21,19 @@ export interface BackgroundJob {
 interface BackgroundTaskContextValue {
   jobs: BackgroundJob[];
   activeJobs: BackgroundJob[];
-  startJob: (type: string, params: Record<string, unknown>) => Promise<string | null>;
+  startJob: (type: BackgroundJobType, params: Record<string, unknown>) => Promise<string | null>;
   getJobResult: (jobId: string) => unknown | undefined;
+  findActiveJob: (criteria: JobLookupCriteria) => BackgroundJob | undefined;
+  findLatestTerminalJob: (criteria: JobLookupCriteria & { withResult?: boolean }) => BackgroundJob | undefined;
+  jobsForWorkspace: (workspaceId: string | undefined) => BackgroundJob[];
   cancelJob: (jobId: string) => Promise<void>;
   dismissJob: (jobId: string) => void;
-  clearDone: () => void;
+  clearDone: (workspaceId?: string) => void;
+}
+
+interface JobLookupCriteria {
+  type: BackgroundJobType | string;
+  workspaceId?: string;
 }
 
 const BackgroundTaskContext = createContext<BackgroundTaskContextValue>({
@@ -32,10 +41,25 @@ const BackgroundTaskContext = createContext<BackgroundTaskContextValue>({
   activeJobs: [],
   startJob: async () => null,
   getJobResult: () => undefined,
+  findActiveJob: () => undefined,
+  findLatestTerminalJob: () => undefined,
+  jobsForWorkspace: () => [],
   cancelJob: async () => {},
   dismissJob: () => {},
   clearDone: () => {},
 });
+
+export function isTerminalJobStatus(status: BackgroundJob['status']): boolean {
+  return status === 'done' || status === 'error' || status === 'cancelled';
+}
+
+export function jobMatchesCriteria(job: BackgroundJob, criteria: JobLookupCriteria): boolean {
+  return job.type === criteria.type && (!criteria.workspaceId || job.workspaceId === criteria.workspaceId);
+}
+
+export function jobBelongsToPanel(job: BackgroundJob, workspaceId: string | undefined): boolean {
+  return workspaceId ? job.workspaceId === workspaceId : !job.workspaceId;
+}
 
 export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
@@ -96,13 +120,20 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
       .catch((err) => { console.error('useBackgroundTasks operation failed:', err); });
   }, []);
 
-  const startJob = useCallback(async (type: string, params: Record<string, unknown>): Promise<string | null> => {
+  const startJob = useCallback(async (type: BackgroundJobType, params: Record<string, unknown>): Promise<string | null> => {
     try {
       const data = await post<{ jobId?: string; error?: string }>('/api/jobs', { type, params });
       if (data.jobId) return data.jobId;
       console.error('Failed to start job:', data.error);
       return null;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.body && typeof err.body === 'object' && 'jobId' in err.body) {
+        const jobId = (err.body as { jobId?: unknown }).jobId;
+        if (typeof jobId === 'string') {
+          console.warn('Background job already running; attaching to existing job:', jobId);
+          return jobId;
+        }
+      }
       console.error('Failed to start job:', err);
       return null;
     }
@@ -110,6 +141,21 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
 
   const getJobResult = useCallback((jobId: string) => {
     return jobs.find(j => j.id === jobId)?.result;
+  }, [jobs]);
+
+  const findActiveJob = useCallback((criteria: JobLookupCriteria) => {
+    return jobs.find(j => jobMatchesCriteria(j, criteria) && !isTerminalJobStatus(j.status));
+  }, [jobs]);
+
+  const findLatestTerminalJob = useCallback((criteria: JobLookupCriteria & { withResult?: boolean }) => {
+    return jobs.find(j => {
+      if (!jobMatchesCriteria(j, criteria) || !isTerminalJobStatus(j.status)) return false;
+      return !criteria.withResult || j.result !== undefined;
+    });
+  }, [jobs]);
+
+  const jobsForWorkspace = useCallback((workspaceId: string | undefined) => {
+    return jobs.filter(j => jobBelongsToPanel(j, workspaceId));
   }, [jobs]);
 
   const dismissJob = useCallback((jobId: string) => {
@@ -124,15 +170,21 @@ export function BackgroundTaskProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const clearDone = useCallback(() => {
-    setJobs(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
-    del('/api/jobs/completed').catch((err) => { console.error('useBackgroundTasks operation failed:', err); });
+  const clearDone = useCallback((workspaceId?: string) => {
+    setJobs(prev => prev.filter(j => {
+      const visibleInPanel = jobBelongsToPanel(j, workspaceId);
+      return !visibleInPanel || !isTerminalJobStatus(j.status);
+    }));
+    const query = workspaceId
+      ? `workspaceId=${encodeURIComponent(workspaceId)}`
+      : 'scope=global';
+    del(`/api/jobs/completed?${query}`).catch((err) => { console.error('useBackgroundTasks operation failed:', err); });
   }, []);
 
   const activeJobs = jobs.filter(j => j.status === 'pending' || j.status === 'running');
 
   return (
-    <BackgroundTaskContext.Provider value={{ jobs, activeJobs, startJob, getJobResult, cancelJob: cancelJobFn, dismissJob, clearDone }}>
+    <BackgroundTaskContext.Provider value={{ jobs, activeJobs, startJob, getJobResult, findActiveJob, findLatestTerminalJob, jobsForWorkspace, cancelJob: cancelJobFn, dismissJob, clearDone }}>
       {children}
     </BackgroundTaskContext.Provider>
   );

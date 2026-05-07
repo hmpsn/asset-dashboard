@@ -24,9 +24,9 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Content Matrices — CRUD', () => {
@@ -155,6 +155,57 @@ describe('Content Matrices — CRUD', () => {
       },
     );
     expect(res.status).toBe(404);
+  });
+
+  it('public content-plan stays hidden until cells are sent for review', async () => {
+    const hiddenRes = await api(`/api/public/content-plan/${testWsId}`);
+    expect(hiddenRes.status).toBe(200);
+    expect(await hiddenRes.json()).toEqual([]);
+
+    const sendRes = await postJson(`/api/content-plan/${testWsId}/${matrixId}/send-samples`, {
+      cellIds: [firstCellId],
+    });
+    expect(sendRes.status).toBe(200);
+    const sent = await sendRes.json();
+    expect(sent.cellsSent).toBe(1);
+
+    const publicRes = await api(`/api/public/content-plan/${testWsId}`);
+    expect(publicRes.status).toBe(200);
+    const publicPlans = await publicRes.json();
+    expect(publicPlans).toHaveLength(1);
+    expect(publicPlans[0].cells).toHaveLength(1);
+    expect(publicPlans[0].cells[0]).toMatchObject({ id: firstCellId, status: 'review' });
+
+    const detailRes = await api(`/api/public/content-plan/${testWsId}/${matrixId}`);
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.cells.map((c: { id: string }) => c.id)).toEqual([firstCellId]);
+  });
+
+  it('client flagging a content-plan cell keeps it visible and records activity', async () => {
+    const invalidFlagRes = await postJson(`/api/public/content-plan/${testWsId}/${matrixId}/cells/${firstCellId}/flag`, {
+      comment: '   ',
+    });
+    expect(invalidFlagRes.status).toBe(400);
+
+    const flagRes = await postJson(`/api/public/content-plan/${testWsId}/${matrixId}/cells/${firstCellId}/flag`, {
+      comment: 'Please adjust this planned page before production.',
+    });
+    expect(flagRes.status).toBe(200);
+
+    const detailRes = await api(`/api/public/content-plan/${testWsId}/${matrixId}`);
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.cells[0]).toMatchObject({
+      id: firstCellId,
+      status: 'flagged',
+      clientFlag: 'Please adjust this planned page before production.',
+    });
+
+    const activityRes = await api(`/api/public/activity/${testWsId}?limit=5`);
+    expect(activityRes.status).toBe(200);
+    const activity = await activityRes.json();
+    expect(activity.some((entry: { title?: string }) => entry.title?.includes('Client flagged content plan page'))).toBe(true);
   });
 
   it('DELETE removes the matrix', async () => {

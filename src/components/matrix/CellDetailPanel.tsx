@@ -22,6 +22,7 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc'
   keyword_validated: { label: 'Keyword Optimized', color: 'blue', icon: '◐' },
   brief_generated: { label: 'Brief Generated', color: 'amber', icon: '◑' },
   review: { label: 'Client Review', color: 'blue', icon: '◑' },
+  flagged: { label: 'Client Flagged', color: 'amber', icon: '!' },
   approved: { label: 'Approved', color: 'teal', icon: '✓' },
   draft: { label: 'Draft', color: 'orange', icon: '◐' },
   published: { label: 'Published', color: 'emerald', icon: '●' },
@@ -234,7 +235,7 @@ export function CellDetailPanel({
                 const dotColor = toCfg ? STATUS_DOT_COLOR[toCfg.color] ?? '#71717a' : '#71717a';
                 return (
                   <div key={i} className="relative flex items-start gap-2.5 pb-2.5 last:pb-0">
-                    <div className="w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-[var(--surface-2)]" style={{ backgroundColor: dotColor }} />
+                    <div className="w-2 h-2 rounded-[var(--radius-pill)] mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-[var(--surface-2)]" style={{ backgroundColor: dotColor }} />
                     <div className="min-w-0">
                       <span className="t-caption text-[var(--brand-text-bright)] font-medium">{toCfg?.label || entry.to}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">{timeAgo(entry.at)}</span>

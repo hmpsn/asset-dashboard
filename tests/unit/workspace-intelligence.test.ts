@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock all subsystem dependencies
-vi.mock('../../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(),
+vi.mock('../../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => 'Test brand voice'),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
@@ -20,8 +20,11 @@ vi.mock('../../server/outcome-playbooks.js', () => ({
   getPlaybooks: vi.fn().mockReturnValue([]),
 }));
 vi.mock('../../server/outcome-tracking.js', () => ({
-  getActionsByPage: vi.fn(),
-  getOutcomesForAction: vi.fn(),
+  getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
+  getOutcomesForAction: vi.fn(() => []),
+  getPendingActions: vi.fn(() => []),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn().mockReturnValue(true),
@@ -29,6 +32,7 @@ vi.mock('../../server/feature-flags.js', () => ({
 vi.mock('../../server/intelligence-cache.js', () => {
   class MockLRUCache {
     get = vi.fn().mockReturnValue(null);
+    peek = vi.fn().mockReturnValue(null);
     set = vi.fn();
     deleteByPrefix = vi.fn().mockReturnValue(0);
     stats = vi.fn().mockReturnValue({ entries: 0, maxEntries: 200 });
@@ -40,28 +44,22 @@ vi.mock('../../server/intelligence-cache.js', () => {
 });
 
 import { buildWorkspaceIntelligence, formatForPrompt } from '../../server/workspace-intelligence.js';
-import { buildSeoContext } from '../../server/seo-context.js';
+import { singleFlight } from '../../server/intelligence-cache.js';
+import { buildEffectiveBrandVoiceBlock } from '../../server/intelligence/seo-context-source.js';
 import { getInsights } from '../../server/analytics-insights-store.js';
 import { getWorkspaceLearnings } from '../../server/workspace-learnings.js';
 import { getWorkspace } from '../../server/workspaces.js';
 
-const mockBuildSeoContext = vi.mocked(buildSeoContext);
+const mockBuildEffectiveBrandVoiceBlock = vi.mocked(buildEffectiveBrandVoiceBlock);
 const mockGetInsights = vi.mocked(getInsights);
 const mockGetLearnings = vi.mocked(getWorkspaceLearnings);
 const mockGetWorkspace = vi.mocked(getWorkspace);
+const mockSingleFlight = vi.mocked(singleFlight);
 
 describe('buildWorkspaceIntelligence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: 'Test brand voice',
-      businessContext: 'Test context',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue('Test brand voice');
     mockGetInsights.mockReturnValue([]);
     mockGetLearnings.mockReturnValue(null);
   });
@@ -88,7 +86,7 @@ describe('buildWorkspaceIntelligence', () => {
   });
 
   it('gracefully handles subsystem failure — returns partial data', async () => {
-    mockBuildSeoContext.mockImplementation(() => { throw new Error('SEO context failed'); });
+    mockBuildEffectiveBrandVoiceBlock.mockImplementation(() => { throw new Error('SEO context failed'); });
     mockGetInsights.mockReturnValue([
       { id: '1', insightType: 'content_decay', severity: 'warning', impactScore: 5 },
     ] as any);
@@ -112,6 +110,41 @@ describe('buildWorkspaceIntelligence', () => {
     expect(result.insights!.all.length).toBeLessThanOrEqual(100);
     expect(result.insights!.all[0].impactScore).toBe(149);
   });
+
+  it('isolates siteInventory cache keys by site identity without storing raw Webflow tokens', async () => {
+    mockSingleFlight.mockClear();
+
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-a',
+      siteBaseUrl: 'https://alpha.example',
+      webflowToken: 'secret-token-alpha',
+    });
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-b',
+      siteBaseUrl: 'https://beta.example',
+      webflowToken: 'secret-token-beta',
+    });
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-a',
+      siteBaseUrl: 'https://alpha.example',
+      webflowToken: 'rotated-secret-token-alpha',
+    });
+
+    const keys = mockSingleFlight.mock.calls
+      .map(call => call[0] as string)
+      .filter(key => key.startsWith('intelligence:ws-cache:'));
+    expect(keys).toHaveLength(3);
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(keys[0]).not.toBe(keys[2]);
+    expect(keys[0]).toContain('site=site-a');
+    expect(keys[1]).toContain('site=site-b');
+    expect(keys.join('\n')).not.toContain('secret-token-alpha');
+    expect(keys.join('\n')).not.toContain('secret-token-beta');
+    expect(keys.join('\n')).not.toContain('rotated-secret-token-alpha');
+  });
 });
 
 describe('assembleSeoContext — voice profile authority on intelligence path', () => {
@@ -122,14 +155,14 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
    * via `getRawBrandVoice()`. 12 caller sites across content-brief, internal-links,
    * aeo-page-review, webflow-seo, rewrite-chat, jobs, and admin-chat-context formatted
    * it via a `formatBrandVoiceForPrompt(seo?.brandVoice)` helper — completely bypassing
-   * the voice profile authority logic in `buildSeoContext`. Result: for non-calibrated
+   * the voice profile authority logic in the SEO context source. Result: for non-calibrated
    * workspaces the entire voice profile feature (DNA, samples, guardrails) was invisible
    * to the AI on those code paths; for calibrated workspaces the legacy block
    * contradicted Layer 2.
    *
-   * Fix: `assembleSeoContext` now also sets `effectiveBrandVoiceBlock` from
-   * `ctx.brandVoiceBlock`, which is the already-computed authority-applied block from
-   * `buildSeoContext`. Callers migrate to `seo?.effectiveBrandVoiceBlock ?? ''`, and the
+   * Fix: `assembleSeoContext` now sets `effectiveBrandVoiceBlock` from
+   * `buildEffectiveBrandVoiceBlock`, which is the already-computed authority-applied block.
+   * Callers migrate to `seo?.effectiveBrandVoiceBlock ?? ''`, and the
    * legacy `formatBrandVoiceForPrompt` helper has been DELETED (PR #167 follow-up) so
    * no one can reintroduce the bypass.
    *
@@ -142,17 +175,9 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
     mockGetLearnings.mockReturnValue(null);
   });
 
-  it('copies buildSeoContext.brandVoiceBlock into seoContext.effectiveBrandVoiceBlock', async () => {
+  it('copies buildEffectiveBrandVoiceBlock into seoContext.effectiveBrandVoiceBlock', async () => {
     const AUTHORITY_BLOCK = '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nSentinel legacy voice for wiring check';
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: AUTHORITY_BLOCK,
-      businessContext: '',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue(AUTHORITY_BLOCK);
 
     const result = await buildWorkspaceIntelligence('ws-voice-1', { slices: ['seoContext'] });
 
@@ -160,19 +185,11 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
     expect(result.seoContext!.effectiveBrandVoiceBlock).toBe(AUTHORITY_BLOCK);
   });
 
-  it('returns empty effectiveBrandVoiceBlock when buildSeoContext returns empty (no legacy, no profile)', async () => {
+  it('returns empty effectiveBrandVoiceBlock when the SEO context source returns empty (no legacy, no profile)', async () => {
     // Silent-drop regression guard: when the whole voice system is empty the field must
     // still exist as a string — not undefined, not missing — so caller sites can safely
     // do `seo?.effectiveBrandVoiceBlock ?? ''` without TypeScript gymnastics.
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: '',
-      businessContext: '',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue('');
 
     const result = await buildWorkspaceIntelligence('ws-voice-2', { slices: ['seoContext'] });
 
@@ -181,22 +198,14 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
     expect(result.seoContext!.effectiveBrandVoiceBlock).toBe('');
   });
 
-  it('passes buildSeoContext.brandVoiceBlock through unchanged (no re-formatting at assembler layer)', async () => {
+  it('passes buildEffectiveBrandVoiceBlock through unchanged (no re-formatting at assembler layer)', async () => {
     // This test verifies the assembler's passthrough contract only — it does NOT
-    // exercise the calibration authority logic itself. buildSeoContext is fully
+    // exercise the calibration authority logic itself. buildEffectiveBrandVoiceBlock is
     // mocked here, so whatever it returns (calibrated or legacy format) must reach
     // the slice byte-for-byte. Real calibration authority is covered end-to-end in
     // tests/unit/seo-context-voice-profile.test.ts against a real DB.
     const CALIBRATED_BLOCK = '\n\nBRAND VOICE REFERENCE (samples):\n- Sentinel calibrated sample';
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: CALIBRATED_BLOCK,
-      businessContext: '',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue(CALIBRATED_BLOCK);
 
     const result = await buildWorkspaceIntelligence('ws-voice-3', { slices: ['seoContext'] });
 
@@ -210,15 +219,7 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
 describe('assembleSeoContext — businessPriorities and contact info merging', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: '',
-      businessContext: 'Test context',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue('');
     mockGetInsights.mockReturnValue([]);
     mockGetLearnings.mockReturnValue(null);
   });
@@ -245,6 +246,8 @@ describe('assembleSeoContext — businessPriorities and contact info merging', (
         phone: '+1-555-0100',
         email: 'info@example.com',
         address: { street: '123 Main St', city: 'Springfield', state: 'IL', zip: '62701', country: 'US' },
+        foundedDate: '2012-01-01',
+        numberOfEmployees: '10-50',
       },
       intelligenceProfile: { industry: 'Retail', goals: [], targetAudience: 'Consumers' },
     } as any);
@@ -256,21 +259,17 @@ describe('assembleSeoContext — businessPriorities and contact info merging', (
     // Address should be flattened to a comma-joined string
     expect(result.seoContext!.businessProfile!.address).toContain('123 Main St');
     expect(result.seoContext!.businessProfile!.address).toContain('Springfield');
+    // Structured address fields are preserved for schema/context consumers.
+    expect(result.seoContext!.businessProfile!.addressParts?.city).toBe('Springfield');
+    expect(result.seoContext!.businessProfile!.foundedDate).toBe('2012-01-01');
+    expect(result.seoContext!.businessProfile!.numberOfEmployees).toBe('10-50');
   });
 });
 
 describe('assembleContentPipeline — rewritePlaybook and contentPricing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildSeoContext.mockReturnValue({
-      strategy: undefined,
-      brandVoiceBlock: '',
-      businessContext: '',
-      personasBlock: '',
-      knowledgeBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as any);
+    mockBuildEffectiveBrandVoiceBlock.mockReturnValue('');
     mockGetInsights.mockReturnValue([]);
     mockGetLearnings.mockReturnValue(null);
   });

@@ -29,8 +29,8 @@ vi.mock('../server/db/index.js', () => ({
 vi.mock('../server/db/stmt-cache.js', () => ({
   createStmtCache: (factory: () => unknown) => factory,
 }));
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({ strategy: null, brandVoiceBlock: '', businessContext: '', knowledgeBlock: '' })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));

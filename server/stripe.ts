@@ -1,6 +1,14 @@
 import Stripe from 'stripe';
-import { createPayment, updatePayment, getPaymentBySession, type ProductType } from './payments.js';
-import { updateContentRequest } from './content-requests.js';
+import {
+  createPayment,
+  updatePayment,
+  getPaymentBySession,
+  listPaymentsBySession,
+  getPaymentByPaymentIntent,
+  type PaymentRecord,
+  type ProductType,
+} from './payments.js';
+import { getContentRequest, updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
 import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
@@ -96,6 +104,86 @@ export function getProductConfig(type: ProductType): ProductConfig | null {
   };
 }
 
+function validatePostPolishedUpgrade(workspaceId: string, contentRequestId: string | undefined): void {
+  if (!contentRequestId) throw new Error('Full-post upgrades require an approved brief request');
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) throw new Error('Content request not found');
+  if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+    throw new Error('Only approved brief requests can be upgraded to a full post');
+  }
+}
+
+function applyContentRequestPayment(workspaceId: string, productType: string, contentRequestId: string | undefined): void {
+  if (!contentRequestId) return;
+  if (productType === 'post_polished') {
+    const request = getContentRequest(workspaceId, contentRequestId);
+    if (!request) {
+      log.warn({ workspaceId, contentRequestId }, 'Paid full-post upgrade references a missing content request');
+      return;
+    }
+    if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+      log.warn({ workspaceId, contentRequestId, status: request.status, serviceType: request.serviceType }, 'Paid full-post upgrade cannot be applied to request state');
+      return;
+    }
+    updateContentRequest(workspaceId, contentRequestId, {
+      serviceType: 'full_post',
+      upgradedAt: new Date().toISOString(),
+      status: 'in_progress',
+    });
+    _broadcastFn?.(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: contentRequestId, status: 'in_progress' });
+    return;
+  }
+  try {
+    updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
+    } else {
+      throw err;
+    }
+  }
+}
+
+function checkoutPaymentIntentId(session: Stripe.Checkout.Session): string | undefined {
+  return typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+}
+
+function isFulfillmentProduct(productType: string): boolean {
+  return productType.startsWith('fix_') || productType.startsWith('schema_');
+}
+
+function paymentQueuesByProduct(payments: PaymentRecord[]): Map<ProductType, PaymentRecord[]> {
+  const queues = new Map<ProductType, PaymentRecord[]>();
+  for (const payment of payments) {
+    const existing = queues.get(payment.productType) ?? [];
+    existing.push(payment);
+    queues.set(payment.productType, existing);
+  }
+  return queues;
+}
+
+function takePaymentForProduct(
+  queues: Map<ProductType, PaymentRecord[]>,
+  productType: ProductType,
+  fallback: PaymentRecord | undefined,
+): PaymentRecord | undefined {
+  const queue = queues.get(productType);
+  return queue?.shift() ?? fallback;
+}
+
+function paymentFailureMetadata(intent: Stripe.PaymentIntent): Record<string, string> {
+  const failure = intent.last_payment_error;
+  const metadata: Record<string, string> = {
+    stripePaymentIntentId: intent.id,
+    failureStatus: intent.status,
+  };
+  if (failure?.message) metadata.failureMessage = failure.message;
+  if (failure?.code) metadata.failureCode = failure.code;
+  if (failure?.decline_code) metadata.declineCode = failure.decline_code;
+  if (failure?.payment_method?.type) metadata.paymentMethodType = failure.payment_method.type;
+  return metadata;
+}
+
 export function listProducts(): ProductConfig[] {
   return (Object.keys(PRODUCT_MAP) as ProductType[]).map(type => getProductConfig(type)!);
 }
@@ -119,6 +207,7 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   const config = getProductConfig(params.productType);
   if (!config) throw new Error(`Unknown product type: ${params.productType}`);
   if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${params.productType}. Configure it in Command Center → Payments.`);
+  if (params.productType === 'post_polished') validatePostPolishedUpgrade(params.workspaceId, params.contentRequestId);
 
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
@@ -218,16 +307,6 @@ export async function createCartCheckoutSession(params: CartCheckoutParams): Pro
   return { sessionId: session.id, url: session.url! };
 }
 
-// --- Payment Intent (for Stripe Elements inline form) ---
-
-export interface PaymentIntentParams {
-  workspaceId: string;
-  productType: ProductType;
-  contentRequestId?: string;
-  topic?: string;
-  targetKeyword?: string;
-}
-
 async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise<string> {
   const ws = getWorkspace(workspaceId);
   if (ws?.stripeCustomerId) {
@@ -250,50 +329,6 @@ async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise
   // Persist the customer ID on the workspace
   updateWorkspace(workspaceId, { stripeCustomerId: customer.id });
   return customer.id;
-}
-
-export async function createPaymentIntentForProduct(params: PaymentIntentParams): Promise<{ clientSecret: string; paymentIntentId: string; amount: number }> {
-  const stripe = getStripe();
-  if (!stripe) throw new Error('Stripe is not configured. Add your Secret Key in Command Center → Payments.');
-
-  const config = getProductConfig(params.productType);
-  if (!config) throw new Error(`Unknown product type: ${params.productType}`);
-
-  const amountCents = config.priceUsd * 100;
-
-  // Get or create a Stripe Customer so payment methods are saved
-  const customerId = await getOrCreateCustomer(stripe, params.workspaceId);
-
-  const metadata: Record<string, string> = {
-    workspaceId: params.workspaceId,
-    productType: params.productType,
-  };
-  if (params.contentRequestId) metadata.contentRequestId = params.contentRequestId;
-  if (params.topic) metadata.topic = params.topic;
-  if (params.targetKeyword) metadata.targetKeyword = params.targetKeyword;
-
-  const intent = await stripe.paymentIntents.create({
-    amount: amountCents,
-    currency: 'usd',
-    customer: customerId,
-    setup_future_usage: 'off_session',
-    metadata,
-    automatic_payment_methods: { enabled: true },
-  });
-
-  // Create pending payment record
-  createPayment(params.workspaceId, {
-    workspaceId: params.workspaceId,
-    stripeSessionId: intent.id, // store PI id in session field for lookup
-    productType: params.productType,
-    amount: amountCents,
-    currency: 'usd',
-    status: 'pending',
-    contentRequestId: params.contentRequestId,
-    metadata,
-  });
-
-  return { clientSecret: intent.client_secret!, paymentIntentId: intent.id, amount: amountCents };
 }
 
 // --- Startup: clear stale test-mode customer IDs when using live keys ---
@@ -363,33 +398,40 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      // Find and update payment record
-      const payment = getPaymentBySession(workspaceId, session.id);
-      if (payment) {
-        updatePayment(workspaceId, payment.id, {
-          status: 'paid',
-          stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
-          paidAt: new Date().toISOString(),
-        });
+      const sessionPayments = listPaymentsBySession(workspaceId, session.id);
+      if (sessionPayments.length === 0) {
+        log.error({ workspaceId, stripeSessionId: session.id }, 'checkout.session.completed missing pending payment records — skipping fulfillment for manual reconciliation');
+        return;
+      }
+      const paidSessionPayments = sessionPayments.filter(payment => payment.status === 'paid');
+      if (paidSessionPayments.length === sessionPayments.length) {
+        log.info({ workspaceId, stripeSessionId: session.id }, 'checkout.session.completed replay ignored — session payments already paid');
+        return;
+      }
+      if (paidSessionPayments.length > 0) {
+        log.error({
+          workspaceId,
+          stripeSessionId: session.id,
+          paidPaymentIds: paidSessionPayments.map(payment => payment.id),
+          pendingPaymentIds: sessionPayments.filter(payment => payment.status !== 'paid').map(payment => payment.id),
+        }, 'checkout.session.completed found partially-paid session — skipping fulfillment to avoid duplicate side effects');
+        return;
       }
 
+      const stripePaymentIntentId = checkoutPaymentIntentId(session);
+      const paidAt = new Date().toISOString();
+      const paidPayments = sessionPayments.map(payment => (
+        updatePayment(workspaceId, payment.id, {
+          status: 'paid',
+          stripePaymentIntentId,
+          paidAt,
+        }) ?? payment
+      ));
+      const firstPayment = paidPayments[0];
       const productType = session.metadata?.productType || 'unknown';
       const contentRequestId = session.metadata?.contentRequestId;
 
-      // Update content request status if linked — if already fast-tracked past
-      // 'requested', the transition guard will reject it; that's fine, the payment
-      // is still valid and downstream operations must proceed.
-      if (contentRequestId) {
-        try {
-          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'InvalidTransitionError') {
-            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
-          } else {
-            throw err;
-          }
-        }
-      }
+      applyContentRequestPayment(workspaceId, productType, contentRequestId);
 
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
@@ -441,16 +483,17 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         'payment_received',
         `Payment received: $${amount} for ${productType.replace(/_/g, ' ')}`,
         contentRequestId ? `Content request: ${contentRequestId}` : '',
-        { paymentId: payment?.id, productType, stripeSessionId: session.id }
+        { paymentId: firstPayment?.id, paymentIds: paidPayments.map(payment => payment.id), productType, stripeSessionId: session.id }
       );
 
       // Create work orders for fix/schema products
-      if (productType.startsWith('fix_') || productType.startsWith('schema_')) {
+      if (isFulfillmentProduct(productType)) {
         const pageIds = parseJsonSafe(session.metadata?.pageIds, stringArraySchema, [], { workspaceId, field: 'pageIds', table: 'stripe_session' });
         const issueChecks = session.metadata?.issueChecks
           ? parseJsonSafe(session.metadata.issueChecks, stringArraySchema, [], { workspaceId, field: 'issueChecks', table: 'stripe_session' })
           : undefined;
         const quantity = parseInt(session.metadata?.quantity || '1', 10);
+        const payment = paidPayments.find(p => p.productType === productType) ?? firstPayment;
         createWorkOrder(workspaceId, {
           paymentId: payment?.id || session.id,
           productType: productType as ProductType,
@@ -465,9 +508,11 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Handle cart checkouts (multiple line items)
       if (session.metadata?.cartItems) {
         const cartItems = parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' });
+        const paymentQueues = paymentQueuesByProduct(paidPayments);
         for (const item of cartItems) {
           try {
-            if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
+            if (isFulfillmentProduct(item.productType)) {
+              const payment = takePaymentForProduct(paymentQueues, item.productType as ProductType, firstPayment);
               createWorkOrder(workspaceId, {
                 paymentId: payment?.id || session.id,
                 productType: item.productType as ProductType,
@@ -506,31 +551,28 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      // Find payment record (we stored the PI id in stripeSessionId field)
-      const payment = getPaymentBySession(workspaceId, intent.id);
-      if (payment) {
-        updatePayment(workspaceId, payment.id, {
-          status: 'paid',
-          stripePaymentIntentId: intent.id,
-          paidAt: new Date().toISOString(),
-        });
+      // Direct legacy PaymentIntent records used the PI id as stripeSessionId.
+      // Checkout records keep the Checkout session id separately and store the
+      // PI id once checkout.session.completed has reconciled the session.
+      const payment = getPaymentBySession(workspaceId, intent.id) ?? getPaymentByPaymentIntent(workspaceId, intent.id);
+      if (payment?.status === 'paid') {
+        log.info({ workspaceId, stripePaymentIntentId: intent.id }, 'payment_intent.succeeded replay ignored — payment already paid');
+        return;
       }
+      if (!payment) {
+        log.error({ workspaceId, stripePaymentIntentId: intent.id }, 'payment_intent.succeeded missing pending payment record — skipping fulfillment for manual reconciliation');
+        return;
+      }
+      updatePayment(workspaceId, payment.id, {
+        status: 'paid',
+        stripePaymentIntentId: intent.id,
+        paidAt: new Date().toISOString(),
+      });
 
       const productType = intent.metadata?.productType || 'unknown';
       const contentRequestId = intent.metadata?.contentRequestId;
 
-      // Update content request status if linked — same guard as checkout.session.completed
-      if (contentRequestId) {
-        try {
-          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'InvalidTransitionError') {
-            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
-          } else {
-            throw err;
-          }
-        }
-      }
+      applyContentRequestPayment(workspaceId, productType, contentRequestId);
 
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
@@ -559,17 +601,26 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const workspaceId = intent.metadata?.workspaceId;
       if (!workspaceId) return;
 
-      // Try to find and update payment record
-      // payment_intent doesn't have a session ID directly, so we search by payment intent ID
-      // This is a fallback — most failures are caught at checkout level
+      const payment = getPaymentBySession(workspaceId, intent.id) ?? getPaymentByPaymentIntent(workspaceId, intent.id);
+      if (payment) {
+        updatePayment(workspaceId, payment.id, {
+          status: 'failed',
+          stripePaymentIntentId: intent.id,
+          metadata: {
+            ...(payment.metadata ?? {}),
+            ...paymentFailureMetadata(intent),
+          },
+        });
+      }
+
       log.warn(`Payment failed: workspace=${workspaceId} intent=${intent.id}`);
 
       addActivity(
         workspaceId,
         'payment_failed',
         'Payment failed — please retry or contact support',
-        `Stripe PaymentIntent: ${intent.id}`,
-        { stripePaymentIntentId: intent.id }
+        intent.last_payment_error?.message || `Stripe PaymentIntent: ${intent.id}`,
+        { paymentId: payment?.id, ...paymentFailureMetadata(intent) }
       );
       break;
     }
@@ -636,11 +687,12 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
     case 'invoice.paid': {
       const invoice = event.data.object as Stripe.Invoice;
       const subId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined;
-      if (!subId || !invoice.metadata?.workspaceId) return;
-      const workspaceId = invoice.metadata.workspaceId;
+      if (!subId) return;
 
       // Reset content subscription period on renewal using actual invoice billing period
       const contentSub = getContentSubscriptionByStripeId(subId);
+      const workspaceId = invoice.metadata?.workspaceId ?? contentSub?.workspaceId;
+      if (!workspaceId) return;
       if (contentSub) {
         const periodStart = invoice.period_start
           ? new Date(invoice.period_start * 1000).toISOString()

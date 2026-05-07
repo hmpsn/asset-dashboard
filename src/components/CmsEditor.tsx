@@ -171,7 +171,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setSaving(prev => new Set(prev).add(itemId));
     setErrors(prev => { const n = { ...prev }; delete n[itemId]; return n; });
     try {
-      const result = await patch<{ success?: boolean; error?: string }>(`/api/webflow/collections/${collectionId}/items/${itemId}`, { fieldData: fields, workspaceId });
+      const result = await patch<{ success?: boolean; error?: string }>(`/api/webflow/collections/${collectionId}/items/${itemId}`, { fieldData: fields, siteId, workspaceId });
       if (!result.success) {
         setErrors(prev => ({ ...prev, [itemId]: result.error || 'Save failed' }));
       } else {
@@ -193,7 +193,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     if (savedItemIds.length === 0) return;
     setPublishing(prev => new Set(prev).add(collectionId));
     try {
-      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds, workspaceId });
+      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds, siteId, workspaceId });
       if (result.success) {
         setPublished(prev => new Set(prev).add(collectionId));
         setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);

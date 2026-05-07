@@ -107,6 +107,121 @@ describe('extractFaq', () => {
     expect(callAI).not.toHaveBeenCalled();
   });
 
+  it('extracts FAQs from heading and paragraph pairs', async () => {
+    const html = `
+      <article>
+        <h2>What does Invisalign cost?</h2>
+        <p>Pricing depends on treatment complexity and location.</p>
+        <h2>Can I use insurance?</h2>
+        <p>Many plans include orthodontic coverage.</p>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What does Invisalign cost?', answer: 'Pricing depends on treatment complexity and location.' },
+      { question: 'Can I use insurance?', answer: 'Many plans include orthodontic coverage.' },
+    ]);
+  });
+
+  it('extracts FAQs from Webflow question and answer wrapper pairs', async () => {
+    const html = `
+      <section>
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq_content-wrapper">
+          <div class="faq_question background-color-dark-sand">
+            <h3>Am I a candidate for veneers?</h3>
+            <div class="faq6_icon-wrapper">+</div>
+          </div>
+          <div class="faq_answer">Veneers can be a fit after a consultation confirms your teeth are healthy.</div>
+        </div>
+        <div class="faq_content-wrapper">
+          <div class="faq_question background-color-dark-sand">
+            <h3>How much do veneers cost?</h3>
+            <div class="faq6_icon-wrapper">+</div>
+          </div>
+          <div class="faq_answer">Pricing depends on the number of veneers and your treatment plan.</div>
+        </div>
+      </section>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      {
+        question: 'Am I a candidate for veneers?',
+        answer: 'Veneers can be a fit after a consultation confirms your teeth are healthy.',
+      },
+      {
+        question: 'How much do veneers cost?',
+        answer: 'Pricing depends on the number of veneers and your treatment plan.',
+      },
+    ]);
+  });
+
+  it('does not treat index/card teaser questions as FAQ without a dedicated section', async () => {
+    const html = `
+      <main>
+        <article class="blog-card">
+          <h2>What does Invisalign cost?</h2>
+          <p>Read the full article.</p>
+        </article>
+        <article class="blog-card">
+          <h2>Can I use insurance?</h2>
+          <p>Read the full article.</p>
+        </article>
+      </main>
+    `;
+    const result = await extractFaq(html, { requireDedicatedSection: true });
+    expect(result).toEqual([]);
+  });
+
+  it('allows dedicated FAQ sections on index pages', async () => {
+    const html = `
+      <section class="faq-section">
+        <h2>Frequently Asked Questions</h2>
+        <h3>What does Invisalign cost?</h3>
+        <p>Pricing depends on treatment complexity and location.</p>
+        <h3>Can I use insurance?</h3>
+        <p>Many plans include orthodontic coverage.</p>
+      </section>
+    `;
+    const result = await extractFaq(html, { requireDedicatedSection: true });
+    expect(result).toEqual([
+      { question: 'What does Invisalign cost?', answer: 'Pricing depends on treatment complexity and location.' },
+      { question: 'Can I use insurance?', answer: 'Many plans include orthodontic coverage.' },
+    ]);
+  });
+
+  it('extracts FAQs from accordion button panels', async () => {
+    const html = `
+      <article>
+        <button aria-controls="a1">What should I bring?</button>
+        <div id="a1">Bring your insurance card.</div>
+        <button aria-controls="a2">Do appointments hurt?</button>
+        <div id="a2">Most cleanings are comfortable.</div>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What should I bring?', answer: 'Bring your insurance card.' },
+      { question: 'Do appointments hurt?', answer: 'Most cleanings are comfortable.' },
+    ]);
+  });
+
+  it('extracts aria-controlled panels whose ids need CSS escaping', async () => {
+    const html = `
+      <article>
+        <button aria-controls="faq:1">What should I bring?</button>
+        <div id="faq:1">Bring your insurance card.</div>
+        <button aria-controls="faq.2">Do appointments hurt?</button>
+        <div id="faq.2">Most cleanings are comfortable.</div>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What should I bring?', answer: 'Bring your insurance card.' },
+      { question: 'Do appointments hurt?', answer: 'Most cleanings are comfortable.' },
+    ]);
+  });
+
   it('returns empty array when only one Q&A (FAQPage requires 2+)', async () => {
     const html = '<details><summary>Q</summary><p>A</p></details>';
     const result = await extractFaq(html);

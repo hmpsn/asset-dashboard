@@ -19,8 +19,8 @@ const compoundKey = (sprintId: string, itemId: number | string) => `${sprintId}:
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-[var(--brand-text-muted)]" />;
   return sortDir === 'asc'
-    ? <ChevronUp className="w-3 h-3 text-teal-400" />
-    : <ChevronDown className="w-3 h-3 text-teal-400" />;
+    ? <ChevronUp className="w-3 h-3 text-accent-brand" />
+    : <ChevronDown className="w-3 h-3 text-accent-brand" />;
 }
 
 export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatus }: Props) {
@@ -46,7 +46,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
   };
 
   const thStatic = 'px-3 py-2 text-left t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider';
-  const sortBtn = 'flex items-center gap-1 text-left t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider hover:text-[var(--brand-text-bright)] focus:outline-none focus:text-teal-400 select-none';
+  const sortBtn = 'flex items-center gap-1 text-left t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider hover:text-[var(--brand-text-bright)] focus:outline-none focus:text-accent-brand select-none';
 
   const ariaSortFor = (col: SortKey): 'ascending' | 'descending' | 'none' =>
     sortKey === col ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';

@@ -10,19 +10,27 @@ const DEFAULT_PAYMENT_INTENT = 'pi_test_xyz789';
 const DEFAULT_SUBSCRIPTION_ID = 'sub_test_def456';
 const DEFAULT_PORTAL_URL = 'https://billing.stripe.com/test_portal';
 const DEFAULT_CUSTOMER_ID = 'cus_test_ghi012';
-const DEFAULT_CLIENT_SECRET = 'pi_test_xyz789_secret_abc';
 
 // ---------------------------------------------------------------------------
 // Mock Stripe SDK method stubs
 // ---------------------------------------------------------------------------
 
-export const mockCheckoutSessionsCreate = vi.fn();
-export const mockBillingPortalSessionsCreate = vi.fn();
-export const mockSubscriptionsUpdate = vi.fn();
-export const mockCustomersCreate = vi.fn();
-export const mockCustomersRetrieve = vi.fn();
-export const mockPaymentIntentsCreate = vi.fn();
-export const mockWebhooksConstructEvent = vi.fn();
+const mockState = vi.hoisted(() => ({
+  mockCheckoutSessionsCreate: vi.fn(),
+  mockBillingPortalSessionsCreate: vi.fn(),
+  mockSubscriptionsUpdate: vi.fn(),
+  mockCustomersCreate: vi.fn(),
+  mockCustomersRetrieve: vi.fn(),
+  mockWebhooksConstructEvent: vi.fn(),
+  webhookEventCounter: 0,
+}));
+
+export const mockCheckoutSessionsCreate = mockState.mockCheckoutSessionsCreate;
+export const mockBillingPortalSessionsCreate = mockState.mockBillingPortalSessionsCreate;
+export const mockSubscriptionsUpdate = mockState.mockSubscriptionsUpdate;
+export const mockCustomersCreate = mockState.mockCustomersCreate;
+export const mockCustomersRetrieve = mockState.mockCustomersRetrieve;
+export const mockWebhooksConstructEvent = mockState.mockWebhooksConstructEvent;
 
 /**
  * A mock Stripe instance with the same nested structure as the real SDK.
@@ -40,9 +48,21 @@ export const mockStripeInstance = {
     create: mockCustomersCreate,
     retrieve: mockCustomersRetrieve,
   },
-  paymentIntents: { create: mockPaymentIntentsCreate },
   webhooks: { constructEvent: mockWebhooksConstructEvent },
 };
+
+vi.mock('stripe', () => {
+  // Must use a class (not arrow fn) so `new Stripe(...)` works as a constructor.
+  class StripeMock {
+    checkout = mockStripeInstance.checkout;
+    billingPortal = mockStripeInstance.billingPortal;
+    subscriptions = mockStripeInstance.subscriptions;
+    customers = mockStripeInstance.customers;
+    paymentIntents = mockStripeInstance.paymentIntents;
+    webhooks = mockStripeInstance.webhooks;
+  }
+  return { default: StripeMock, Stripe: StripeMock };
+});
 
 // ---------------------------------------------------------------------------
 // Configuration helpers — call these in individual tests
@@ -108,31 +128,18 @@ export function mockCustomerRetrieveNotFound(): void {
   mockCustomersRetrieve.mockRejectedValue(new Error('No such customer'));
 }
 
-/** Configure `stripe.paymentIntents.create()` with sensible defaults. */
-export function mockPaymentIntentCreate(
-  intentData?: Partial<{ id: string; client_secret: string; amount: number }>,
-): void {
-  mockPaymentIntentsCreate.mockResolvedValue({
-    id: intentData?.id ?? DEFAULT_PAYMENT_INTENT,
-    client_secret: intentData?.client_secret ?? DEFAULT_CLIENT_SECRET,
-    amount: intentData?.amount ?? 12500,
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Webhook event helpers
 // ---------------------------------------------------------------------------
-
-let _webhookEventCounter = 0;
 
 /** Create a Stripe webhook event object matching the `Stripe.Event` shape. */
 export function createWebhookEvent(
   type: string,
   data: Record<string, unknown>,
 ): { id: string; type: string; data: { object: Record<string, unknown> } } {
-  _webhookEventCounter++;
+  mockState.webhookEventCounter++;
   return {
-    id: `evt_test_${_webhookEventCounter}`,
+    id: `evt_test_${mockState.webhookEventCounter}`,
     type,
     data: { object: data },
   };
@@ -160,9 +167,8 @@ export function resetStripeMocks(): void {
   mockSubscriptionsUpdate.mockReset();
   mockCustomersCreate.mockReset();
   mockCustomersRetrieve.mockReset();
-  mockPaymentIntentsCreate.mockReset();
   mockWebhooksConstructEvent.mockReset();
-  _webhookEventCounter = 0;
+  mockState.webhookEventCounter = 0;
 }
 
 /**
@@ -186,16 +192,5 @@ export function resetStripeMocks(): void {
  * ```
  */
 export function setupStripeMocks(): void {
-  vi.mock('stripe', () => {
-    // Must use a class (not arrow fn) so `new Stripe(...)` works as a constructor.
-    class StripeMock {
-      checkout = mockStripeInstance.checkout;
-      billingPortal = mockStripeInstance.billingPortal;
-      subscriptions = mockStripeInstance.subscriptions;
-      customers = mockStripeInstance.customers;
-      paymentIntents = mockStripeInstance.paymentIntents;
-      webhooks = mockStripeInstance.webhooks;
-    }
-    return { default: StripeMock, Stripe: StripeMock };
-  });
+  resetStripeMocks();
 }

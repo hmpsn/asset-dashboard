@@ -1,6 +1,9 @@
-# hmpsn.studio — Claude Code Rules
+# hmpsn.studio — Agent Rules
 
-> This file is loaded at the start of every Claude Code session. Follow it before making changes.
+> **Single source of truth for all AI agents** (Claude Code, Codex, Devin, Windsurf, Cursor).
+> This file is loaded at the start of every session. Follow it before making changes.
+>
+> Codex reads this via `.codex/config.toml` fallback. Windsurf's `.windsurfrules` is a thin pointer here.
 
 ---
 
@@ -11,14 +14,14 @@
 Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-4.1), Anthropic (Claude for creative prose).
 
 - **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`.
-- **API Client** — Typed fetch wrappers in `src/api/` (12 modules). No raw `fetch()` in components.
-- **Shared Types** — `shared/types/` (11 modules) shared between client and server.
-- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 21+ migrations in `server/db/migrations/`.
+- **API Client** — Typed fetch wrappers in `src/api/` (14 modules). No raw `fetch()` in components.
+- **Shared Types** — `shared/types/` (28 modules) shared between client and server.
+- **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 80 migrations in `server/db/migrations/`.
 - **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` routes to either provider — new code should use this. Direct helpers: OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
 - **Auth** — Dual: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Turnstile CAPTCHA optional.
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM).
 - **Validation** — Zod v3 via `server/middleware/validate.ts`. Import as `import { validate, z } from '../middleware/validate.js'`.
-- **Data Fetching** — React Query (`@tanstack/react-query`) for ALL frontend data. 50+ hooks in `src/hooks/admin/` and `src/hooks/client/`.
+- **Data Fetching** — React Query (`@tanstack/react-query`) for ALL frontend data. 60+ hooks in `src/hooks/admin/` and `src/hooks/client/`.
 - **Logging** — Pino structured JSON (`server/logger.ts`). `createLogger(module)` for child loggers.
 - **Error Monitoring** — Sentry (server + frontend). Auto-tags `workspaceId`.
 - **Monetization** — 3 tiers (Free/Growth/Premium), per-item content purchases, 14-day Growth trial, UX soft-gating via `<TierGate>`.
@@ -27,7 +30,7 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via
 
 ## Enforcement Layers
 
-Claude Code project rules live in three places. Know which layer you're reading before copy-pasting:
+Project rules live in three layers. Know which layer you're reading before copy-pasting:
 
 1. **CLAUDE.md** (this file) — session protocol, decision framework, design laws, and philosophical guardrails that can't be grepped.
 2. **[docs/rules/automated-rules.md](./docs/rules/automated-rules.md)** — every rule enforced by `scripts/pr-check.ts`. Auto-generated from the `CHECKS` array; do not hand-edit. CI fails if the committed file drifts from `npm run rules:generate`.
@@ -232,6 +235,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Zod clearable-field pattern** — optional validated fields that back user-editable inputs (email, URL, phone with pattern) must use `.or(z.literal(''))` so clearing the field doesn't return a 400. `.optional()` only handles the key being absent, not an empty string from a cleared input.
 - **Feature toggle scope minimality** — feature toggles must gate the specific sub-feature, never a composite parent component. Pass the flag as a prop and gate inside the component at the narrowest point. Wrapping a composite component (e.g. `InsightsDigest` with 12+ card types) hides far more than the toggle intends.
 - **`buildSchemaContext` reads must use intelligence slices.** New data sources for schema generation are read via `buildWorkspaceIntelligence({ slices: [...] })` inside `server/helpers.ts:buildSchemaContext`. Direct workspace reads (`ctx.X = ws.Y`) are reserved for identity fields (`name`, `id`, `liveDomain`, `brandLogoUrl`, `siteHasSearch`, plus `siteId`). All other fields must come from a slice. Five remaining direct reads (`brandVoice`, `businessContext`, `knowledgeBase`, `_businessProfile`, `_personasBlock`) are tracked in `data/roadmap.json:schema-context-builder-pattern-b-migration` for opportunistic migration when adjacent code is touched. Net-new direct reads outside the identity allow-list require an inline `// schema-context-direct-read-ok: <reason>` hatch. Enforced by pr-check rule `schema-context-direct-read-not-on-allowlist`.
+- **Long-running admin generation must use the background job platform.** Admin routes that crawl many pages, process many records, call AI repeatedly, or continue after a response must use `server/jobs.ts` / `/api/jobs`, return `{ jobId }`, and surface progress through `useBackgroundTasks` + `TaskPanel`. Job labels and cancellation semantics live in `shared/types/background-jobs.ts`. Short synchronous editor assists require an explicit rationale; post-response generation outside the job system is guarded by pr-check with `// background-generation-ok`. Full contract: [docs/rules/background-generation.md](./docs/rules/background-generation.md).
 
 > **Mechanized enforcement.** Many rules above (and every silent-failure rule removed from this section during the pr-check audit) are now enforced by `scripts/pr-check.ts`. The canonical list with escape hatches lives in [docs/rules/automated-rules.md](./docs/rules/automated-rules.md) — do not duplicate them here.
 

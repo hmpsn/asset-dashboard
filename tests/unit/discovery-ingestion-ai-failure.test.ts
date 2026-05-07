@@ -1,7 +1,7 @@
 /**
  * Unit test: discovery-ingestion AI failure retry semantics.
  *
- * When callOpenAI throws (transient outage, rate limit, etc.), processSource()
+ * When callAI's delegated OpenAI call throws (transient outage, rate limit, etc.), processSource()
  * must return early WITHOUT calling markProcessed. The source must remain
  * unprocessed so the next invocation retries it.
  *
@@ -30,6 +30,7 @@ import {
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 const mockCallOpenAI = vi.mocked(callOpenAI);
+// processSource calls callAI(), whose default OpenAI path delegates to this mocked helper.
 
 describe('processSource — AI failure retry semantics', () => {
   let wsId: string;

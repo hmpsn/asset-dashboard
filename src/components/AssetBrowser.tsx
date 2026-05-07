@@ -48,9 +48,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const queryClient = useQueryClient();
   const { startJob, jobs } = useBackgroundTasks();
   const bulkCompressJobId = useRef<string | null>(null);
-  const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId);
-  const { data: unusedIds = null } = useAssetAudit(siteId, assets.length > 0);
-  const { data: cmsImageData } = useCmsImages(siteId, assets.length > 0);
+  const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId, workspaceId);
+  const { data: unusedIds = null } = useAssetAudit(siteId, workspaceId, assets.length > 0);
+  const { data: cmsImageData } = useCmsImages(siteId, workspaceId, assets.length > 0);
 
   // Build a quick-lookup map: assetId → CmsImageUsage[]
   const cmsUsageMap = useMemo(() => {
@@ -100,9 +100,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   }, [cmsImageData]);
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
-    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId), old => updater(old ?? []));
+    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId, workspaceId), old => updater(old ?? []));
   const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
-    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
+    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId, workspaceId), old => {
       if (!old) return old;
       return {
         ...old,
@@ -115,7 +115,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         },
       };
     });
-  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId) });
+  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId, workspaceId) });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortField>('createdOn');
@@ -197,7 +197,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const handleSaveAlt = async (assetId: string) => {
     setAltError(null);
     try {
-      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/assets/${assetId}`, { altText: altDraft, siteId });
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/assets/${assetId}`, { altText: altDraft, siteId, workspaceId });
       if (!data.success) {
         setAltError(`Failed to save alt text: ${data.error || 'Unknown error'}`);
         return;
@@ -316,6 +316,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         contentType: asset.contentType,
         imageUrl: asset.hostedUrl || asset.url,
         siteId,
+        workspaceId,
         assetId: asset.id,
       });
       if (data.fullName) {
@@ -330,7 +331,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     if (!renameDraft.trim()) return;
     setAltError(null);
     try {
-      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/rename/${assetId}`, { displayName: renameDraft.trim(), siteId });
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/rename/${assetId}`, { displayName: renameDraft.trim(), siteId, workspaceId });
       if (!data.success) {
         setAltError(`Rename failed: ${data.error || 'Unknown error'}`);
         return;
@@ -357,10 +358,11 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           contentType: asset.contentType,
           imageUrl: asset.hostedUrl || asset.url,
           siteId,
+          workspaceId,
           assetId: asset.id,
         });
         if (data.fullName) {
-          await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId });
+          await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId, workspaceId });
           updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
       } catch (err) { console.error('AssetBrowser operation failed:', err); }
@@ -377,6 +379,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     setAltError(null);
     const jobId = await startJob('bulk-compress', {
       siteId,
+      workspaceId,
       assets: toCompress.map(a => ({
         assetId: a.id,
         imageUrl: a.hostedUrl || a.url,
@@ -425,7 +428,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     setOrganizePreview(null);
     setOrganizeResult(null);
     try {
-      const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}`);
+      const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`);
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
       } else if (data.moves && data.foldersToCreate && data.summary) {
@@ -449,6 +452,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       const data = await post<{ error?: string; summary?: { moved: number; failed: number; total: number } }>(`/api/webflow/organize-execute/${siteId}`, {
         moves: organizePreview.moves,
         foldersToCreate: organizePreview.foldersToCreate,
+        workspaceId,
       });
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
@@ -465,7 +469,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} assets permanently from Webflow?`)) return;
     setDeleting(true);
-    await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId });
+    await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId, workspaceId });
     updateAssets(prev => prev.filter(a => !selected.has(a.id)));
     setSelected(new Set());
     setDeleting(false);
@@ -543,9 +547,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             <div className="text-sm text-teal-200">
               Generating alt text... {bulkProgress.done}/{bulkProgress.total}
             </div>
-            <div className="mt-1.5 h-1.5 bg-teal-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-teal-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
               />
             </div>
@@ -577,9 +581,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             <div className="text-sm text-cyan-200">
               Renaming assets... {bulkRenameProgress.done}/{bulkRenameProgress.total}
             </div>
-            <div className="mt-1.5 h-1.5 bg-cyan-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-cyan-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                className="h-full bg-cyan-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkRenameProgress.done / bulkRenameProgress.total) * 100}%` }}
               />
             </div>
@@ -596,9 +600,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
               Compressing assets... {bulkCompressProgress.done}/{bulkCompressProgress.total}
               {bulkCompressProgress.saved > 0 && <span className="text-orange-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>}
             </div>
-            <div className="mt-1.5 h-1.5 bg-orange-950 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-orange-950 rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                className="h-full bg-orange-500 rounded-[var(--radius-pill)] transition-all duration-300"
                 style={{ width: `${(bulkCompressProgress.done / bulkCompressProgress.total) * 100}%` }}
               />
             </div>

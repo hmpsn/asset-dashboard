@@ -42,13 +42,13 @@ beforeAll(async () => {
   validationWsId = createWorkspace('CTA Validation WS').id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(baseWsId);
   deleteWorkspace(rateLimitWsId);
   deleteWorkspace(dedupWsId);
   deleteWorkspace(schemaWsId);
   deleteWorkspace(validationWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Signal endpoint contract ──────────────────────────────────────────────────

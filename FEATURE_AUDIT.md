@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **310 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **357 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -86,13 +86,13 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 6. Schema Generator
-**What it does:** Analyzes every page's content and existing structured data, then generates unified `@graph` JSON-LD schemas (Organization, FAQ, Service, Article, BreadcrumbList, LocalBusiness, etc.) using AI. Validates against Google requirements. Supports **per-page generation** via a searchable page picker — generate for one page without scanning the whole site. Results stream incrementally with real-time progress via WebSocket. Schemas persist to disk and survive deploys (incremental saves every 10s during generation). One-click **Publish to Webflow** injects schema via the Custom Code API — plus **Bulk Publish All** publishes every unpublished schema sequentially with a live progress counter. **Schema Diff View** shows a side-by-side comparison of existing vs. suggested JSON-LD before publishing, so you can see exactly what changes. **Send to Client** creates an approval batch for client review before publishing. **CMS Template Schemas** generate dynamic schemas for collection pages using Webflow's `{{wf {...}}}` template syntax — one schema template auto-populates from CMS fields across all collection items. Prompt engineering enforces strict output: no empty arrays/objects, consistent `@id` naming, omitted empty properties. **Audit Fix→ auto-generation**: when arriving from the Site Health Audit Fix→ button for a schema issue, automatically generates JSON-LD for the specific affected page — no manual page selection needed. **Direct JSON editing**: toggle an Edit button to switch from read-only preview to an editable textarea — modify the generated JSON-LD before copying or publishing. Validates JSON on change with inline error display. Edited schemas are used in copy, single-page publish, and bulk publish flows. **Recommendation flags**: `useRecommendations` hook fetches active AI recommendations per workspace; pages with schema-type recommendations show amber badge counts in the header and expandable recommendation banners (title, insight, traffic at risk, priority) inside the page detail. **workspaceId cost tracking**: AI schema generation calls now pass `workspaceId` through `SchemaContext` to `callOpenAI` for per-workspace token cost attribution. **Google Rich Results Validation Gate** (Phase 1): pre-publish rule-based validator checks all schema nodes against Google's documented required/recommended fields per type (Article, FAQPage, LocalBusiness, Product, JobPosting, Event, Recipe, Course, Review, HowTo, VideoObject, BlogPosting, NewsArticle + more). Results stored in `schema_validations` table per page. Publish button disabled when status is `errors`; warnings are advisory only. **Schema Health Dashboard** (Phase 3): per-page validation status badges (valid/warnings/errors), rich result type chips, expandable error detail with re-validate button; aggregated stats (X valid, X warnings, X errors). **Entity consistency checker**: cross-page validation that Organization, WebSite, and LocalBusiness nodes are consistent across all generated schemas for a workspace. **9 new page roles** (Phase 2): job-posting, course, event, author, review, pricing, recipe, medical, financial — each with correct Schema.org type, required fields, and Google Rich Results eligibility. AI prompt updated with disambiguation rules to prevent role conflicts. **GPT-4.1 upgrade**: schema generation, auto-fix, and CMS template generation upgraded from gpt-4.1-mini to gpt-4.1 for higher quality structured data.
+**What it does:** Analyzes every page's content and existing structured data, then generates unified `@graph` JSON-LD schemas (Organization, FAQ, Service, Article, BreadcrumbList, LocalBusiness, etc.) using AI. Validates against Google requirements. Supports **per-page generation** via a searchable page picker — generate for one page without scanning the whole site. Results stream incrementally with real-time progress via WebSocket. Schemas persist to disk and survive deploys (incremental saves every 10s during generation). One-click **Publish to Webflow** injects schema via the Custom Code API — plus **Bulk Publish All** publishes every unpublished schema sequentially with a live progress counter. **Schema Diff View** shows a side-by-side comparison of existing vs. suggested JSON-LD before publishing, so you can see exactly what changes. **Send to Client** creates an approval batch for client review before publishing. **CMS Template Schemas** generate dynamic schemas for collection pages using Webflow's `{{wf {...}}}` template syntax — one schema template auto-populates from CMS fields across all collection items. Prompt engineering enforces strict output: no empty arrays/objects, consistent `@id` naming, omitted empty properties. **Audit Fix→ auto-generation**: when arriving from the Site Health Audit Fix→ button for a schema issue, automatically generates JSON-LD for the specific affected page — no manual page selection needed. **Direct JSON editing**: toggle an Edit button to switch from read-only preview to an editable textarea — modify the generated JSON-LD before copying or publishing. Validates JSON on change with inline error display. Edited schemas are used in copy, single-page publish, and bulk publish flows. **Recommendation flags**: `useRecommendations` hook fetches active AI recommendations per workspace; pages with schema-type recommendations show amber badge counts in the header and expandable recommendation banners (title, insight, traffic at risk, priority) inside the page detail. **workspaceId cost tracking**: AI schema generation calls now pass `workspaceId` through `SchemaContext` to `callOpenAI` for per-workspace token cost attribution. **Google Rich Results Validation Gate** (Phase 1): pre-publish rule-based validator checks all schema nodes against Google's documented required/recommended fields per type (Article, FAQPage, LocalBusiness, Product, JobPosting, Event, Recipe, Course, Review, HowTo, VideoObject, BlogPosting, NewsArticle + more). Results stored in `schema_validations` table per page. Publish button disabled when status is `errors`; warnings are advisory only. **Schema Health Dashboard** (Phase 3): per-page validation status badges (valid/warnings/errors), rich result type chips, expandable error detail with re-validate button; aggregated stats (X valid, X warnings, X errors). **Entity consistency checker**: cross-page validation that Organization, WebSite, and LocalBusiness nodes are consistent across all generated schemas for a workspace. **9 new page roles** (Phase 2): job-posting, course, event, author, review, pricing, recipe, medical, financial — each with correct Schema.org type, required fields, and Google Rich Results eligibility. AI prompt updated with disambiguation rules to prevent role conflicts. **Current model refresh (May 2026):** schema generation, auto-fix, and CMS template generation now use gpt-5.4 for higher quality structured data.
 
-**Agency value:** Schema implementation is time-consuming and error-prone. This generates production-ready, validated JSON-LD in seconds — per-page or full-site. Direct Webflow publishing eliminates manual copy-paste. CMS templates mean one schema covers hundreds of collection items automatically.
+**Agency value:** Schema implementation is time-consuming and error-prone. This generates production-ready, validated JSON-LD in seconds — per-page or full-site. Direct Webflow publishing eliminates manual copy-paste when Webflow's API can safely accept the script, and oversized static-page schemas fall back to JSON-only paste instructions for Webflow's native Page Settings → Schema markup field instead of a generic failure. CMS templates mean one schema covers hundreds of collection items automatically.
 
 **Client value:** Rich snippets in search results (stars, FAQs, breadcrumbs) increase click-through rates significantly. Client reviews and approves before anything goes live.
 
-**Mutual:** High-value SEO deliverable that's visible in search results. Clients see their listings stand out; agency delivers it efficiently. The approval flow ensures nothing ships without sign-off. **Entity Graph — Cross-Page @id References (Workstream C, April 2026):** Hub pages now emit semantically correct schema types with cross-page `@id` references when a `siteContext` is provided to `generateLeanSchema`: (a) **BlogIndex** (`/blog`, `/insights`, etc.) → `Blog` with `blogPost[]` containing `@id` refs to every child `BlogPosting`, sorted newest-first by `lastPublished`, capped at 10 with `numberOfItems` reflecting the true count; (b) **ServiceIndex** (`/services`) → `Service` with `hasOfferCatalog: { @type: OfferCatalog, hasPart[] }` referencing each child service's canonical `@id`; (c) **CaseStudyIndex** (`/our-work`, `/case-studies`, etc.) → `CollectionPage` with `mainEntity: { @type: ItemList, itemListElement[] }` containing positional `ListItem` entries pointing to each case study's `@id`. All three fall back to `CollectionPage` when no `siteContext` is supplied. Non-hub pages (individual `BlogPosting`, `Service`, `AboutPage`, etc.) are unchanged. 18 integration tests added in `tests/integration/schema-entity-graph.test.ts`. **Schema Generator Quality Hardening (April 2026):** Seven post-processing and intelligence-wiring improvements shipped together: (1) **UTILITY_SLUGS filter** — single regex `/^\/(401|403|404|500|password|robots|sitemap|privacy|terms|legal|cookie|maintenance)/` applied at four injection points (hasPart, relatedLink, generation queue pre-filter) to prevent error/utility pages from entering schema output or the generation pipeline; (2) **Healthcare type upgrade** — deterministic `upgradeHealthcareType()` fallback reads `businessContext` at post-processing time and rewrites Organization/LocalBusiness → Dentist, Physician, Optician, Chiropractor, MedicalClinic, Hospital, or MedicalBusiness — catches cases where the AI ignores the prompt rule; (3) **Product zero-price strip** — `autoFixSchema` now strips `offers` arrays where every Offer has price 0 or "0.00" to prevent implying free services on dental/healthcare pages; (4) **knowsAbout trim** — `autoFixSchema` enforces max 5 items in `knowsAbout` arrays (prompt says 3–5 but had no code enforcement); (5) **Intelligence signals wired** — `buildSchemaContext` now populates `_serpFeatures` (featured snippets, PAA, local pack) and `_backlinkReferringDomains` from the workspace intelligence layer; three new prompt blocks (SERP FEATURES, SITE AUTHORITY by domain tier, PRIOR SCHEMA VALIDATION ERRORS) injected when data is available; declined keywords filtered from `siteKeywords`/`pageKeywords` before context assembly; (6) **Prior validation errors** — `_existingErrors` populated from `schema_validations` table at all three call sites (single-page route, batch route, jobs route) so the AI avoids re-introducing known invalid fields; (7) **Business profile completeness warning** — `BusinessProfileTab` shows an amber banner when profile is empty/null and `businessContext` matches a local-business keyword (dental, clinic, attorney, restaurant, etc.), prompting the user to add contact fields that schema generation uses directly.
+**Mutual:** High-value SEO deliverable that's visible in search results. Clients see their listings stand out; agency delivers it efficiently. The approval flow ensures nothing ships without sign-off. **Collection-Aware Schema Generation + CMS Delivery (May 2026):** Adds a `siteInventory` intelligence slice and schema inventory service that joins static pages, Webflow CMS collections, CMS items, field definitions, field values, canonical URLs, utility-page exclusions, inferred collection roles, and mapped collection roles. Schema role precedence now supports UI override → active schema plan → mapped collection role → inferred collection role → rendered URL/content classification. CMS item suggestions carry collection identity, evidence sources, and CMS delivery diagnostics; single-page generation supports synthetic CMS page IDs. Publishing CMS item schema writes JSON-only JSON-LD into a mapped collection field such as `schema-json-ld`, while static pages keep page custom-code publishing. **Schema Quality Field Mapping (May 2026):** Detect + Map now persists collection field bindings for location NAP fields and service fields, resolves human-readable reference values before JSON-LD emission, blocks raw Webflow IDs from public schema, emits Service offers only when price/currency are verified, keeps multi-location homepages as Organization/WebSite unless a primary address is verified, and suppresses FAQPage on index/card layouts unless a dedicated FAQ section is present. **Semantic Extraction & AI-Powered Generation (May 2026):** `extractSemanticData()` (Haiku 4.5 tool_use) runs per page after element extraction and pulls phone, address, hours, staff members, services, aggregate ratings, social profiles (sameAs), FAQ pairs, and primary image directly from HTML — stored on `PageElementCatalog.semantics`. `applyPostEnrichment()` appends FAQPage, AggregateRating, sameAs, and VideoObject nodes to the generated `@graph` from semantics data, with a rollback-on-new-errors safety pattern that never introduces invalid nodes. `generateSchemaForUnknownType()` provides a second Haiku generation pass for `WebPage`-classified pages that have non-empty semantics — ensures LocalBusiness location pages, specialty service pages, and industry-specific pages get correct schema types instead of generic WebPage. Validator extended with `DEDICATED_VALIDATOR_TYPES` guard, `unverified-type` warnings for unknown Schema.org types, and `addressCountry` on ContactPage. **GSC URL Inspection (May 2026):** `inspectUrlForRichResults()` calls GSC URL Inspection API 3 minutes after every schema publish; result stored as `google_validation_status` on `schema_publish_history`. **Schema.org Pre-Publish Validator (May 2026):** `validateWithSchemaOrg()` posts generated schemas to validator.schema.org at generation time (fire-and-forget, result logged). **Entity Graph — Cross-Page @id References (Workstream C, April 2026):** Hub pages now emit semantically correct schema types with cross-page `@id` references when a `siteContext` is provided to `generateLeanSchema`: (a) **BlogIndex** (`/blog`, `/insights`, etc.) → `Blog` with `blogPost[]` containing `@id` refs to every child `BlogPosting`, sorted newest-first by `lastPublished`, capped at 10 with `numberOfItems` reflecting the true count; (b) **ServiceIndex** (`/services`) → `Service` with `hasOfferCatalog: { @type: OfferCatalog, hasPart[] }` referencing each child service's canonical `@id`; (c) **CaseStudyIndex** (`/our-work`, `/case-studies`, etc.) → `CollectionPage` with `mainEntity: { @type: ItemList, itemListElement[] }` containing positional `ListItem` entries pointing to each case study's `@id`. All three fall back to `CollectionPage` when no `siteContext` is supplied. Non-hub pages (individual `BlogPosting`, `Service`, `AboutPage`, etc.) are unchanged. 18 integration tests added in `tests/integration/schema-entity-graph.test.ts`. **Schema Generator Quality Hardening (April 2026):** Seven post-processing and intelligence-wiring improvements shipped together: (1) **UTILITY_SLUGS filter** — single regex `/^\/(401|403|404|500|password|robots|sitemap|privacy|terms|legal|cookie|maintenance)/` applied at four injection points (hasPart, relatedLink, generation queue pre-filter) to prevent error/utility pages from entering schema output or the generation pipeline; (2) **Healthcare type upgrade** — deterministic `upgradeHealthcareType()` fallback reads `businessContext` at post-processing time and rewrites Organization/LocalBusiness → Dentist, Physician, Optician, Chiropractor, MedicalClinic, Hospital, or MedicalBusiness — catches cases where the AI ignores the prompt rule; (3) **Product zero-price strip** — `autoFixSchema` now strips `offers` arrays where every Offer has price 0 or "0.00" to prevent implying free services on dental/healthcare pages; (4) **knowsAbout trim** — `autoFixSchema` enforces max 5 items in `knowsAbout` arrays (prompt says 3–5 but had no code enforcement); (5) **Intelligence signals wired** — `buildSchemaContext` now populates `_serpFeatures` (featured snippets, PAA, local pack) and `_backlinkReferringDomains` from the workspace intelligence layer; three new prompt blocks (SERP FEATURES, SITE AUTHORITY by domain tier, PRIOR SCHEMA VALIDATION ERRORS) injected when data is available; declined keywords filtered from `siteKeywords`/`pageKeywords` before context assembly; (6) **Prior validation errors** — `_existingErrors` populated from `schema_validations` table at all three call sites (single-page route, batch route, jobs route) so the AI avoids re-introducing known invalid fields; (7) **Business profile completeness warning** — `BusinessProfileTab` shows an amber banner when profile is empty/null and `businessContext` matches a local-business keyword (dental, clinic, attorney, restaurant, etc.), prompting the user to add contact fields that schema generation uses directly.
 
 ---
 
@@ -234,13 +234,13 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 17. Background Tasks
-**What it does:** Long-running operations (audits, compression, brief generation, schema generation, strategy analysis) run asynchronously with real-time WebSocket progress updates. Supports job cancellation (stop mid-generation and keep partial results). Job labels in TaskPanel identify what's running. Incremental persistence saves partial results to disk during long jobs.
+**What it does:** Long-running operations use the shared background job platform where implemented: `/api/jobs`, durable job records, WebSocket progress updates, `useBackgroundTasks`, and the floating TaskPanel. Phase 1 added shared job metadata for labels, cancellation semantics, and result behavior so server and frontend use one contract. TaskPanel filters to the current workspace, labels feature-specific SEO bulk jobs, and only shows stop controls for jobs with real abort handling. Keyword strategy generation now starts through the shared `keyword-strategy` job from the admin panel instead of the component directly owning the streaming request, while the worker translates the existing generation stream into job progress. Keyword strategy success activity is logged inside the shared generation service, so direct SSE/API generation and background job generation produce the same workspace activity without duplicate job-wrapper logging. Content post generation now creates a durable `content-post-generation` job alongside the immediate skeleton post, so the existing floating task panel shows the long-running draft generation while the post remains visible in the content workflow. The content post worker now reports real steps for context prep, intro, each section, conclusion, unification, SEO metadata, and finalization; it also registers cancellation and passes `AbortSignal` through the content AI calls before exposing the TaskPanel stop control. Schema, page-analysis, and SEO bulk workers now keep cancellation observable from durable job status and unregister abort controllers on terminal cleanup, closing drift bugs where cancelled jobs could keep running after the controller was removed or leak controller state after completion. Schema and page-analysis worker bodies are now extracted from `server/routes/jobs.ts` into dedicated worker modules, keeping the central job route as a dispatcher while preserving existing TaskPanel/background job behavior. Schema snapshot writes now broadcast `schema:snapshot_updated` from generation, publish, rollback, retract, and delete paths so admin and client React Query caches do not hydrate stale structured-data snapshots after background work or manual publish actions. Restart recovery marks persisted `pending`/`running` jobs as errored with a visible interruption message so TaskPanel does not show orphaned work after a deploy or crash.
 
-**Agency value:** No frozen screens or timeouts. Start a schema generation across 50 pages and keep working — partial results stream in live. Cancel anytime and keep what's done.
+**Agency value:** No frozen screens or timeouts for job-backed workflows. Start schema generation or page analysis and keep working while progress stays visible. The shared contract also makes it harder for new generation work to drift into invisible fire-and-forget promises.
 
 **Client value:** Invisible to the client, but ensures their dashboard always loads fast and never hangs.
 
-**Mutual:** Professional, responsive UX that handles heavy operations gracefully. No lost work from server restarts.
+**Mutual:** Professional, responsive UX that handles heavy operations gracefully. Phase 2 is now pulling crawl-heavy workspace setup generation - knowledge base, brand voice, and personas - onto this same contract so the remaining drift gets smaller with each slice.
 
 ---
 
@@ -269,11 +269,11 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 20. Client SEO Strategy View
-**What it does:** Exposes the keyword strategy to the client in a consolidated 3-section layout: (1) **Optimize Existing Pages** — merges Quick Wins + Growth Opportunities into a single section for improving pages the site already has. (2) **New Content to Create** — merges Content Gaps, Competitor Keyword Gaps, and Keyword Opportunities as sub-sections, presenting all net-new content ideas in one place with "Request This Topic" buttons. (3) **Your Keyword Map** — merges Page Performance Map + Target Keywords + Tracked Keywords into a unified section showing what each page targets and how it performs. Previously 5 separate sections (Content Opportunities, Quick Wins, Growth Opportunities, Keyword Opportunities, Target Keywords); now streamlined to 3.
+**What it does:** Exposes the keyword strategy to the client in a consolidated 3-section layout: (1) **Optimize Existing Pages** — merges Quick Wins + Growth Opportunities into a single section for improving pages the site already has. (2) **New Content to Create** — merges Content Gaps, Competitor Keyword Gaps, and Keyword Opportunities as sub-sections, presenting all net-new content ideas in one place with "Request This Topic" buttons. (3) **Your Keyword Map** — merges Page Performance Map + Target Keywords + Tracked Keywords into a unified section showing what each page targets and how it performs. Previously 5 separate sections (Content Opportunities, Quick Wins, Growth Opportunities, Keyword Opportunities, Target Keywords); now streamlined to 3. **Priority Keywords rebuild (May 2026):** The "In Strategy" keyword panel was rebuilt as a two-zone flat list (confirmed above / suggestions below) with a slide-in detail drawer. Drawer shows three enrichment states: "gathering" (pulsing indicator, data collecting), "partial" (any signal available), and "enriched" (full plain-English metrics). Metrics use a translation layer: KD maps to "Approachable/Moderate/Competitive/Highly competitive", volume maps to audience size labels, trend maps to "Interest growing/steady/declining". Drawer hierarchy: Verdict → Opportunity → Your Position → The Move → foldable "See the numbers". Confirmed rows show role indicator dots (emerald=content, blue=page, teal=strategy) and an "enrichmentStatus" field. Suggestion rows show a left-edge blue accent bar scaled to opportunity score. Background DataForSEO enrichment fires when a tracked keyword is added via the client portal. `computeOpportunityScore` returns `undefined` (not `0`) for unenriched keywords; content gap filter keeps all keywords including volume=0; site enrichment cap raised 15→30.
 
-**Agency value:** Strategy becomes a conversion tool. Cleaner layout means clients engage more deeply instead of bouncing between sections. Consolidation reduces cognitive overload and increases content request conversions.
+**Agency value:** Strategy becomes a conversion tool. Cleaner layout means clients engage more deeply instead of bouncing between sections. Consolidation reduces cognitive overload and increases content request conversions. Plain-English metrics mean clients understand their strategy without needing SEO education.
 
-**Client value:** Full visibility into the SEO roadmap in a clear, action-oriented structure. "Optimize" vs. "Create" framing makes the next step obvious. Unified keyword map shows the full picture in one place.
+**Client value:** Full visibility into the SEO roadmap in a clear, action-oriented structure. "Optimize" vs. "Create" framing makes the next step obvious. Unified keyword map shows the full picture in one place. Keywords show real data instead of dashes, with clear "Gathering data" states while enrichment is in progress.
 
 **Mutual:** Turns strategy from a one-time deliverable into an ongoing, interactive growth plan. Content gaps become revenue. Fewer sections = less confusion = faster client action.
 
@@ -346,7 +346,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 24. AI Insights Engine (Client Chatbot)
-**What it does:** Branded "hmpsn studio Insights Engine" — in-dashboard AI advisor powered by GPT-4o that answers questions using the client's full dashboard data: Google Search Console, GA4 (overview, events, conversions, sources, devices, countries), site health audit + detail, SEO strategy (page map, opportunities, content gaps, quick wins), rank tracking, activity log, annotations, pending approvals, and active requests. Revenue hook system naturally connects data insights to team services using a 3-step pattern: surface insight with numbers → explain business impact → warm handoff. Per-workspace knowledge base provides business context. Updated quick questions reflect the full data breadth. **Conversation memory**: persistent session history stored to disk (`server/chat-memory.ts`). Last 10 messages sent as conversation context to OpenAI for coherent multi-turn dialogue. **Cross-session summaries**: AI-generated session summaries (gpt-4o-mini) injected into system prompts so the chatbot recalls topics from previous conversations. Auto-summarizes after 6+ messages. **Chat history UI**: New Chat button, session history panel listing past conversations with message counts and dates, click to resume any previous session. **Period comparison data**: searchComparison, ga4Comparison, ga4Organic, and ga4NewVsReturning now sent to AI so it can reference period-over-period changes ("your clicks are up 23% vs last month"). **Audit traffic intelligence**: cached `getAuditTrafficForWorkspace` cross-references audit errors with GSC/GA4 traffic; top 5 high-traffic pages with SEO issues injected into system prompt so AI prioritizes fixes by real visitor impact. **Chat activity logging**: first exchange of each new session logged to activity log (`chat_session` type) so the agency sees what clients are asking about. **Proactive insights**: on chat open, `fetchProactiveInsight()` auto-generates 2-3 data-driven insight bullets as the opening greeting (no user message needed). `proactiveInsightSent` ref prevents duplicate greetings. `buildChatContext()` helper extracted for shared context building. Quick question follow-ups displayed after the proactive greeting.
+**What it does:** Branded "hmpsn studio Insights Engine" — in-dashboard AI advisor powered by current OpenAI models that answers questions using the client's full dashboard data: Google Search Console, GA4 (overview, events, conversions, sources, devices, countries), site health audit + detail, SEO strategy (page map, opportunities, content gaps, quick wins), rank tracking, activity log, annotations, pending approvals, and active requests. Revenue hook system naturally connects data insights to team services using a 3-step pattern: surface insight with numbers → explain business impact → warm handoff. Per-workspace knowledge base provides business context. Updated quick questions reflect the full data breadth. **Conversation memory**: persistent session history stored to disk (`server/chat-memory.ts`). Last 10 messages sent as conversation context to OpenAI for coherent multi-turn dialogue. **Cross-session summaries**: AI-generated session summaries (gpt-5.4-nano) injected into system prompts so the chatbot recalls topics from previous conversations. Auto-summarizes after 6+ messages. **Chat history UI**: New Chat button, session history panel listing past conversations with message counts and dates, click to resume any previous session. **Period comparison data**: searchComparison, ga4Comparison, ga4Organic, and ga4NewVsReturning now sent to AI so it can reference period-over-period changes ("your clicks are up 23% vs last month"). **Audit traffic intelligence**: cached `getAuditTrafficForWorkspace` cross-references audit errors with GSC/GA4 traffic; top 5 high-traffic pages with SEO issues injected into system prompt so AI prioritizes fixes by real visitor impact. **Chat activity logging**: first exchange of each new session logged to activity log (`chat_session` type) so the agency sees what clients are asking about. **Proactive insights**: on chat open, `fetchProactiveInsight()` auto-generates 2-3 data-driven insight bullets as the opening greeting (no user message needed). `proactiveInsightSent` ref prevents duplicate greetings. `buildChatContext()` helper extracted for shared context building. Quick question follow-ups displayed after the proactive greeting.
 
 **Agency value:** Every conversation is a potential touchpoint for additional services. Revenue hooks surface upsell opportunities organically — data-backed, never pushy. Reduces support burden while positioning the agency as the solution. Conversation memory means the chatbot builds rapport over time — clients don't repeat themselves. Activity log integration gives visibility into client concerns.
 
@@ -469,7 +469,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 32. Unified Design System
-**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons. **Selective type size bump**: `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px for improved readability. **MetricRing** background tracks use muted score-colored fills (15% opacity) instead of flat gray. **Global cursor-pointer** rule ensures all interactive elements show pointer cursor. **SectionCard** headings bumped to `font-semibold text-zinc-200`, **PageHeader** titles to `text-zinc-100`. Theme-aware `scoreColor()` returns WCAG-compliant colors in light mode. **Standardized typography hierarchy** across all 8 client dashboard tabs: page titles use `text-xl font-semibold text-zinc-100`, subtitles use `text-sm text-zinc-500`, section headers use `text-sm font-semibold text-zinc-200`. Every tab (Overview, Search, Analytics, Site Health, Strategy, Content, Requests, Approvals) now has a consistent page-level title. **LoadingState & ErrorState components**: Contextual loading messages ("Calculating traffic value...", "Loading approvals...") and type-specific error handling with recovery actions. **EmptyState standardization**: Consistent "No data available" messages with context-appropriate icons and actions across all components. **Light mode audit (2026-03-30)**: Exhaustive 148-instance audit across 42 files. Added `themeColor()`, `chartGridColor()`, `chartAxisColor()`, `chartDotStroke()`, `chartDotFill()`, `chartTooltipStyle()`, `chartTooltipLabelStyle()` helpers to `ui/constants.ts`. Fixed all Recharts grids/axes/dots/tooltips (AnnotatedTrendChart, ScoreTrendChart, RankTracker, WorkspaceOverview, client AnalyticsTab/helpers). Fixed inline styles in RequestManager, ClientDashboardTab, BrandHub, DropZone, InternalLinks, RedirectManager, WorkspaceSettings, StripePaymentForm. Fixed icon/timeline colors in OverviewTab, HealthTab, CellDetailPanel, SiteArchitecture, WorkspaceHome. Added 17 missing `.dashboard-light` CSS overrides for opacity variants and gradients. Skeleton shimmer rule for light mode. **MetricRing glow bug fix**: glow now matches ring score color (teal/amber/red) instead of always showing teal. Page-level spacing standardized to `space-y-8` across 10 components. Asymmetric border radius (`10px 24px 10px 24px` / `6px 12px 6px 12px`) applied to section and compact cards. pr-check extended with two new automated rules: hardcoded dark hex in inline styles, SVG dark fill/stroke. **Light mode overhaul (2026-04-20)**: Full token system overhaul — `.dashboard-light` expanded from 10 to 25 CSS variables (WCAG AA-verified contrast ratios, `--brand-text-muted` adjusted to `#475569` for 6.5:1). Four-step text hierarchy restored (zinc-300/400 were identical, now distinct). `chartGridColor()` and `chartTooltipStyle()` migrated from hardcoded hex to CSS variables via new `getCssVar()` helper. 6 components had rarely-used opacity variants consolidated. All neutral bg/border overrides now point at CSS variables. New `ConfirmDialog` component (`src/components/ui/`) replaces 3 `window.confirm()` calls in ApprovalsTab. ApprovalsTab gains filter bar (All / Needs Action / Ready to Apply / Applied with live counts).
+**What it does:** Consistent teal/zinc color palette across all admin and client dashboard components. All inline CSS variable references replaced with Tailwind utility classes. Unified card backgrounds, sidebar styling, workspace selector, and button treatments. **Accessibility pass**: minimum `text-[11px]` font size enforced (was `text-[8px]` in some places), improved contrast ratios, `aria-label` attributes on all icon-only buttons. **Selective type size bump**: `text-[11px]`/`text-xs` → 13.5px, `text-sm` → 15.5px for improved readability. **MetricRing** background tracks use muted score-colored fills (15% opacity) instead of flat gray. **Global cursor-pointer** rule ensures all interactive elements show pointer cursor. **SectionCard** headings bumped to `font-semibold text-zinc-200`, **PageHeader** titles to `text-zinc-100`. Theme-aware `scoreColor()` returns WCAG-compliant colors in light mode. **Standardized typography hierarchy** across all 8 client dashboard tabs: page titles use `text-xl font-semibold text-zinc-100`, subtitles use `text-sm text-zinc-500`, section headers use `text-sm font-semibold text-zinc-200`. Every tab (Overview, Search, Analytics, Site Health, Strategy, Content, Requests, Approvals) now has a consistent page-level title. **LoadingState & ErrorState components**: Contextual loading messages ("Calculating traffic value...", "Loading approvals...") and type-specific error handling with recovery actions. **EmptyState standardization**: Consistent "No data available" messages with context-appropriate icons and actions across all components. **Light mode audit (2026-03-30)**: Exhaustive 148-instance audit across 42 files. Added `themeColor()`, `chartGridColor()`, `chartAxisColor()`, `chartDotStroke()`, `chartDotFill()`, `chartTooltipStyle()`, `chartTooltipLabelStyle()` helpers to `ui/constants.ts`. Fixed all Recharts grids/axes/dots/tooltips (AnnotatedTrendChart, ScoreTrendChart, RankTracker, WorkspaceOverview, client AnalyticsTab/helpers). Fixed inline styles in RequestManager, ClientDashboardTab, BrandHub, DropZone, InternalLinks, RedirectManager, WorkspaceSettings, and the historical StripePaymentForm (since retired). Fixed icon/timeline colors in OverviewTab, HealthTab, CellDetailPanel, SiteArchitecture, WorkspaceHome. Added 17 missing `.dashboard-light` CSS overrides for opacity variants and gradients. Skeleton shimmer rule for light mode. **MetricRing glow bug fix**: glow now matches ring score color (teal/amber/red) instead of always showing teal. Page-level spacing standardized to `space-y-8` across 10 components. Asymmetric border radius (`10px 24px 10px 24px` / `6px 12px 6px 12px`) applied to section and compact cards. pr-check extended with two new automated rules: hardcoded dark hex in inline styles, SVG dark fill/stroke. **Light mode overhaul (2026-04-20)**: Full token system overhaul — `.dashboard-light` expanded from 10 to 25 CSS variables (WCAG AA-verified contrast ratios, `--brand-text-muted` adjusted to `#475569` for 6.5:1). Four-step text hierarchy restored (zinc-300/400 were identical, now distinct). `chartGridColor()` and `chartTooltipStyle()` migrated from hardcoded hex to CSS variables via new `getCssVar()` helper. 6 components had rarely-used opacity variants consolidated. All neutral bg/border overrides now point at CSS variables. New `ConfirmDialog` component (`src/components/ui/`) replaces 3 `window.confirm()` calls in ApprovalsTab. ApprovalsTab gains filter bar (All / Needs Action / Ready to Apply / Applied with live counts).
 
 **Phase 5 foundation (2026-04-24):** `src/tokens.css` created as the canonical single source for all 113 `--*` CSS custom properties. `src/index.css` now `@import`s tokens.css; `.dashboard-light` block no longer re-declares tokens. Vite `copyTokensPlugin()` emits `public/tokens.css` at build time so the styleguide can `@import url('/tokens.css')` in prod. 14 `.t-*` typography utility classes added globally. `scoreColorClass()` fixed to return `text-emerald-400` for scores ≥80 (was `text-green-400`) to match `scoreColor()` hex `#34d399`. All 187 `text-green-400` instances across 70 components migrated to `text-emerald-400`. `Badge.tsx` purple variant removed (Law 03: purple is admin-AI only). `statusConfig.ts` `in-review` changed from purple to blue tokens. All rose/pink hues eliminated from `src/components/`. Barrel skeleton pre-committed: 30 placeholder files for Phase 1 primitives (typography, Icon, Button, forms, layout, overlay). `styleguide-token-parity` pr-check customCheck rule added with 4 fixture tests. 11 audit outputs frozen in `docs/superpowers/audits/2026-04-24-phase5/`.
 
@@ -604,7 +604,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 44. Stripe Payment Integration
-**What it does:** Full Stripe Checkout integration for content deliverables. **Server:** `server/stripe.ts` lazily initializes the Stripe SDK (picks up keys from admin UI or env vars), defines 14 product types (7 brief types, 3 post tiers, 2 schema, 2 strategy), creates Checkout sessions with workspace/content-request metadata, handles webhooks (`checkout.session.completed` → marks payment paid + logs activity, `payment_intent.payment_failed` → logs failure). `server/payments.ts` provides PaymentRecord CRUD with JSON-on-disk persistence per workspace. `server/stripe-config.ts` stores Stripe keys encrypted at rest (AES-256-GCM) on disk — no env vars needed. **Admin UI:** `StripeSettings.tsx` in the Command Center lets you paste API keys (masked inputs), map Stripe Price IDs to each product, enable/disable individual products, and see connection status. **Frontend:** `ClientDashboard.tsx` `confirmPricingAndSubmit()` creates the content request first, then redirects to Stripe Checkout when `stripeEnabled`. Payment success/cancel detected via URL params on return with toast + URL cleanup. Falls back to direct submit when Stripe isn't configured. **Workspace:** `tier` (free/growth/premium), `trialEndsAt`, `stripeCustomerId` fields added. **14-day Growth trial**: new workspaces auto-provisioned with Growth tier + 14-day trial via `initializeNewWorkspaceTrial()`. `isTrial`, `trialDaysRemaining`, and `baseTier` computed at API time. `checkTrialExpiry()` scheduled job runs daily to downgrade expired trials to `baseTier`. Trial status surfaced across client dashboard (badges, welcome modal, plans page).
+**What it does:** Full Stripe Checkout integration for content deliverables. **Server:** `server/stripe.ts` lazily initializes the Stripe SDK (picks up keys from admin UI or env vars), defines 14 product types (7 brief types, 3 post tiers, 2 schema, 2 strategy), creates Checkout sessions with workspace/content-request metadata, handles webhooks (`checkout.session.completed` → marks payment paid + logs activity, `payment_intent.payment_failed` → logs failure). The retired inline PaymentIntent/Stripe Elements purchase path has been removed so Checkout is the single client purchase architecture; PaymentIntent webhook handling remains only for Stripe Checkout reconciliation and failure events, including lookup by `stripePaymentIntentId` after hosted Checkout completion. `server/payments.ts` provides PaymentRecord CRUD with JSON-on-disk persistence per workspace. `server/stripe-config.ts` stores Stripe keys encrypted at rest (AES-256-GCM) on disk — no env vars needed. **Admin UI:** `StripeSettings.tsx` in the Command Center lets you paste API keys (masked inputs), map Stripe Price IDs to each product, enable/disable individual products, and see connection status. **Frontend:** `ClientDashboard.tsx` `confirmPricingAndSubmit()` creates the content request first, then redirects to Stripe Checkout when `stripeEnabled`. Payment success/cancel detected via URL params on return with toast + URL cleanup. Falls back to direct submit when Stripe isn't configured. **Workspace:** `tier` (free/growth/premium), `trialEndsAt`, `stripeCustomerId` fields added. **14-day Growth trial**: new workspaces auto-provisioned with Growth tier + 14-day trial via `initializeNewWorkspaceTrial()`. `isTrial`, `trialDaysRemaining`, and `baseTier` computed at API time. `checkTrialExpiry()` scheduled job runs daily to downgrade expired trials to `baseTier`. Trial status surfaced across client dashboard (badges, welcome modal, plans page).
 
 **Agency value:** Direct revenue from content deliverables without invoicing friction. Admin manages everything from the dashboard — no code deploys needed to change keys or products. Encrypted key storage meets security requirements.
 
@@ -787,7 +787,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 60. AI Content Post Generator
-**What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. Every prompt includes the total article word budget and strict ±10% per-section tolerances. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions, removing cross-section repetition, ensuring consistent voice, verifying the intro's promises are fulfilled by the body, and **trimming word count to the brief's target** when over budget. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement with dynamic maxTokens (8K–16K based on target word count). Unification status (`success`/`failed`/`skipped`) is tracked on the post and surfaced in the PostEditor UI. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate`, GET/PATCH/DELETE per post, export as markdown/HTML. **Content quality engine (v5)**: comprehensive `WRITING_QUALITY_RULES` injected into every prompt — forbidden phrase lists (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution), structural anti-patterns (no section-ending summaries, no repetitive bullet patterns), fabrication rules (no invented stats/percentages, directional case study outcomes only), anchor text accuracy rules, and mandatory H3 subheadings for sections 200+ words. Internal links use the workspace `liveDomain` for correct URLs. Full Webflow sitemap (published pages + CMS pages via `getAllSitePages`) passed to both brief and post generation for comprehensive internal link suggestions. Brand name limited to intro + conclusion only.
+**What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. Every prompt includes the total article word budget and strict ±10% per-section tolerances. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions, removing cross-section repetition, ensuring consistent voice, verifying the intro's promises are fulfilled by the body, and **trimming word count to the brief's target** when over budget. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement with dynamic maxTokens (8K–16K based on target word count). Unification status (`success`/`failed`/`skipped`) is tracked on the post and surfaced in the PostEditor UI. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate` creates a skeleton post and durable `content-post-generation` background job, GET/PATCH/DELETE per post, export as markdown/HTML. **Content quality engine (v5)**: comprehensive `WRITING_QUALITY_RULES` injected into every prompt — forbidden phrase lists (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution), structural anti-patterns (no section-ending summaries, no repetitive bullet patterns), fabrication rules (no invented stats/percentages, directional case study outcomes only), anchor text accuracy rules, and mandatory H3 subheadings for sections 200+ words. Internal links use the workspace `liveDomain` for correct URLs. Full Webflow sitemap (published pages + CMS pages via `getAllSitePages`) passed to both brief and post generation for comprehensive internal link suggestions. Brand name limited to intro + conclusion only.
 
 **Agency value:** Full blog posts generated in minutes instead of hours. Page-type-specific prompts produce content that matches the intent (landing page copy reads differently from a blog post). Unification pass eliminates the "obviously AI-generated" seams between sections. Quality guardrails prevent common AI writing tells — no "Let's dive in", no fabricated statistics, no repetitive brand mentions, no buzzword-laden prose. Claude produces noticeably more natural prose than GPT alone.
 
@@ -798,9 +798,9 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 61. Auto-Publish to Webflow CMS
-**What it does:** Closes the content loop: Brief → AI generates post → client approves → one-click publish to Webflow CMS collection. Ten-part implementation: (1) `createCollectionItem()` in `server/webflow.ts` for CMS item creation via Webflow v2 API. (2) `server/html-to-richtext.ts` assembles post HTML from intro/sections/conclusion and generates URL-safe slugs. (3) `publishTarget` config on workspace model with field mapping (title, slug, body, meta fields, featured image, author, date, category). (4) `PublishSettings.tsx` admin UI with collection selector, AI-powered field mapping suggestions via GPT (POST `/api/webflow/suggest-field-mapping/:siteId`), and save to workspace. (5) Publish endpoint `POST /api/content-posts/:wsId/:postId/publish-to-webflow` — loads post, validates status, converts HTML, builds field data from mapping, creates CMS item, publishes it live, updates SQLite tracking. (6) `server/content-image.ts` — DALL-E 3 featured image generation with automatic Webflow asset upload via presigned S3. (7) Publish buttons in `PostEditor.tsx` header and `ContentManager.tsx` list view — confirmation dialog with title/slug preview, "Publish + Generate Image" option, success badge with link. (8) Auto-publish on approval — when post status changes to 'approved' and workspace has publishTarget configured, automatically publishes in the background. (9) SQLite migration `007-content-publish.sql` adds `webflow_item_id`, `webflow_collection_id`, `published_at`, `published_slug` to content_posts and `publish_target` to workspaces. (10) `CONTENT_PUBLISHED` WebSocket event and `content_published` activity type for real-time UI updates.
+**What it does:** Closes the content loop: Brief → AI generates post → client approves → one-click publish to Webflow CMS collection. Ten-part implementation: (1) `createCollectionItem()` in `server/webflow.ts` for CMS item creation via Webflow v2 API. (2) `server/html-to-richtext.ts` assembles post HTML from intro/sections/conclusion and generates URL-safe slugs. (3) `publishTarget` config on workspace model with field mapping (title, slug, body, meta fields, featured image, author, date, category). (4) `PublishSettings.tsx` admin UI with collection selector, AI-powered field mapping suggestions via GPT (POST `/api/webflow/suggest-field-mapping/:siteId`), and save to workspace. (5) Publish endpoint `POST /api/content-posts/:wsId/:postId/publish-to-webflow` — loads post, validates status, converts HTML, builds field data from mapping, creates CMS item, publishes it live, updates SQLite tracking. (6) `server/content-image.ts` — GPT Image 2 featured image generation with automatic Webflow asset upload via presigned S3. (7) Publish buttons in `PostEditor.tsx` header and `ContentManager.tsx` list view — confirmation dialog with title/slug preview, "Publish + Generate Image" option, success badge with link. (8) Auto-publish on approval — when post status changes to 'approved' and workspace has publishTarget configured, automatically publishes in the background. (9) SQLite migration `007-content-publish.sql` adds `webflow_item_id`, `webflow_collection_id`, `published_at`, `published_slug` to content_posts and `publish_target` to workspaces. (10) `CONTENT_PUBLISHED` WebSocket event and `content_published` activity type for real-time UI updates.
 
-**Agency value:** Eliminates the manual copy-paste step between content generation and CMS publishing. One-click (or zero-click with auto-publish) from approved content to live site. AI field mapping means no manual configuration for each Webflow collection schema. DALL-E featured images remove the need for stock photo sourcing.
+**Agency value:** Eliminates the manual copy-paste step between content generation and CMS publishing. One-click (or zero-click with auto-publish) from approved content to live site. AI field mapping means no manual configuration for each Webflow collection schema. GPT Image featured images remove the need for stock photo sourcing.
 
 **Client value:** Approved content goes live immediately — no waiting for the agency to manually publish. The approval workflow becomes the publish trigger, giving clients direct control over when content appears on their site.
 
@@ -809,7 +809,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 62. Knowledge Base Auto-Generation
-**What it does:** One-click knowledge base generation from the client's live website. `POST /api/workspaces/:id/generate-knowledge-base` crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the shared `scrapeWorkspaceSite()` helper plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
+**What it does:** One-click knowledge base generation from the client's live website. The action now starts the shared `knowledge-base-generation` background job through TaskPanel/useBackgroundTasks instead of blocking the Brand Hub while crawling. The worker crawls up to 15 priority pages (homepage, about, services, case studies, blog, contact — selected via regex pattern matching on URL paths) using the shared `scrapeWorkspaceSite()` helper plus sitemap discovery for CMS pages. Scraped content (titles, meta descriptions, headings, body text excerpts) is sent to GPT-4.1 which extracts a structured knowledge base: business overview, services & offerings, target audience, differentiators, case studies & results (with real numbers when available), brand voice & tone, key topics & expertise, and important details. The generated text populates the Knowledge Base textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button with loading state and unsaved-changes indicator.
 
 **Agency value:** Eliminates the manual step of writing business context for each new client. One click produces a comprehensive knowledge base that immediately improves all AI outputs (chatbot, content briefs, blog posts, strategy).
 
@@ -820,7 +820,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 65. Brand Voice Auto-Generation
-**What it does:** One-click brand voice guide generation from the client's live website. `POST /api/workspaces/:id/generate-brand-voice` reuses the shared `scrapeWorkspaceSite()` helper to crawl up to 15 priority pages, then sends the content to GPT-4.1 with a brand strategist prompt that analyzes writing patterns across the site. Produces a comprehensive guide covering: tone & personality (overall tone, personality traits, formality level), writing style (sentence structure, vocabulary level, person/perspective, active vs passive voice), messaging patterns (service descriptions, reader address style, CTA style, recurring phrases), do's and don'ts, and example phrases lifted directly from the site. The generated text populates the Brand Voice textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button next to "Save Brand Voice" with loading state.
+**What it does:** One-click brand voice guide generation from the client's live website. The action now starts the shared `brand-voice-generation` background job through TaskPanel/useBackgroundTasks instead of blocking the Brand Hub while crawling. The worker reuses the shared `scrapeWorkspaceSite()` helper to crawl up to 15 priority pages, then sends the content to GPT-4.1 with a brand strategist prompt that analyzes writing patterns across the site. Produces a comprehensive guide covering: tone & personality (overall tone, personality traits, formality level), writing style (sentence structure, vocabulary level, person/perspective, active vs passive voice), messaging patterns (service descriptions, reader address style, CTA style, recurring phrases), do's and don'ts, and example phrases lifted directly from the site. The generated text populates the Brand Voice textarea in the Brand & AI hub (`BrandHub.tsx`) for human review before saving. "Generate from Website" button next to "Save Brand Voice" with loading state.
 
 **Agency value:** Eliminates guesswork when defining brand voice for new clients. The AI analyzes actual writing patterns instead of relying on the agency's subjective impression. Produces actionable guidelines that all AI features follow immediately.
 
@@ -831,7 +831,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 66. Audience Personas Auto-Generation
-**What it does:** One-click audience persona generation from the client's live website. `POST /api/workspaces/:id/generate-personas` reuses the shared `scrapeWorkspaceSite()` helper, then sends content to GPT-4.1 with a marketing strategist prompt that identifies 2-5 distinct audience segments. Returns structured JSON personas with: name, description, pain points, goals, objections, preferred content format, and buying stage. The AI identifies personas based on evidence from the website — who the services target, case study clients, language used. Results populate the Audience Personas manager in the Brand & AI hub (`BrandHub.tsx`) as draft personas for human review before saving. "Generate from Website" button in the personas section with loading state and toast notification showing count and pages scraped.
+**What it does:** One-click audience persona generation from the client's live website. The action now starts the shared `persona-generation` background job through TaskPanel/useBackgroundTasks instead of blocking the Brand Hub while crawling. The worker reuses the shared `scrapeWorkspaceSite()` helper, then sends content to GPT-4.1 with a marketing strategist prompt that identifies 2-5 distinct audience segments. Returns structured JSON personas with: name, description, pain points, goals, objections, preferred content format, and buying stage. The AI identifies personas based on evidence from the website — who the services target, case study clients, language used. Results populate the Audience Personas manager in the Brand & AI hub (`BrandHub.tsx`) as draft personas for human review before saving. "Generate from Website" button in the personas section with loading state and toast notification showing count and pages scraped.
 
 **Agency value:** Skips the manual persona research step for new client onboarding. AI-generated personas are evidence-based (derived from actual website content) and immediately usable in content briefs, blog posts, and strategy.
 
@@ -907,6 +907,17 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 ---
 
+### 69A. Client API Contract Drift Hardening
+**What it does:** Keeps the client portal's public APIs and the intelligence layer in sync: public tier-gated usage routes now honor the workspace's effective tier, strategy responses preserve the enrichment fields the Strategy tab renders (`trendDirection`, `serpFeatures`, `competitorProof`, `questionKeywords`, `opportunityScore`), delivered content requests expose `deliveryUrl` and `deliveryNotes`, and client business priorities are normalized so the intelligence engine can read both string and object-based rows consistently.
+
+**Agency value:** Fewer support surprises caused by the UI and API disagreeing about what data exists. Trial users see the right limits, strategy reviews keep their signal, and delivered work shows the right handoff links.
+
+**Client value:** The dashboard behaves more predictably. Trial access, strategy suggestions, delivery status, and business-priority context now line up with what clients expect to see.
+
+**Mutual:** Removes a class of silent mismatches between storage, API serialization, and client rendering. That keeps the portal trustworthy without changing the overall product flow.
+
+---
+
 ### 70. CMS SEO Editor Issue Highlighting
 **What it does:** The CMS SEO Editor now matches the static page SEO editor's color-highlight system. Item rows show color-coded left borders (amber for SEO issues, status-colored for tracking state). Collapsed rows display "No title" (amber) and "No desc" (red) badges. Collection headers surface aggregate issue counts (missing names, SEO titles, meta descriptions). Character counts on Name and SEO fields use green/amber/red color coding with target thresholds. Unsaved changes shown as blue badges. Untitled items rendered in red italic.
 
@@ -963,7 +974,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 75. React Query Migration — Phase 1 (Client Portal)
-**What it does:** Replaced the monolithic `useClientData.ts` (312 lines, 32 `useState`, 6 `useCallback` fetch functions) with React Query-backed individual hooks composed via a backward-compatible facade. Created `src/hooks/client/useClientSearch.ts` (GSC overview, trend, comparison, devices), `src/hooks/client/useClientGA4.ts` (12 GA4 endpoints), and `src/hooks/client/useClientQueries.ts` (activity, ranks, annotations, anomalies, approvals, requests, content requests, audit, strategy, pricing, content plan). All data fetching now goes through `useQuery` with automatic caching (60s stale, 5min GC), stale-while-revalidate on tab focus, and per-query error states. WebSocket handlers now use `queryClient.invalidateQueries` instead of manual re-fetches. Date range changes trigger automatic refetch via query key changes. Return interface unchanged — `ClientDashboard.tsx` required only removal of `setAudit`/`AuditSummary` (now unused) and simplified `audit:complete` handler.
+**What it does:** Replaced the monolithic `useClientData.ts` (312 lines, 32 `useState`, 6 `useCallback` fetch functions) with React Query-backed individual hooks. Created `src/hooks/client/useClientSearch.ts` (GSC overview, trend, comparison, devices), `src/hooks/client/useClientGA4.ts` (12 GA4 endpoints), and `src/hooks/client/useClientQueries.ts` (activity, ranks, annotations, anomalies, approvals, requests, content requests, audit, strategy, pricing, content plan). The temporary compatibility facade was retired in the 2026-05 platform consolidation pass: `ClientDashboard.tsx` now composes the feature hooks directly, shared client data types live in `src/components/client/types.ts`, and WebSocket handlers invalidate query keys without routing through facade no-op setters. All data fetching now goes through `useQuery` with automatic caching (60s stale, 5min GC), stale-while-revalidate on tab focus, and per-query error states. Date range changes trigger automatic refetch via query key changes.
 
 **Agency value:** Individual hooks are 15-25 lines each vs the previous 312-line monolith. New features no longer need to thread state through `useClientData`. WebSocket integration is one-liners. React Query DevTools available for debugging.
 
@@ -1066,6 +1077,16 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 ---
 
+### 84a. Intelligence Layer Gap Follow-Up
+
+**What it does:** Tightens audit finding auto-resolution so scheduled and on-demand audit passes only resolve bridge-generated `audit_finding` insights from `bridge-audit-page-health` or `bridge-audit-site-health`, leaving manual findings untouched. Also populates `siteHealth.cwvPassRate.desktop` from the latest audit `cwvSummary.desktop` as a homepage/site-level pass indicator until PageSpeed snapshots are keyed by strategy.
+
+**Files:** `server/scheduled-audits.ts`, `server/routes/webflow-seo.ts`, `server/workspace-intelligence.ts`, `tests/integration/audit-insight-resolution.test.ts`, `tests/assemble-site-health.test.ts`
+
+**Agency value:** Prevents automated audit cleanup from closing manually-created findings while giving AI/admin context an accurate desktop CWV signal from already-captured audit data.
+
+---
+
 ### 85. Anomaly Boost Reversal
 
 **Status:** Shipped (PR 3 — Platform Health Sprint)
@@ -1098,8 +1119,8 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 Items to revisit as budget/tier upgrades allow or when priorities shift.
 
 ### OpenAI Model Upgrades
-- ~~All models upgraded to GPT-4.1 series~~: ✅ Shipped (March 10, 2026) — gpt-4o → gpt-4.1, gpt-4o-mini → gpt-4.1-mini across all endpoints (SEO rewrite, content briefs, content posts, schema, audit, anomaly detection, chat memory, strategy, keyword analysis, seo-copy, internal links). Alt text generation uses gpt-4.1-nano for cost savings on trivial tasks. Brand name context injected into all AI prompts that generate client-facing copy.
-- ~~All SEO rewrites → Claude primary~~: ✅ Shipped (March 24, 2026) — `/api/webflow/seo-rewrite`, `/api/webflow/seo-bulk-fix`, and `/api/webflow/seo-bulk-rewrite` now use `callCreativeAI()` (Claude Sonnet primary, GPT-4.1 fallback) for richer, more natural title/meta description language.
+- ~~All OpenAI text models upgraded to current GPT-5 family~~: ✅ Refreshed (May 6, 2026) — primary structured/analytical paths use `gpt-5.4`, cost-sensitive paths use `gpt-5.4-mini`, and trivial classification/summary paths use `gpt-5.4-nano`. Brand name context is injected into all AI prompts that generate client-facing copy.
+- ~~All SEO rewrites → Claude primary~~: ✅ Shipped (March 24, 2026) — `/api/webflow/seo-rewrite`, `/api/webflow/seo-bulk-fix`, and `/api/webflow/seo-bulk-rewrite` now use `callCreativeAI()` (Claude Sonnet primary, `gpt-5.4` fallback) for richer, more natural title/meta description language.
 - ~~Persistent bulk SEO suggestions with 3 variations~~: ✅ Shipped (March 24, 2026) — Bulk AI rewrite generates 3 differentiated variations per page, stored in SQLite (`seo_suggestions` table). Suggestions persist across refreshes. Users select preferred variation per page, then apply to Webflow in one action. Migration `023-seo-suggestions.sql`.
 
 ### Schema Generator Enhancements
@@ -1195,7 +1216,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - **Writer assignment**: Assign content pieces to specific writers with notifications.
 - **Content delivery**: Attach deliverables (Google Doc links, uploaded files) to completed requests.
 - ~~Knowledge base auto-generation~~: ✅ Shipped (March 10, 2026) — One-click website crawl extracts structured business knowledge (services, audience, differentiators, case studies, brand voice, expertise) from up to 15 priority pages. See Feature #62.
-- ~~Claude/GPT hybrid model~~: ✅ Shipped (March 10, 2026) — Claude (claude-sonnet-4-20250514) for creative prose (intro/sections/conclusion), GPT-4.1 for structured tasks (unification, SEO meta, briefs). Auto-fallback to GPT if no Anthropic key.
+- ~~Claude/GPT hybrid model~~: ✅ Refreshed (May 6, 2026) — Claude (`claude-sonnet-4-6`) for creative prose (intro/sections/conclusion), with `gpt-5.4` / `gpt-5.4-mini` for OpenAI structured tasks (unification, SEO meta, briefs). Auto-fallback to GPT if no Anthropic key.
 - ~~AI context enrichment audit~~: ✅ Shipped (March 11, 2026) — Full audit of all AI-powered features for context completeness. Fixes: (1) Content briefs now persist real SERP data (PAA questions + top results) instead of losing them after generation. (2) Keyword strategy master synthesis now receives knowledge base for better content gap alignment with business services. (3) Client chat now receives structured SEO context (keyword strategy + brand voice + keyword map) matching admin chat quality. (4) Internal link analyzer now receives knowledge base for better anchor text and link priority suggestions.
 - **Knowledge base enrichment**: Feed real case study metrics (traffic increases, conversion data, timelines) into the knowledge base so AI can reference actual numbers instead of vague outcomes.
 - **Brand voice training**: Allow uploading 3-5 sample blog posts as style examples so the AI can match the client's actual writing voice, not just a generic "conversational" tone.
@@ -1735,7 +1756,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 108. Background Job Persistence
-**What it does:** `server/jobs.ts` rewritten with SQLite write-through cache (migration `006-jobs.sql`). Background jobs (audits, brief generation, post generation, etc.) now persist to the `jobs` table and survive server restarts. Running/pending jobs are marked as `interrupted` during graceful shutdown. Write-through cache means reads hit memory for speed, writes go to both memory and SQLite for durability.
+**What it does:** `server/jobs.ts` rewritten with SQLite write-through cache (migration `006-jobs.sql`). Background jobs (audits, brief generation, post generation, etc.) now persist to the `jobs` table and survive server restarts. Running/pending jobs are marked as interrupted during graceful shutdown and as errored with a visible restart-interruption message during startup recovery if the process died before shutdown completed. Write-through cache means reads hit memory for speed, writes go to both memory and SQLite for durability.
 
 **Agency value:** Long-running jobs (AI content generation, full-site audits) no longer lost on deploy or restart. Interrupted jobs are visible in the admin UI so you know what to re-run.
 
@@ -2287,8 +2308,8 @@ When the user asks to update this document with recent features, follow this pro
 
 
 ### 125. Bundle Optimization & Dependency Audit
-**What it does:** Verified Lucide tree-shaking (each icon individually code-split), added vendor chunk splitting via `manualChunks` in Vite config (react-vendor, stripe), and lazy-loaded StripePaymentForm so the Stripe SDK only loads when a payment is initiated. Main bundle split from 366 kB into 188 kB (app) + 190 kB (react-vendor) for independent caching. ClientDashboard reduced from 379 → 359 kB by extracting Stripe into a 13 kB lazy chunk. Total JS unchanged (~1,947 kB) but initial page load and long-term caching significantly improved.
-**Files:** `vite.config.ts` (manualChunks), `src/components/ClientDashboard.tsx` (lazy Stripe import)
+**What it does:** Verified Lucide tree-shaking (each icon individually code-split), added vendor chunk splitting via `manualChunks` in Vite config (react-vendor, stripe), and later removed the client-side Stripe Elements chunk when billing consolidated on Checkout-only redirects. Main bundle split from 366 kB into 188 kB (app) + 190 kB (react-vendor) for independent caching; the former inline payment form no longer ships to clients because Checkout handles the hosted payment UI.
+**Files:** `vite.config.ts` (manualChunks), `src/components/ClientDashboard.tsx`, `src/hooks/usePayments.ts`
 
 **Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
 
@@ -2748,7 +2769,7 @@ When the user asks to update this document with recent features, follow this pro
 
 
 ### 162. Unified AI Context Architecture
-**What it does:** Refactors `buildSeoContext()` in `server/seo-context.ts` to be the single source of truth for all AI context. The `SeoContext` return object now includes `personasBlock`, `knowledgeBlock`, and a `fullContext` convenience string (all blocks joined) in addition to the existing `keywordBlock`, `brandVoiceBlock`, `businessContext`, and `strategy`. All 13 AI feature call sites updated to use the unified return — no more separate `buildPersonasContext()`/`buildKnowledgeBase()` imports scattered across the codebase. **5 features that previously had no KB/persona context are now wired up:** SEO audit auto-fix suggestions, Google Search Console chat, keyword analysis, content decay refresh recommendations, and content post AI review. The separate functions still exist for backward compatibility but are only called internally by `buildSeoContext()`.
+**What it does:** Refactors `buildSeoContext()` in `server/seo-context.ts` to be the single source of truth for all AI context. The `SeoContext` return object now includes `personasBlock`, `knowledgeBlock`, and a `fullContext` convenience string (all blocks joined) in addition to the existing `keywordBlock`, `brandVoiceBlock`, `businessContext`, and `strategy`. All 13 AI feature call sites updated to use the unified return — no more separate `buildPersonasContext()`/`buildKnowledgeBase()` imports scattered across the codebase. **5 features that previously had no KB/persona context are now wired up:** SEO audit auto-fix suggestions, Google Search Console chat, keyword analysis, content decay refresh recommendations, and content post AI review. The separate functions still exist for backward compatibility but are only called internally by `buildSeoContext()`. **AI dispatcher consolidation (May 2026):** general OpenAI/Anthropic generation paths now route through `callAI()` instead of importing provider helpers directly, preserving model choices while keeping future provider routing centralized. Migrated coverage includes chat memory summaries, anomaly digest summaries, meeting briefs, monthly digests, content decay recommendations, internal link suggestions, SEO audit metadata recommendations, rewrite chat, admin/client Search chat, workspace intelligence-profile autofill, keyword recommendations, keyword strategy synthesis, content briefs/outline regeneration, content post creative generation/SEO metadata/voice scoring/AI review, content publish field mapping, AEO page review, schema plan/template suggestions, diagnostic synthesis, Webflow keyword analysis, llms.txt page summaries, Webflow per-page SEO copy generation, jobs bulk SEO fixes, page analysis jobs, bulk Webflow page analysis jobs, copy pipeline generation/regeneration, and blueprint generation. The dispatcher also passes OpenAI JSON response format through for structured outputs, with brandscript import, copy-intelligence pattern extraction, copy refresh suggestions, discovery extraction, diagnostics, content briefs, and voice feedback classification/suggestion migrated onto that shared path.
 **Files:** `server/seo-context.ts` (expanded `SeoContext` interface + `buildSeoContext()`), `server/routes/webflow-seo.ts`, `server/admin-chat-context.ts`, `server/content-posts-ai.ts`, `server/content-brief.ts`, `server/aeo-page-review.ts`, `server/routes/rewrite-chat.ts`, `server/internal-links.ts`, `server/routes/keyword-strategy.ts`, `server/routes/public-analytics.ts`, `server/seo-audit.ts`, `server/routes/google.ts`, `server/routes/webflow-keywords.ts`, `server/content-decay.ts`, `server/routes/content-posts.ts`
 
 **Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
@@ -2847,8 +2868,8 @@ When the user asks to update this document with recent features, follow this pro
 
 
 ### 171. Page Analysis — Background Job System
-**What it does:** Moves bulk "Analyze All Pages" from a frontend Promise.all loop (blocked navigation, lost on refresh) to the server-side background job system. Job type `page-analysis` in `server/routes/jobs.ts`: discovers all pages (static + CMS via sitemap), fetches HTML for each, extracts title/meta/content, calls GPT-4.1-mini keyword analysis with SEMRush enrichment, and auto-persists all 15 analysis fields to workspace keywordStrategy.pageMap. Processes in batches of 3 with 1.5s rate limiting. Cancellable via WebSocket. Frontend watches job progress via `useBackgroundTasks` hook. TaskPanel shows "Page Analysis" label. Activity log records completion.
-**Files:** `server/routes/jobs.ts` (new `page-analysis` job case — ~270 lines), `server/activity-log.ts` (added `page_analysis` to ActivityType), `src/components/PageIntelligence.tsx` (useBackgroundTasks integration, job progress watching, cancel wiring), `src/components/TaskPanel.tsx` (type label)
+**What it does:** Moves bulk "Analyze All Pages" from a frontend Promise.all loop (blocked navigation, lost on refresh) to the server-side background job system. Job type `page-analysis` dispatches through `server/routes/jobs.ts` and runs in `server/page-analysis-job.ts`: discovers all pages (static + CMS via sitemap), fetches HTML for each, extracts title/meta/content, calls GPT-4.1-mini keyword analysis with SEMRush enrichment, and auto-persists all 15 analysis fields to workspace keywordStrategy.pageMap. Processes in batches of 3 with 1.5s rate limiting. Cancellable via WebSocket; cancellation now remains visible through durable job status even after abort-controller cleanup. Frontend watches job progress via `useBackgroundTasks` hook and rediscovers active `page-analysis` jobs after navigation/reload so inline progress stays aligned with TaskPanel. TaskPanel shows "Page Analysis" label. Activity log records completion. Terminal states are explicit: empty discovery reports that no pages were found, missing OpenAI configuration shows a user-facing job message, and pages whose HTML cannot be fetched are skipped with visible skipped-count accounting instead of sending empty content to AI.
+**Files:** `server/routes/jobs.ts` (`page-analysis` dispatch case), `server/page-analysis-job.ts` (worker body), `server/activity-log.ts` (added `page_analysis` to ActivityType), `src/components/PageIntelligence.tsx` (useBackgroundTasks integration, job progress watching, cancel wiring), `src/components/TaskPanel.tsx` (type label)
 
 **Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
 
@@ -3217,7 +3238,7 @@ When the user asks to update this document with recent features, follow this pro
 ---
 
 ### 204. Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)
-**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources workspace data through `buildWorkspaceIntelligence()` slices instead of direct DB helpers. Activity → `intel.operational.recentActivity`, CWV/PageSpeed summary → `intel.siteHealth`, client health/churn signals → `intel.clientSignals`. Context size is managed through selective slice inclusion per question category (general queries union all three supplemental slices). Approvals keep direct `listBatches()` call + `intel.operational.approvalQueue` supplement. Performance keeps direct `getLinkCheck()`/`getPageSpeed()` calls for per-URL dead link detail (up to 10) and worst-page scores (top 5) — the siteHealth slice only stores counts, matching the `listBatches()` supplement pattern. Churn signals now surface human-readable `title` and `description` fields. CWV pass rate correctly converted from 0–1 decimal to percentage. (2) **businessProfile auto-populate**: the Intelligence Profile editor gains an "Auto-fill from site data" button (Sparkles icon, teal). Calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-4.1-mini` (temperature 0.3, 300 tokens) in JSON mode, returns `{ industry, goals, targetAudience }` pre-filled into the form. Autofill is a pure suggestion — no save/broadcast until the user clicks Save.
+**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources workspace data through `buildWorkspaceIntelligence()` slices instead of direct DB helpers. Activity → `intel.operational.recentActivity`, CWV/PageSpeed summary → `intel.siteHealth`, client health/churn signals → `intel.clientSignals`. Context size is managed through selective slice inclusion per question category (general queries union all three supplemental slices). Approvals keep direct `listBatches()` call + `intel.operational.approvalQueue` supplement. Performance keeps direct `getLinkCheck()`/`getPageSpeed()` calls for per-URL dead link detail (up to 10) and worst-page scores (top 5) — the siteHealth slice only stores counts, matching the `listBatches()` supplement pattern. Churn signals now surface human-readable `title` and `description` fields. CWV pass rate correctly converted from 0–1 decimal to percentage. (2) **businessProfile auto-populate**: the Intelligence Profile editor gains an "Auto-fill from site data" button (Sparkles icon, teal). Calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-5.4-mini` (temperature 0.3, 300 tokens) in JSON mode, returns `{ industry, goals, targetAudience }` pre-filled into the form. Autofill is a pure suggestion — no save/broadcast until the user clicks Save.
 
 **Files:** `server/admin-chat-context.ts`, `server/routes/workspaces.ts`, `src/components/settings/IntelligenceProfileTab.tsx`, `tests/admin-chat-slice-migration.test.ts` (new)
 
@@ -3348,9 +3369,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**310 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**329 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **310**. Last updated: April 2026.
+Current feature count: **329**. Last updated: May 2026.
 
 ---
 
@@ -3965,7 +3986,7 @@ Current feature count: **310**. Last updated: April 2026.
 
 ### 326. Schema Page-Element Catalog PR2 (PR #388, 2026-04-30)
 
-**What it does:** Builds on PR1's catalog infrastructure to ship 3 new pattern-based extractors (images with rule-based hero/informative/decorative role classification, tables with pricing/comparison heuristics, testimonials with author + optional rating extraction) plus 2 AI-assisted extractors (image role classifier with vision via gpt-4.1-mini, HowTo-list disambiguation via gpt-4.1-mini text) behind a single feature flag `schema-ai-element-classifier` (default OFF, 120-call shared `AiBudget` per regenerate-all run). Adds 4 validator `REQUIRED_BY_TYPE` entries (Review, AggregateRating, Table, ImageGallery) and 3 schema integrations: `ImageGallery` node on Article + Service templates from informative images; `Review[]` graph nodes + `AggregateRating` aggregate on Service + LocalBusiness templates from rated testimonials; `Table` mainEntity sub-graph on Service templates from pricing/comparison tables. Each new node has a synchronous pre-emission gate (Devin PR1 r2 BUG-0001 lesson): Review requires `itemReviewed.@id` + `reviewRating` + `author` all present; AggregateRating only emits when ≥1 testimonial has a rating; Table requires `about` populated; ImageGallery requires `name` + ≥2 informative images.
+**What it does:** Builds on PR1's catalog infrastructure to ship 3 new pattern-based extractors (images with rule-based hero/informative/decorative role classification, tables with pricing/comparison heuristics, testimonials with author + optional rating extraction) plus 2 AI-assisted extractors (image role classifier with vision via gpt-5.4-mini, HowTo-list disambiguation via gpt-5.4-mini text) behind a single feature flag `schema-ai-element-classifier` (default OFF, 120-call shared `AiBudget` per regenerate-all run). Adds 4 validator `REQUIRED_BY_TYPE` entries (Review, AggregateRating, Table, ImageGallery) and 3 schema integrations: `ImageGallery` node on Article + Service templates from informative images; `Review[]` graph nodes + `AggregateRating` aggregate on Service + LocalBusiness templates from rated testimonials; `Table` mainEntity sub-graph on Service templates from pricing/comparison tables. Each new node has a synchronous pre-emission gate (Devin PR1 r2 BUG-0001 lesson): Review requires `itemReviewed.@id` + `reviewRating` + `author` all present; AggregateRating only emits when ≥1 testimonial has a rating; Table requires `about` populated; ImageGallery requires `name` + ≥2 informative images.
 
 **Why this PR:** PR1 shipped the catalog infrastructure + 3 highest-leverage element types (videos, HowTo lists, citations). PR2 ships the visual + commerce piece — Review/AggregateRating unlocks Google's review-rich-snippets eligibility for Service pages; Table/ImageGallery enrich pricing and gallery sections without breaking the lean-schema invariant.
 
@@ -3974,7 +3995,7 @@ Current feature count: **310**. Last updated: April 2026.
 - The HowTo disambiguator stays on `callAI` (text-only prompt — dispatcher works cleanly).
 - `generateSchemaSuggestions` now allocates ONE `AiBudget` per regenerate-all run (gated on `isFeatureEnabled('schema-ai-element-classifier')`) and threads it through both the static-pages loop and the CMS-items loop. Closes Devin's PR1 round-5 informational note that flagged the per-call vs per-run gap.
 
-**AI cost budget:** ≤$0.01 per regenerate-all on a 28-page Webflow site (28 pages × ~50% needing classification × $0.0001/call gpt-4.1-mini). Per-run cap of 100 image classifications + 20 HowTo disambiguations is enforced by a SINGLE `AiBudget` allocated at the top of `generateSchemaSuggestions`.
+**AI cost budget:** AI classification stays bounded by a per-run cap of 100 image classifications + 20 HowTo disambiguations, enforced by a SINGLE `AiBudget` allocated at the top of `generateSchemaSuggestions`. Current model refresh uses `gpt-5.4-mini` for these PR2 classification paths.
 
 **Files:** `shared/types/feature-flags.ts` (+1 line); `server/schema/validator.ts` (+4 REQUIRED_BY_TYPE entries + recursive nested-object validation for inline schema.org types); `server/schema-suggester.ts` (3 `generateLeanSchema` sites threaded with shared `aiBudget`); `server/schema/extractors/page-elements.ts` (wire 3 new pattern extractors + 2 AI passes); `server/schema/extractors/page-elements/images.ts` (NEW); `server/schema/extractors/page-elements/tables.ts` (NEW); `server/schema/extractors/page-elements/testimonials.ts` (NEW); `server/schema/extractors/page-elements/image-fetch.ts` (NEW utility); `server/schema/extractors/page-elements/image-ai-classifier.ts` (NEW); `server/schema/extractors/page-elements/howto-ai-fallback.ts` (NEW); `server/schema/templates/article.ts` (+ImageGallery emission); `server/schema/templates/service.ts` (+Review[] + AggregateRating + ImageGallery + Table); `server/schema/templates/local-business.ts` (+Review[] + AggregateRating); 4 new HTML fixtures (`webflow-service-pricing-table.html`, `webflow-testimonials.html`, `webflow-decorative-images.html`, `webflow-mixed-elements-pr2.html`); 6 new unit + integration test files; `tests/integration/lean-schema-generator.test.ts` extended with PR2 multi-node @graph emission case; `scripts/pr-check.ts` (added 2 image-ai files to bare-JSON.parse exclusion list).
 
@@ -4168,3 +4189,477 @@ All replaced `.includes()` / `.endsWith()` with `normalizePath()` + exact compar
 **Mutual:** Eliminates a class of data-integrity bugs that caused incorrect keyword/traffic attribution across all SEO tools.
 
 **Files modified:** `src/components/CmsEditor.tsx` (bugs 1, 3); `src/components/SeoEditor.tsx` (bug 10); `server/routes/webflow-seo.ts` (bugs 4, 6); `server/seo-change-tracker.ts` (bug 8); `server/admin-chat-context.ts` (bug 9); `tests/admin-chat-path-matching.test.ts` (updated assertions).
+
+
+### 328. Strategy Keywords — Two-Zone Flat List + Keyword Detail Drawer (PRs #430–#434 + task commits)
+**What it does:** Full rebuild of the client-facing strategy keywords panel in `StrategyTab.tsx`. Replaces the sortable 7-column table with accordion expand with a scannable two-zone flat list and a slide-in keyword detail drawer.
+
+**Two-zone flat list:**
+- **Confirmed** keywords appear above with standard surface styling.
+- **Suggestions** (keyword ideas / content gap candidates) appear below with a blue-tinted row background (`bg-blue-950/60 border border-blue-900/50`) visually separating them from confirmed keywords.
+- Each row shows: keyword name (truncated, one line) + role·volume·KD sublabel (truncated, one line). No sort controls.
+- Role sublabel format: `"role · N/mo · KD N"` — role as plain text, volume as `/mo` suffix, KD as numeric.
+
+**Keyword detail drawer:**
+- Opens on row click. Desktop: right-side slide-in panel (`sm:w-full sm:max-w-sm`, `animate-in slide-in-from-right duration-200`). Mobile: bottom sheet (`fixed inset-x-0 bottom-0 h-[65vh]`, `rounded-t-[var(--radius-signature-lg)]`).
+- **Metrics strip:** volume, KD (with difficulty color), trend direction (with trend color).
+- **AI rationale:** prose from `contentGaps.rationale`, falls back to `opportunityDetail`.
+- **Signals chips:** `serpFeatures`, competitor proof, impression data — small info badges.
+- **Next move:** `nextMoveLabel` + `nextMoveDetail` text + context-appropriate CTA (e.g. "Improve page", "Map a page", "Add to strategy").
+- **Footer actions:** "Remove from strategy" (confirmed rows) / "Add to strategy" + "Dismiss" (suggestion rows).
+
+**Role badge colors (in drawer):**
+- `content opportunity` → `border-emerald-500/20 bg-emerald-500/8 text-accent-success`
+- `page opportunity` → `border-blue-500/20 bg-blue-500/10 text-accent-info`
+- `strategy keyword` → `border-teal-500/20 bg-teal-500/8 text-accent-brand`
+- `keyword idea` → `border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]`
+
+**KD difficulty coloring (in drawer metrics + list sublabel):** emerald ≤29, amber 30–49, red ≥50. No KD → muted.
+
+**Trend coloring (in drawer metrics):** rising = `text-emerald-400`, declining = `text-red-400`, stable/unknown = muted.
+
+**Files:** `src/components/client/StrategyTab.tsx` (full panel rebuild: two-zone list, drawer, role/KD/trend helpers, `StrategyKeywordTableRow` extended with `rationale` + `trendDirection`, dead sort/filter state removed, `openKeywordDrawer` state added).
+
+**Agency value:** Cleaner keyword review UX. Clients can scan all keywords at a glance and get full context on demand without leaving the strategy tab.
+
+**Client value:** Strategy keywords are now browsable and actionable. Each keyword shows why it matters (AI rationale), how hard it is to rank for (KD color), where the trend is heading, and what to do next — all in one panel.
+
+**Mutual:** Faster strategy alignment with clients. The drawer surfaces the "next move" recommendation so the conversation can be about action, not data interpretation.
+
+
+### 329. Platform Consolidation — Monolith Split Phase 1
+**What it does:** First behavior-preserving split in the platform consolidation monolith track. `server/routes/webflow-seo.ts` was retired after its remaining endpoints moved into focused routers: SEO suggestion CRUD/apply routes live in `server/routes/webflow-seo-suggestions.ts`, page HTML fetching and per-page SEO copy generation live in `server/routes/webflow-seo-page-tools.ts`, single-page SEO rewrite generation lives in `server/routes/webflow-seo-rewrite.ts`, legacy bulk rewrite suggestion generation lives in `server/routes/webflow-seo-bulk-rewrite.ts`, live SEO bulk-fix and pattern-apply routes live in `server/routes/webflow-seo-apply.ts`, the on-demand audit endpoint lives in `server/routes/webflow-seo-audit.ts`, and the `/api/seo/:workspaceId/*` background job start endpoints live in `server/routes/webflow-seo-jobs.ts`. `server/workspace-intelligence.ts` also delegates the page-scoped `pageElements` assembler/formatter to `server/intelligence/page-elements-slice.ts`. The bulk audit-fix, bulk rewrite, and bulk analyze background job bodies now live in `server/webflow-seo-bulk-accept-fixes-job.ts`, `server/webflow-seo-bulk-rewrite-job.ts`, and `server/webflow-seo-bulk-analyze-job.ts`, keeping the route responsible for auth/validation/job start while the workers own progress, Webflow/AI work, broadcasts, activity, and abort cleanup. On-demand SEO audit page-state marking and audit insight bridge handling now live in `server/webflow-seo-audit-bridges.ts`.
+
+**Agency value:** Smaller route and intelligence files make SEO tooling safer to change. Engineers can work on suggestions, page tools, bulk jobs, and intelligence slices without reopening one giant file for every change.
+
+**Client value:** N/A — infrastructure-only refactor with preserved endpoints and behavior.
+
+**Mutual:** Creates the first clean stepping stone for the larger monolith roadmap: keyword strategy route split, StrategyTab decomposition, Webflow SEO job split, and workspace intelligence slice extraction.
+
+**Files:** `server/routes/webflow-seo-suggestions.ts`; `server/routes/webflow-seo-page-tools.ts`; `server/routes/webflow-seo-rewrite.ts`; `server/routes/webflow-seo-bulk-rewrite.ts`; `server/routes/webflow-seo-apply.ts`; `server/routes/webflow-seo-audit.ts`; `server/routes/webflow-seo-jobs.ts`; `server/webflow-seo-rewrite-utils.ts`; `server/webflow-seo-audit-bridges.ts`; `server/webflow-seo-bulk-accept-fixes-job.ts`; `server/webflow-seo-bulk-rewrite-job.ts`; `server/webflow-seo-bulk-analyze-job.ts`; `server/schemas/seo-bulk-jobs.ts`; `server/route-groups/webflow.ts`; `server/workspace-intelligence.ts`; `server/intelligence/page-elements-slice.ts`; `tests/unit/page-elements-slice.test.ts`; `tests/unit/webflow-seo-audit-bridges.test.ts`; `tests/unit/webflow-seo-bulk-accept-fixes-job.test.ts`; `tests/unit/webflow-seo-bulk-rewrite-job.test.ts`; `tests/unit/webflow-seo-bulk-analyze-job.test.ts`.
+
+
+### 330. Platform Consolidation — SEO Provider Boundary Cleanup
+**What it does:** Finishes the keyword-strategy-facing cleanup from SEMRush-specific naming toward the existing `SeoDataProvider` abstraction. Provider-neutral trend/SERP helpers now live in `server/seo-provider-signals.ts`; `server/semrush.ts` keeps compatibility re-exports only. Keyword strategy generation imports the neutral helpers, emits `seo-data` progress events, and stores `seoDataMode` for new strategies while preserving `semrushMode` fallback for legacy jobs, direct route callers, and existing stored strategy blobs.
+
+The admin Keyword Strategy UI now uses `seoDataAvailable` / `seoDataMode` state and sends `seoDataMode` into background jobs. `useKeywordStrategy()` derives availability from `/api/seo-providers/status`, so DataForSEO-only workspaces can enable SEO data mode without depending on the legacy `/api/semrush/status` naming. The admin read path returns a provider-neutral `seoDataMode` alias for old strategies that only have `semrushMode`; the public client strategy endpoint continues to omit provider/mode internals.
+
+**Agency value:** Keyword strategy settings now describe the configured SEO data provider instead of implying SEMRush is the only backend. This reduces confusion as DataForSEO becomes the default provider.
+
+**Client value:** N/A — admin-facing naming and platform boundary cleanup only. Client-safe APIs remain unchanged.
+
+**Mutual:** Keeps provider-specific code at the provider boundary while preserving old route/job payload compatibility, making the next keyword strategy service split less tangled.
+
+**Files:** `server/seo-provider-signals.ts`; `server/keyword-strategy-generation.ts`; `server/routes/keyword-strategy.ts`; `server/routes/jobs.ts`; `server/semrush.ts`; `shared/types/workspace.ts`; `src/hooks/admin/useKeywordStrategy.ts`; `src/components/KeywordStrategy.tsx`; `src/components/strategy/CompetitiveIntel.tsx`; `src/components/strategy/KeywordStrategyGuide.tsx`; `tests/contract/seo-provider-boundary.test.ts`; `tests/component/KeywordStrategyBackgroundJob.test.tsx`; `tests/integration/client-strategy.test.ts`; `tests/unit/use-page-join.test.ts`.
+
+
+### 331. Platform Consolidation — Keyword Strategy Service Split Phase 1
+**What it does:** Starts the keyword strategy backend split after the route wrapper and provider-boundary cleanup. Pure deterministic helpers now live in `server/keyword-strategy-helpers.ts`: content-gap opportunity scoring, incremental page freshness selection, competitor cache freshness checks, and strategy-intelligence prompt block formatting. SEO provider data collection now lives in `server/keyword-strategy-seo-data.ts`, keeping domain keyword fetches, competitor discovery, competitor keyword/gap collection, related keywords, question keywords, and competitor cache timestamp writes behind one focused function.
+
+`server/keyword-strategy-generation.ts` remains the orchestration service for discovery, analytics collection, AI page mapping, enrichment, persistence, broadcasts, activity, and follow-on recommendation/llms.txt work, but it no longer owns the pure helper logic or provider collection internals. Public route re-exports remain compatible for existing tests and importers.
+
+**Agency value:** Engineers can review and change keyword strategy helper logic or provider collection behavior without reopening the entire generation service. This reduces merge risk and makes the remaining split work easier to sequence.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Creates the first keyword-strategy-specific stepping stone for the larger backend split: orchestration can now be separated from provider collection, helper logic, enrichment, and persistence in follow-up slices.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-helpers.ts`; `server/keyword-strategy-seo-data.ts`.
+
+
+### 332. Platform Consolidation — Keyword Strategy Service Split Phase 2
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving live-page discovery/content collection and first-party search signal collection out of the orchestration service. `server/keyword-strategy-pages.ts` now owns live domain resolution, Webflow metadata lookup, sitemap-based live page discovery, utility/legal page filtering, large-site page caps, bounded HTML snippet reads, thin-page filtering, and incremental-mode fresh-page skeleton recovery. `server/keyword-strategy-search-data.ts` now owns GSC query/device/country/period comparison fetches and GA4 organic landing page/conversion/event fetches.
+
+`server/keyword-strategy-generation.ts` still coordinates provider data, prompt assembly, AI page mapping/master synthesis, enrichment, persistence, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration, but it no longer owns the discovery and search-data plumbing directly. Progress labels, incremental no-op behavior, sitemap fallback behavior, and direct/background job compatibility are preserved.
+
+**Agency value:** Engineers can reason about crawl/page collection and analytics collection independently from the AI synthesis body. This reduces the review surface for the remaining keyword strategy split work and makes future fixes to page discovery or search data safer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves another cohesive chunk out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-pages.ts`; `server/keyword-strategy-search-data.ts`.
+
+
+### 333. Platform Consolidation — Keyword Strategy Service Split Phase 3
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving AI prompt context assembly, page-batch keyword mapping, keyword-pool construction, incremental fresh-page merge handling, post-AI keyword validation, and master site-level synthesis into `server/keyword-strategy-ai-synthesis.ts`.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for discovery, search data, provider data, enrichment, persistence/history, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration. The extracted synthesis service preserves the shared `callAI()` dispatcher path, prompt wrapping through `buildSystemPrompt()`, declined/requested keyword handling, competitor brand filtering, invalid-master-JSON payload behavior, and incremental no-op refund path compatibility.
+
+**Agency value:** Engineers can review prompt assembly and AI synthesis behavior without reopening crawl/search/provider/enrichment/persistence code. This narrows future review surface for prompt changes and keeps the remaining split work easier to sequence.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the highest-token AI section out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `tests/contract/ai-dispatch-migration.test.ts` (AI dispatcher guard moved to the synthesis module); `tests/integration/brand-filter-wiring.test.ts` (static wiring assertions split between generation and synthesis responsibilities).
+
+
+### 334. Platform Consolidation — Keyword Strategy Service Split Phase 4
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving post-synthesis enrichment into `server/keyword-strategy-enrichment.ts`. The extracted service owns GSC page metrics, provider volume/KD/CPC and SERP feature enrichment, content-gap metrics and opportunity scoring, SERP targeting recommendations, cannibalization detection, AI topical authority clustering, site keyword metrics, quick-win ROI scoring, and final impact sorting.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for page/search/provider input collection, AI synthesis, persistence/history, broadcasts, activity, rank seeding, recommendations, and llms.txt regeneration. The enrichment service preserves existing progress labels, provider bulk lookup caps, GSC-impression fallbacks, zero-volume content-gap retention, and direct/background job compatibility.
+
+**Agency value:** Engineers can change ranking-data enrichment or scoring behavior without reopening AI prompt assembly or persistence code. This makes remaining persistence/history/broadcast extraction smaller and easier to review.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the ranking-data and scoring layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-enrichment.ts`; `tests/contract/seo-provider-boundary.test.ts` (provider-neutral signal boundary moved with enrichment responsibility).
+
+
+### 335. Platform Consolidation — Keyword Strategy Service Split Phase 5
+**What it does:** Continues the behavior-preserving keyword strategy backend split by moving persistence/history/broadcast side effects into `server/keyword-strategy-persistence.ts`. The extracted service owns page-keyword table writes, incremental/full replacement semantics, strategy-history snapshots and pruning, workspace strategy blob persistence, strategy-generated activity logging, `STRATEGY_UPDATED` broadcasts, SEO/intelligence cache invalidation, and strategy outcome-action recording.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestration service for page/search/provider input collection, AI synthesis, enrichment, rank seeding, recommendations, and llms.txt regeneration. The persistence service preserves full vs incremental page-map writes, history ordering, activity-after-persistence ordering, broadcast payloads, cache invalidation bridges, and direct/background job compatibility.
+
+**Agency value:** Engineers can review persistence and cache/broadcast correctness without reopening crawl, AI, or enrichment logic. This narrows the last remaining route-split work to tracked-keyword/recommendation/llms.txt follow-ons.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Moves the storage and realtime consistency layer out of the keyword strategy monolith while keeping the shared generation service intact for both direct compatibility routes and background jobs.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-persistence.ts`; `tests/contract/keyword-strategy-activity-parity.test.ts` (activity/persistence ordering guard now follows the extracted service).
+
+
+### 336. Platform Consolidation — Keyword Strategy Service Split Phase 6
+**What it does:** Completes the behavior-preserving keyword strategy backend split by moving post-persistence follow-ons into `server/keyword-strategy-follow-ons.ts`. The extracted service owns rank-tracking auto-seeding from strategy keywords/page primary keywords, keyword-strategy-triggered llms.txt regeneration, and deduped recommendation refreshes after strategy updates.
+
+`server/keyword-strategy-generation.ts` remains the shared direct-route/background-job orchestrator and still owns generation lifecycle state, keepalive cleanup, response assembly, usage refunds, and active-generation cleanup. Follow-on ordering is preserved: tracked keyword seeding runs after persistence succeeds, and detached llms.txt/recommendation refreshes are queued only after the response strategy is assembled and marked safe.
+
+**Agency value:** Engineers can review post-strategy side effects without reopening crawl, AI synthesis, enrichment, or persistence code. The generator now reads as a focused orchestration service, making the follow-on behavior easier to audit for direct route/background job parity.
+
+**Client value:** N/A — infrastructure-only refactor with preserved keyword strategy behavior.
+
+**Mutual:** Finishes the route split portion of the platform consolidation keyword strategy work while leaving storage normalization sequenced under the dedicated follow-up roadmap items.
+
+**Files:** `server/keyword-strategy-generation.ts`; `server/keyword-strategy-follow-ons.ts`; `tests/contract/keyword-strategy-follow-ons.test.ts`.
+
+
+### 337. Platform Consolidation — Client StrategyTab State Hooks Phase 1
+**What it does:** Starts the Client StrategyTab split by moving keyword feedback, tracked strategy keyword, and business-priority workflow state out of `StrategyTab.tsx` into focused hooks under `src/components/client/strategy/`. The tab remains the rendering/orchestration shell for now, while `useStrategyKeywordFeedback`, `useStrategyTrackedKeywords`, and `useStrategyBusinessPriorities` own the API calls, loading/error state, local optimistic state, retry entry points, and existing toast behavior for those workflows.
+
+The migration preserves the current client behavior: feedback approval/decline/undo still uses the public keyword-feedback endpoints, tracked keywords still load/add/remove through the typed API wrapper, business priorities still persist through the existing public route, and the tab's retry/error UI still calls the same logical reload paths.
+
+**Agency value:** Engineers can continue splitting the 2k-line client strategy surface without editing keyword feedback, tracked keyword, and priority persistence logic in the same file. This reduces review noise for the next section-extraction slice.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab behavior.
+
+**Mutual:** Creates stable client-side ownership boundaries for the larger platform consolidation sprint while keeping the current tab UI intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/useStrategyKeywordFeedback.ts`; `src/components/client/strategy/useStrategyTrackedKeywords.ts`; `src/components/client/strategy/useStrategyBusinessPriorities.ts`; `tests/contract/client-strategy-tab-split.test.ts`.
+
+
+### 338. Platform Consolidation — Client StrategyTab Drawer Section Phase 2
+**What it does:** Continues the Client StrategyTab split by moving the keyword detail drawer markup and actions into `src/components/client/strategy/StrategyKeywordDrawer.tsx`. Shared keyword row display types, labels, intent colors, confidence labels, audience/momentum formatting, and role badge styling now live in `src/components/client/strategy/strategyKeywordDisplay.ts`, so `StrategyTab.tsx` can keep owning row assembly, state, focus trapping, and drawer snapshot selection while the rendered drawer body is isolated.
+
+The migration preserves the current drawer behavior: close backdrop, focus target, mobile bottom-sheet/desktop side-panel classes, opportunity and position metrics, evidence disclosure, content/page navigation actions, add/remove strategy actions, and dismiss feedback still use the same state and callbacks from `StrategyTab`.
+
+**Agency value:** Engineers can change keyword drawer layout, copy, or evidence presentation without reopening the full StrategyTab workflow file. This reduces review surface for the next content-gap / quick-win section extraction.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab drawer behavior.
+
+**Mutual:** Moves the largest drawer surface out of the client strategy monolith while keeping the state/control flow in one place for this phase.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordDrawer.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
+
+
+### 339. Platform Consolidation — Client StrategyTab Content Section Phase 3
+**What it does:** Continues the Client StrategyTab split by moving the Create Content accordion into `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`. The extracted section owns strong content recommendations, keyword idea review cards, additional page ideas, request-status badges, content-plan navigation badges, feedback chips, and brief/full-post request actions, while `StrategyTab.tsx` keeps owning expansion state, deep-link refs, pricing-modal state, feedback callbacks, and tab navigation.
+
+Shared keyword display helpers now include `kdColor()` alongside the existing intent and number formatting helpers so content gaps, keyword ideas, quick wins, and future extracted sections use the same difficulty color mapping.
+
+**Agency value:** Engineers can review content recommendation layout and request-button behavior without reopening the full StrategyTab orchestration file. This narrows the next section extraction to quick wins/page opportunities, business priorities, and remaining request-flow cleanup.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab Create Content behavior.
+
+**Mutual:** Moves another high-churn rendered section out of the client strategy monolith while keeping current tier gates, deep-link expansion, feedback, plan badges, and pricing-modal behavior intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`; `src/components/client/strategy/strategyKeywordDisplay.ts`; `tests/contract/client-strategy-tab-content-gaps.test.ts`.
+
+
+### 340. Platform Consolidation — Client StrategyTab Page Improvements Phase 4
+**What it does:** Continues the Client StrategyTab split by moving the Improve Pages accordion into `src/components/client/strategy/StrategyPageImprovementsSection.tsx`. The extracted section owns quick-win rendering, unranked page growth-opportunity scoring/sorting, "Pages to Review" cards, request-review API submission state, and show-more controls, while `StrategyTab.tsx` keeps owning expansion state, deep-link refs, strategy health scoring, page-map rendering, and the remaining workflow shell.
+
+The migration preserves the current client behavior: the Improve Pages deep-link still expands the same section, quick wins still show the same impact badges and limits, page review cards keep the same "Almost there" and difficulty signals, and optimization requests still POST to the existing public content-request route with the same payload, toast, and refresh callbacks.
+
+**Agency value:** Engineers can review quick-win/page-review behavior without reopening the full StrategyTab workflow file. This narrows remaining StrategyTab work to business-priority UI extraction and request-flow cleanup.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab Improve Pages behavior.
+
+**Mutual:** Moves another rendered accordion out of the client strategy monolith while keeping current tier gates, deep-link expansion, request-review behavior, and page-map ownership intact.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `tests/contract/client-strategy-tab-page-improvements.test.ts`.
+
+
+### 341. Platform Consolidation — Client StrategyTab Business Priorities Phase 5
+**What it does:** Continues the Client StrategyTab split by moving the Guide This Strategy business-priority accordion into `src/components/client/strategy/StrategyBusinessPrioritiesSection.tsx`. The extracted section owns saved-priority rendering, category badge styling, add/remove controls, max-priority messaging, and the existing save callback wiring, while `StrategyTab.tsx` keeps owning the `useStrategyBusinessPriorities` hook state and section expansion orchestration.
+
+The migration preserves the current persistence behavior through `useStrategyBusinessPriorities`, fixes the adjacent `?tab=business-priorities` scroll target so same-page deep links expand and scroll to the business-priority accordion instead of the strategy-keywords panel, and keeps the keyboard add path aligned with the existing 10-priority cap.
+
+**Agency value:** Engineers can review client strategy priority controls without reopening the full StrategyTab workflow file. This leaves the remaining StrategyTab work focused on request-flow cleanup and final shell reduction.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab business-priority behavior.
+
+**Mutual:** Moves another client strategy workflow section out of the monolith while preserving the existing public business-priorities API path, toast behavior, and deep-link expansion contract.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyBusinessPrioritiesSection.tsx`; `tests/contract/client-strategy-tab-business-priorities.test.ts`.
+
+### 342. Platform Consolidation — Client StrategyTab Request Flow Phase 6
+**What it does:** Continues the Client StrategyTab split by moving the Strategy Keywords request/feedback surface into focused strategy modules. `StrategyKeywordsSection` now owns the add-keyword form, confirmed keyword list, suggestion add/dismiss controls, overflow affordance, and row-level remove actions. `StrategyDeclinedKeywordsSection` owns the declined-keyword restore accordion, and `StrategyDeclineKeywordModal` owns the decline-reason form.
+
+The migration preserves the existing data ownership: `StrategyTab.tsx` still assembles keyword rows from strategy data, tracked keywords, requested keywords, and feedback state; the extracted components receive the same callbacks for adding tracked keywords, submitting/removing feedback, restoring declined keywords, and opening the keyword drawer.
+
+**Agency value:** Engineers can review keyword request and feedback UI without reopening the full StrategyTab orchestration file. StrategyTab is now a smaller shell around data assembly, deep-link expansion, and section composition.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab keyword request behavior.
+
+**Mutual:** Reduces the remaining client strategy monolith while preserving tier gates, suggestion review actions, decline/restore behavior, and keyword drawer compatibility.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategyKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclinedKeywordsSection.tsx`; `src/components/client/strategy/StrategyDeclineKeywordModal.tsx`; `tests/contract/client-strategy-tab-request-flow.test.ts`; `tests/contract/client-strategy-tab-sections.test.ts`.
+
+### 343. Platform Consolidation — Client StrategyTab Shell Sections Phase 7
+**What it does:** Completes the Client StrategyTab split by moving the remaining rendered shell sections into focused strategy components. `StrategySnapshotSection` owns the planning-readiness score, summary metrics, and readiness bars. `StrategyNextStepsSection` owns the top recommended action cards and receives scroll callbacks from the shell. `StrategyPageKeywordMapSection` owns the Keyword Map tier gate, accordion header, and `PageKeywordMapContent` wiring.
+
+The migration preserves the existing StrategyTab orchestration contract: `StrategyTab.tsx` still owns strategy data assembly, deep-link expansion, section refs, keyword feedback state, drawer state, pricing/modal callbacks, and all workflow hooks. The extracted components receive the same counts, callbacks, tier value, feedback map, and public request callbacks that the inline JSX used before.
+
+**Agency value:** Engineers can now change snapshot, next-step card, or page-map presentation without reopening the StrategyTab data assembly and workflow shell. The client strategy surface is split into narrow modules with contract tests for each migration slice.
+
+**Client value:** N/A — infrastructure-only refactor with preserved StrategyTab behavior.
+
+**Mutual:** Finishes the StrategyTab consolidation track while preserving tier gates, deep-link behavior, feedback actions, and keyword drawer compatibility.
+
+**Files:** `src/components/client/StrategyTab.tsx`; `src/components/client/strategy/StrategySnapshotSection.tsx`; `src/components/client/strategy/StrategyNextStepsSection.tsx`; `src/components/client/strategy/StrategyPageKeywordMapSection.tsx`; `tests/contract/client-strategy-tab-shell-sections.test.ts`.
+
+### 344. Platform Consolidation — PageIntelligence Display Helpers Split
+**What it does:** Begins the feature-tool monolith split by moving PageIntelligence's pure display and priority helpers into `src/components/page-intelligence/pageIntelligenceDisplay.ts`. The extracted module owns rank color thresholds, keyword difficulty labels/colors, search-intent badge classes/icons, estimated-difficulty text colors, and opportunity scoring used by the existing PageIntelligence sort and report cards.
+
+The migration preserves the current PageIntelligence behavior: the component still owns data fetching, background page-analysis job rediscovery/start/cancel wiring, tab state, filters, expansion, editing, and rendering. The extracted helpers are directly covered by unit tests that pin the existing class strings and scoring thresholds.
+
+**Agency value:** Engineers can update PageIntelligence presentation rules without reopening the full workflow component, creating a safe first boundary for the larger feature-tool split track.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Reduces a >1,000-line admin feature module while keeping the shared background job platform and typed PageKeywordMap contract unchanged.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceDisplay.ts`; `tests/unit/page-intelligence-display.test.ts`.
+
+### 345. Platform Consolidation — PageIntelligence Data Helpers Split
+**What it does:** Continues the feature-tool monolith split by moving PageIntelligence's pure data derivation into `src/components/page-intelligence/pageIntelligenceData.ts` and the local PageIntelligence data contracts into `src/components/page-intelligence/pageIntelligenceTypes.ts`. The extracted helper module owns persisted-analysis hydration, page search/filtering, sort ordering, and the traffic-impact fix queue.
+
+The migration preserves PageIntelligence behavior: the component still owns page-analysis background job rediscovery/start/cancel wiring, direct single-page analysis calls, keyword editing, rank tracking, SEO copy generation, navigation actions, and rendering. The data helpers are covered by focused unit tests that pin defaults, fresh-analysis precedence, search fields, sort semantics, and fix-queue impact scoring.
+
+**Agency value:** Engineers can reason about PageIntelligence ranking and hydration behavior in a small testable module instead of the full workflow component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Reduces PageIntelligence's component surface while keeping the shared background job platform and typed `PageKeywordMap` / `UnifiedPage` contracts unchanged.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/pageIntelligenceData.ts`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-data.test.ts`; `tests/unit/page-intelligence-metricsSource.test.ts`.
+
+### 346. Platform Consolidation — PageIntelligence Pages Header Split
+**What it does:** Extracts the PageIntelligence pages-tab header/control strip into `src/components/page-intelligence/PageIntelligencePagesHeader.tsx`. The focused component owns the page counts, analyze-all/analyze-remaining buttons, inline background-job progress display, `ProgressIndicator`, analysis error state, completion next-step card, impact-ranked "Fix These First" queue, and search/sort controls.
+
+The migration preserves PageIntelligence behavior: the parent still owns `useBackgroundTasks`, `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS` rediscovery/start/cancel wiring, single-page analysis, query invalidation, rank tracking, keyword editing, SEO copy generation, page expansion, and navigation handlers. The extracted header receives values and callbacks only, and a source-level unit guard pins the boundary so the background job ownership stays in `PageIntelligence.tsx`.
+
+**Agency value:** Engineers can adjust PageIntelligence's page-level workflow controls without editing the full analysis/detail renderer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Continues reducing PageIntelligence's component surface while keeping the shared background job platform and existing page-analysis UX intact.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePagesHeader.tsx`; `tests/unit/page-intelligence-pages-header.test.ts`.
+
+### 347. Platform Consolidation — PageIntelligence Page List Split
+**What it does:** Extracts the PageIntelligence pages list, collapsed row summary, expanded keyword/analysis detail renderer, edit controls, SEO copy panel mount, and page-level action bar into `src/components/page-intelligence/PageIntelligencePageList.tsx`.
+
+The migration preserves PageIntelligence behavior: the parent still owns `useBackgroundTasks`, `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS` rediscovery/start/cancel wiring, single-page analysis calls, keyword persistence, rank tracking mutations, SEO copy generation, and route navigation. The extracted list receives typed values and callbacks only, including the shared `KeywordEditDraft` contract, and focused tests pin the render branches plus the source boundary so background job ownership does not move.
+
+**Agency value:** Engineers can iterate on the dense page-detail UI without reopening the full PageIntelligence workflow component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's component surface while preserving the same page-analysis, edit, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/pageIntelligenceTypes.ts`; `tests/unit/page-intelligence-page-list.test.ts`; `tests/unit/page-intelligence-page-list-render.test.tsx`.
+
+### 348. Platform Consolidation — PageIntelligence Row Detail Split
+**What it does:** Continues the PageIntelligence feature-tool split by breaking the extracted page list into focused row and detail renderers. `PageIntelligencePageList` now coordinates the collection and empty state, `PageIntelligencePageRow` owns the collapsed row summary and expand affordance, and `PageIntelligencePageDetails` owns the expanded keyword, SEO copy, AI analysis, content metrics, persisted-analysis, and page action sections.
+
+The migration preserves PageIntelligence behavior: the parent still owns the page-analysis background job platform wiring, single-page analysis calls, keyword persistence, rank tracking, SEO copy generation, and route navigation. The row/detail components receive values and callbacks only, and the source contract guard now pins all three extracted components against accidental background-job ownership drift.
+
+**Agency value:** Engineers can change collapsed row presentation separately from the dense expanded analysis panel, making future PageIntelligence UI work smaller and easier to review.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces the PageIntelligence UI surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/page-intelligence/PageIntelligencePageList.tsx`; `src/components/page-intelligence/PageIntelligencePageRow.tsx`; `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 349. Platform Consolidation — PageIntelligence Detail Sections Split
+**What it does:** Continues the PageIntelligence feature-tool split by breaking the expanded page detail renderer into focused section components. `PageIntelligenceStrategySection` owns strategy keyword display/editing and the SEO copy panel, `PageIntelligenceAnalysisSection` owns the AI analysis and content metrics cards, `PageIntelligencePersistedAnalysisSummary` owns the persisted-analysis fallback summary, `PageIntelligencePageActions` owns the follow-on navigation actions, and `PageIntelligenceTrackKeywordButton` centralizes the duplicated track/tracking badge.
+
+The migration preserves PageIntelligence behavior: the parent still owns page-analysis background job wiring, single-page analysis calls, keyword persistence, rank tracking mutation state, SEO copy generation, and route navigation. The extracted sections receive values and callbacks only, and the source contract guard now pins the detail-section boundary against accidental background-job ownership drift.
+
+**Agency value:** Engineers can change strategy, analysis, persisted-summary, or action-button presentation independently instead of reopening the full expanded detail renderer.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's dense detail surface while preserving the same page analysis, editing, tracking, SEO copy, and follow-on action behavior.
+
+**Files:** `src/components/page-intelligence/PageIntelligencePageDetails.tsx`; `src/components/page-intelligence/PageIntelligenceStrategySection.tsx`; `src/components/page-intelligence/PageIntelligenceAnalysisSection.tsx`; `src/components/page-intelligence/PageIntelligencePersistedAnalysisSummary.tsx`; `src/components/page-intelligence/PageIntelligencePageActions.tsx`; `src/components/page-intelligence/PageIntelligenceTrackKeywordButton.tsx`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 350. Platform Consolidation — PageIntelligence Workflow Hooks Split
+**What it does:** Continues the PageIntelligence feature-tool split by moving parent-owned workflow state into focused hooks. `usePageIntelligenceAnalysis` owns direct page analysis, page-analysis background job rediscovery/progress/cancellation wiring, query invalidation, and analysis fallback/error/next-step state. `usePageIntelligenceKeywordEditing` owns page keyword edit draft/save state, `usePageIntelligenceKeywordTracking` owns tracked keyword hydration/adds, and `usePageIntelligenceSeoCopy` owns SEO copy generation and clipboard feedback state.
+
+The migration preserves PageIntelligence behavior: the parent still coordinates tabs, page filtering/sorting, fix-context auto-expansion, follow-on route navigation, and passes callbacks to the extracted render components. The background job path still uses the shared `useBackgroundTasks` platform with `BACKGROUND_JOB_TYPES.PAGE_ANALYSIS`; no separate job implementation was introduced.
+
+**Agency value:** Engineers can reason about PageIntelligence workflow mutations in small hooks instead of a dense mixed UI/controller component, reducing regression risk for future PageIntelligence and feature-tool split work.
+
+**Client value:** N/A — infrastructure-only refactor with preserved PageIntelligence behavior.
+
+**Mutual:** Further reduces PageIntelligence's parent component while preserving the same page-analysis, keyword edit, tracking, SEO copy, and route action behavior.
+
+**Files:** `src/components/PageIntelligence.tsx`; `src/components/page-intelligence/usePageIntelligenceAnalysis.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordEditing.ts`; `src/components/page-intelligence/usePageIntelligenceKeywordTracking.ts`; `src/components/page-intelligence/usePageIntelligenceSeoCopy.ts`; `tests/unit/page-intelligence-page-list.test.ts`.
+
+### 351. Platform Consolidation — SchemaSuggester Generation Workflow Hook
+**What it does:** Begins the SchemaSuggester feature-tool split by moving schema generation workflow state into `useSchemaSuggesterGeneration`. The hook owns saved snapshot hydration, persisted page-type hydration, Webflow page loading, fix-context single-page generation, add-page filtering, scan progress/error/next-step state, and shared `schema-generator` background job start/cancel/result handling.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the generator, CMS template tools, schema cards, approvals, publishing, retraction, impact tracking, and navigation affordances. The bulk generation path still uses the shared `useBackgroundTasks` platform and now starts jobs through `BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR` instead of a raw string; no separate background-job implementation was introduced.
+
+**Agency value:** Engineers can reason about schema generation, page hydration, and background job progress in a focused hook instead of reopening the full 1,000+ line SchemaSuggester component.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Reduces SchemaSuggester's controller surface while preserving schema scan, single-page generation, page picker, saved snapshot, and progress behavior.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `tests/unit/schema-suggester-generation.test.ts`.
+
+### 352. Platform Consolidation — SchemaSuggester CMS Workflow Hook
+**What it does:** Continues the SchemaSuggester feature-tool split by moving CMS template and field-mapping workflow state into `useSchemaSuggesterCmsWorkflow`. The hook owns CMS template page loading, template generation, template publish/copy feedback, CMS field-mapping query/mutation state, saving/error labels, and detected location/service collection derivation.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the CMS template panel and collection field mapping controls, while continuing to own page-level schema publishing, bulk publish progress, approvals/retractions, impact tracking, and schema card editing. The CMS mapping query keeps the existing `queryKeys.admin.schemaCmsFieldMappings` contract and React Query mutation cache update; no background-job or endpoint behavior was changed.
+
+**Agency value:** Engineers can adjust CMS template/schema-field mapping behavior in a focused workflow hook instead of editing the remaining SchemaSuggester shell.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Reduces SchemaSuggester's parent surface again while keeping CMS template publishing, field mapping, and page-level publish/approval flows behaviorally unchanged.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterCmsWorkflow.ts`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/CmsTemplatePanel.tsx`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
+
+### 353. Platform Consolidation — SchemaSuggester Publishing Workflow Hook
+**What it does:** Continues the SchemaSuggester feature-tool split by moving page-level schema publishing, client approval submission, manual-delivery state, retraction, schema JSON edit/copy actions, site-template saving, bulk publish progress, and page edit-state refreshes into `useSchemaSuggesterPublishingWorkflow`.
+
+The migration preserves SchemaSuggester behavior: the parent still renders the bulk publish controls, pending approvals panel, schema impact panel, schema completeness widget, and `SchemaPageCard` list, while the hook owns the API calls to `/api/webflow/schema-publish`, `/api/approvals/:workspaceId`, `/api/webflow/schema-template`, and `schemaApi.retract`. No background-job or endpoint behavior was changed.
+
+**Agency value:** Engineers can adjust schema publish/approval state in a focused workflow hook instead of threading page-card mutations through the remaining SchemaSuggester shell.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Further reduces SchemaSuggester's parent component while preserving page publishing, approval batches, manual fallback copying, retraction, and edit-status display behavior.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`.
+
+### 354. Platform Consolidation — SchemaSuggester Results Rendering Split
+**What it does:** Continues the SchemaSuggester feature-tool split by moving schema impact rendering/fetch state and results-summary calculations out of the parent shell. `SchemaImpactPanel` now owns schema deployment impact display state and the existing `schemaImpactApi.get` fetch, while `SchemaResultsSummary` owns the page/validation/existing-schema summary cards and `SchemaEditStatusSummary` owns the edit-status summary bar.
+
+The migration preserves SchemaSuggester behavior: the parent still coordinates generation, CMS workflow, publishing workflow, page cards, approvals, completeness, and add-page controls. Impact tracking still uses the existing schema impact API, summary warning counts still count pages rather than findings, and edit-status counts still use the shared `usePageEditStates` summary returned by `useSchemaSuggesterPublishingWorkflow`. No background-job, endpoint, or mutation behavior was changed.
+
+**Agency value:** Engineers can adjust schema impact and summary presentation without reopening the remaining SchemaSuggester controller logic.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Shrinks the SchemaSuggester parent again while keeping the rendered summary, impact, and edit-status experience unchanged.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/SchemaResultsSummary.tsx`; `tests/unit/schema-suggester-results-summary.test.ts`; `tests/unit/schema-suggester-publishing-workflow.test.ts`.
+
+### 355. Platform Consolidation — SchemaPageCard Details Split
+**What it does:** Continues the schema monolith cleanup by moving read-only SchemaPageCard detail bands into `SchemaPageCardDetails`. The new module owns existing-schema badges, validation finding grouping/expansion, recommendation banners, graph-type summaries, generation diagnostics, and rich-result eligibility rendering. `SchemaPageCard` now keeps the page header, page-type/regenerate controls, schema preview/editor/diff controls, publish/manual-delivery/send-to-client actions, and version history.
+
+The migration preserves behavior: validation findings are still grouped by field with error groups sorted first, field groups with multiple findings remain expandable, legacy validation error strings still render as warnings when typed findings are absent, recommendation priority badges and diagnostic labels are unchanged, and publish/edit/version-history flows stay in the original card component.
+
+**Agency value:** Engineers can adjust schema diagnostics and validation presentation without reopening publish controls or page-level mutation wiring.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Shrinks the largest remaining schema-specific component while keeping the page-card experience and mutation behavior unchanged.
+
+**Files:** `src/components/schema/SchemaPageCard.tsx`; `src/components/schema/SchemaPageCardDetails.tsx`; `tests/component/SchemaPageCard.test.tsx`.
+
+### 356. Platform Consolidation — SchemaSuggester Setup Split
+**What it does:** Completes the SchemaSuggester monolith cleanup by moving setup-only rendering into `SchemaGeneratorSetup`. The new module owns the business-profile schema callout, generator hero actions, initial page search/type picker, page-type guide, and CMS collection field-mapping panel. `SchemaSuggester` now stays focused on workflow orchestration across generation, CMS template workflow, publishing, approvals, impact, completeness, and page-card rendering.
+
+The migration preserves behavior: the business-profile callout still gates on missing address data and deep-links to the business-profile settings tab, the CMS Templates action still calls the existing CMS workflow hook, initial page type updates still flow through the shared page-type state, single-page generation still calls the existing generation hook, and CMS field mapping still uses the same typed `SchemaFieldTarget` contract. No background-job, endpoint, or mutation behavior was changed.
+
+**Agency value:** Engineers can adjust schema setup controls without reopening the full SchemaSuggester shell, and the remaining schema-specific components now sit under 500 lines each.
+
+**Client value:** N/A — infrastructure-only refactor with preserved SchemaSuggester behavior.
+
+**Mutual:** Finishes the schema monolith portion of the platform-consolidation sprint while preserving the generator, template, and mapping experience.
+
+**Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaGeneratorSetup.tsx`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `tests/component/SchemaGeneratorSetup.test.tsx`.
+
+### 357. Platform Consolidation — Workspace Intelligence Slice Modules
+**What it does:** Decomposes the workspace intelligence backend monolith while preserving the public facade at `server/workspace-intelligence.ts`. Prompt formatting and standalone prompt helpers now live in `server/intelligence/formatters.ts`; slice assemblers now live in focused modules for SEO context, insights, learnings, content pipeline, client signals, operational state, site health, site inventory, and page profile. Existing callers continue to import `buildWorkspaceIntelligence`, `formatForPrompt`, `buildIntelPrompt`, cache helpers, and prompt helpers from the facade.
+
+The migration also fixes touched intelligence bugs: `siteInventory` cache keys now isolate by `siteId`, `siteBaseUrl`, and a non-secret Webflow token fingerprint; saved AEO review parsing uses validated parsing instead of raw `JSON.parse`; and pr-check coverage now follows the extracted formatter/SEO-context modules for assembled-but-never-rendered fields, backlink calls, direct `buildSeoContext`, dynamic imports, and JSON parsing.
+
+**Agency value:** Engineers can inspect and extend one intelligence slice without reopening a 3,000-line coordination file, reducing regression risk during future AI-context and schema-context work.
+
+**Client value:** N/A — infrastructure-only refactor with preserved intelligence behavior.
+
+**Mutual:** Keeps AI context assembly stable while making future client-facing intelligence additions safer, easier to test, and less likely to lose data silently.
+
+**Files:** `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/seo-context-slice.ts`; `server/intelligence/insights-slice.ts`; `server/intelligence/learnings-slice.ts`; `server/intelligence/content-pipeline-slice.ts`; `server/intelligence/client-signals-slice.ts`; `server/intelligence/operational-slice.ts`; `server/intelligence/site-health-slice.ts`; `server/intelligence/site-inventory-slice.ts`; `server/intelligence/page-profile-slice.ts`; `scripts/pr-check.ts`; `tests/unit/workspace-intelligence.test.ts`; `tests/pr-check.test.ts`.
+
+### 358. Platform Consolidation — SEO Context Builder Retirement
+**What it does:** Retires the deleted `server/seo-context.ts` builder after the workspace intelligence decomposition. Rich chat block prompt instructions now live in `server/prompt-rich-blocks.ts`; raw brand/knowledge document reads and voice authority live in `server/intelligence/seo-context-source.ts`; and `assembleSeoContext` now computes `strategy`, raw brand voice, knowledge base, personas, and `effectiveBrandVoiceBlock` without bridging back to the old builder or its separate cache.
+
+The migration replaces old SEO-context cache invalidation with `invalidateIntelligenceCache(workspaceId)`, hardens pr-check so production server code cannot statically or dynamically import the retired module, and completes schema-context Pattern-B migration in `buildSchemaContext`: `businessContext`, `knowledgeBase`, personas, and business profile now come from the already-fetched `seoContext` slice, while dead `ctx.brandVoice` schema context wiring was removed. `seoContext.businessProfile` now preserves both prompt-friendly flattened address text and structured contact metadata (`addressParts`, `foundedDate`, `numberOfEmployees`) so schema generation can stay slice-driven without losing structured fidelity. Voice authority behavior remains pinned with real DB tests for legacy fallback, calibrated-profile authority, draft explicit config authority, and samples-only draft fallback.
+
+**Agency value:** Engineers now have one intelligence/cache path to reason about instead of a deprecated parallel builder with separate invalidation and compatibility return shapes.
+
+**Client value:** N/A — infrastructure-only refactor with preserved AI context behavior.
+
+**Mutual:** Reduces AI prompt drift risk by keeping voice, knowledge, personas, and rich prompt helpers under owned modules with explicit guardrails.
+
+**Files:** `server/intelligence/seo-context-slice.ts`; `server/intelligence/seo-context-source.ts`; `server/prompt-rich-blocks.ts`; `server/workspace-intelligence.ts`; `server/helpers.ts`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/verified-clean-rules.md`; `tests/unit/seo-context-voice-profile.test.ts`; `tests/unit/helpers.buildSchemaContext.test.ts`; `tests/unit/prompt-rich-blocks.test.ts`; `tests/pr-check.test.ts`.
+
+### 359. Platform Consolidation — Keyword Strategy Compatibility Wrapper Retirement
+**What it does:** Retires obsolete frontend compatibility paths left behind after keyword strategy generation moved to background jobs. Removed the unused direct-generation route wrapper (`keywords.generateStrategy`) and the unused SSE wrapper (`streamKeywordStrategy`) from `src/api/seo.ts`, then removed the dead SSE stream parser (`readSseStream`) from `src/api/streamUtils.ts`. Updated `src/main.tsx` auth-injection comment to reflect the remaining raw-fetch NDJSON path (`bulkGenerateAltText`) only.
+
+Added a contract guard in `tests/contract/keyword-strategy-compat-retirement.test.ts` that pins the canonical orchestration path (`startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)`) and fails if direct-generation wrappers are reintroduced.
+
+**Agency value:** Removes dead API surface area and reduces the chance of accidental reintroduction of direct long-running request paths that bypass job orchestration and shared progress handling.
+
+**Client value:** N/A — infrastructure-only cleanup with no UI behavior change.
+
+**Mutual:** Keeps keyword strategy generation on the single background-job pathway, making future workflow and reliability changes easier to reason about.
+
+**Files:** `src/api/seo.ts`; `src/api/streamUtils.ts`; `src/main.tsx`; `tests/contract/keyword-strategy-compat-retirement.test.ts`.
+
+### 360. Platform Consolidation — SEO Provider Compatibility Bridge Retirement
+**What it does:** Retires the remaining provider-neutral helper re-export bridge from `server/semrush.ts`. The compatibility export for `trendDirection`, `parseSerpFeatures`, and `hasSerpOpportunity` was removed so new code cannot accidentally treat provider-neutral keyword-signal helpers as Semrush-owned APIs. Remaining touched imports in strategy and Semrush integration tests now import those helpers directly from `server/seo-provider-signals.ts`.
+
+Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to explicitly block reintroducing the `semrush.ts` helper bridge and to require direct provider-neutral helper imports in the touched suites.
+
+**Agency value:** Tightens provider boundaries and reduces drift risk as the platform continues moving from Semrush-specific naming toward the shared `SeoDataProvider` abstraction.
+
+**Client value:** N/A — infrastructure-only cleanup with no user-facing behavior change.
+
+**Mutual:** Keeps provider-neutral enrichment logic anchored to a single source module, making future provider additions and migration audits less error-prone.
+
+**Files:** `server/semrush.ts`; `tests/unit/strategy-enrichment.test.ts`; `tests/integration/semrush-routes.test.ts`; `tests/contract/seo-provider-boundary.test.ts`.
+
+### 361. Platform Consolidation — Schema Context Slice Migration Closeout
+**What it does:** Closes the follow-up roadmap item for schema-context Pattern B migration after verifying the functional migration was already completed in the SEO-context retirement PR. `buildSchemaContext` continues to read business context, knowledge base, personas, site keywords, and business profile from `buildWorkspaceIntelligence({ slices: ['seoContext'] })`; this cleanup removes obsolete `schema-context-direct-read-ok` hatch comments from `server/helpers.ts` so only the explicit identity/analytics allow-list remains.
+
+**Agency value:** Reduces false-positive uncertainty during reviews by aligning code comments, roadmap state, and pr-check policy for schema-context data sourcing.
+
+**Client value:** N/A — guardrail/documentation cleanup with no behavior change.
+
+**Mutual:** Keeps the schema-context migration story internally consistent and easier to audit going forward.
+
+**Files:** `server/helpers.ts`; `data/roadmap.json`.

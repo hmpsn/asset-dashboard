@@ -8,6 +8,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
+import { extractRewriteOnly, parseRewriteSectionTarget } from '../lib/rewriteResponse';
 import { Icon, IconButton } from './ui';
 
 interface SeoIssue {
@@ -210,8 +211,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         pageIssues: pageData?.issues,
       });
 
-      const sectionMatch = resp.answer.match(/^\*{0,2}Rewriting:\s*([^*\n]+?)\*{0,2}\s*$/im);
-      const sectionTarget = sectionMatch ? sectionMatch[1].trim() : undefined;
+      const sectionTarget = parseRewriteSectionTarget(resp.answer);
       const assistantMsg: ChatMessage = { role: 'assistant', content: resp.answer, timestamp: Date.now(), sectionTarget };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
@@ -257,17 +257,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         p.slug.toLowerCase().includes(comboQuery.toLowerCase()) ||
         p.title.toLowerCase().includes(comboQuery.toLowerCase())
       );
-
-  const stripRewritingPrefix = (content: string): string =>
-    content.replace(/^\*{0,2}Rewriting:\s*[^*\n]+\*{0,2}\s*\n?/im, '');
-
-  /** Strip prefix AND rationale — returns only the rewrite prose for Apply/editable */
-  const extractRewriteOnly = (content: string): string => {
-    const stripped = stripRewritingPrefix(content);
-    // Remove "Rationale:" or "**Rationale:**" section and everything after
-    const rationaleIdx = stripped.search(/\n\s*\*{0,2}Rationale:?\*{0,2}/i);
-    return (rationaleIdx > 0 ? stripped.slice(0, rationaleIdx) : stripped).trim();
-  };
 
   const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (filteredPages.length > 0) setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
@@ -608,7 +597,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           <Icon as={ArrowLeft} size="md" />
         </button>
         <div className="flex items-center gap-2">
-          <Icon as={Sparkles} size="md" className="text-teal-400" />
+          <Icon as={Sparkles} size="md" className="text-accent-brand" />
           <h1 className="text-sm font-semibold text-[var(--brand-text-bright)]">AI Page Rewriter</h1>
         </div>
 
@@ -620,7 +609,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
               <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
               <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
-              <button onClick={openCombo} className={"text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0" // arbitrary-text-ok
+              <button onClick={openCombo} className={"text-[10px] text-accent-brand hover:text-accent-brand font-medium flex-shrink-0" // arbitrary-text-ok
               }>Change</button>
             </div>
           )}
@@ -654,14 +643,14 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   placeholder="Search pages or paste a URL…"
                   className="flex-1 bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none"
                 />
-                {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-teal-400 flex-shrink-0" />}
+                {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-accent-brand flex-shrink-0" />}
               </div>
 
               {isUrlQuery && (
                 <div className="px-3 py-2">
                   <button
                     onClick={() => { loadPage(comboQuery); setComboOpen(false); }}
-                    className="text-xs text-teal-400 hover:text-teal-300"
+                    className="text-xs text-accent-brand hover:text-accent-brand"
                   >
                     Load {comboQuery.length > 60 ? `${comboQuery.slice(0, 60)}…` : comboQuery}
                   </button>
@@ -708,7 +697,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
             className={`p-1.5 rounded-[var(--radius-lg)] transition-colors flex-shrink-0 ${
               focusMode
-                ? 'text-teal-400 bg-teal-500/10 hover:bg-teal-500/20'
+                ? 'text-accent-brand bg-teal-500/10 hover:bg-teal-500/20'
                 : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
             }`}
           >
@@ -726,7 +715,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                 <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-teal-400" />
+                  <Sparkles className="w-6 h-6 text-accent-brand" />
                 </div>
                 <div>
                   <h2 className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">AI Page Rewriter</h2>
@@ -781,7 +770,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
                           <button
                             onClick={() => applyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
                           >
                             <Icon as={Check} size="sm" />
                             Apply to {msg.sectionTarget}
@@ -791,7 +780,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                             }
                           >
-                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
+                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -808,7 +797,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                             }
                           >
-                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
+                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -824,7 +813,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             {sending && (
               <div className="flex justify-start">
                 <div className="bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] px-4 py-3 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
                   <span className="text-xs text-[var(--brand-text)]">Analyzing and writing...</span>
                 </div>
               </div>
@@ -874,14 +863,14 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
           {loadingPage && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
               <span className="text-xs text-[var(--brand-text)]">Loading page content...</span>
             </div>
           )}
 
           {pageError && (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
-              <AlertTriangle className="w-6 h-6 text-amber-400/80" />
+              <AlertTriangle className="w-6 h-6 text-accent-warning" />
               <p className="text-xs text-[var(--brand-text)] text-center">{pageError}</p>
             </div>
           )}
@@ -894,7 +883,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   href={pageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-teal-400 transition-colors flex-1 min-w-0"
+                  className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-accent-brand transition-colors flex-1 min-w-0"
                 >
                   <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
                   <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
@@ -942,10 +931,10 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                       key={i}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ // arbitrary-text-ok
                         issue.severity === 'error'
-                          ? 'bg-red-950/40 border-red-500/40 text-red-400'
+                          ? 'bg-red-950/40 border-red-500/40 text-accent-danger'
                           : issue.severity === 'warning'
-                          ? 'bg-amber-950/40 border-amber-500/40 text-amber-400'
-                          : 'bg-blue-950/40 border-blue-500/40 text-blue-400'
+                          ? 'bg-amber-950/40 border-amber-500/40 text-accent-warning'
+                          : 'bg-blue-950/40 border-blue-500/40 text-accent-info'
                       }`}
                     >
                       {issue.severity === 'error' ? '✕' : '⚠'} {issue.message}

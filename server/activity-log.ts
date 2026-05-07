@@ -26,6 +26,7 @@ export type ActivityType =
   | 'content_updated'
   | 'content_requested'
   | 'content_declined'
+  | 'content_request_commented'
   | 'brief_generated'
   | 'brief_approved'
   | 'changes_requested'
@@ -36,6 +37,7 @@ export type ActivityType =
   | 'content_upgraded'
   | 'schema_generated'
   | 'schema_published'
+  | 'schema_mapping_updated'
   | 'schema_plan_generated'
   | 'schema_plan_sent'
   | 'redirects_scanned'
@@ -69,8 +71,14 @@ export type ActivityType =
   | 'client_profile_updated'
   | 'client_onboarding_submitted'
   | 'client_keyword_feedback'
+  | 'client_keyword_tracked'
+  | 'client_keyword_removed'
   | 'client_priorities_updated'
   | 'client_content_gap_vote'
+  | 'client_action_sent'
+  | 'client_action_approved'
+  | 'client_action_changes_requested'
+  | 'client_action_completed'
   | 'meeting_brief_generated'
   | 'brandscript_created'
   | 'brandscript_deleted'
@@ -157,11 +165,13 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
 
 /** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
-  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
+  'audit_completed', 'request_resolved', 'approval_applied', 'approval_reverted', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
-  'brief_generated', 'brief_approved', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
+  'content_declined', 'content_request_commented', 'brief_generated', 'brief_approved',
+  'changes_requested', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
-  'post_client_edit', 'post_sent_for_review',
+  'post_client_edit', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
+  'client_action_changes_requested', 'client_action_completed',
 ]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---

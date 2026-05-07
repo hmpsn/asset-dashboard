@@ -14,10 +14,38 @@ export function matchPagePath(a: string, b: string): boolean {
   return normalizePath(a).toLowerCase() === normalizePath(b).toLowerCase();
 }
 
+/**
+ * Normalize a page identity that may arrive as a full URL, path, or bare slug.
+ * Strips origin/query/hash for full URLs, then delegates to normalizePath().
+ */
+export function normalizePageUrl(url: string): string {
+  try {
+    if (url.startsWith('http')) {
+      return normalizePath(new URL(url).pathname);
+    }
+  } catch {
+    // Malformed URL string — fall through to path-only normalization.
+  }
+  return normalizePath(url);
+}
+
+/** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
+export function matchPageIdentity(a: string, b: string): boolean {
+  return normalizePageUrl(a).toLowerCase() === normalizePageUrl(b).toLowerCase();
+}
+
 /** Find a pageMap entry by path (exact match with normalization, case-insensitive) */
 export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], path: string): T | undefined {
   const norm = normalizePath(path).toLowerCase();
   return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
+}
+
+/** Find a pageMap entry from a full URL/path/bare slug using exact normalized page identity. */
+export function findPageMapEntryByIdentity<T extends { pagePath: string }>(
+  pageMap: T[],
+  pageIdentity: string,
+): T | undefined {
+  return findPageMapEntry(pageMap, normalizePageUrl(pageIdentity));
 }
 
 /** Resolve a Webflow page's canonical path from publishedPath or slug */

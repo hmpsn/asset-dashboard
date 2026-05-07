@@ -20,7 +20,7 @@ import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -224,23 +224,19 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
 
 // ── AI Summary Generation ──
 
-async function generatePageSummary(title: string, description: string, pageUrl: string): Promise<string> {
+async function generatePageSummary(workspaceId: string, title: string, description: string, pageUrl: string): Promise<string> {
   try {
-    const result = await callOpenAI({
-      model: 'gpt-4.1-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture: what the page is about, what services/expertise it represents, and who the target audience is. Be factual and precise. Do not use marketing language.',
-        },
-        {
-          role: 'user',
-          content: `Page: ${title}\nURL: ${pageUrl}\nMeta description: ${description || 'None'}\n\nSummarize this page in 2-3 sentences.`,
-        },
-      ],
+    const result = await callAI({
+      model: 'gpt-5.4-mini',
+      system: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture: what the page is about, what services/expertise it represents, and who the target audience is. Be factual and precise. Do not use marketing language.',
+      messages: [{
+        role: 'user',
+        content: `Page: ${title}\nURL: ${pageUrl}\nMeta description: ${description || 'None'}\n\nSummarize this page in 2-3 sentences.`,
+      }],
       maxTokens: 200,
       temperature: 0.3,
       feature: 'llms-txt-summary',
+      workspaceId,
     });
     return result.text.trim();
   } catch (err) {
@@ -304,7 +300,7 @@ export function buildLlmsTxtIndex(input: IndexInput): string {
     const statusLabel: Record<string, string> = {
       planned: 'Planned', keyword_validated: 'Planned',
       brief_generated: 'Brief Ready', draft: 'In Draft',
-      review: 'In Review', approved: 'Approved',
+      review: 'In Review', flagged: 'Needs Review', approved: 'Approved',
       client_review: 'Client Review', in_progress: 'In Progress',
     };
 
@@ -452,7 +448,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     for (let i = 0; i < needsSummary.length; i += 5) {
       const batch = needsSummary.slice(i, i + 5);
       const results = await Promise.all(
-        batch.map(p => generatePageSummary(p.title, p.description || '', baseUrl ? `${baseUrl}${p.path}` : p.path))
+        batch.map(p => generatePageSummary(workspaceId, p.title, p.description || '', baseUrl ? `${baseUrl}${p.path}` : p.path))
       );
       for (let j = 0; j < batch.length; j++) {
         const url = baseUrl ? `${baseUrl}${batch[j].path}` : batch[j].path;

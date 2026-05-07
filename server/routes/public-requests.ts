@@ -2,14 +2,11 @@
  * public-requests routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
 import fs from 'fs';
 import path from 'path';
 import { broadcast, broadcastToWorkspace } from '../broadcast.js';
 import { notifyTeamNewRequest } from '../email.js';
-import { upload } from '../middleware.js';
+import { requireClientPortalAuth, upload } from '../middleware.js';
 import {
   listRequests,
   createRequest,
@@ -21,14 +18,28 @@ import {
 } from '../requests.js';
 import { getWorkspace } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
+import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
+
+const router = Router();
 
 const createRequestSchema = z.object({
   title: z.string().min(1, 'Title is required').max(500),
   description: z.string().min(1, 'Description is required').max(5000),
-  category: z.string().min(1, 'Category is required'),
+  category: z.enum(['bug', 'content', 'design', 'seo', 'feature', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
   pageUrl: z.string().url().optional().or(z.literal('')),
   submittedBy: z.string().max(200).optional(),
+});
+
+const requestNoteContentSchema = z.string().trim().max(5000);
+const addRequestNoteSchema = z.object({
+  content: requestNoteContentSchema.min(1, 'content required'),
+});
+
+router.use('/api/public/requests/:workspaceId', requireClientPortalAuth('workspaceId'));
+router.use('/api/public/requests/:workspaceId', (req, res, next) => {
+  if (!getWorkspace(req.params.workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+  next();
 });
 
 // --- Request Attachments ---
@@ -48,8 +59,8 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
 router.post('/api/public/requests/:workspaceId', validate(createRequestSchema), (req, res) => {
   const { title, description, category, priority, pageUrl, submittedBy } = req.body;
   const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl, submittedBy });
-  broadcast('request:created', request);
-  broadcastToWorkspace(req.params.workspaceId, 'request:created', { id: request.id });
+  broadcast(ADMIN_EVENTS.REQUEST_CREATED, request);
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_CREATED, { id: request.id });
   // Email team
   const ws = getWorkspace(req.params.workspaceId);
   if (ws) {
@@ -71,15 +82,14 @@ router.get('/api/public/requests/:workspaceId/:requestId', (req, res) => {
 });
 
 // Public: client adds a note
-router.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => {
+router.post('/api/public/requests/:workspaceId/:requestId/notes', validate(addRequestNoteSchema), (req, res) => {
   const { content } = req.body;
-  if (!content) return res.status(400).json({ error: 'content required' });
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
   res.json(updated);
 });
 
@@ -92,14 +102,16 @@ router.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.a
   const atts = processUploadedAttachments(files);
   const updated = addAttachmentsToRequest(req.params.workspaceId, req.params.requestId, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
   res.json(updated);
 });
 
 // Upload attachments with a note (public client)
 router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upload.array('files', 5), (req, res) => {
-  const content = req.body.content || '';
+  const contentResult = requestNoteContentSchema.optional().safeParse(req.body.content);
+  if (!contentResult.success) return res.status(400).json({ error: contentResult.error.issues[0]?.message || 'Invalid content' });
+  const content = contentResult.data || '';
   const files = req.files as Express.Multer.File[];
   if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
   const r = getRequest(req.params.requestId);
@@ -107,8 +119,8 @@ router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upl
   const atts = files?.length ? processUploadedAttachments(files) : undefined;
   const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
   res.json(updated);
 });
 

@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export type IconButtonSize = 'sm' | 'md' | 'lg';
-export type IconButtonVariant = 'ghost' | 'solid';
+export type IconButtonVariant = 'ghost' | 'solid' | 'accent' | 'danger';
 
 export interface IconButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'aria-label'> {
@@ -27,8 +27,14 @@ const ICON_SIZE: Record<IconButtonSize, string> = {
 };
 
 const VARIANT: Record<IconButtonVariant, string> = {
-  ghost: 'bg-transparent hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200',
-  solid: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200',
+  ghost:
+    'bg-transparent hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]',
+  solid:
+    'bg-[var(--surface-3)] hover:bg-[var(--surface-active)] text-[var(--brand-text-bright)]',
+  accent:
+    'bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] text-[var(--button-primary-text)] hover:brightness-105',
+  danger:
+    'bg-transparent hover:bg-[color:color-mix(in_srgb,var(--red)_10%,transparent)] text-[var(--brand-text-muted)] hover:text-[var(--red)]',
 };
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(

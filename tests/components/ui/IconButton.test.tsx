@@ -21,7 +21,7 @@ describe('IconButton', () => {
     render(<IconButton icon={X} label="Close" variant={variant} />);
     const btn = screen.getByRole('button');
     if (variant === 'ghost') expect(btn.className).toContain('bg-transparent');
-    else expect(btn.className).toContain('bg-zinc-800');
+    else expect(btn.className).toContain('bg-[var(--surface-3)]');
   });
 
   it('fires onClick', () => {

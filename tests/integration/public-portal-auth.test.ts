@@ -45,6 +45,8 @@ import {
   deleteClientUser,
   signClientToken,
 } from '../../server/client-users.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { JWT_SECRET } from '../../server/jwt-config.js';
 
@@ -68,6 +70,10 @@ let otherWsId = '';
 let otherClientUserId = '';
 /** Valid client JWT for otherWsId — must be rejected when used for protectedWsId. */
 let otherClientToken = '';
+let scopedUserId = '';
+let scopedUserToken = '';
+let wrongWorkspaceUserId = '';
+let wrongWorkspaceUserToken = '';
 
 /**
  * Passwordless workspace — no clientPassword, accessible without any auth.
@@ -111,19 +117,81 @@ beforeAll(async () => {
   otherClientUserId = otherClientUser.id;
   otherClientToken = signClientToken(otherClientUser);
 
+  const scopedUser = await createUser(
+    'portal-auth-internal@test.local',
+    'InternalPass1!',
+    'Portal Auth Internal',
+    'member',
+    [protectedWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+
+  const wrongWorkspaceUser = await createUser(
+    'portal-auth-wrong-internal@test.local',
+    'InternalPass1!',
+    'Portal Auth Wrong Internal',
+    'member',
+    [otherWsId],
+  );
+  wrongWorkspaceUserId = wrongWorkspaceUser.id;
+  wrongWorkspaceUserToken = signToken({ userId: wrongWorkspaceUser.id, email: wrongWorkspaceUser.email, role: wrongWorkspaceUser.role });
+
   // — Open (passwordless) workspace —
   const openWs = createWorkspace('Portal Auth Test — Open');
   openWsId = openWs.id;
   // Deliberately no clientPassword → auth gate does NOT activate
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteClientUser(clientUserId, protectedWsId);
   deleteClientUser(otherClientUserId, otherWsId);
+  deleteUser(scopedUserId);
+  deleteUser(wrongWorkspaceUserId);
   deleteWorkspace(protectedWsId);
   deleteWorkspace(otherWsId);
   deleteWorkspace(openWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
+});
+
+describe('Internal JWT workspace scoping on protected public routes', () => {
+  const path = () => `/api/public/content-requests/${protectedWsId}`;
+
+  it('internal JWT scoped to the requested workspace can access protected public data', async () => {
+    ctx.clearCookies();
+    const res = await ctx.api(path(), {
+      headers: { Authorization: `Bearer ${scopedUserToken}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('internal JWT scoped to a different workspace does not bypass client portal auth', async () => {
+    ctx.clearCookies();
+    const res = await ctx.api(path(), {
+      headers: { Authorization: `Bearer ${wrongWorkspaceUserToken}` },
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('Deleted client-user JWT rejection', () => {
+  it('rejects a still-valid signed client token after the client user is deleted', async () => {
+    const deletedUser = await createClientUser(
+      'portal-auth-deleted@test.local',
+      'DeletedPass1!',
+      'Deleted Portal User',
+      protectedWsId,
+      'client_member',
+    );
+    const deletedToken = signClientToken(deletedUser);
+    deleteClientUser(deletedUser.id, protectedWsId);
+
+    const res = await getWithCookie(
+      `/api/public/content-requests/${protectedWsId}`,
+      clientCookieHeader(protectedWsId, deletedToken),
+    );
+    expect(res.status).toBe(401);
+  });
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -296,6 +364,11 @@ describe('GET /api/public/content-requests/:workspaceId — auth enforcement', (
     expect(Array.isArray(body)).toBe(true);
   });
 
+  it('unknown workspace → 404, not an orphan request surface', async () => {
+    const res = await getNoAuth('/api/public/requests/ws_does_not_exist_requests_auth');
+    expect(res.status).toBe(404);
+  });
+
   it('cross-workspace JWT → 401', async () => {
     const res = await getWithCookie(path(), clientCookieHeader(protectedWsId, otherClientToken));
     expect(res.status).toBe(401);
@@ -461,6 +534,25 @@ describe('GET /api/public/content-performance/:workspaceId — auth enforcement'
   });
 
   it('valid client JWT → not 401 (auth passed, business logic response varies)', async () => {
+    const res = await getWithValidClientToken(path());
+    expect(res.status).not.toBe(401);
+  });
+
+  it('cross-workspace JWT → 401', async () => {
+    const res = await getWithCookie(path(), clientCookieHeader(protectedWsId, otherClientToken));
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /api/public/stripe/status/:workspaceId/:sessionId — explicit auth enforcement', () => {
+  const path = () => `/api/public/stripe/status/${protectedWsId}/cs_missing_auth_test`;
+
+  it('no auth → 401 even though workspaceId is not the generic middleware segment', async () => {
+    const res = await getNoAuth(path());
+    expect(res.status).toBe(401);
+  });
+
+  it('valid client JWT → not 401 (auth passed, missing session returns business response)', async () => {
     const res = await getWithValidClientToken(path());
     expect(res.status).not.toBe(401);
   });

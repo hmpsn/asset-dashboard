@@ -29,7 +29,9 @@ describe('useDeepLinkFocus', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(getByTestId('logo-input'));
     });
-    expect(getByTestId('focus-param').textContent).toBe('none');
+    await waitFor(() => {
+      expect(getByTestId('focus-param').textContent).toBe('none');
+    });
   });
 
   it('scrolls a non-input element into view when matched', async () => {
@@ -41,7 +43,9 @@ describe('useDeepLinkFocus', () => {
     await waitFor(() => {
       expect(getByTestId('address-row').scrollIntoView).toHaveBeenCalled();
     });
-    expect(getByTestId('focus-param').textContent).toBe('none');
+    await waitFor(() => {
+      expect(getByTestId('focus-param').textContent).toBe('none');
+    });
   });
 
   it('does nothing when no matching element', async () => {

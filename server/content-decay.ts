@@ -8,7 +8,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -300,8 +300,8 @@ Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on
 
 Keep each bullet to 1-2 sentences. Be specific to this page's situation.`;
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1-mini',
+  const result = await callAI({
+    model: 'gpt-5.4-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.3,

@@ -2,9 +2,8 @@
  * AI keyword analysis & content scoring routes — extracted from webflow.ts
  */
 import { Router } from 'express';
-import { callOpenAI } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
@@ -99,8 +98,8 @@ IMPORTANT:
 
 Return ONLY valid JSON, no markdown, no explanation.`;
 
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    const aiResult = await callAI({
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       temperature: 0.4,
@@ -188,7 +187,6 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
     // Bridge #5: page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
       invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');

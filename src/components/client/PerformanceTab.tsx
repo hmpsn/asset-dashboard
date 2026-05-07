@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, LineChart } from 'lucide-react';
 import { TabBar } from '../ui';
 import { SearchTab } from './SearchTab';
@@ -50,9 +50,28 @@ interface PerformanceTabProps {
 export function PerformanceTab(props: PerformanceTabProps) {
   const hasSearch = !!props.overview;
   const hasAnalytics = !!props.ga4Overview;
+  const searchExpected = !!props.ws.gscPropertyUrl;
   const [subTab, setSubTab] = useState<'search' | 'analytics'>(
-    props.initialSubTab || (hasSearch ? 'search' : 'analytics')
+    props.initialSubTab || (hasSearch ? 'search' : (hasAnalytics && !searchExpected ? 'analytics' : 'search'))
   );
+
+  useEffect(() => {
+    if (props.initialSubTab === 'analytics' && hasAnalytics && subTab !== 'analytics') {
+      setSubTab('analytics');
+      return;
+    }
+    if (props.initialSubTab === 'search' && hasSearch && subTab !== 'search') {
+      setSubTab('search');
+      return;
+    }
+    if (!props.initialSubTab && subTab === 'search' && !hasSearch && hasAnalytics && !searchExpected) {
+      setSubTab('analytics');
+      return;
+    }
+    if (subTab === 'analytics' && !hasAnalytics && hasSearch) {
+      setSubTab('search');
+    }
+  }, [props.initialSubTab, hasAnalytics, hasSearch, searchExpected]);
 
   return (
     <>

@@ -1,8 +1,12 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
-import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
-import { readNdjsonStream, readSseStream } from './streamUtils';
+import type { LatestRank, RankHistoryEntry } from '../components/client/types';
+import { readNdjsonStream } from './streamUtils';
+
+const workspaceQuery = (workspaceId?: string) => workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+const appendWorkspaceQuery = (url: string, workspaceId?: string) =>
+  workspaceId ? `${url}${url.includes('?') ? '&' : '?'}workspaceId=${encodeURIComponent(workspaceId)}` : url;
 
 export interface StrategyDiff {
   previousGeneratedAt: string;
@@ -24,8 +28,11 @@ export const audit = {
   detail: (wsId: string) =>
     getOptional<unknown>(`/api/public/audit-detail/${wsId}`),
 
-  traffic: (siteId: string) =>
-    getSafe<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>(`/api/audit-traffic/${siteId}`, {}),
+  traffic: (workspaceId: string, siteId: string) =>
+    getSafe<Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>>(
+      appendWorkspaceQuery(`/api/audit-traffic/${siteId}`, workspaceId),
+      {},
+    ),
 
   publicAudit: (wsId: string) =>
     getOptional<unknown>(`/api/public/audit/${wsId}`),
@@ -45,14 +52,14 @@ export const auditSchedules = {
 
 // ── Reports / snapshots ─────────────────────────────────────────
 export const reports = {
-  history: (siteId: string) =>
-    getSafe<unknown[]>(`/api/reports/${siteId}/history`, []),
+  history: (workspaceId: string, siteId: string) =>
+    getSafe<unknown[]>(appendWorkspaceQuery(`/api/reports/${siteId}/history`, workspaceId), []),
 
-  latest: (siteId: string) =>
-    getOptional<unknown>(`/api/reports/${siteId}/latest`),
+  latest: (workspaceId: string, siteId: string) =>
+    getOptional<unknown>(appendWorkspaceQuery(`/api/reports/${siteId}/latest`, workspaceId)),
 
-  snapshot: (siteId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/reports/${siteId}/snapshot`, body),
+  snapshot: (workspaceId: string, siteId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/reports/${siteId}/snapshot`, { ...body, workspaceId }),
 
   updateAction: (snapshotId: string, actionId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/reports/snapshot/${snapshotId}/actions/${actionId}`, body),
@@ -84,8 +91,8 @@ export const schema = {
   remove: (wsId: string, pageId: string) =>
     del(`/api/schema/${wsId}/${pageId}`),
 
-  retract: (wsId: string, pageId: string) =>
-    del(`/api/webflow/schema-retract/${wsId}/${pageId}`),
+  retract: (siteId: string, pageId: string, workspaceId?: string) =>
+    del(appendWorkspaceQuery(`/api/webflow/schema-retract/${siteId}/${pageId}`, workspaceId)),
 
   bulkGenerate: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/schema/${wsId}/bulk-generate`, body),
@@ -113,35 +120,35 @@ export interface SchemaValidationRecord {
 }
 
 export const schemaValidation = {
-  validate: (siteId: string, body: { pageId: string; schema: Record<string, unknown> }) =>
-    post<SchemaValidationResult>(`/api/webflow/schema-validate/${siteId}`, body),
+  validate: (siteId: string, body: { pageId: string; schema: Record<string, unknown> }, workspaceId?: string) =>
+    post<SchemaValidationResult>(`/api/webflow/schema-validate/${siteId}${workspaceQuery(workspaceId)}`, body),
 
-  getAll: (siteId: string) =>
-    getSafe<SchemaValidationRecord[]>(`/api/webflow/schema-validations/${siteId}`, []),
+  getAll: (siteId: string, workspaceId?: string) =>
+    getSafe<SchemaValidationRecord[]>(`/api/webflow/schema-validations/${siteId}${workspaceQuery(workspaceId)}`, []),
 
-  get: (siteId: string, pageId: string) =>
-    getOptional<SchemaValidationRecord>(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`),
+  get: (siteId: string, pageId: string, workspaceId?: string) =>
+    getOptional<SchemaValidationRecord>(appendWorkspaceQuery(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`, workspaceId)),
 };
 
 // ── Schema Site Plan ────────────────────────────────────────────
 export const schemaPlan = {
-  get: (siteId: string) =>
-    getOptional<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`),
+  get: (siteId: string, workspaceId?: string) =>
+    getOptional<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
 
-  generate: (siteId: string) =>
-    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`),
+  generate: (siteId: string, workspaceId?: string) =>
+    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
 
-  update: (siteId: string, pageRoles: PageRoleAssignment[], canonicalEntities?: CanonicalEntity[]) =>
-    put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`, { pageRoles, canonicalEntities }),
+  update: (siteId: string, pageRoles: PageRoleAssignment[], canonicalEntities?: CanonicalEntity[], workspaceId?: string) =>
+    put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`, { pageRoles, canonicalEntities }),
 
-  sendToClient: (siteId: string) =>
-    post<{ plan: SchemaSitePlan }>(`/api/webflow/schema-plan/${siteId}/send-to-client`),
+  sendToClient: (siteId: string, workspaceId?: string) =>
+    post<{ plan: SchemaSitePlan }>(`/api/webflow/schema-plan/${siteId}/send-to-client${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
-  activate: (siteId: string) =>
-    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate`),
+  activate: (siteId: string, workspaceId?: string) =>
+    post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate${workspaceQuery(workspaceId)}`),
 
-  retract: (siteId: string) =>
-    del(`/api/webflow/schema-plan/${siteId}`),
+  retract: (siteId: string, workspaceId?: string) =>
+    del(`/api/webflow/schema-plan/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── Keywords / Strategy ─────────────────────────────────────────
@@ -161,9 +168,6 @@ export const keywords = {
   webflowStrategy: (wsId: string) =>
     get<unknown>(`/api/webflow/keyword-strategy/${wsId}`),
 
-  generateStrategy: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
-
   patchStrategy: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
 
@@ -171,16 +175,16 @@ export const keywords = {
     getOptional<StrategyDiff | null>(`/api/webflow/keyword-strategy/${wsId}/diff`),
 
   semrushStatus: () =>
-    getOptional<unknown>('/api/semrush/status'),
+    getOptional<{ configured: boolean }>('/api/semrush/status'),
 
   providerStatus: () =>
     getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
 
   discoverCompetitors: (wsId: string) =>
-    get<{ competitors: Array<{ domain: string; relevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
+    get<{ competitors: Array<{ domain: string; competitorRelevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
 
   saveCompetitors: (wsId: string, domains: string[]) =>
-    post<{ saved: number }>(`/api/semrush/competitors/${wsId}`, { domains }),
+    post<{ competitors: string[] }>(`/api/semrush/competitors/${wsId}`, { domains }),
 
   seoCopy: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/seo-copy', body),
@@ -224,29 +228,29 @@ export const webflow = {
   sites: (token: string) =>
     get<unknown[]>(`/api/webflow/sites?token=${encodeURIComponent(token)}`),
 
-  pages: (siteId: string) =>
-    get<unknown[]>(`/api/webflow/pages/${siteId}`),
+  pages: (siteId: string, workspaceId?: string) =>
+    get<unknown[]>(`/api/webflow/pages/${siteId}${workspaceQuery(workspaceId)}`),
 
-  pageHtml: (siteId: string, path: string) =>
-    get<unknown>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(path)}`),
+  pageHtml: (siteId: string, path: string, workspaceId?: string) =>
+    get<unknown>(appendWorkspaceQuery(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(path)}`, workspaceId)),
 
   updatePageSeo: (pageId: string, body: Record<string, unknown>) =>
     put<unknown>(`/api/webflow/pages/${pageId}/seo`, body),
 
-  publish: (siteId: string) =>
-    post<unknown>(`/api/webflow/publish/${siteId}`),
+  publish: (siteId: string, workspaceId?: string) =>
+    post<unknown>(`/api/webflow/publish/${siteId}${workspaceQuery(workspaceId)}`),
 
   bulkFix: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/seo-bulk-fix/${siteId}`, body),
 
-  assets: (siteId: string) =>
-    get<unknown[]>(`/api/webflow/assets/${siteId}`),
+  assets: (siteId: string, workspaceId?: string) =>
+    get<unknown[]>(`/api/webflow/assets/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   updateAsset: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/assets/${assetId}`, body),
 
-  removeAsset: (assetId: string, siteId: string) =>
-    del(`/api/webflow/assets/${assetId}?siteId=${siteId}`),
+  removeAsset: (assetId: string, siteId: string, workspaceId?: string) =>
+    del(`/api/webflow/assets/${assetId}?siteId=${encodeURIComponent(siteId)}${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   generateAlt: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/${workspaceId}/generate-alt/${assetId}`, body),
@@ -257,23 +261,23 @@ export const webflow = {
   rename: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/rename/${assetId}`, body),
 
-  organizePreview: (siteId: string) =>
-    get<unknown>(`/api/webflow/organize-preview/${siteId}`),
+  organizePreview: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/organize-preview/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   organizeExecute: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/organize-execute/${siteId}`, body),
 
-  auditAssets: (siteId: string) =>
-    get<unknown>(`/api/webflow/audit/${siteId}`),
+  auditAssets: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/audit/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
-  linkCheckDomains: (siteId: string) =>
-    get<unknown[]>(`/api/webflow/link-check-domains/${siteId}`),
+  linkCheckDomains: (siteId: string, workspaceId?: string) =>
+    get<unknown[]>(`/api/webflow/link-check-domains/${siteId}${workspaceQuery(workspaceId)}`),
 
-  linkCheck: (siteId: string, domain?: string) =>
-    get<unknown>(`/api/webflow/link-check/${siteId}${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`),
+  linkCheck: (siteId: string, domain?: string, workspaceId?: string) =>
+    get<unknown>(appendWorkspaceQuery(`/api/webflow/link-check/${siteId}${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`, workspaceId)),
 
-  linkCheckSnapshot: (siteId: string) =>
-    get<unknown>(`/api/webflow/link-check-snapshot/${siteId}`),
+  linkCheckSnapshot: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/link-check-snapshot/${siteId}${workspaceQuery(workspaceId)}`),
 
   cmsCollections: (siteId: string) =>
     get<unknown[]>(`/api/webflow/cms/collections/${siteId}`),
@@ -291,10 +295,10 @@ export const webflow = {
     post<unknown>(`/api/webflow/internal-links/${siteId}/analyze`),
 
   internalLinksWithParams: (siteId: string, workspaceId?: string) =>
-    get<unknown>(`/api/webflow/internal-links/${siteId}${workspaceId ? `?workspaceId=${workspaceId}` : ''}`),
+    get<unknown>(`/api/webflow/internal-links/${siteId}${workspaceQuery(workspaceId)}`),
 
-  internalLinksSnapshot: (siteId: string) =>
-    getOptional<unknown>(`/api/webflow/internal-links-snapshot/${siteId}`),
+  internalLinksSnapshot: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/internal-links-snapshot/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── SEO Suggestions (persistent bulk rewrite variations) ────────
@@ -439,20 +443,20 @@ export const pageWeight = {
   analyze: (wsId: string) =>
     post<unknown>(`/api/pagespeed/${wsId}/analyze`),
 
-  webflowPageWeight: (siteId: string) =>
-    get<unknown>(`/api/webflow/page-weight/${siteId}`),
+  webflowPageWeight: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/page-weight/${siteId}${workspaceQuery(workspaceId)}`),
 
-  webflowPageWeightSnapshot: (siteId: string) =>
-    getOptional<unknown>(`/api/webflow/page-weight-snapshot/${siteId}`),
+  webflowPageWeightSnapshot: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/page-weight-snapshot/${siteId}${workspaceQuery(workspaceId)}`),
 
-  pagespeedBulk: (siteId: string, strategy: string, maxPages?: number) =>
-    get<unknown>(`/api/webflow/pagespeed/${siteId}?strategy=${strategy}&maxPages=${maxPages ?? 3}`),
+  pagespeedBulk: (siteId: string, strategy: string, maxPages?: number, workspaceId?: string) =>
+    get<unknown>(appendWorkspaceQuery(`/api/webflow/pagespeed/${siteId}?strategy=${strategy}&maxPages=${maxPages ?? 3}`, workspaceId)),
 
-  pagespeedSingle: (siteId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/pagespeed-single/${siteId}`, body),
+  pagespeedSingle: (siteId: string, body: Record<string, unknown>, workspaceId?: string) =>
+    post<unknown>(`/api/webflow/pagespeed-single/${siteId}`, { ...body, ...(workspaceId ? { workspaceId } : {}) }),
 
-  pagespeedSnapshot: (siteId: string) =>
-    getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}`),
+  pagespeedSnapshot: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── Alt-text generation (single + bulk NDJSON stream) ───────────
@@ -525,69 +529,4 @@ export async function bulkGenerateAltText(
       onProgress(event.assetId, event.altText);
     }
   });
-}
-
-/**
- * SSE event emitted by the keyword-strategy generation stream. Mirrors the
- * shape parsed in KeywordStrategy.tsx.
- */
-interface KeywordStrategySseEvent {
-  error?: string;
-  done?: boolean;
-  strategy?: unknown;
-  step?: string;
-  detail?: string;
-  progress?: number;
-  message?: string;
-}
-
-/**
- * Stream the POST /api/webflow/keyword-strategy/:workspaceId SSE endpoint.
- * Returns a cleanup function that aborts the in-flight fetch — callers
- * should invoke it on unmount.
- *
- * Parsing mirrors KeywordStrategy.tsx:156 verbatim: split buffer on '\n',
- * keep incomplete trailing line, parse `data: ` prefixed lines as JSON, and
- * forward parsed events to onEvent (the caller decides which fields to react
- * to — progress, done+strategy, or error).
- */
-export function streamKeywordStrategy(
-  workspaceId: string,
-  body: Record<string, unknown>,
-  onEvent: (event: KeywordStrategySseEvent) => void,
-  onError: (err: Error) => void,
-  onDone: () => void,
-): () => void {
-  const controller = new AbortController();
-
-  (async () => {
-    try {
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        // Non-streaming error response (429, 400, 500, etc.) — parse JSON body.
-        let data: KeywordStrategySseEvent = {};
-        try { data = await res.json() as KeywordStrategySseEvent; } catch { /* non-JSON error body */ }
-        if (!res.ok || data.error) {
-          onError(new Error(data.message || data.error || 'Request failed'));
-          return;
-        }
-        onDone();
-        return;
-      }
-
-      await readSseStream<KeywordStrategySseEvent>(res.body, onEvent);
-      onDone();
-    } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError') return;
-      onError(err instanceof Error ? err : new Error(String(err)));
-    }
-  })();
-
-  return () => controller.abort();
 }

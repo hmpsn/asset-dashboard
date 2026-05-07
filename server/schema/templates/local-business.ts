@@ -4,7 +4,8 @@
  * (Dentist, Physician, etc.) is deferred to the intelligence-layer follow-up.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, withBreadcrumb } from './helpers.js';
+import type { SchemaIndustrySubtype } from '../../../shared/types/schema-plan.js';
+import { breadcrumbRef, dropUndefined, withBreadcrumb } from './helpers.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -12,19 +13,47 @@ export interface LocalBusinessInput {
   businessProfile: BusinessProfile | null;
   /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
   siteHasSearch?: boolean;
+  industrySubtype?: SchemaIndustrySubtype;
+}
+
+function isOpaqueIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function safeText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  return cleaned;
 }
 
 export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<string, unknown> {
   const { pageData, businessProfile, baseUrl, siteHasSearch } = input;
+  const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
+  const lbId = isHomepageUsage
+    ? `${baseUrl}/#localbusiness`
+    : `${pageData.canonicalUrl}#localbusiness`;
+  const lbUrl = isHomepageUsage ? baseUrl : pageData.canonicalUrl;
+  const localBusinessType = input.industrySubtype === 'medical'
+    ? 'MedicalOrganization'
+    : input.industrySubtype === 'financial'
+      ? 'FinancialService'
+      : 'LocalBusiness';
 
-  const address = businessProfile?.address
+  const addressFields = businessProfile?.address
+    ? {
+        streetAddress: safeText(businessProfile.address.street),
+        addressLocality: safeText(businessProfile.address.city),
+        addressRegion: safeText(businessProfile.address.state),
+        postalCode: safeText(businessProfile.address.zip),
+        addressCountry: safeText(businessProfile.address.country),
+      }
+    : undefined;
+  const address = addressFields && Object.values(addressFields).some(Boolean)
     ? dropUndefined({
         '@type': 'PostalAddress',
-        'streetAddress': businessProfile.address.street,
-        'addressLocality': businessProfile.address.city,
-        'addressRegion': businessProfile.address.state,
-        'postalCode': businessProfile.address.zip,
-        'addressCountry': businessProfile.address.country,
+        ...addressFields,
       })
     : undefined;
 
@@ -57,21 +86,21 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   });
 
   const localBusiness = dropUndefined({
-    '@type': 'LocalBusiness',
-    '@id': `${baseUrl}/#localbusiness`,
+    '@type': localBusinessType,
+    '@id': lbId,
     'name': pageData.publisher.name,
     'description': pageData.description,
-    'url': baseUrl,
+    'url': lbUrl,
     'image': pageData.image,
     'inLanguage': pageData.inLanguage,
-    'telephone': businessProfile?.phone,
-    'email': businessProfile?.email,
+    'telephone': safeText(businessProfile?.phone),
+    'email': safeText(businessProfile?.email),
     'openingHours': businessProfile?.openingHours,
     'address': address,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
-    'foundedDate': businessProfile?.foundedDate,
+    'foundingDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
-    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'areaServed': safeText(pageData.areaServed) ? { '@type': 'Place' as const, name: safeText(pageData.areaServed) } : undefined,
     'aggregateRating': aggregateRating,
   });
 
@@ -96,13 +125,12 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   };
 
   // PR2: Review[] graph nodes
-  const lbId = `${baseUrl}/#localbusiness`;
   const reviews: Array<Record<string, unknown>> = (pageData.elements?.testimonials ?? [])
     .reduce<Array<Record<string, unknown>>>((acc, t, idx) => {
       if (!t.author || t.rating == null) return acc;
       acc.push(dropUndefined({
         '@type': 'Review' as const,
-        '@id': `${baseUrl}/#review-${idx}`,
+        '@id': `${lbUrl}#review-${idx}`,
         'itemReviewed': { '@id': lbId },
         'reviewRating': dropUndefined({
           '@type': 'Rating' as const,
@@ -116,5 +144,20 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       return acc;
     }, []);
 
-  return withBreadcrumb([organization, localBusiness, website, ...reviews], pageData);
+  const webPageNode = !isHomepageUsage ? dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${pageData.canonicalUrl}#webpage`,
+    'url': pageData.canonicalUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': { '@id': `${baseUrl}/#website` },
+    'about': { '@id': lbId },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
+  }) : undefined;
+
+  const nodes: Array<Record<string, unknown>> = [organization, localBusiness, website, ...reviews];
+  if (webPageNode) nodes.push(webPageNode);
+
+  return withBreadcrumb(nodes, pageData);
 }

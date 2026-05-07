@@ -1,15 +1,17 @@
 /**
  * reports routes — extracted from server/index.ts
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
 const router = Router();
 
 import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { getDataDir } from '../data-dir.js';
 import { applySuppressionsToAudit } from '../helpers.js';
 import { triggerMonthlyReport } from '../monthly-report.js';
@@ -24,6 +26,8 @@ import {
   deleteActionItem,
   getActionItems,
   extractSiteLogo,
+  type ActionPriority,
+  type ActionStatus,
 } from '../reports.js';
 import { getMonthlyReportHTML, listMonthlyReports } from '../monthly-report.js';
 import { runSalesAudit } from '../sales-audit.js';
@@ -34,6 +38,52 @@ import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('reports');
+
+const actionPrioritySchema = z.enum(['high', 'medium', 'low']);
+const actionStatusSchema = z.enum(['planned', 'in-progress', 'completed']);
+
+const createActionItemSchema = z.object({
+  title: z.string({ required_error: 'Title is required' }).trim().min(1, 'Title is required').max(500),
+  description: z.string().trim().max(5000).optional().default(''),
+  priority: actionPrioritySchema.optional().default('medium'),
+  category: z.string().trim().max(100).optional(),
+});
+
+const updateActionItemSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(500).optional(),
+  description: z.string().trim().max(5000).optional(),
+  status: actionStatusSchema.optional(),
+  priority: actionPrioritySchema.optional(),
+  category: z.string().trim().max(100).optional(),
+}).refine(
+  (body) => Object.values(body).some((value) => value !== undefined),
+  { message: 'At least one field required' },
+);
+
+const requireSnapshotWorkspaceAccess: RequestHandler = (req, res, next) => {
+  const snapshot = getSnapshot(req.params.id);
+  if (!snapshot) {
+    res.status(404).json({ error: 'Report not found' });
+    return;
+  }
+
+  const workspace = listWorkspaces().find(w => w.webflowSiteId === snapshot.siteId);
+  if (!workspace) {
+    if (!req.user) {
+      next();
+      return;
+    }
+    sendWorkspaceAccessDenied(res);
+    return;
+  }
+
+  if (!requestUserCanAccessWorkspace(req, workspace.id)) {
+    sendWorkspaceAccessDenied(res);
+    return;
+  }
+
+  next();
+};
 
 // --- Sales Report (URL-based, no Webflow API needed) ---
 router.post('/api/sales-report', async (req, res) => {
@@ -96,7 +146,10 @@ router.get('/api/sales-report/:id/html', (req, res) => {
 
 // --- Reports & Snapshots ---
 // Save audit as snapshot (run audit + save + extract logo)
-router.post('/api/reports/:siteId/save', async (req, res) => {
+router.post('/api/reports/:siteId/save', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), async (req, res) => {
   try {
     const { siteId } = req.params;
     const { siteName } = req.body;
@@ -116,7 +169,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
             logoUrl = (await extractSiteLogo(`https://${siteData.shortName}.webflow.io`)) || undefined;
           }
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'reports: POST /api/reports/:siteId/save: programming error'); /* logo extraction is best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'reports: POST /api/reports/:siteId/save: programming error'); /* logo extraction is best-effort */ } // url-fetch-ok
     }
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
@@ -127,7 +180,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
       addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${effectiveAudit.siteScore}`,
         `${effectiveAudit.totalPages} pages scanned, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
         { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
-      broadcastToWorkspace(auditWs.id, 'audit:complete', { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
+      broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
   } catch (err) {
@@ -137,7 +190,10 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
 });
 
 // Save existing audit data as snapshot (no re-run)
-router.post('/api/reports/:siteId/snapshot', (req, res) => {
+router.post('/api/reports/:siteId/snapshot', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'params', name: 'siteId' },
+}), (req, res) => {
   try {
     const { siteId } = req.params;
     const { siteName, audit } = req.body;
@@ -151,7 +207,7 @@ router.post('/api/reports/:siteId/snapshot', (req, res) => {
 });
 
 // Get latest full snapshot for a site (used by admin SeoAudit to restore after deploy)
-router.get('/api/reports/:siteId/latest', (req, res) => {
+router.get('/api/reports/:siteId/latest', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const latest = getLatestSnapshot(req.params.siteId);
   if (!latest) return res.json(null);
   // Apply suppressions so admin sees filtered scores matching client view
@@ -164,43 +220,48 @@ router.get('/api/reports/:siteId/latest', (req, res) => {
 });
 
 // List snapshots for a site
-router.get('/api/reports/:siteId/history', (req, res) => {
+router.get('/api/reports/:siteId/history', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const history = listSnapshots(req.params.siteId);
   res.json(history);
 });
 
 // Get a specific snapshot
-router.get('/api/reports/snapshot/:id', (req, res) => {
+router.get('/api/reports/snapshot/:id', requireSnapshotWorkspaceAccess, (req, res) => {
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).json({ error: 'Report not found' });
   res.json(snapshot);
 });
 
 // --- Action Items ---
-router.get('/api/reports/snapshot/:id/actions', (req, res) => {
+router.get('/api/reports/snapshot/:id/actions', requireSnapshotWorkspaceAccess, (req, res) => {
   res.json(getActionItems(req.params.id));
 });
 
-router.post('/api/reports/snapshot/:id/actions', (req, res) => {
+router.post('/api/reports/snapshot/:id/actions', requireSnapshotWorkspaceAccess, validate(createActionItemSchema), (req, res) => {
   const { title, description, priority, category } = req.body;
-  if (!title) return res.status(400).json({ error: 'Title is required' });
   const item = addActionItem(req.params.id, {
     title,
-    description: description || '',
-    priority: priority || 'medium',
+    description,
+    priority: priority as ActionPriority,
     category,
   });
   if (!item) return res.status(404).json({ error: 'Snapshot not found' });
   res.json(item);
 });
 
-router.patch('/api/reports/snapshot/:id/actions/:actionId', (req, res) => {
-  const item = updateActionItem(req.params.id, req.params.actionId, req.body);
+router.patch('/api/reports/snapshot/:id/actions/:actionId', requireSnapshotWorkspaceAccess, validate(updateActionItemSchema), (req, res) => {
+  const item = updateActionItem(req.params.id, req.params.actionId, req.body as {
+    title?: string;
+    description?: string;
+    status?: ActionStatus;
+    priority?: ActionPriority;
+    category?: string;
+  });
   if (!item) return res.status(404).json({ error: 'Action item not found' });
   res.json(item);
 });
 
-router.delete('/api/reports/snapshot/:id/actions/:actionId', (req, res) => {
+router.delete('/api/reports/snapshot/:id/actions/:actionId', requireSnapshotWorkspaceAccess, (req, res) => {
   const ok = deleteActionItem(req.params.id, req.params.actionId);
   if (!ok) return res.status(404).json({ error: 'Action item not found' });
   res.json({ success: true });

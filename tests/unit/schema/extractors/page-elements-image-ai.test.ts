@@ -44,7 +44,7 @@ function fakeChatResponse(text: string) {
   return {
     choices: [{ message: { content: text } }],
     usage: { prompt_tokens: 100, completion_tokens: 5, total_tokens: 105 },
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
   };
 }
 

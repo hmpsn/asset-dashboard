@@ -120,10 +120,10 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **StatCard** | `StatCard.tsx` | Sparkline default: `#2dd4bf` (teal); value: `text-zinc-100` or passed color | Also exports `CompactStatBar` for inline metric rows |
 | **MetricRing** | `MetricRing.tsx` | Auto from `scoreColor()`: ≥80 green, ≥60 amber, <60 red | DIN Pro 700, font size = `0.38 × ring size` |
 | **MetricRingSvg** | `MetricRing.tsx` | Same as MetricRing | Smaller inline SVG variant for tight spaces |
-| **SectionCard** | `SectionCard.tsx` | `bg-zinc-900 border-zinc-800` | Header row optional; title: `text-sm font-semibold text-zinc-200` |
-| **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
+| **SectionCard** | `SectionCard.tsx` | `bg-[var(--surface-2)] border-[var(--brand-border)]` | Header row optional; title: `.t-body font-semibold text-[var(--brand-text-bright)]` |
+| **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-[var(--brand-border)]`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), `.t-ui` inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature card radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
-| **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
+| **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 7 colors: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
@@ -150,7 +150,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Default border: `border-zinc-700`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Placeholder: `text-zinc-500`. | Phase 5. Dark-theme inputs, mint focus ring. Consume error state + id from FormFieldContext. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
 | **Checkbox** | `ui/forms/Checkbox.tsx` | Checked: `bg-[var(--brand-mint)] border-[var(--brand-mint)]` (Law 01). Unchecked: `bg-zinc-800 border-zinc-700`. Check icon: `text-zinc-900`. | Phase 5. Custom visual checkbox over hidden native input (preserves Space-key + a11y). Required `label` string. forwardRef to input. |
 | **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
-| **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Spinner replaces icon while `loading`. `link` variant skips size padding. |
+| **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Sizes preserve hierarchy: `.t-caption-sm` / `.t-caption` / `.t-body`. Spinner replaces icon while `loading`. `link` variant skips size padding. |
 | **IconButton** | `ui/IconButton.tsx` | Ghost: `text-zinc-400 hover:text-zinc-200`; solid: `bg-zinc-800` | Icon-only with required `label` for ARIA. 3 sizes (sm/md/lg), 2 variants (ghost/solid). |
 | **ActionPill** | `ui/ActionPill.tsx` | start: teal tint; approve: emerald tint; decline: red tint; send: blue tint; request-changes: amber tint | Compact tinted pill for workflow action buttons. Each variant maps to the status-color family (Law 1/success/error/data/warning). |
 | **SegmentedControl** | `ui/SegmentedControl.tsx` | Active: `bg-zinc-700 text-white`; inactive: `text-zinc-400`; container: `bg-zinc-900 border-zinc-800` | WAI-ARIA radiogroup. Roving tabIndex (selected=0, others=-1). Arrow-key navigation (Left/Right + Home/End). Fallback tab stop on first non-disabled option when `value` matches none. 2 sizes (sm/md). |
@@ -374,18 +374,77 @@ Premium-only one-line "letter from the editor" rendered ABOVE the dateline when 
 | Status badge: failed | `bg-red-500/10 text-red-400` | Error = red |
 | Status badge: running/pending | `bg-amber-500/10 text-amber-400` | In-progress = amber |
 
-### Stripe Payment (`StripePaymentForm.tsx`)
+### Strategy Keywords (`StrategyTab.tsx` — `priorityKeywordsPanel`)
+
+Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
+
+#### Two-zone flat list
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Confirmed keyword row (default) | `bg-[var(--surface-2)]` (via SectionCard/standard row) | No special tint — confirmed = native surface |
+| Suggestion keyword row | `bg-blue-500/5 border border-blue-500/20` | Blue tint distinguishes suggestions from confirmed; hover `border-blue-500/30` |
+| Row keyword name | `text-[var(--brand-text-bright)]` truncated 1 line | Primary identifier |
+| Role·volume·KD sublabel | `text-[var(--brand-text-muted)]` truncated 1 line | Supporting metadata, not primary |
+| **Role indicator dot — content** | `w-1.5 h-1.5 rounded-full bg-emerald-400 mt-0.5` | Emerald = content role (Law 3); `aria-hidden="true"` |
+| **Role indicator dot — page** | `bg-blue-400` | Blue = page/data role (Law 2); `aria-hidden="true"` |
+| **Role indicator dot — strategy** | `bg-teal-400` | Teal = strategy/action role (Law 1); `aria-hidden="true"` |
+| **Role indicator dot — unknown** | `bg-[var(--brand-text-muted)]` | Muted = unclassified; `aria-hidden="true"` |
+| **Enrichment pending suffix** | ` · data pending` appended to sublabel when `enrichmentStatus === 'unenriched'` | Plain English, no special color |
+| **Opportunity accent bar** | `absolute left-0 top-0 bottom-0 w-0.5 bg-blue-400` + inline `opacity` scaled to `opportunityScore/100` (min 0.2) | Blue = data metric (Law 2); strength visually encoded; `aria-hidden="true"` |
+
+#### Keyword detail drawer (desktop = right slide-in, mobile = bottom sheet)
+
+**Three enrichment states:**
+- `unenriched` — pulsing `w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-pulse` dot + "Gathering data for this keyword…" message
+- `partial` — metric cards render with "Gathering…" placeholder for missing fields
+- `enriched` — full plain-English metrics rendered
+
+**Plain-English metric translation layer** (`fmtAudience`, `fmtCompetition`, `fmtMomentum` helpers):
+- KD 0–29 → "Approachable" (`text-emerald-400`)
+- KD 30–49 → "Moderate competition" (`text-amber-400`)
+- KD 50–74 → "Competitive" (`text-red-400`)
+- KD 75+ → "Highly competitive" (`text-red-400`)
+- Volume → audience size label (e.g. "~2.4K searches/mo")
+- Trend → "Interest growing / steady / declining"
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Drawer backdrop | `fixed inset-0 z-[var(--z-modal-backdrop)]` | Standard modal backdrop token |
+| Drawer panel (desktop) | `sm:inset-y-0 sm:right-0 sm:border-l bg-[var(--surface-2)]` | Right-side slide-in, surface-2 for contrast |
+| Drawer panel (mobile) | `inset-x-0 bottom-0 h-[65vh] rounded-t-[var(--radius-signature-lg)]` | Bottom sheet with brand signature radius |
+| **Role badge — content opportunity** | `border-emerald-500/20 bg-emerald-500/8 text-accent-success` | Emerald = content/success opportunity |
+| **Role badge — page opportunity** | `border-blue-500/20 bg-blue-500/10 text-accent-info` | Blue = data/page-level read |
+| **Role badge — strategy keyword** | `border-teal-500/20 bg-teal-500/8 text-accent-brand` | Teal = primary strategy signal (Law 1) |
+| **Role badge — keyword idea** | `border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]` | Zinc/muted = low-confidence idea |
+| **Competition label — Approachable** | `text-emerald-400` | Low KD = quick win (Law 3) |
+| **Competition label — Moderate** | `text-amber-400` | Medium KD = caution |
+| **Competition label — Competitive / Highly competitive** | `text-red-400` | High KD = costly |
+| **Trend — growing** | `text-emerald-400` | Positive direction (Law 3) |
+| **Trend — declining** | `text-red-400` | Negative direction |
+| **Trend — steady / unknown** | `text-[var(--brand-text-muted)]` | No direction signal |
+| AI rationale prose | `t-caption-sm text-[var(--brand-text-muted)] leading-relaxed` | Supporting context, not the headline |
+| Foldable "See the numbers" section | `bg-[var(--surface-3)] rounded-[var(--radius-lg)]` | Raw KD/volume/CPC hidden by default (progressive disclosure) |
+| Next move CTA (add to strategy) | `bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30` | Teal = action (Law 1) |
+| Footer "Remove" action | `text-[var(--brand-text-muted)] hover:text-red-400` | Destructive = red on hover |
+
+**Intent coloring (search intent badges in inline rows):**
+- `commercial` → `text-accent-info bg-blue-500/10 border-blue-500/20`
+- `informational` → `text-accent-success bg-emerald-500/10 border-emerald-500/20`
+- `transactional` → `text-accent-warning bg-amber-500/10 border-amber-500/20`
+- `navigational` → `text-accent-cyan bg-cyan-500/10 border-cyan-500/20`
+
+### Stripe Checkout
 
 | Element | Color |
 |---------|-------|
-| Header gradient | `from-teal-600/15 via-emerald-600/10` |
-| Decorative glow | `bg-teal-500` |
+| Confirmation modal CTA | `from-teal-600 to-emerald-600` |
 | Price text | `text-teal-300` |
 | Keyword text | `text-teal-400/80` |
-| Submit button | `from-teal-600 to-emerald-600` |
-| Success state | `bg-teal-500/15 ring-teal-500/30`, `text-teal-400` |
+| Billing settings status | teal for configured actions, emerald for success |
+| Checkout redirect errors | red error copy with retry |
 
-> **All client-facing payment UI is teal.** The `accentColor` prop still exists in the interface for backward compat but is no longer branched on.
+> **All client-facing payment UI is teal.** Payments use Stripe Checkout redirects; the retired Stripe Elements form/modal should not be reintroduced.
 
 ---
 
@@ -506,7 +565,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/AdminChat.tsx` | Admin AI chat (purple accent) |
 | `src/components/KeywordStrategy.tsx` | SEO strategy + content gaps |
 | `src/components/ContentBriefs.tsx` | Admin content brief management |
-| `src/components/StripePaymentForm.tsx` | Stripe payment UI (teal unified) |
+| `src/components/StripeSettings.tsx` | Stripe Checkout configuration |
 | `src/components/WorkspaceOverview.tsx` | Admin workspace grid |
 | `src/components/WorkspaceSettings.tsx` | Admin workspace config |
 
@@ -589,7 +648,7 @@ When shipping UI changes that affect color or design patterns:
 | Date | Change |
 |------|--------|
 | 2025-03-07 | Initial creation: unified violet→teal, blue CTA→teal, simplified payment modal, removed client page-type selectors, cleaned content cards, hidden bundles |
-| 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed StripePaymentForm, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
+| 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed the historical Stripe payment form, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
 | 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` with dual Y-axes, annotation markers, click-to-annotate. Merged SearchConsole + GoogleAnalytics into `AnalyticsHub`. |
 | 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
 | 2026-03-28 | **Visual Polish** (10 refinements): Asymmetric card radius (SectionCard `10px 24px`, StatCard `6px 12px`), MetricRing outward glow + charge-up animation, noise overlay on body, ScannerReveal page transitions, spacing variation (`space-y-8` between sections), removed uppercase from section headings, StatCard `size="hero"` prop, stagger-fade entrance animations, interactive card hover (teal left-border accent), status color muting (`emerald-400/80`, `amber-400/80`, `red-400/80`, bg at `/8` opacity). Updated: SectionCard, StatCard, MetricRing, Skeleton, TierGate, Badge, statusConfig, ~60 consumer files. |
@@ -611,5 +670,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-04-29 | **`.t-body` → DIN Pro 500** (PR #379): Body text utility class promoted from `Inter / 400` to `'DIN Pro', 'Inter' / 500` in both `src/index.css` + `public/styleguide.css` (lockstep per styleguide-typography-parity rule). Affects every consumer of `.t-body` platform-wide — page cards, form descriptions, schema widgets, BodyText primitive, etc. Inter remains the fallback so glyphs missing from DIN Pro degrade gracefully. Other `.t-*` classes unchanged. |
 
 ---
+
+| 2026-05-03 | **Strategy Keywords rebuild** (PRs #430–#434 + task commits): Two-zone flat list (confirmed rows = standard surface, suggestion rows = `bg-blue-950/60 border border-blue-900/50`). Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD difficulty coloring: ≤29=emerald-400, 30–49=amber-400, ≥50=red-400. Trend coloring: rising=emerald-400, declining=red-400, stable/unknown=muted. Drawer: right slide-in on desktop, bottom sheet on mobile. No sort controls. Per-component map section added. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.

@@ -9,8 +9,10 @@ import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
 import { stripCodeFences } from './helpers.js';
+import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 
 const log = createLogger('openai');
+const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
 
 // --- Token / Cost Tracking (persisted to disk) ---
 
@@ -90,27 +92,41 @@ function loadEntriesFromDisk(since?: string, days?: number): TokenUsage[] {
 
 // --- Cost estimation per model ---
 
-/** Per-token pricing (USD). Updated March 2026. */
+/** Per-token pricing (USD). Updated May 2026. */
 function estimateCost(entry: TokenUsage): number {
   const m = entry.model;
-  // GPT-4.1 nano
-  if (m.includes('nano')) return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
-  // GPT-4.1 mini
-  if (m.includes('mini')) return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
-  // GPT-4.1
+  // GPT-5.5
+  if (m.startsWith('gpt-5.5')) return (entry.promptTokens * 0.000005) + (entry.completionTokens * 0.00003);
+  // GPT-5.4 nano
+  if (m.startsWith('gpt-5.4-nano')) return (entry.promptTokens * 0.0000002) + (entry.completionTokens * 0.00000125);
+  // GPT-5.4 mini
+  if (m.startsWith('gpt-5.4-mini')) return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
+  // GPT-5.4
+  if (m.startsWith('gpt-5.4')) return (entry.promptTokens * 0.0000025) + (entry.completionTokens * 0.000015);
+  // Historical GPT-4.1 nano
+  if (m === 'gpt-4.1-nano') return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
+  // Historical GPT-4.1 mini
+  if (m === 'gpt-4.1-mini') return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
+  // Historical GPT-4.1
   if (m.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
-  // Claude Sonnet 4
+  // Claude Sonnet 4+
   if (m.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
+  // Claude Haiku 4.5
+  if (m.includes('claude-haiku-4-5')) return (entry.promptTokens * 0.000001) + (entry.completionTokens * 0.000005);
   // Claude 3.5 Sonnet
   if (m.includes('claude-3-5-sonnet')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
   // Claude 3.5 Haiku
   if (m.includes('claude-3-5-haiku')) return (entry.promptTokens * 0.0000008) + (entry.completionTokens * 0.000004);
-  // Fallback: GPT-4.1 pricing
-  return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
+  // Fallback: current default OpenAI mini pricing
+  return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
 }
 
 function getProvider(model: string): 'openai' | 'anthropic' {
   return model.includes('claude') ? 'anthropic' : 'openai';
+}
+
+function usesMaxCompletionTokens(model: string): boolean {
+  return model.startsWith('gpt-5') || model === 'chat-latest' || /^o\d/.test(model);
 }
 
 /** Get recent token usage, optionally filtered by workspace */
@@ -215,7 +231,17 @@ interface ChatMessage {
 }
 
 interface OpenAIChatOptions {
-  model?: 'gpt-4.1-nano' | 'gpt-4.1-mini' | 'gpt-4.1' | 'gpt-4o-mini' | 'gpt-4o';
+  model?:
+    | 'gpt-5.5'
+    | 'gpt-5.4'
+    | 'gpt-5.4-mini'
+    | 'gpt-5.4-nano'
+    | 'chat-latest'
+    | 'gpt-4.1-nano'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1'
+    | 'gpt-4o-mini'
+    | 'gpt-4o';
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -229,6 +255,8 @@ interface OpenAIChatOptions {
   maxRetries?: number;
   /** Timeout per request in ms (default 60000) */
   timeoutMs?: number;
+  /** Optional caller cancellation signal. Composed with timeoutMs. */
+  signal?: AbortSignal;
 }
 
 interface OpenAIChatResult {
@@ -244,7 +272,7 @@ interface OpenAIChatResult {
  */
 export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
   const {
-    model = 'gpt-4.1-mini',
+    model = 'gpt-5.4-mini',
     messages,
     maxTokens = 1000,
     temperature = 0.7,
@@ -253,7 +281,13 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     workspaceId,
     maxRetries = 3,
     timeoutMs = 60_000,
+    signal,
   } = opts;
+
+  if (signal) {
+    // Cancellable requests are per-job work; sharing a deduped promise would let one job abort another.
+    return executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal });
+  }
 
   // Create deduplication key from request parameters
   const { AIRequestDeduplicator }: typeof AiDeduplication = await import('./ai-deduplication.js'); // dynamic-import-ok
@@ -273,7 +307,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
   return aiDeduplicator.deduplicate(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs }),
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal }),
     {
       cacheTtlMs: 5 * 60 * 1000, // 5 minutes
       skipCache: shouldSkipCache,
@@ -289,7 +323,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const {
-    model = 'gpt-4.1-mini',
+    model = 'gpt-5.4-mini',
     messages,
     maxTokens = 1000,
     temperature = 0.7,
@@ -298,12 +332,17 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     workspaceId,
     maxRetries = 3,
     timeoutMs = 60_000,
+    signal,
   } = opts;
+
+  const tokenLimit = usesMaxCompletionTokens(model)
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
 
   const body = JSON.stringify({
     model,
     messages,
-    max_tokens: maxTokens,
+    ...tokenLimit,
     temperature,
     ...(responseFormat && { response_format: responseFormat }),
   });
@@ -311,6 +350,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   const callStartMs = Date.now();
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -318,7 +358,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
           'Content-Type': 'application/json',
         },
         body,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: composeTimeoutSignal(timeoutMs, signal),
       });
 
       if (!res.ok) {
@@ -337,7 +377,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfterMs) waitMs = Math.max(parseInt(retryAfterMs, 10) + 500, waitMs);
           log.info(`[${feature}] OpenAI ${res.status}, retrying in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(r => setTimeout(r, waitMs));
+          await abortableDelay(waitMs, signal, AI_REQUEST_CANCELLED_MESSAGE);
           continue;
         }
         throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 300)}`);
@@ -359,15 +399,16 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
+      if (signal?.aborted) throw err;
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
         log.info(`[${feature}] OpenAI timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
         continue;
       }
       if (attempt === maxRetries) throw err;
       // Generic retry for network errors
       log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);
     }
   }
   throw new Error(`[${feature}] OpenAI call failed after ${maxRetries} retries`);

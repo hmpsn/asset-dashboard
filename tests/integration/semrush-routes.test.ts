@@ -10,7 +10,7 @@
  * - Credit-exhaustion circuit breaker: automatic halt of API calls when
  *   "BALANCE IS ZERO" appears in response, reset after 5-minute cooldown
  * - Single-failure graceful handling (non-fatal errors)
- * - Pure utility functions: trendDirection, parseSerpFeatures, hasSerpOpportunity,
+ * - Utility functions: trendDirection, parseSerpFeatures, hasSerpOpportunity,
  *   estimateCreditCost, isSemrushConfigured
  */
 
@@ -41,12 +41,14 @@ import {
   getDomainOrganicKeywords,
   getDomainOverview,
   getBacklinksOverview,
-  trendDirection,
-  parseSerpFeatures,
-  hasSerpOpportunity,
   estimateCreditCost,
   isSemrushConfigured,
 } from '../../server/semrush.js';
+import {
+  trendDirection,
+  parseSerpFeatures,
+  hasSerpOpportunity,
+} from '../../server/seo-provider-signals.js';
 
 // ── HTTP test context ──────────────────────────────────────────────────────
 
@@ -61,9 +63,9 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── SEMRush HTTP routes ────────────────────────────────────────────────────

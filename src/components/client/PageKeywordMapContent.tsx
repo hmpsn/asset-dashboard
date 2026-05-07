@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
 import { Icon } from '../ui/Icon.js';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
@@ -40,13 +40,13 @@ interface PageKeywordMapContentProps {
   isLoadingFeedback?: (keyword: string) => boolean;
 }
 
-type FilterTab = 'all' | 'ranking' | 'opportunities' | 'stagnant' | 'falling';
+type FilterTab = 'all' | 'ranking' | 'opportunities' | 'falling';
 
 function getTrendIndicator(current?: number, previous?: number) {
   if (!current || !previous) return null;
   const diff = previous - current; // Lower position number is better (e.g., 5 -> 3 is +2 improvement)
-  if (diff > 0) return { icon: ArrowUpRight, color: 'text-emerald-400', label: `↑ ${diff}` };
-  if (diff < 0) return { icon: ArrowDownRight, color: 'text-red-400', label: `↓ ${Math.abs(diff)}` };
+  if (diff > 0) return { icon: ArrowUpRight, color: 'text-accent-success', label: `↑ ${diff}` };
+  if (diff < 0) return { icon: ArrowDownRight, color: 'text-accent-danger', label: `↓ ${Math.abs(diff)}` };
   return { icon: Minus, color: 'text-[var(--brand-text-muted)]', label: '→' };
 }
 
@@ -63,20 +63,18 @@ function getPageFolder(path: string): string {
 }
 
 function positionColor(pos: number): string {
-  if (pos <= 3) return 'text-emerald-400';
-  if (pos <= 10) return 'text-emerald-400/70';
-  if (pos <= 20) return 'text-amber-400';
-  if (pos <= 50) return 'text-amber-400/70';
+  if (pos <= 3) return 'text-accent-success font-semibold';
+  if (pos <= 10) return 'text-accent-success';
+  if (pos <= 20) return 'text-accent-warning font-semibold';
+  if (pos <= 50) return 'text-accent-warning';
   return 'text-[var(--brand-text-muted)]';
 }
 
-const ITEMS_PER_PAGE = 20;
-
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [discussingPage, setDiscussingPage] = useState<string | null>(null);
 
   const togglePage = (path: string) => {
     setExpandedPages(prev => {
@@ -87,19 +85,12 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
     });
   };
 
-  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [activeFilter]);
-
   const filteredPages = useMemo(() => {
     switch (activeFilter) {
       case 'ranking':
         return pageMap.filter(p => p.currentPosition && p.currentPosition <= 20);
       case 'opportunities':
         return pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0);
-      case 'stagnant':
-        return pageMap.filter(p => {
-          if (!p.currentPosition || !p.previousPosition) return false;
-          return Math.abs(p.currentPosition - p.previousPosition) < 2;
-        });
       case 'falling':
         return pageMap.filter(p => {
           if (!p.currentPosition || !p.previousPosition) return false;
@@ -112,13 +103,13 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
 
   const groupedPages = useMemo(() => {
     const groups: Record<string, PageMapItem[]> = {};
-    filteredPages.slice(0, visibleCount).forEach(page => {
+    filteredPages.forEach(page => {
       const folder = getPageFolder(page.pagePath);
       if (!groups[folder]) groups[folder] = [];
       groups[folder].push(page);
     });
     return groups;
-  }, [filteredPages, visibleCount]);
+  }, [filteredPages]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders(prev => {
@@ -131,18 +122,28 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
 
   const filterTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all', label: 'All Pages', count: pageMap.length },
-    { id: 'ranking', label: 'Top 20', count: pageMap.filter(p => p.currentPosition && p.currentPosition <= 20).length },
-    { id: 'opportunities', label: 'Opportunities', count: pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length },
+    { id: 'ranking', label: 'Ranking', count: pageMap.filter(p => p.currentPosition && p.currentPosition <= 20).length },
+    { id: 'opportunities', label: 'Needs Review', count: pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length },
     { id: 'falling', label: 'Falling', count: pageMap.filter(p => p.currentPosition && p.previousPosition && p.currentPosition > p.previousPosition).length },
   ];
+  const emptyMessage: Record<FilterTab, string> = {
+    all: 'No mapped pages are available yet.',
+    ranking: 'No mapped pages are currently ranking in the top 20.',
+    opportunities: 'No pages need ranking review right now.',
+    falling: 'No pages are losing ranking positions right now.',
+  };
 
   return (
     <div className="border-t border-[var(--brand-border)]">
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--brand-border)]/50 overflow-x-auto">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--brand-border)]/50 overflow-x-auto" role="tablist" aria-label="Page keyword map filters">
         {filterTabs.map(tab => (
           <button
             key={tab.id}
+            id={`page-keyword-map-tab-${tab.id}`}
+            role="tab"
+            aria-selected={activeFilter === tab.id}
+            aria-controls="page-keyword-map-panel"
             onClick={() => setActiveFilter(tab.id)}
             className={`px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors whitespace-nowrap ${
               activeFilter === tab.id
@@ -151,16 +152,22 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
             }`}
           >
             {tab.label}
-            <span className="ml-1.5 text-[var(--brand-text-dim)]">{tab.count}</span>
+            <span className="ml-1.5 text-[var(--brand-text-muted)]">{tab.count}</span>
           </button>
         ))}
       </div>
 
       {/* Grouped Page List */}
-      <div className="max-h-[400px] overflow-y-auto" key={activeFilter}>
+      <div
+        id="page-keyword-map-panel"
+        role="tabpanel"
+        aria-labelledby={`page-keyword-map-tab-${activeFilter}`}
+        className="max-h-[400px] overflow-y-auto"
+        key={activeFilter}
+      >
         {Object.entries(groupedPages).length === 0 ? (
           <div className="px-4 py-8 text-center">
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">No pages match this filter</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">{emptyMessage[activeFilter]}</p>
           </div>
         ) : (
           Object.entries(groupedPages).map(([folder, pages]) => (
@@ -173,7 +180,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                 <div className="flex items-center gap-2">
                   <Icon as={Layers} size="md" className="text-[var(--brand-text-muted)]" />
                   <span className="t-caption-sm font-medium text-[var(--brand-text)]">{folder}</span>
-                  <span className="t-caption-sm text-[var(--brand-text-dim)]">{pages.length} pages</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{pages.length} pages</span>
                 </div>
                 <svg
                   className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${expandedFolders.has(folder) ? '' : '-rotate-90'}`}
@@ -208,7 +215,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   {page.pageTitle || page.pagePath.split('/').pop() || page.pagePath}
                                 </div>
                                 {isOpportunity && (
-                                  <span className="t-caption-sm bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-blue-500/20">
+                                  <span className="t-caption-sm bg-blue-500/10 text-accent-info px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-blue-500/20">
                                     Opportunity
                                   </span>
                                 )}
@@ -217,7 +224,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                               {page.impressions != null && page.impressions > 0 && (
-                                <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} imp</span>
+                                <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} impressions</span>
                               )}
                               {page.clicks != null && page.clicks > 0 && (
                                 <span className="t-caption-sm text-[var(--brand-text)]">{page.clicks.toLocaleString()} clicks</span>
@@ -242,24 +249,24 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                           {/* Summary row: primary keyword + keyword count */}
                           <div className="flex items-center gap-2 mt-1">
                             {page.primaryKeyword && (
-                              <span className="t-caption-sm text-teal-400/80 truncate inline-flex items-center gap-1">
+                              <span className="t-caption-sm text-accent-brand truncate inline-flex items-center gap-1">
                                 {page.primaryKeyword}
                                 {page.validated === false && (
-                                  <span className="text-amber-400 bg-amber-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-amber-500/20 t-caption-sm" title="This keyword has no confirmed search volume in SEMRush">
+                                  <span className="text-accent-warning bg-amber-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-amber-500/20 t-caption-sm" title="This keyword has no confirmed search volume in SEMRush">
                                     Unvalidated
                                   </span>
                                 )}
                                 {/* Inline feedback badge */}
                                 {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'approved' && (
-                                  <span className="text-emerald-400 bg-emerald-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-emerald-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={ThumbsUp} size="sm" />Approved</span>
+                                  <span className="text-accent-success bg-emerald-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-emerald-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={ThumbsUp} size="sm" />Relevant</span>
                                 )}
                                 {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'declined' && (
-                                  <span className="text-red-400 bg-red-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-red-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={Ban} size="sm" />Declined</span>
+                                  <span className="text-accent-danger bg-red-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-red-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={Ban} size="sm" />Not relevant</span>
                                 )}
                               </span>
                             )}
                             {kwCount > 0 && (
-                              <span className="t-caption-sm text-[var(--brand-text-dim)] flex items-center gap-0.5">
+                              <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5">
                                 <Icon as={Search} size="sm" />
                                 {kwCount} keywords
                               </span>
@@ -268,15 +275,15 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <span className="t-caption-sm text-[var(--brand-text-muted)] inline-flex items-center gap-0.5">
                                 {page.volume.toLocaleString()}/mo
                                 {page.metricsSource === 'partial_match' && (
-                                  <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
                                 )}
                               </span>
                             )}
                             {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`t-caption-sm inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-emerald-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
-                                KD {page.difficulty}
+                              <span className={`t-caption-sm inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-accent-success' : page.difficulty <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                Difficulty {page.difficulty}
                                 {page.metricsSource === 'partial_match' && (
-                                  <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
+                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
                                 )}
                               </span>
                             )}
@@ -313,9 +320,9 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <div className="t-caption-sm text-[var(--brand-text-muted)] py-2">
                                 {page.secondaryKeywords && page.secondaryKeywords.length > 0 ? (
                                   <div>
-                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Target keywords (no GSC data yet):</div>
+                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Strategy keywords (no GSC data yet):</div>
                                     <div className="flex flex-wrap gap-1.5">
-                                      <span className="t-caption-sm text-teal-400/80 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-[var(--radius-sm)]">{page.primaryKeyword}</span>
+                                      <span className="t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-[var(--radius-sm)]">{page.primaryKeyword}</span>
                                       {page.secondaryKeywords.map((kw, i) => (
                                         <span key={i} className="t-caption-sm text-[var(--brand-text)] bg-[var(--surface-3)] border border-[var(--brand-border)]/50 px-2 py-0.5 rounded-[var(--radius-sm)]">{kw}</span>
                                       ))}
@@ -334,8 +341,8 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               const loading = isLoadingFeedback?.(kw) ?? false;
                               if (fbStatus === 'declined') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-red-500/5 border border-red-500/20">
-                                  <Icon as={Ban} size="sm" className="text-red-400 flex-shrink-0" />
-                                  <span className="t-caption-sm text-red-400 flex-1">Declined — excluded from future strategies</span>
+                                  <Icon as={Ban} size="sm" className="text-accent-danger flex-shrink-0" />
+                                  <span className="t-caption-sm text-accent-danger flex-1">Not relevant - excluded from future strategies</span>
                                   {onUndoFeedback && (
                                     <button onClick={() => onUndoFeedback(kw)} disabled={loading} className="t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] flex items-center gap-0.5 transition-colors disabled:opacity-50">
                                       <Icon as={Undo2} size="sm" /> Restore
@@ -345,8 +352,8 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               );
                               if (fbStatus === 'approved') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/5 border border-emerald-500/20">
-                                  <Icon as={ThumbsUp} size="sm" className="text-emerald-400 flex-shrink-0" />
-                                  <span className="t-caption-sm text-emerald-400">Approved — prioritized in strategy</span>
+                                  <Icon as={ThumbsUp} size="sm" className="text-accent-success flex-shrink-0" />
+                                  <span className="t-caption-sm text-accent-success">Relevant - can shape future recommendations</span>
                                 </div>
                               );
                               return (
@@ -355,14 +362,14 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   <button
                                     onClick={() => onApproveKeyword(kw, 'page_map')}
                                     disabled={loading}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                                   >
                                     <Icon as={ThumbsUp} size="sm" /> Yes
                                   </button>
                                   <button
                                     onClick={() => onDeclineKeyword(kw, 'page_map')}
                                     disabled={loading}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                                   >
                                     <Icon as={ThumbsDown} size="sm" /> Not relevant
                                   </button>
@@ -374,22 +381,31 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             {isOpportunity && workspaceId && (
                               <div className="mt-2 pt-2 border-t border-[var(--brand-border)]/30 flex justify-end">
                                 <button
-                                  onClick={() => {
-                                    post(`/api/public/content-request/${workspaceId}`, {
-                                      type: 'meeting_discussion',
-                                      targetPage: page.pagePath,
-                                      targetKeyword: page.primaryKeyword,
-                                      notes: 'Page getting impressions but not ranking - discuss optimization strategy',
-                                      priority: 'high'
-                                    }).then(() => {
-                                      setToast?.('Added to meeting agenda');
+                                  onClick={async () => {
+                                    if (discussingPage === page.pagePath) return;
+                                    const topic = `Discuss optimization for ${page.pageTitle || page.pagePath}`;
+                                    const targetKeyword = page.primaryKeyword || page.pageTitle || page.pagePath;
+                                    setDiscussingPage(page.pagePath);
+                                    try {
+                                      await post(`/api/public/content-request/${workspaceId}`, {
+                                        topic,
+                                        targetKeyword,
+                                        rationale: `Page ${page.pagePath} is getting impressions but not ranking. Review optimization strategy.`,
+                                        priority: 'high'
+                                      });
+                                      setToast?.('Optimization request created');
                                       onContentRequested?.();
-                                    }).catch(() => setToast?.('Failed to add to agenda'));
+                                    } catch {
+                                      setToast?.('Failed to create optimization request');
+                                    } finally {
+                                      setDiscussingPage(null);
+                                    }
                                   }}
-                                  className="px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors flex items-center gap-1"
+                                  disabled={discussingPage === page.pagePath}
+                                  className="px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <Icon as={MessageCircle} size="sm" />
-                                  Discuss
+                                  {discussingPage === page.pagePath ? 'Requesting...' : 'Request Review'}
                                 </button>
                               </div>
                             )}
@@ -405,22 +421,6 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
         )}
       </div>
 
-      {/* Pagination footer */}
-      {filteredPages.length > ITEMS_PER_PAGE && (
-        <div className="px-4 py-2.5 border-t border-[var(--brand-border)]/50 flex items-center justify-between">
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            Showing {Math.min(visibleCount, filteredPages.length)} of {filteredPages.length} pages
-          </span>
-          {visibleCount < filteredPages.length && (
-            <button
-              onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
-              className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors font-medium"
-            >
-              Show {Math.min(ITEMS_PER_PAGE, filteredPages.length - visibleCount)} more
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -31,7 +31,7 @@ import { createLogger } from '../../../logger.js';
 const log = createLogger('schema/extractors/image-ai-classifier');
 
 const VALID_ROLES = new Set<PageImage['role']>(['hero', 'informative', 'decorative']);
-const MODEL = 'gpt-4.1-mini' as const;
+const MODEL = 'gpt-5.4-mini' as const;
 
 const CLASSIFIER_PROMPT = `Classify this image into ONE of three roles for SEO schema markup:
 - "hero": the page's lead image, conveying the primary subject. Usually large and visually prominent.
@@ -96,7 +96,7 @@ export async function aiClassifyImages(
     try {
       const response = await getClient().chat.completions.create({
         model: MODEL,
-        max_tokens: 50,
+        max_completion_tokens: 50,
         temperature: 0,
         messages: [{
           role: 'user',
@@ -126,7 +126,7 @@ export async function aiClassifyImages(
 
       const text = (response.choices?.[0]?.message?.content ?? '').trim();
       if (!text) {
-        // Empty content (rare gpt-4.1-mini failure mode: refusal, content filter).
+        // Empty content (rare gpt-5.4-mini failure mode: refusal, content filter).
         // Avoid JSON.parse(''), which throws unnecessarily — budget already
         // consumed; stay rule-classified.
         result.push(image);

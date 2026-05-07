@@ -70,7 +70,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
   const runAudit = () => {
     setLoading(true);
     setHasRun(true);
-    get<AuditResult>(`/api/webflow/audit/${siteId}`)
+    get<AuditResult>(`/api/webflow/audit/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`)
       .then(data => setAudit(data))
       .catch((err) => { console.error('AssetAudit operation failed:', err); })
       .finally(() => setLoading(false));
@@ -177,7 +177,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
   const handleDeleteAsset = async (issue: AuditIssue) => {
     setDeletingIds(prev => new Set(prev).add(issue.assetId));
     try {
-      await del(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`);
+      await del(`/api/webflow/assets/${issue.assetId}?siteId=${encodeURIComponent(siteId)}&workspaceId=${encodeURIComponent(workspaceId)}`);
       if (audit) {
         const wasUnused = issue.issues.includes('unused');
         setAudit({
@@ -199,7 +199,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
     setDeletingUnused(true);
     for (const issue of unused) {
       try {
-        await del(`/api/webflow/assets/${issue.assetId}?siteId=${siteId}`);
+        await del(`/api/webflow/assets/${issue.assetId}?siteId=${encodeURIComponent(siteId)}&workspaceId=${encodeURIComponent(workspaceId)}`);
       } catch (err) { console.error('AssetAudit operation failed:', err); }
     }
     setAudit({

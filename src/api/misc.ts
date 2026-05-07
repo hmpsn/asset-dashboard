@@ -291,11 +291,11 @@ export const redirects = {
   save: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/redirects/${siteId}`, body),
 
-  scan: (siteId: string) =>
-    get<unknown>(`/api/webflow/redirect-scan/${siteId}`),
+  scan: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/redirect-scan/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
-  snapshot: (siteId: string) =>
-    getOptional<unknown>(`/api/webflow/redirect-snapshot/${siteId}`),
+  snapshot: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/redirect-snapshot/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 };
 
 // ── Content subscriptions ──────────────────────────────────────
@@ -354,6 +354,11 @@ export const keywordFeedback = {
 
   submit: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/public/keyword-feedback/${wsId}`, body),
+
+  remove: (wsId: string, keyword: string) =>
+    del<{ deleted: string; existed?: boolean }>(
+      `/api/public/keyword-feedback/${wsId}?keyword=${encodeURIComponent(keyword)}`,
+    ),
 };
 
 // ── Public: tracked keywords ─────────────────────────────────
@@ -362,6 +367,12 @@ export const trackedKeywords = {
     getSafe<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
       `/api/public/tracked-keywords/${wsId}`,
       { keywords: [] },
+    ),
+
+  add: (wsId: string, keyword: string) =>
+    post<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+      `/api/public/tracked-keywords/${wsId}`,
+      { keyword },
     ),
 
   remove: (wsId: string, keyword: string) =>

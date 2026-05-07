@@ -1,7 +1,7 @@
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { getROIHighlights } from './roi-attribution.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
@@ -41,7 +41,7 @@ export async function generateMonthlyDigest(
     digestCache.delete(cacheKey); // evict expired entry
   }
 
-  // Coalesce concurrent requests — only one OpenAI call per cache key
+  // Coalesce concurrent requests — only one AI call per cache key
   const inflight = inflightDigests.get(cacheKey);
   if (inflight) return inflight;
 
@@ -254,12 +254,10 @@ Voice rules (follow exactly):
       'You are writing a concise monthly performance update for a website client dashboard. Write 2-3 factual, encouraging sentences. No fluff.',
     );
 
-    const result = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
+    const result = await callAI({
+      model: 'gpt-5.4',
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
       temperature: 0.4,
       feature: 'monthly-digest',

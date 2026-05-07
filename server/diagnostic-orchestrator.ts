@@ -19,7 +19,7 @@ import { scanRedirects } from './redirect-scanner.js';
 import { resolveFullPageUrl } from './outcome-measurement.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { getInsights, stampDiagnosticReportId } from './analytics-insights-store.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { probeCanonical, countInternalLinks } from './diagnostic-probe.js';
 import {
   completeDiagnosticReport,
@@ -464,12 +464,10 @@ Rules for remediation:
 - Include specific page URLs when relevant
 - Order by priority then impact`;
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: JSON.stringify(context) },
-    ],
+  const result = await callAI({
+    model: 'gpt-5.4',
+    system: systemPrompt,
+    messages: [{ role: 'user', content: JSON.stringify(context) }],
     maxTokens: 3000,
     temperature: 0.3,
     responseFormat: { type: 'json_object' },

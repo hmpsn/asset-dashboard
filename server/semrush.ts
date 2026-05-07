@@ -6,6 +6,7 @@ import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js'
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 import { normalizeProviderDate } from './seo-data-provider.js';
+import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from './constants.js';
 
 const log = createLogger('semrush');
 
@@ -400,12 +401,21 @@ export async function getKeywordGap(
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
   const allGaps: KeywordGap[] = [];
+  let clientKwSet: Set<string> | null = null;
+
+  async function getClientKeywordSet(): Promise<Set<string>> {
+    if (!clientKwSet) {
+      const clientKeywords = await getDomainOrganicKeywords(clientDomain, workspaceId, 200, database);
+      clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+    }
+    return clientKwSet;
+  }
 
   // For each competitor, get their organic keywords and find ones client doesn't rank for
   // We use domain_organic for each competitor and cross-reference
-  for (const comp of competitorDomains.slice(0, 3)) {
+  for (const comp of competitorDomains.slice(0, MAX_COMPETITORS)) {
     const cleanComp = cleanDomainForSemrush(comp);
-    const cacheKey = `gap_${database}_${clientDomain.replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}`;
+    const cacheKey = `gap_${database}_${clientDomain.replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
     const cached = readCache<KeywordGap[]>(workspaceId, cacheKey);
 
     if (cached) {
@@ -415,15 +425,14 @@ export async function getKeywordGap(
 
     try {
       // Get competitor's top keywords
-      const compKeywords = await getDomainOrganicKeywords(cleanComp, workspaceId, limit, database);
+      const compKeywords = await getDomainOrganicKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database);
 
       // Get client's keywords to find gaps
-      const clientKeywords = await getDomainOrganicKeywords(clientDomain, workspaceId, 200, database);
-      const clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+      const clientKeywords = await getClientKeywordSet();
 
       // Keywords competitor ranks for but client doesn't
       const gaps: KeywordGap[] = compKeywords
-        .filter(ck => !clientKwSet.has(ck.keyword.toLowerCase()))
+        .filter(ck => !clientKeywords.has(ck.keyword.toLowerCase()))
         .filter(ck => ck.volume > 0)
         .sort((a, b) => b.volume - a.volume)
         .slice(0, limit)
@@ -576,46 +585,6 @@ export async function getQuestionKeywords(
   logCreditUsage({ credits: results.length * 10, endpoint: 'phrase_questions', query: seedKeyword, rowsReturned: results.length, workspaceId, cached: false });
   writeCache(workspaceId, cacheKey, results);
   return results;
-}
-
-// ── Trend Direction Helper ──
-/** Compute trend direction from 12-month volume array: 'rising' | 'declining' | 'stable' */
-export function trendDirection(trend?: number[]): 'rising' | 'declining' | 'stable' {
-  if (!trend || trend.length < 4) return 'stable';
-  // Compare average of last 3 months vs first 3 months
-  const recent = trend.slice(-3).reduce((s, v) => s + v, 0) / 3;
-  const early = trend.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
-  if (early === 0) return recent > 0 ? 'rising' : 'stable';
-  const change = (recent - early) / early;
-  if (change > 0.15) return 'rising';
-  if (change < -0.15) return 'declining';
-  return 'stable';
-}
-
-// ── SERP Feature Parsing ──
-const SERP_FEATURE_MAP: Record<string, string> = {
-  '0': 'featured_snippet', '1': 'reviews', '2': 'sitelinks', '3': 'people_also_ask',
-  '4': 'image_pack', '5': 'video', '6': 'knowledge_panel', '7': 'twitter',
-  '8': 'news', '9': 'shopping', '10': 'top_stories', '11': 'local_pack',
-  '12': 'carousel', '13': 'instant_answer', '14': 'video_carousel',
-  '15': 'thumbnail', '16': 'ads_top', '17': 'ads_bottom',
-};
-
-/** Parse SEMRush SERP features string into human-readable labels */
-export function parseSerpFeatures(raw?: string): string[] {
-  if (!raw) return [];
-  return raw.split(',').map(code => SERP_FEATURE_MAP[code.trim()] || code.trim()).filter(Boolean);
-}
-
-/** Check if a keyword has a specific high-value SERP feature opportunity */
-export function hasSerpOpportunity(raw?: string): { featuredSnippet: boolean; paa: boolean; video: boolean; localPack: boolean } {
-  const features = parseSerpFeatures(raw);
-  return {
-    featuredSnippet: features.includes('featured_snippet'),
-    paa: features.includes('people_also_ask'),
-    video: features.includes('video') || features.includes('video_carousel'),
-    localPack: features.includes('local_pack'),
-  };
 }
 
 // ── Domain Overview (domain-level organic traffic & keyword metrics) ──

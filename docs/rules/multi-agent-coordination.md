@@ -50,7 +50,7 @@ Agent 2 (Discovery Ingestion Service):
 **Shared files** (touched by 2+ agents) must be handled sequentially:
 - `server/app.ts` — route registration (one agent at a time)
 - `src/api/brand-engine.ts` — API client additions (one agent at a time)
-- `server/seo-context.ts` — context builder additions (one agent at a time)
+- `server/intelligence/seo-context-slice.ts` and `server/intelligence/seo-context-source.ts` — SEO context assembly/source changes (one agent at a time)
 - `src/components/BrandHub.tsx` — tab additions (one agent at a time)
 
 **When dispatching an implementer subagent, include in the prompt:**
@@ -102,7 +102,7 @@ Parallel after Task 2:
   Task 3 (Brandscript Service) ∥ Task 4 (Discovery Service) ∥ Task 5 (Voice Service)
 
 Sequential shared-file tasks (after parallel batch):
-  Task 7 (SEO Context builders) — touches server/seo-context.ts
+  Task 7 (SEO context slice/source) — touches server/intelligence/seo-context-slice.ts and server/intelligence/seo-context-source.ts
   Task 8 (App.ts route registration) — touches server/app.ts
 
 Parallel after Task 8:

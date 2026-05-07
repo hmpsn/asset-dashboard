@@ -7,7 +7,7 @@
  * strategy_alignment insight type, or bridge source tags.
  */
 import { Router } from 'express';
-import { getWorkspace } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import { createLogger } from '../logger.js';
 import type {
@@ -137,7 +137,7 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const tier = (ws.tier ?? 'free') as 'free' | 'growth' | 'premium';
+  const tier = computeEffectiveTier(ws);
 
   const slices: Array<'insights' | 'contentPipeline' | 'learnings' | 'siteHealth' | 'seoContext' | 'clientSignals'> = [
     'insights',

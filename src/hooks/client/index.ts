@@ -18,5 +18,4 @@ export {
   useClientPricing,
   useClientContentPlan,
   useClientPageKeywords,
-  type ApprovalPageKeyword,
 } from './useClientQueries';

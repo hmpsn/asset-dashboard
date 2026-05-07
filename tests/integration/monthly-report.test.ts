@@ -54,10 +54,10 @@ beforeAll(async () => {
   emptyWsId = emptyWs.id;
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(richWsId);
   deleteWorkspace(emptyWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Unit: generateReportHTML ──

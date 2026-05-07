@@ -262,8 +262,8 @@ export function InsightsBriefingPage({
           of the paid-tier block guarantees length ≥ 1 here, so no
           conditional wrapper is needed. */}
       <div className="border-t border-[var(--brand-border)] pt-4">
-        <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
-          <Icon as={Sparkles} size="sm" className="text-teal-400" />
+        <h3 className="t-label text-[var(--brand-text-bright)] tracking-wider mb-3 flex items-center gap-2">
+          <Icon as={Sparkles} size="sm" className="text-accent-brand" />
           Also this week
         </h3>
         <div className="space-y-0">

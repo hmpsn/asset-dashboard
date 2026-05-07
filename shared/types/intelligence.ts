@@ -7,6 +7,7 @@ import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
+import type { SiteInventorySlice } from './site-inventory.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -28,7 +29,8 @@ export type IntelligenceSlice =
   | 'siteHealth'
   | 'clientSignals'
   | 'operational'
-  | 'pageElements';
+  | 'pageElements'
+  | 'siteInventory';
 
 // ── Options ─────────────────────────────────────────────────────────────
 
@@ -41,6 +43,12 @@ export interface IntelligenceOptions {
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   /** Token budget hint for downstream prompt formatting */
   tokenBudget?: number;
+  /** Optional Webflow site id for siteInventory assembly. */
+  siteId?: string;
+  /** Optional resolved live base URL for siteInventory assembly. */
+  siteBaseUrl?: string;
+  /** Optional Webflow token for live CMS inventory assembly. */
+  webflowToken?: string;
   /**
    * Opt-in: fetch backlink profile from the configured SEO data provider.
    * OFF by default — the provider call adds network latency and costs credits.
@@ -63,6 +71,8 @@ export interface WorkspaceIntelligence {
   /** Per-page structural element catalog (videos, HowTo lists, citations, etc.).
    *  Populated when buildWorkspaceIntelligence is called with opts.pagePath. */
   pageElements?: PageElementSlice;
+  /** Site/page/CMS inventory for collection-aware schema generation. */
+  siteInventory?: SiteInventorySlice;
   contentPipeline?: ContentPipelineSlice;
   siteHealth?: SiteHealthSlice;
   clientSignals?: ClientSignalsSlice;
@@ -83,12 +93,12 @@ export interface SeoContextSlice {
   /**
    *  Pre-formatted prompt block with voice-authority applied. Inject DIRECTLY into prompts
    *  — it already carries the emphatic BRAND VOICE header when non-empty. Source of
-   *  truth: buildSeoContext(workspaceId).brandVoiceBlock.
+   *  truth: buildEffectiveBrandVoiceBlock(workspaceId) in the SEO context source.
    *
    *  Authority rule:
    *    - profile.status === 'calibrated' → voice profile block (Layer 2 system prompt covers DNA)
-   *    - profile has real content (samples/examples) → voice profile block
-   *    - otherwise → legacy workspace.brandVoice + readBrandDocs() block
+   *    - profile has saved DNA/guardrails and rendered profile content → voice profile block
+   *    - otherwise → legacy workspace.brandVoice + brand-docs block
    *
    *  Empty string means "no brand voice configured" — render nothing.
    */
@@ -251,6 +261,13 @@ export interface ClientSignalsSlice {
    * Always undefined until the assembler reads it (post-Phase 2 only).
    */
   latestBriefing?: BriefingSummary | null;
+  clientActions?: {
+    pending: number;
+    approved: number;
+    changesRequested: number;
+    completed: number;
+    recentDecisions: Array<{ title: string; status: string; sourceType: string; updatedAt: string }>;
+  };
 }
 
 export interface OperationalSlice {
@@ -261,6 +278,7 @@ export interface OperationalSlice {
   // New in 3A
   timeSaved?: { totalMinutes: number; byFeature: Record<string, number> } | null;
   approvalQueue?: { pending: number; oldestAge: number | null };
+  clientActionQueue?: { pending: number; oldestAge: number | null };
   recommendationQueue?: { fixNow: number; fixSoon: number; fixLater: number };
   actionBacklog?: { pendingMeasurement: number; oldestAge: number | null };
   detectedPlaybooks?: string[];
@@ -370,9 +388,20 @@ export interface BusinessProfile {
   targetAudience: string;
   phone?: string;
   email?: string;
+  /** Prompt-friendly one-line address text (e.g. "street, city, state, zip, country"). */
   address?: string;
+  /** Source-of-truth structured address for schema and contact-aware consumers. */
+  addressParts?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
   socialProfiles?: string[];
   openingHours?: string;
+  foundedDate?: string;
+  numberOfEmployees?: string;
 }
 
 export interface BacklinkProfile {

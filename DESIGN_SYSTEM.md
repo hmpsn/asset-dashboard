@@ -195,8 +195,8 @@ Consistent top section for every page/tab.
 └──────────────────────────────────────────────────────┘
 ```
 
-- Title: `text-lg font-semibold text-zinc-200` (DIN Pro 600)
-- Subtitle: `text-xs text-zinc-500 mt-0.5`
+- Title: `.t-h2 text-[var(--brand-text-bright)]`
+- Subtitle: `.t-caption-sm text-[var(--brand-text-muted)] mt-0.5`
 - Actions area: right-aligned flex row
 - No container (sits directly in page flow with `space-y-5` gap)
 
@@ -212,11 +212,11 @@ Standard card container for content sections.
 └──────────────────────────────────────────────────────┘
 ```
 
-- Container: `bg-zinc-900 border border-zinc-800` with `style={{ borderRadius: '10px 24px 10px 24px' }}`
-- With header: `px-4 py-3 border-b border-zinc-800` top row (radius: `10px 24px 0 0`), content in `p-4`
+- Container: `bg-[var(--surface-2)] border border-[var(--brand-border)]` with the signature card radius
+- With header: `px-4 py-3 border-b border-[var(--brand-border)]` top row, content in `p-4`
 - Without header: `p-4`
-- Section title: `text-sm font-semibold text-zinc-200` (NOT uppercase)
-- Action buttons: `text-xs font-medium text-teal-400`
+- Section title: `.t-body font-semibold text-[var(--brand-text-bright)]` (NOT uppercase)
+- Action buttons: `.t-ui text-accent-brand`
 - `interactive` prop: adds teal left-border accent on hover (`hover:border-l-teal-500/40`) for clickable cards
 - `staggerIndex` prop: entrance animation delay (0-based, 60ms per index)
 
@@ -231,7 +231,7 @@ Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini
 └──────────────────────────────────────────────────────┘
 ```
 
-- Container: same `bg-[var(--surface-2)] border-zinc-800` + signature `10px 24px 10px 24px` radius as SectionCard
+- Container: same `bg-[var(--surface-2)] border-[var(--brand-border)]` + signature radius as SectionCard
 - Tighter padding than SectionCard: header `px-4 py-3`, body `px-4 pb-3`
 - No `border-b` separator — chart visuals flow directly under header
 - `trend?: number` prop renders an inline `<TrendBadge>` next to the title; `trendProps` passes through (`invert`, `showSign`, `label`, etc.)
@@ -408,10 +408,13 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 
 | Variant | Classes |
 |---------|---------|
-| **Primary** | `bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-lg px-3 py-2 text-xs font-medium` |
-| **Secondary** | `bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5 text-xs font-medium` |
-| **Ghost** | `text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
-| **Accent text** | `text-teal-400 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
+| **Primary** | `bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] text-[var(--button-primary-text)] rounded-md font-semibold` |
+| **Secondary** | `bg-[var(--surface-3)] hover:bg-[var(--surface-active)] text-[var(--brand-text-bright)] rounded-md` |
+| **Ghost** | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]/70 rounded-md` |
+| **Danger** | `bg-red-600 hover:bg-red-500 text-white rounded-md` |
+| **Link** | `text-[var(--teal)] underline underline-offset-2 bg-transparent` |
+
+Sizes preserve label hierarchy: `sm` uses `.t-caption-sm`, `md` uses `.t-caption`, and `lg` uses `.t-body`.
 
 ### 16. Typography primitives (Phase 5)
 

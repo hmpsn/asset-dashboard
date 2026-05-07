@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { stopChildProcess } from './integration/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -63,8 +64,8 @@ beforeAll(async () => {
   });
 }, 20_000);
 
-afterAll(() => {
-  proc?.kill('SIGTERM');
+afterAll(async () => {
+  await stopChildProcess(proc);
 });
 
 // Helper to make requests

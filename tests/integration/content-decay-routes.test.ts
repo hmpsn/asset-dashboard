@@ -117,16 +117,16 @@ const allSeverityPages = [criticalPage, warningPage, watchPage];
 // ── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  // Set a fake OpenAI key before spawning so generateBatchRecommendations
-  // fails with a fast auth error (not a hang). The test asserts 500 — the
-  // correct behavior when the AI call fails (not phantom success).
+  // Clear the OpenAI key before spawning so generateBatchRecommendations
+  // fails synchronously through the missing-key guard instead of retrying a
+  // fake key through the provider SDK. The route should still degrade to
+  // fallback recommendations.
   // Save and restore so we don't contaminate sibling test files in this process.
-  // Always override OPENAI_API_KEY with a fake value before spawning — even
-  // in CI or dev environments where a real key is configured. The child
-  // process inherits env at spawn time, so we must unconditionally set the
-  // fake key here (not conditionally) to guarantee the 500 path in all envs.
+  // Always override OPENAI_API_KEY before spawning — even in CI or dev
+  // environments where a real key is configured. The child process inherits
+  // env at spawn time, so we must unconditionally set the empty value here.
   const savedOpenAIKey = process.env.OPENAI_API_KEY;
-  process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
+  process.env.OPENAI_API_KEY = '';
   await ctx.startServer();
   if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY = savedOpenAIKey;
@@ -140,12 +140,12 @@ beforeAll(async () => {
   // No decay data seeded for wsEmpty — GET should return null (no rows)
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteDecayAnalysis(wsWithData);
   deleteDecayAnalysis(wsEmpty);
   deleteWorkspace(wsWithData);
   deleteWorkspace(wsEmpty);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── GET /api/content-decay/:workspaceId ──────────────────────────────────────
@@ -379,11 +379,9 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  // Timeout bumped to 60s: the OpenAI SDK retries the fake key through several
-  // auth-failure backoffs before surfacing the error, and the original 30s
-  // boundary was brushing right up against the deadline (observed 29951ms in
-  // one run, 30004ms in the next). Same rationale applies to the shape test
-  // below — both hit the same retry path.
+  // Timeout stays generous for slower CI machines, but the server now inherits
+  // an empty OPENAI_API_KEY so the fallback path uses the synchronous missing-key
+  // guard instead of retrying a fake provider key.
   it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 60_000 }, async () => {
     // generateBatchRecommendations catches OpenAI errors per-page and sets a
     // meaningful fallback string — it never throws. The route returns 200 with

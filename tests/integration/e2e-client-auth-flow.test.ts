@@ -56,10 +56,10 @@ beforeAll(async () => {
   clientUserId = user.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteClientUser(clientUserId, testWsId);
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('E2E: Client auth flow', () => {

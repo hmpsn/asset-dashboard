@@ -23,6 +23,7 @@ import { isFeatureEnabled } from '../../../feature-flags.js';
 import { callAI } from '../../../ai.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
+import { cleanHowToStepText, makeHowToStepName } from './howto.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('schema/extractors/howto-ai-fallback');
@@ -76,7 +77,7 @@ export async function aiDisambiguateHowTo(
     try {
       const response = await callAI({
         provider: 'openai',
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         feature: 'schema-ai-element-classifier',
         workspaceId: opts.workspaceId,
         maxTokens: 50,
@@ -86,7 +87,7 @@ export async function aiDisambiguateHowTo(
           content: DISAMBIG_PROMPT + items.map((t, idx) => `${idx + 1}. ${t}`).join('\n'),
         }],
       });
-      // Empty AI content (rare gpt-4.1-mini failure mode: refusal, content filter)
+      // Empty AI content (rare gpt-5.4-mini failure mode: refusal, content filter)
       // would crash JSON.parse('') — guard so the budget slot doesn't double-cost via stack unwind.
       const text = (response.text ?? '').trim();
       if (!text) {
@@ -95,11 +96,14 @@ export async function aiDisambiguateHowTo(
       }
       const parsed: AiResponse = JSON.parse(text);
       if (parsed.howTo === true) {
-        const steps: HowToStep[] = items.map((text, idx) => ({
-          name: text,
-          text,
-          position: idx + 1,
-        }));
+        const steps: HowToStep[] = items.map((rawText, idx) => {
+          const stepText = cleanHowToStepText(rawText);
+          return {
+            name: makeHowToStepName(stepText),
+            text: stepText,
+            position: idx + 1,
+          };
+        });
         result.push({ ...list, isHowToLike: true, steps });
       } else {
         result.push(list);

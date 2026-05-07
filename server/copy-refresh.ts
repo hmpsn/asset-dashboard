@@ -10,7 +10,8 @@
 import { listBlueprints } from './page-strategy.js';
 import { getSectionsForEntry } from './copy-review.js';
 import { loadDecayAnalysis } from './content-decay.js';
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callAI } from './ai.js';
+import { parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
@@ -206,8 +207,8 @@ Return a JSON object with a "suggestions" array. Each item must have:
 Prioritize sections that are most likely contributing to the decline (outdated info, weak CTAs, poor keyword targeting).`;
 
   try {
-    const result = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    const result = await callAI({
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.4,
@@ -231,15 +232,18 @@ Prioritize sections that are most likely contributing to the decline (outdated i
       return [];
     }
 
-    // Build a lookup for section data by id
+    // Build lookups for section data by both persisted copy section ID and
+    // section plan item ID. AI responses sometimes include both; prefer the
+    // concrete section ID, but still fall back to the plan item when the ID is
+    // hallucinated.
     const sectionMap = new Map(sectionsWithCopy.map(s => [s.id, s]));
+    const sectionPlanItemMap = new Map(sectionsWithCopy.map(s => [s.sectionPlanItemId, s]));
 
     const suggestions: CopyRefreshSuggestion[] = [];
     for (const raw of parsed.suggestions) {
-      const sectionId = raw.sectionId ?? raw.sectionPlanItemId ?? '';
       // Resolve section — AI may return the copy section id or the plan item id
-      const section = sectionMap.get(sectionId)
-        ?? sectionsWithCopy.find(s => s.sectionPlanItemId === sectionId);
+      const section = (raw.sectionId ? sectionMap.get(raw.sectionId) : undefined)
+        ?? (raw.sectionPlanItemId ? sectionPlanItemMap.get(raw.sectionPlanItemId) : undefined);
 
       if (!section) continue;
 

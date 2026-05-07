@@ -1,6 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -194,8 +194,8 @@ DOCUMENT TO PARSE:
 ${rawText}`;
 
   log.info({ workspaceId }, 'importing brandscript from text');
-  const result = await callOpenAI({
-    model: 'gpt-4.1-mini',
+  const result = await callAI({
+    model: 'gpt-5.4-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0,

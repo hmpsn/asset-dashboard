@@ -59,13 +59,8 @@ vi.mock('../../server/feature-flags.js', () => ({
 
 // ── SEO context dependencies ──────────────────────────────────────────────────
 
-vi.mock('../../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  })),
+vi.mock('../../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
@@ -229,6 +224,36 @@ vi.mock('../../server/client-signals-store.js', () => ({
   countAllSignals: vi.fn(() => 0),
 }));
 
+vi.mock('../../server/client-actions.js', () => ({
+  summarizeClientActions: vi.fn(() => ({
+    pending: 1,
+    approved: 1,
+    changesRequested: 1,
+    completed: 1,
+    recentDecisions: [
+      {
+        title: 'Keyword strategy',
+        status: 'approved',
+        sourceType: 'keyword_strategy',
+        updatedAt: '2026-05-01T12:00:00Z',
+      },
+      {
+        title: 'Refresh page',
+        status: 'changes_requested',
+        sourceType: 'content_decay',
+        updatedAt: '2026-05-01T14:00:00Z',
+      },
+      {
+        title: 'Redirects',
+        status: 'completed',
+        sourceType: 'redirect_proposal',
+        updatedAt: '2026-05-01T16:00:00Z',
+      },
+    ],
+  })),
+  getClientActionQueueStats: vi.fn(() => ({ pending: 1, oldestAge: 24 })),
+}));
+
 vi.mock('../../server/chat-memory.js', () => ({
   getMonthlyConversationCount: vi.fn(() => 0),
   listSessions: vi.fn(() => []),
@@ -370,19 +395,13 @@ describe('contract: SeoContextSlice field population', () => {
 
   it('effectiveBrandVoiceBlock passthrough: non-empty brandVoiceBlock reaches slice', async () => {
     // Regression guard: the empty-path test above only verifies the contract when
-    // buildSeoContext returns an empty block. This test verifies the non-empty
+    // the SEO context source returns an empty block. This test verifies the non-empty
     // passthrough — if `assembleSeoContext` ever silently stripped, transformed, or
-    // mis-wired the field, this would catch it. The default mock at line 62 returns
+    // mis-wired the field, this would catch it. The default mock above returns
     // empty, so we re-mock for this test only.
     const SENTINEL_BLOCK = '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nSentinel contract voice';
-    const seoContextMock = await import('../../server/seo-context.js');
-    const originalBuildSeoContext = vi.mocked(seoContextMock.buildSeoContext);
-    originalBuildSeoContext.mockReturnValueOnce({
-      strategy: null,
-      brandVoiceBlock: SENTINEL_BLOCK,
-      businessContext: '',
-      knowledgeBlock: '',
-    } as any);
+    const seoContextSource = await import('../../server/intelligence/seo-context-source.js');
+    vi.mocked(seoContextSource.buildEffectiveBrandVoiceBlock).mockReturnValueOnce(SENTINEL_BLOCK);
 
     const result = await getSlice<SeoContextSlice>('seoContext');
 
@@ -827,9 +846,17 @@ describe('contract: ClientSignalsSlice field population', () => {
       expect(typeof result.intentSignals.totalCount).toBe('number');
       expect(Array.isArray(result.intentSignals.recentTypes)).toBe(true);
     }
+
+    if (result.clientActions !== undefined) {
+      expect(typeof result.clientActions.pending).toBe('number');
+      expect(typeof result.clientActions.approved).toBe('number');
+      expect(typeof result.clientActions.changesRequested).toBe('number');
+      expect(typeof result.clientActions.completed).toBe('number');
+      expect(Array.isArray(result.clientActions.recentDecisions)).toBe(true);
+    }
   });
 
-  it('assembler always populates churnSignals, engagement, feedbackItems, serviceRequests', async () => {
+  it('assembler always populates churnSignals, engagement, feedbackItems, serviceRequests, clientActions', async () => {
     const result = await getSlice<ClientSignalsSlice>('clientSignals');
 
     // These are always set in the assembler's return statement
@@ -837,6 +864,17 @@ describe('contract: ClientSignalsSlice field population', () => {
     expect(result.engagement).toBeDefined();
     expect(result.feedbackItems).toBeDefined();
     expect(result.serviceRequests).toBeDefined();
+    expect(result.clientActions).toBeDefined();
+  });
+
+  it('summarizes client action response patterns and recent decisions', async () => {
+    const result = await getSlice<ClientSignalsSlice>('clientSignals');
+
+    expect(result.clientActions?.pending).toBe(1);
+    expect(result.clientActions?.approved).toBe(1);
+    expect(result.clientActions?.changesRequested).toBe(1);
+    expect(result.clientActions?.completed).toBe(1);
+    expect(result.clientActions?.recentDecisions.map(d => d.status)).toEqual(['approved', 'changes_requested', 'completed']);
   });
 });
 
@@ -903,9 +941,13 @@ describe('contract: OperationalSlice field population', () => {
         expect(typeof result.insightAcceptanceRate.rate).toBe('number');
       }
     }
+    if (result.clientActionQueue !== undefined) {
+      expect(typeof result.clientActionQueue.pending).toBe('number');
+      expect(result.clientActionQueue.oldestAge === null || typeof result.clientActionQueue.oldestAge === 'number').toBe(true);
+    }
   });
 
-  it('assembler always populates timeSaved, approvalQueue, recommendationQueue, actionBacklog, detectedPlaybooks, workOrders, insightAcceptanceRate', async () => {
+  it('assembler always populates timeSaved, approvalQueue, recommendationQueue, actionBacklog, detectedPlaybooks, workOrders, insightAcceptanceRate, clientActionQueue', async () => {
     const result = await getSlice<OperationalSlice>('operational');
 
     // These are always set in the assembler return statement
@@ -916,6 +958,7 @@ describe('contract: OperationalSlice field population', () => {
     expect(result.actionBacklog).toBeDefined();
     expect(result.detectedPlaybooks).toBeDefined();
     expect(result.workOrders).toBeDefined();
+    expect(result.clientActionQueue).toBeDefined();
     // insightAcceptanceRate can be null when no insights exist
     expect(result.insightAcceptanceRate === null || result.insightAcceptanceRate === undefined || typeof result.insightAcceptanceRate === 'object').toBe(true);
   });

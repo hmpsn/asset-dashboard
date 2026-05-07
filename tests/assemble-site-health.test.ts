@@ -2,6 +2,8 @@
 // Tests for the siteHealth slice assembler in workspace-intelligence.ts
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ── Module mocks (must be hoisted before any imports) ─────────────────────
 
@@ -67,13 +69,8 @@ vi.mock('../server/bridge-infrastructure.js', () => ({
   withWorkspaceLock: vi.fn(),
 }));
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn().mockReturnValue({
-    strategy: undefined,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  }),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
@@ -287,6 +284,45 @@ describe('assembleSiteHealth', () => {
     expect(health.schemaValidation?.valid).toBe(1);
   });
 
+  it('populates desktop CWV pass rate from the latest audit summary', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace());
+    getLatestSnapshot.mockReturnValue({
+      ...makeMockSnapshot(90, 80),
+      audit: {
+        ...makeMockSnapshot(90, 80).audit,
+        cwvSummary: {
+          desktop: {
+            assessment: 'good',
+            fieldDataAvailable: true,
+            lighthouseScore: 95,
+            metrics: {
+              LCP: { value: 1800, rating: 'good' },
+              INP: { value: 120, rating: 'good' },
+              CLS: { value: 0.05, rating: 'good' },
+            },
+          },
+        },
+      },
+    });
+    listSnapshots.mockReturnValue([
+      { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 90, totalPages: 10, errors: 0, warnings: 1, infos: 3 },
+      { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 80, totalPages: 10, errors: 2, warnings: 3, infos: 2 },
+    ]);
+    getPageSpeed.mockReturnValue(makeMockPageSpeedResult());
+    getLinkCheck.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue({ ...makeMockArchitecture(), orphanPaths: [] });
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const intel = await buildWorkspaceIntelligence('ws-1', { slices: ['siteHealth'] });
+    const health = intel.siteHealth as SiteHealthSlice;
+
+    expect(health.cwvPassRate.desktop).toBe(1);
+  });
+
   // ── Test 2: Empty data defaults ──────────────────────────────────────────
 
   it('returns sensible defaults when all sources return null/empty', async () => {
@@ -319,6 +355,44 @@ describe('assembleSiteHealth', () => {
     expect(health.cwvPassRate.desktop).toBeNull();
     expect(health.anomalyCount).toBe(0);
     expect(health.seoChangeVelocity).toBe(0);
+  });
+
+  it('keeps valid AEO review page scores when one saved page has a legacy score shape', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace());
+    getLatestSnapshot.mockReturnValue(null);
+    listSnapshots.mockReturnValue([]);
+    getPageSpeed.mockReturnValue(null);
+    getLinkCheck.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue({ ...makeMockArchitecture(), orphanPaths: [] });
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const { getDataDir } = await import('../server/data-dir.js');
+    const reviewDir = getDataDir('aeo-reviews');
+    const reviewFile = path.join(reviewDir, 'ws-aeo-legacy.json');
+    fs.writeFileSync(reviewFile, JSON.stringify({
+      pages: [
+        { overallScore: 80 },
+        { overallScore: '72' },
+        { overallScore: null },
+        { overallScore: 'not-a-score' },
+      ],
+    }));
+
+    try {
+      const intel = await buildWorkspaceIntelligence('ws-aeo-legacy', { slices: ['siteHealth'] });
+      const health = intel.siteHealth as SiteHealthSlice;
+
+      expect(health.aeoReadiness).toEqual({
+        pagesChecked: 4,
+        passingRate: 0.5,
+      });
+    } finally {
+      fs.rmSync(reviewFile, { force: true });
+    }
   });
 
   // ── Test 3: Source failure survival ─────────────────────────────────────

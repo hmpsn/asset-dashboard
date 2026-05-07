@@ -3,7 +3,7 @@
  *
  * Verifies that when an audit re-runs and a previously-detected finding is no longer
  * present, the corresponding audit_finding insight gets auto-resolved. Tests the logic
- * implemented in server/routes/webflow-seo.ts (bridge-audit-auto-resolve callback).
+ * implemented in server/webflow-seo-audit-bridges.ts (bridge-audit-auto-resolve callback).
  *
  * Port: 13320
  */
@@ -243,6 +243,66 @@ describe('audit_finding insight auto-resolution', () => {
       expect(updated!.resolutionSource).toBe('admin');
     } finally {
       ws3.cleanup();
+    }
+  });
+
+  it('does NOT auto-resolve manual audit_finding insights without an audit bridge source', () => {
+    const ws4 = seedWorkspace();
+    try {
+      const manual = upsertInsight({
+        workspaceId: ws4.workspaceId,
+        pageId: 'manual-page',
+        insightType: 'audit_finding',
+        severity: 'warning',
+        data: {
+          scope: 'page',
+          issueCount: 1,
+          issueMessages: 'Manually tracked audit note',
+          source: 'manual_review',
+        },
+        impactScore: 40,
+      });
+
+      const bridgeGenerated = upsertInsight({
+        workspaceId: ws4.workspaceId,
+        pageId: 'bridge-page',
+        insightType: 'audit_finding',
+        severity: 'warning',
+        data: {
+          scope: 'page',
+          issueCount: 1,
+          issueMessages: 'Missing H1 tag',
+          source: 'bridge_12_audit_page_health',
+        },
+        impactScore: 50,
+        bridgeSource: 'bridge-audit-page-health',
+      });
+
+      const pagesWithIssues = new Set<string>();
+      const autoResolvableSources = new Set(['bridge-audit-page-health', 'bridge-audit-site-health']);
+      const allInsights = getInsights(ws4.workspaceId);
+      const auditFindings = allInsights.filter(
+        i => i.insightType === 'audit_finding'
+          && i.resolutionStatus !== 'resolved'
+          && i.bridgeSource != null
+          && autoResolvableSources.has(i.bridgeSource),
+      );
+
+      for (const af of auditFindings) {
+        const data = (af.data ?? {}) as Record<string, unknown>;
+        if (data.scope === 'page' && af.pageId && !pagesWithIssues.has(af.pageId)) {
+          resolveInsight(af.id, ws4.workspaceId, 'resolved', 'Auto-resolved', 'bridge-audit-auto-resolve');
+        }
+      }
+
+      const manualAfter = getInsightById(manual.id, ws4.workspaceId);
+      const bridgeAfter = getInsightById(bridgeGenerated.id, ws4.workspaceId);
+      expect(manualAfter).toBeDefined();
+      expect(manualAfter!.resolutionStatus).not.toBe('resolved');
+      expect(bridgeAfter).toBeDefined();
+      expect(bridgeAfter!.resolutionStatus).toBe('resolved');
+    } finally {
+      ws4.cleanup();
     }
   });
 });

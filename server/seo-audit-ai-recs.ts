@@ -2,11 +2,12 @@
 // Extracted from seo-audit.ts for modularity.
 // Note: mutates results[].issues[].suggestedFix in-place — no DB writes.
 
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { findPageMapEntryByIdentity } from './helpers.js';
 import type { PageSeoResult } from './audit-page.js';
 
 const log = createLogger('seo-audit-ai-recs');
@@ -92,7 +93,7 @@ export async function generateAiRecommendations(opts: AiRecsOpts): Promise<void>
           // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
           const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
           if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {
-            const kw = seoCtx.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePath.toLowerCase());
+            const kw = findPageMapEntryByIdentity(seoCtx.strategy.pageMap, pagePath);
             if (kw) seoCtx.pageKeywords = kw;
           }
           const pageProfileIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['pageProfile'] as const, pagePath });
@@ -142,8 +143,8 @@ ${auditBrandName ? `- The brand name is "${auditBrandName}" — use this exact n
 Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
-          const aiResult = await callOpenAI({
-            model: 'gpt-4.1-mini',
+          const aiResult = await callAI({
+            model: 'gpt-5.4-mini',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.6,
             maxTokens: 400,

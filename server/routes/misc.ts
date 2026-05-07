@@ -26,6 +26,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 
 const log = createLogger('misc');
 
@@ -37,11 +38,11 @@ router.get('/api/public/page-states/:workspaceId', (req, res) => {
 });
 
 // File upload
-router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
+router.post('/api/upload/:workspaceId', requireWorkspaceAccess('workspaceId'), upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, false);
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'asset',
     count: files.length,
@@ -55,11 +56,11 @@ router.post('/api/upload/:workspaceId', upload.array('files'), (req, res) => {
   res.json({ uploaded: files.length });
 });
 
-router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) => {
+router.post('/api/upload/:workspaceId/meta', requireWorkspaceAccess('workspaceId'), upload.array('files'), (req, res) => {
   const files = req.files as Express.Multer.File[];
   const filePaths = moveUploadedFiles(files, req.params.workspaceId, true);
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'meta',
     count: files.length,
@@ -74,7 +75,7 @@ router.post('/api/upload/:workspaceId/meta', upload.array('files'), (req, res) =
 });
 
 // --- Audit Traffic Context (cross-reference audit pages with GSC/GA4 traffic) ---
-router.get('/api/audit-traffic/:siteId', async (req, res) => {
+router.get('/api/audit-traffic/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
@@ -94,7 +95,7 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
             trafficMap[path].impressions += p.impressions;
           } catch { /* skip malformed URLs */ }
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ } // url-fetch-ok
     }
 
     // Fetch GA4 top pages
@@ -112,14 +113,17 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
 
     res.json(trafficMap);
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error');
+    if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error'); // url-fetch-ok
     else log.debug({ err }, 'misc: audit-traffic endpoint failed — degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 // --- Smart Naming (AI Vision Enhanced) ---
-router.post('/api/smart-name', async (req, res) => {
+router.post('/api/smart-name', requireWorkspaceSiteAccess({
+  workspace: { source: 'body', name: 'workspaceId' },
+  site: { source: 'body', name: 'siteId' },
+}), async (req, res) => {
   const { originalName, altText, pageTitle, contentType, imageUrl, siteId, assetId } = req.body;
   if (!originalName) return res.status(400).json({ error: 'originalName required' });
 
@@ -202,8 +206,8 @@ Just output the filename slug, nothing else.`;
           const base64 = smallBuf.toString('base64');
 
           const visionRes = await client.chat.completions.create({
-            model: 'gpt-4.1-nano',
-            max_tokens: 60,
+            model: 'gpt-5.4-nano',
+            max_completion_tokens: 60,
             messages: [{
               role: 'user',
               content: [
@@ -222,8 +226,8 @@ Just output the filename slug, nothing else.`;
     // Fallback to text-only if vision didn't work
     if (!suggestion) {
       const response = await client.chat.completions.create({
-        model: 'gpt-4.1-nano',
-        max_tokens: 60,
+        model: 'gpt-5.4-nano',
+        max_completion_tokens: 60,
         messages: [{ role: 'user', content: promptText }],
       });
       suggestion = response.choices[0]?.message?.content?.trim() || originalName.replace(/\.[^.]+$/, '');
@@ -240,7 +244,7 @@ Just output the filename slug, nothing else.`;
 });
 
 // --- Clipboard Upload (with HDPI 2x resize) ---
-router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (req, res) => {
+router.post('/api/upload/:workspaceId/clipboard', requireWorkspaceAccess('workspaceId'), upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file' });
 
@@ -275,7 +279,7 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
   // Clean up temp file if still exists
   try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* ignore */ }
 
-  broadcast('files:uploaded', {
+  broadcast('files:uploaded', { // ws-event-ok
     workspace: req.params.workspaceId,
     type: 'asset',
     count: 1,

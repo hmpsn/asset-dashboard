@@ -56,13 +56,8 @@ vi.mock('../server/content-decay.js', () => ({
 }));
 
 // Mock other imports the module needs
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));

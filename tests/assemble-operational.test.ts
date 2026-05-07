@@ -58,6 +58,10 @@ vi.mock('../server/approvals.js', () => ({
   ]),
 }));
 
+vi.mock('../server/client-actions.js', () => ({
+  getClientActionQueueStats: vi.fn(() => ({ pending: 2, oldestAge: 5 })),
+}));
+
 vi.mock('../server/analytics-annotations.js', () => ({
   getAnnotations: vi.fn(() => [
     { id: 'ann1', date: '2026-03-01', label: 'Traffic spike', pageUrl: '/blog/test' },
@@ -81,11 +85,15 @@ vi.mock('../server/work-orders.js', () => ({
 }));
 
 vi.mock('../server/outcome-tracking.js', () => ({
+  getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
+  getOutcomesForAction: vi.fn(() => []),
   getPendingActions: vi.fn(() => [
     { id: 'pa1', workspaceId: 'ws-1', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
     { id: 'pa2', workspaceId: 'ws-1', createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
     { id: 'pa3', workspaceId: 'ws-other', createdAt: new Date().toISOString() },
   ]),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 
 vi.mock('../server/outcome-playbooks.js', () => ({
@@ -119,13 +127,8 @@ vi.mock('../server/workspaces.js', () => ({
 
 // ── Mocks for other slices used by workspace-intelligence.ts ──────────────
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
@@ -206,6 +209,9 @@ describe('assembleOperational', () => {
         ],
       } as any,
     ]);
+
+    const { getClientActionQueueStats } = await import('../server/client-actions.js');
+    vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 2, oldestAge: 5 });
 
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     vi.mocked(getAnnotations).mockReturnValue([
@@ -348,6 +354,16 @@ describe('assembleOperational', () => {
     expect(typeof op.approvalQueue?.oldestAge).toBe('number');
   });
 
+  it('computes clientActionQueue with pending count and oldest pending age', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
+
+    const op = result.operational as OperationalSlice;
+    expect(op.clientActionQueue?.pending).toBe(2);
+    expect(op.clientActionQueue?.oldestAge).toBeGreaterThanOrEqual(4);
+    expect(op.clientActionQueue?.oldestAge).toBeLessThanOrEqual(5);
+  });
+
   it('counts recommendations by priority in recommendationQueue', async () => {
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
@@ -409,6 +425,7 @@ describe('assembleOperational', () => {
     const { loadRecommendations } = await import('../server/recommendations.js');
     const { listJobs } = await import('../server/jobs.js');
     const { listBatches } = await import('../server/approvals.js');
+    const { getClientActionQueueStats } = await import('../server/client-actions.js');
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     const { listAnnotations } = await import('../server/annotations.js');
     const { listWorkOrders } = await import('../server/work-orders.js');
@@ -421,6 +438,7 @@ describe('assembleOperational', () => {
     vi.mocked(loadRecommendations).mockReturnValue({ recommendations: [] } as any);
     vi.mocked(listJobs).mockReturnValue([]);
     vi.mocked(listBatches).mockReturnValue([]);
+    vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 0, oldestAge: null });
     vi.mocked(getAnnotations).mockReturnValue([]);
     vi.mocked(listAnnotations).mockReturnValue([]);
     vi.mocked(listWorkOrders).mockReturnValue([]);
@@ -443,6 +461,8 @@ describe('assembleOperational', () => {
     expect(op.timeSaved).toBeNull();
     expect(op.approvalQueue?.pending).toBe(0);
     expect(op.approvalQueue?.oldestAge).toBeNull();
+    expect(op.clientActionQueue?.pending).toBe(0);
+    expect(op.clientActionQueue?.oldestAge).toBeNull();
     expect(op.recommendationQueue?.fixNow).toBe(0);
     expect(op.recommendationQueue?.fixSoon).toBe(0);
     expect(op.recommendationQueue?.fixLater).toBe(0);

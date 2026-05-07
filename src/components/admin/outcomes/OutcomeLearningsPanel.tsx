@@ -37,7 +37,7 @@ function formatWinRateRecord(record: Record<string, number>): Array<{ label: str
 
 function NoDataMessage({ message = 'Not enough data yet' }: { message?: string }) {
   return (
-    <p className="text-xs text-[var(--brand-text-muted)] italic py-2">{message}</p>
+    <p className="t-caption-sm text-[var(--brand-text-muted)] italic py-2">{message}</p>
   );
 }
 
@@ -51,7 +51,7 @@ function ContentSection({ data }: ContentSectionProps) {
   return (
     <SectionCard
       title="Content"
-      titleIcon={<FileText className="w-4 h-4 text-blue-400" />}
+      titleIcon={<FileText className="w-4 h-4 text-accent-info" />}
       staggerIndex={1}
     >
       <div className="space-y-4">
@@ -62,8 +62,8 @@ function ContentSection({ data }: ContentSectionProps) {
             <div className="space-y-1.5">
               {formatWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="t-caption-sm text-[var(--brand-text)] capitalize">{label}</span>
+                  <span className="t-caption-sm font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -76,18 +76,18 @@ function ContentSection({ data }: ContentSectionProps) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Avg Days to Page 1</p>
-            <p className="text-sm font-bold text-[var(--brand-text-bright)]">
+            <p className="t-ui font-bold text-[var(--brand-text-bright)]">
               {data.avgDaysToPage1 !== null ? `${data.avgDaysToPage1}d` : '—'}
             </p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Refresh Recovery Rate</p>
-            <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.refreshRecoveryRate)}</p>
+            <p className="t-ui font-bold text-[var(--brand-text-bright)]">{pct(data.refreshRecoveryRate)}</p>
           </div>
           {data.optimalWordCount && (
             <div>
               <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Optimal Word Count</p>
-              <p className="text-sm font-bold text-[var(--brand-text-bright)]">
+              <p className="t-ui font-bold text-[var(--brand-text-bright)]">
                 {data.optimalWordCount.min}–{data.optimalWordCount.max}
               </p>
             </div>
@@ -95,7 +95,7 @@ function ContentSection({ data }: ContentSectionProps) {
           {data.voiceScoreCorrelation !== null && (
             <div>
               <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Voice Score Correlation</p>
-              <p className="text-sm font-bold text-[var(--brand-text-bright)]">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
+              <p className="t-ui font-bold text-[var(--brand-text-bright)]">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
             </div>
           )}
         </div>
@@ -129,7 +129,7 @@ function StrategySection({ data }: StrategySectionProps) {
   return (
     <SectionCard
       title="Strategy"
-      titleIcon={<Target className="w-4 h-4 text-blue-400" />}
+      titleIcon={<Target className="w-4 h-4 text-accent-info" />}
       staggerIndex={2}
     >
       <div className="space-y-4">
@@ -140,8 +140,8 @@ function StrategySection({ data }: StrategySectionProps) {
             <div className="space-y-1.5">
               {difficultyWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="t-caption-sm text-[var(--brand-text)] capitalize">{label}</span>
+                  <span className="t-caption-sm font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -157,8 +157,8 @@ function StrategySection({ data }: StrategySectionProps) {
             <div className="space-y-1.5">
               {checkpointWinRates.map(([checkpoint, rate]) => (
                 <div key={checkpoint} className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--brand-text)] capitalize">{checkpoint}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{Math.round(rate * 100)}%</span>
+                  <span className="t-caption-sm text-[var(--brand-text)] capitalize">{checkpoint}</span>
+                  <span className="t-caption-sm font-semibold text-accent-success">{Math.round(rate * 100)}%</span>
                 </div>
               ))}
             </div>
@@ -170,7 +170,7 @@ function StrategySection({ data }: StrategySectionProps) {
           {data.keywordVolumeSweetSpot && (
             <div>
               <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Volume Sweet Spot</p>
-              <p className="text-sm font-bold text-[var(--brand-text-bright)]">
+              <p className="t-ui font-bold text-[var(--brand-text-bright)]">
                 {data.keywordVolumeSweetSpot.min.toLocaleString()}–{data.keywordVolumeSweetSpot.max.toLocaleString()}
               </p>
             </div>
@@ -203,7 +203,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
   return (
     <SectionCard
       title="Technical"
-      titleIcon={<Wrench className="w-4 h-4 text-blue-400" />}
+      titleIcon={<Wrench className="w-4 h-4 text-accent-info" />}
       staggerIndex={3}
     >
       <div className="space-y-4">
@@ -214,8 +214,8 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
             <div className="space-y-1.5">
               {fixTypeWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="t-caption-sm text-[var(--brand-text)] capitalize">{label}</span>
+                  <span className="t-caption-sm font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -228,11 +228,11 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Avg Health Score Gain</p>
-            <p className="text-sm font-bold text-[var(--brand-text-bright)]">+{data.avgHealthScoreImprovement.toFixed(1)}</p>
+            <p className="t-ui font-bold text-[var(--brand-text-bright)]">+{data.avgHealthScoreImprovement.toFixed(1)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Internal Link Effectiveness</p>
-            <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.internalLinkEffectiveness)}</p>
+            <p className="t-ui font-bold text-[var(--brand-text-bright)]">{pct(data.internalLinkEffectiveness)}</p>
           </div>
         </div>
 
@@ -303,7 +303,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
     <div className="space-y-4">
       {/* Confidence + overall stats header */}
       <SectionCard
-        titleIcon={<Brain className="w-4 h-4 text-blue-400" />}
+        titleIcon={<Brain className="w-4 h-4 text-accent-info" />}
         title="AI Learnings"
         titleExtra={
           <Badge
@@ -314,11 +314,11 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         action={
           <div className="flex items-center gap-1.5">
             <TrendBadge value={1} iconOnly hideOnZero={false} size="md" className="text-[var(--brand-text-muted)]" />
-            <span className={`text-xs font-medium ${
+            <span className={`t-caption-sm font-medium ${
               overall.recentTrend === 'improving'
-                ? 'text-emerald-400'
+                ? 'text-accent-success'
                 : overall.recentTrend === 'declining'
-                ? 'text-red-400'
+                ? 'text-accent-danger'
                 : 'text-[var(--brand-text)]'
             }`}>
               {overall.recentTrend}
@@ -329,19 +329,19 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Win Rate</p>
-            <p className="text-xl font-bold text-emerald-400">{pct(overall.totalWinRate)}</p>
+            <p className="t-stat text-accent-success">{pct(overall.totalWinRate)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Strong Win Rate</p>
-            <p className="text-xl font-bold text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
+            <p className="t-stat text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Scored Actions</p>
-            <p className="text-xl font-bold text-blue-400">{learnings.totalScoredActions}</p>
+            <p className="t-stat text-accent-info">{learnings.totalScoredActions}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Top Action</p>
-            <p className="text-sm font-bold text-[var(--brand-text-bright)] leading-tight">
+            <p className="t-ui font-bold text-[var(--brand-text-bright)] leading-tight">
               {overall.topActionTypes[0]
                 ? overall.topActionTypes[0].type.replace(/_/g, ' ')
                 : '—'}
@@ -355,7 +355,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {content !== null ? (
           <ContentSection data={content} />
         ) : (
-          <SectionCard title="Content" titleIcon={<FileText className="w-4 h-4 text-blue-400" />} staggerIndex={1}>
+          <SectionCard title="Content" titleIcon={<FileText className="w-4 h-4 text-accent-info" />} staggerIndex={1}>
             <NoDataMessage message="Not enough content action data yet" />
           </SectionCard>
         )}
@@ -363,7 +363,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {strategy !== null ? (
           <StrategySection data={strategy} />
         ) : (
-          <SectionCard title="Strategy" titleIcon={<Target className="w-4 h-4 text-blue-400" />} staggerIndex={2}>
+          <SectionCard title="Strategy" titleIcon={<Target className="w-4 h-4 text-accent-info" />} staggerIndex={2}>
             <NoDataMessage message="Not enough strategy action data yet" />
           </SectionCard>
         )}
@@ -371,7 +371,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {technical !== null ? (
           <TechnicalSection data={technical} />
         ) : (
-          <SectionCard title="Technical" titleIcon={<Wrench className="w-4 h-4 text-blue-400" />} staggerIndex={3}>
+          <SectionCard title="Technical" titleIcon={<Wrench className="w-4 h-4 text-accent-info" />} staggerIndex={3}>
             <NoDataMessage message="Not enough technical action data yet" />
           </SectionCard>
         )}

@@ -10,7 +10,6 @@ import {
   listTemplates, createTemplate,
   importBrandscript, completeBrandscript,
 } from '../brandscript.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
@@ -94,7 +93,6 @@ router.post(
       const bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
       addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
-      clearSeoContextCache(req.params.workspaceId);
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(bs);
     } catch (err) {
@@ -109,7 +107,6 @@ router.post('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceI
   const bs = createBrandscript(req.params.workspaceId, name, frameworkType, sections);
   addActivity(req.params.workspaceId, 'brandscript_created', `Created brandscript "${bs.name}"`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
-  clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json(bs);
 });
@@ -141,7 +138,6 @@ router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess
     `Updated sections for brandscript "${result.name}"`,
   );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
-  clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);
 });
@@ -157,7 +153,6 @@ router.delete('/api/brandscripts/:workspaceId/:id', requireWorkspaceAccess('work
     existing ? `Deleted brandscript "${existing.name}"` : 'Deleted brandscript',
   );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id, deleted: true });
-  clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json({ deleted: true });
 });
@@ -186,7 +181,6 @@ router.post(
       }
       addActivity(req.params.workspaceId, 'brandscript_completed', `AI completed sections in brandscript "${bs.name}"`);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
-      clearSeoContextCache(req.params.workspaceId);
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(bs);
     } catch (err) {

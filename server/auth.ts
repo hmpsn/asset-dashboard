@@ -5,6 +5,7 @@
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { getUserById, type SafeUser } from './users.js';
+import { getWorkspace } from './workspaces.js';
 import { JWT_SECRET } from './jwt-config.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -103,26 +104,12 @@ export function requireRole(...roles: string[]) {
  */
 export function requireWorkspaceAccess(paramName: string = 'id') {
   return (req: Request, res: Response, next: NextFunction): void => {
-    // If no JWT user is set, pass through (legacy APP_PASSWORD auth handles access)
-    if (!req.user) {
-      next();
-      return;
-    }
-    // Owners bypass workspace checks
-    if (req.user.role === 'owner') {
-      next();
-      return;
-    }
     const wsId = req.params[paramName];
-    if (!wsId) {
+    if (!wsId || requestUserCanAccessWorkspace(req, wsId)) {
       next();
       return;
     }
-    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
-      res.status(403).json({ error: 'You do not have access to this workspace' });
-      return;
-    }
-    next();
+    sendWorkspaceAccessDenied(res);
   };
 }
 
@@ -135,25 +122,128 @@ export function requireWorkspaceAccess(paramName: string = 'id') {
  */
 export function requireWorkspaceAccessFromQuery(queryParam: string = 'workspaceId') {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user) {
+    const raw = req.query[queryParam];
+    const wsId = Array.isArray(raw) ? raw[0] : raw;
+    if (!wsId || typeof wsId !== 'string') {
+      if (requestUserCanOmitWorkspaceScope(req)) {
+        next();
+        return;
+      }
+      sendWorkspaceAccessDenied(res);
+      return;
+    }
+    if (requestUserCanAccessWorkspace(req, wsId)) {
       next();
       return;
     }
-    if (req.user.role === 'owner') {
+    sendWorkspaceAccessDenied(res);
+  };
+}
+
+/**
+ * Requires the authenticated user to have access to the workspace
+ * identified by a request body field.
+ * Owners always have access to all workspaces.
+ * Must be used AFTER requireAuth.
+ */
+export function requireWorkspaceAccessFromBody(bodyParam: string = 'workspaceId') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const body = req.body as Record<string, unknown> | undefined;
+    const wsId = body?.[bodyParam];
+    if (typeof wsId !== 'string') {
+      if (requestUserCanOmitWorkspaceScope(req)) {
+        next();
+        return;
+      }
+      sendWorkspaceAccessDenied(res);
+      return;
+    }
+    if (requestUserCanAccessWorkspace(req, wsId)) {
       next();
       return;
     }
-    const wsId = req.query[queryParam] as string | undefined;
-    if (!wsId) {
-      next();
+    sendWorkspaceAccessDenied(res);
+  };
+}
+
+type RequestFieldSource = 'params' | 'query' | 'body';
+
+interface RequestFieldRef {
+  source: RequestFieldSource;
+  name: string;
+}
+
+interface WorkspaceSiteAccessOptions {
+  workspace: RequestFieldRef;
+  site: RequestFieldRef;
+}
+
+/**
+ * Requires the authenticated user to access the requested workspace AND proves
+ * that workspace owns the requested Webflow site before route code can look up
+ * a site token or mutate a Webflow resource.
+ */
+export function requireWorkspaceSiteAccess(options: WorkspaceSiteAccessOptions) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const wsId = readRequestField(req, options.workspace);
+    const siteId = readRequestField(req, options.site);
+
+    if (!wsId || !siteId) {
+      if (requestUserCanOmitWorkspaceScope(req)) {
+        next();
+        return;
+      }
+      sendWorkspaceAccessDenied(res);
       return;
     }
-    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
-      res.status(403).json({ error: 'You do not have access to this workspace' });
+
+    if (!requestUserCanAccessWorkspace(req, wsId) || !workspaceOwnsWebflowSite(wsId, siteId)) {
+      sendWorkspaceAccessDenied(res);
       return;
     }
+
     next();
   };
+}
+
+export function requireWorkspaceSiteAccessFromQuery(
+  siteParam: string = 'siteId',
+  workspaceQueryParam: string = 'workspaceId',
+) {
+  return requireWorkspaceSiteAccess({
+    workspace: { source: 'query', name: workspaceQueryParam },
+    site: { source: 'params', name: siteParam },
+  });
+}
+
+export function requireWorkspaceSiteAccessFromBody(
+  siteParam: string = 'siteId',
+  workspaceBodyParam: string = 'workspaceId',
+) {
+  return requireWorkspaceSiteAccess({
+    workspace: { source: 'body', name: workspaceBodyParam },
+    site: { source: 'params', name: siteParam },
+  });
+}
+
+export function workspaceOwnsWebflowSite(workspaceId: string, siteId: string): boolean {
+  const workspace = getWorkspace(workspaceId);
+  return workspace?.webflowSiteId === siteId;
+}
+
+export function requestUserCanAccessWorkspace(req: Request, workspaceId: string): boolean {
+  // If no JWT user is set, pass through (legacy APP_PASSWORD auth handles access).
+  if (!req.user) return true;
+  if (req.user.role === 'owner') return true;
+  return !!req.user.workspaceIds?.includes(workspaceId);
+}
+
+function requestUserCanOmitWorkspaceScope(req: Request): boolean {
+  return !req.user || req.user.role === 'owner';
+}
+
+export function sendWorkspaceAccessDenied(res: Response): void {
+  res.status(403).json({ error: 'You do not have access to this workspace' });
 }
 
 /**
@@ -190,4 +280,20 @@ function extractToken(req: Request): string | null {
     return req.cookies.token;
   }
   return null;
+}
+
+function readRequestField(req: Request, field: RequestFieldRef): string | undefined {
+  if (field.source === 'params') {
+    return req.params[field.name];
+  }
+
+  if (field.source === 'query') {
+    const raw = req.query[field.name];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  const body = req.body as Record<string, unknown> | undefined;
+  const value = body?.[field.name];
+  return typeof value === 'string' ? value : undefined;
 }

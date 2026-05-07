@@ -11,28 +11,28 @@ export function AtAGlanceStrip({ metrics }: Props) {
       <StatCard
         label="Site Health"
         value={metrics.siteHealthScore != null ? `${metrics.siteHealthScore}/100` : '—'}
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
       <StatCard
         label="Ranking Opps"
         value={metrics.openRankingOpportunities}
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
       <StatCard
         label="In Pipeline"
         value={metrics.contentInPipeline}
         sub="pieces"
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
       <StatCard
         label="Win Rate"
         value={metrics.overallWinRate != null ? `${metrics.overallWinRate}%` : '—'}
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
       <StatCard
         label="Critical Issues"
         value={metrics.criticalIssues}
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
     </div>
   );

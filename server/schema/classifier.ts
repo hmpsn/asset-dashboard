@@ -16,6 +16,7 @@ export type PageKind =
   | 'CaseStudyIndex'
   | 'AboutPage'
   | 'ContactPage'
+  | 'Location'
   | 'Legal'
   | 'WebPage';
 
@@ -61,6 +62,9 @@ export function classifyPage(url: string, baseUrl: string, opts: ClassifyOpts = 
   }
   if (/^\/contact(-us)?$/.test(path)) {
     return { kind: 'ContactPage', primaryType: 'ContactPage', pagePath: path };
+  }
+  if (/^\/(locations?|offices?|studios?|clinics?|branch(?:es)?|stores?)\/[^/]+/.test(path)) {
+    return { kind: 'Location', primaryType: 'LocalBusiness', pagePath: path };
   }
   if (/^\/(privacy(-policy)?|terms(-of-(service|use))?|legal|cookie(-policy)?|disclaimer)$/.test(path)) {
     return { kind: 'Legal', primaryType: 'WebPage', pagePath: path };

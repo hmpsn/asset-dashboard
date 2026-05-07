@@ -64,7 +64,7 @@ Each assembler is an `async` function that loads data from modules via dynamic `
 
 | Assembler | Primary data sources |
 |---|---|
-| `assembleSeoContext` | `seo-context.ts` (keyword strategy, brand voice, business context), `page-keywords.ts` (live page keyword map), `rank-tracking.ts`, `workspaces.ts` (intelligence profile, business profile), `strategy_history` table |
+| `assembleSeoContext` | `intelligence/seo-context-source.ts` (brand voice authority + knowledge/raw readers), `workspaces.ts` (keyword strategy, business context, personas, intelligence profile, business profile), `page-keywords.ts` (live page keyword map), `rank-tracking.ts`, `strategy_history` table |
 | `assembleInsights` | `analytics-insights-store.ts` (all workspace insights, capped at 100 by impact score) |
 | `assembleLearnings` | `workspace-learnings.ts`, `outcome-playbooks.ts`, `roi-attribution.ts`, `outcome-tracking.ts` (WeCalledIt, TopWins) — **gated by `outcome-ai-injection` feature flag** |
 | `assemblePageProfile` | `page-keywords.ts`, `rank-tracking.ts`, `recommendations.ts`, `analytics-insights-store.ts`, `audit-page.ts`, `schema-validator.ts`, `site-architecture.ts`, `seo-change-tracker.ts`, `content-posts.ts`, `content-decay.ts`, `content-brief.ts` |
@@ -211,7 +211,7 @@ It is called from 16+ locations on any mutation that changes workspace intellige
 - Voice calibration updates (`routes/voice-calibration.ts`)
 - Brand identity / brandscript saves (`routes/brand-identity.ts`, `routes/brandscript.ts`)
 - Copy pipeline writes (`routes/copy-pipeline.ts`)
-- SEO edit application (`routes/webflow-seo.ts`)
+- SEO edit application (`routes/webflow-seo-apply.ts`)
 - Workspace settings updates (`routes/workspaces.ts`)
 - Discovery ingestion completions (`routes/discovery-ingestion.ts`)
 - Churn signal detection (`churn-signals.ts`)

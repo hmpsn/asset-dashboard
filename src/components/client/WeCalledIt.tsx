@@ -14,14 +14,14 @@ import type { OutcomeWinEntry, DeltaSummary, DeltaDirection } from '../../../sha
 // --- Helpers -----------------------------------------------------------
 
 function deltaDirectionIcon(direction: DeltaDirection) {
-  if (direction === 'improved') return <Icon as={TrendingUp} size="md" className="text-emerald-400 flex-shrink-0" />;
-  if (direction === 'declined') return <Icon as={TrendingDown} size="md" className="text-red-400 flex-shrink-0" />;
+  if (direction === 'improved') return <Icon as={TrendingUp} size="md" className="text-accent-success flex-shrink-0" />;
+  if (direction === 'declined') return <Icon as={TrendingDown} size="md" className="text-accent-danger flex-shrink-0" />;
   return <Icon as={Minus} size="md" className="text-[var(--brand-text)] flex-shrink-0" />;
 }
 
 function deltaColor(direction: DeltaDirection): string {
-  if (direction === 'improved') return 'text-emerald-400';
-  if (direction === 'declined') return 'text-red-400';
+  if (direction === 'improved') return 'text-accent-success';
+  if (direction === 'declined') return 'text-accent-danger';
   return 'text-[var(--brand-text)]';
 }
 
@@ -60,7 +60,7 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
     <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-[var(--radius-xl)] p-4 space-y-3">
       {/* Header */}
       <div className="flex items-start gap-2">
-        <Icon as={Lightbulb} size="md" className="text-teal-400 flex-shrink-0 mt-0.5" />
+        <Icon as={Lightbulb} size="md" className="text-accent-brand flex-shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
           <p className="t-body font-medium text-[var(--brand-text-bright)] leading-snug">{entry.recommendation}</p>
           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 truncate">For {pageLabel}</p>
@@ -172,12 +172,11 @@ export default function WeCalledIt({ workspaceId, tier }: WeCalledItProps) {
 
   return (
     <FeatureFlag flag="outcome-client-reporting">
-      <SectionCard>
-        <div className="flex items-center gap-2 mb-4">
-          <Icon as={Sparkles} size="md" className="text-teal-400" />
-          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">We called it</h3>
-          <span className="t-caption text-[var(--brand-text-muted)] ml-1">— recommended, implemented, proven</span>
-        </div>
+      <SectionCard
+        title="We called it"
+        titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
+        titleExtra={<span className="t-caption text-[var(--brand-text-muted)]">Recommended, implemented, proven</span>}
+      >
 
         {isLoading && (
           <div className="space-y-3">

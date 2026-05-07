@@ -1,14 +1,10 @@
-import { Suspense } from 'react';
-import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import {
   Loader2, X, Target, Sparkles, FileText, Shield, Lock, Check,
 } from 'lucide-react';
-import { getSafe } from '../../api/client';
 import { STUDIO_NAME } from '../../constants';
+import { Button, IconButton } from '../ui';
 import type { PricingModalData, StripePaymentData } from '../../hooks/usePayments';
 import type { WorkspaceInfo, ClientContentRequest } from './types';
-
-const LazyStripePaymentModal = lazyWithRetry(() => import('../StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 
 interface Props {
   /** @deprecated Kept for call-site compat; no longer gates rendering. */
@@ -22,7 +18,9 @@ interface Props {
   fullPostPrice: number | null;
   fmtPrice: (n: number) => string;
   contentPricing: WorkspaceInfo['contentPricing'] | undefined;
+  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
   stripePayment: StripePaymentData | null;
+  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
   setStripePayment: React.Dispatch<React.SetStateAction<StripePaymentData | null>>;
   workspaceId: string;
   setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
@@ -41,13 +39,8 @@ export function PricingConfirmationModal({
   fullPostPrice,
   fmtPrice,
   contentPricing,
-  stripePayment,
-  setStripePayment,
-  workspaceId,
-  setContentRequests,
-  setToast,
 }: Props) {
-  if (!pricingModal && !stripePayment) return null;
+  if (!pricingModal) return null;
   const isExternal = billingMode === 'external';
 
   return (
@@ -66,26 +59,33 @@ export function PricingConfirmationModal({
         const fmt = fmtPrice;
         // z-index-ok — pricing modal above standard modal scale
         return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
+          <div
+            className={
+              'fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
+            }
+            onClick={() => !pricingConfirming && setPricingModal(null)}
+          >
             {/* pr-check-disable-next-line -- pricing modal surface uses brand signature radius intentionally */}
             <div className="relative bg-[var(--surface-2)] border border-[var(--brand-border)]/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: 'var(--radius-signature-lg)' }} onClick={e => e.stopPropagation()}>
               {/* Close button */}
-              <button
+              <IconButton
+                icon={X}
+                label="Close pricing confirmation"
+                size="sm"
+                variant="solid"
                 onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-[var(--z-sticky)]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                className="absolute top-3 right-3 z-[var(--z-sticky)]"
+              />
 
               {/* Header with gradient */}
               <div className="relative px-6 pt-6 pb-5 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
                 {/* Decorative glow */}
-                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
+                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-[var(--radius-pill)] blur-3xl opacity-20 bg-teal-500" />
 
                 <div className="relative flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-[var(--radius-xl)] flex items-center justify-center ring-1 bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20">
-                      {isFull ? <Sparkles className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
+                      {isFull ? <Sparkles className="w-5 h-5 text-accent-brand" /> : <FileText className="w-5 h-5 text-accent-brand" />}
                     </div>
                     <div>
                       <div className="t-body font-semibold text-[var(--brand-text-bright)]">
@@ -101,11 +101,11 @@ export function PricingConfirmationModal({
                 {/* Topic card */}
                 <div className="px-3.5 py-3 border bg-teal-950/30 border-teal-500/10" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <div className="flex items-center gap-2 mb-1">
-                    <Target className="w-3 h-3 text-teal-400/70" />
+                    <Target className="w-3 h-3 text-accent-brand" />
                     <span className="t-micro text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Topic</span>
                   </div>
-                  <div className="t-caption text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
-                  <div className="t-caption-sm mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                  <div className="t-body text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
+                  <div className="t-caption-sm mt-1 text-accent-brand">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
@@ -113,11 +113,11 @@ export function PricingConfirmationModal({
               {displayPrice != null && (
                 <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <div>
-                    <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
+                    <div className="t-stat tracking-tight text-accent-brand">{fmt(displayPrice)}</div>
                     <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
                   </div>
                   <div className="w-9 h-9 rounded-[var(--radius-lg)] flex items-center justify-center bg-teal-500/10">
-                    <Shield className="w-4 h-4 text-teal-400/60" />
+                    <Shield className="w-4 h-4 text-accent-brand" />
                   </div>
                 </div>
               )}
@@ -132,10 +132,11 @@ export function PricingConfirmationModal({
 
               {/* Actions */}
               <div className="px-6 pb-5 space-y-3">
-                <button
+                <Button
                   disabled={pricingConfirming}
                   onClick={confirmPricingAndSubmit}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-[var(--radius-xl)] t-body font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
+                  size="lg"
+                  className="w-full rounded-[var(--radius-xl)] shadow-lg active:scale-[0.98] shadow-teal-900/40"
                 >
                   {pricingConfirming ? (
                     <>
@@ -153,14 +154,15 @@ export function PricingConfirmationModal({
                       <span>Confirm Request</span>
                     </>
                   )}
-                </button>
-                <button
+                </Button>
+                <Button
                   disabled={pricingConfirming}
                   onClick={() => setPricingModal(null)}
-                  className="w-full px-4 py-2 rounded-[var(--radius-xl)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all"
+                  variant="ghost"
+                  className="w-full rounded-[var(--radius-xl)]"
                 >
                   Cancel
-                </button>
+                </Button>
 
                 {/* Trust footer — hidden for external billing (no Stripe path) */}
                 {!isExternal && (
@@ -181,28 +183,6 @@ export function PricingConfirmationModal({
           </div>
         );
       })()}
-
-      {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
-      {stripePayment && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-[var(--z-modal)] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>}>
-          <LazyStripePaymentModal
-            clientSecret={stripePayment.clientSecret}
-            publishableKey={stripePayment.publishableKey}
-            amount={stripePayment.amount}
-            productName={stripePayment.productName}
-            topic={stripePayment.topic}
-            targetKeyword={stripePayment.targetKeyword}
-            isFull={stripePayment.isFull}
-            onSuccess={() => {
-              setStripePayment(null);
-              setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-              // Refresh content requests
-              getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('PricingConfirmationModal operation failed:', err); });
-            }}
-            onClose={() => setStripePayment(null)}
-          />
-        </Suspense>
-      )}
     </>
   );
 }

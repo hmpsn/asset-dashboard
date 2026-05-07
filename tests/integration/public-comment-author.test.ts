@@ -2,9 +2,9 @@
  * Integration test: public comment author override enforcement.
  *
  * The POST /api/public/content-request/:workspaceId/:id/comment endpoint
- * is unauthenticated. The handler hardcodes `author = 'client'` and must
- * NEVER persist a client-supplied 'team' value — even if the Zod schema
- * previously accepted it or a future developer re-introduces that pattern.
+ * is unauthenticated. The schema rejects unsupported public fields and the
+ * handler hardcodes `author = 'client'`, so callers must never be able to
+ * persist a client-supplied 'team' value.
  *
  * This test is the safety net for that contract. If someone widens the
  * schema back to `z.enum(['client', 'team'])` and uses `req.body.author`,
@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createContentRequest } from '../../server/content-requests.js';
+import { createContentRequest, getContentRequest } from '../../server/content-requests.js';
 
 // ── Unique port ──────────────────────────────────────────────────────────────
 const ctx = createTestContext(13262);
@@ -36,22 +36,20 @@ beforeAll(async () => {
   requestId = req.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('POST /api/public/content-request/:workspaceId/:id/comment — author override', () => {
-  it('saves author as "client" when caller supplies author: "team"', async () => {
+  it('rejects caller-supplied author without mutating comments', async () => {
+    const beforeCount = getContentRequest(wsId, requestId)?.comments.length ?? 0;
     const res = await postJson(
       `/api/public/content-request/${wsId}/${requestId}/comment`,
       { content: 'Test comment from team impersonator', author: 'team' },
     );
-    expect(res.status).toBe(200);
-    const body = await res.json() as { comments: Array<{ author: string; content: string }> };
-    const saved = body.comments.at(-1);
-    expect(saved?.author).toBe('client');
-    expect(saved?.content).toBe('Test comment from team impersonator');
+    expect(res.status).toBe(400);
+    expect(getContentRequest(wsId, requestId)?.comments.length).toBe(beforeCount);
   });
 
   it('saves author as "client" when caller omits author', async () => {

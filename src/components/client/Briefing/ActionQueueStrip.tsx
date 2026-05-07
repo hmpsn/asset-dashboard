@@ -147,7 +147,7 @@ export function ActionQueueStrip({
 
   return (
     <div className="flex flex-row flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 px-4 py-3 rounded-[var(--radius-xl)]">
-      <Clipboard className="w-4 h-4 text-amber-300 flex-shrink-0" aria-hidden="true" />
+      <Clipboard className="w-4 h-4 text-accent-warning flex-shrink-0" aria-hidden="true" />
       {chips.map((chip, idx) => (
         <button
           // index-based key because briefs/posts both target section='content'
@@ -155,7 +155,7 @@ export function ActionQueueStrip({
           key={`${chip.section}-${idx}`}
           type="button"
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=${chip.section}`)}
-          className="t-caption font-medium text-amber-300 hover:text-amber-200 transition-colors"
+          className="t-caption font-medium text-accent-warning hover:text-accent-warning transition-colors"
         >
           {chip.count} {chip.label}
         </button>
@@ -164,7 +164,7 @@ export function ActionQueueStrip({
         <button
           type="button"
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=approvals`)}
-          className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-amber-200 hover:bg-amber-500/40 transition-colors"
+          className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
           aria-label={`${staleCount} urgent items pending`}
         >
           <Clock className="w-3.5 h-3.5" aria-hidden="true" />

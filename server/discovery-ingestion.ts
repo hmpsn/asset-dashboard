@@ -1,6 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
@@ -204,8 +204,8 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
 
   let result;
   try {
-    result = await callOpenAI({
-      model: 'gpt-4.1-mini',
+    result = await callAI({
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.2,

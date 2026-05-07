@@ -34,7 +34,7 @@ function createWrapper() {
 /** Build a minimal useKeywordStrategy return shape */
 function makeStrategyReturn(pageMap: object[] = []) {
   return {
-    data: { strategy: { pageMap }, semrushAvailable: false, workspaceData: null },
+    data: { strategy: { pageMap }, seoDataAvailable: false, workspaceData: null },
     isLoading: false,
     error: null,
   } as ReturnType<typeof useKeywordStrategy>;

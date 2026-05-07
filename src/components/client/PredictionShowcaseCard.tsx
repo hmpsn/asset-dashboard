@@ -39,7 +39,7 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
   return (
     <SectionCard
       title="Predictions That Came True"
-      titleIcon={<Icon as={Trophy} size="md" className="text-teal-400" />}
+      titleIcon={<Icon as={Trophy} size="md" className="text-accent-brand" />}
     >
       <div className="space-y-3">
         {items.map((p) => (
@@ -49,14 +49,14 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
           >
             {/* What we predicted */}
             <div className="flex items-start gap-2">
-              <Icon as={TrendingUp} size="md" className="text-teal-400 flex-shrink-0 mt-0.5" />
+              <Icon as={TrendingUp} size="md" className="text-accent-brand flex-shrink-0 mt-0.5" />
               <p className="t-body text-[var(--brand-text-bright)] leading-snug">
                 We predicted <span className="font-medium text-[var(--brand-text-bright)]">{p.prediction}</span>
               </p>
             </div>
 
             {/* What actually happened */}
-            <p className="t-body text-teal-400 pl-6 leading-snug">
+            <p className="t-body text-accent-brand pl-6 leading-snug">
               Result: {p.outcome}
             </p>
 

@@ -17,7 +17,10 @@ export const WS_EVENTS = {
   REQUEST_UPDATE: 'request:update',
   CONTENT_REQUEST_CREATED: 'content-request:created',
   CONTENT_REQUEST_UPDATE: 'content-request:update',
+  CONTENT_UPDATED: 'content:updated',
   ACTIVITY_NEW: 'activity:new',
+  FEEDBACK_NEW: 'feedback:new',
+  FEEDBACK_UPDATE: 'feedback:update',
   AUDIT_COMPLETE: 'audit:complete',
   WORK_ORDER_UPDATE: 'work-order:update',
   ANOMALIES_UPDATE: 'anomalies:update',
@@ -26,6 +29,8 @@ export const WS_EVENTS = {
   INSIGHT_RESOLVED: 'insight:resolved',
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
+  SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
+  SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated',
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
   OUTCOME_SCORED: 'outcome:scored',
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
@@ -37,6 +42,7 @@ export const WS_EVENTS = {
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+  CLIENT_ACTION_UPDATE: 'client-action:update',
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)

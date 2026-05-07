@@ -57,7 +57,7 @@ interface IntelResponse {
 interface Props {
   workspaceId: string;
   competitors: string[];
-  semrushAvailable: boolean;
+  seoDataAvailable: boolean;
   /** Keyword gaps from the stored strategy — used as fallback when the live API call fails or returns empty */
   cachedKeywordGaps?: KeywordGap[];
 }
@@ -84,15 +84,15 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
         <span className="text-[var(--brand-text-muted)]">{label}</span>
         <span className="text-orange-400 font-medium">{fmtNum(theirVal)}</span>
       </div>
-      <div className="h-2 bg-[var(--surface-3)] rounded-full overflow-hidden flex">
-        <div className="h-full bg-teal-500/70 rounded-l-full transition-all" style={{ width: `${myPct}%` }} />
-        <div className="h-full bg-orange-500/70 rounded-r-full transition-all" style={{ width: `${100 - myPct}%` }} />
+      <div className="h-2 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden flex">
+        <div className="h-full bg-teal-500/70 rounded-l-[var(--radius-pill)] transition-all" style={{ width: `${myPct}%` }} />
+        <div className="h-full bg-orange-500/70 rounded-r-[var(--radius-pill)] transition-all" style={{ width: `${100 - myPct}%` }} />
       </div>
     </div>
   );
 }
 
-export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, cachedKeywordGaps }: Props) {
+export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, cachedKeywordGaps }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const competitorKey = competitors.join(',');
@@ -100,21 +100,21 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
   const { data, isLoading, error, refetch } = useQuery<IntelResponse>({
     queryKey: queryKeys.admin.competitorIntel(workspaceId, competitorKey),
     queryFn: () => get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
-    enabled: competitors.length > 0 && semrushAvailable,
+    enabled: competitors.length > 0 && seoDataAvailable,
     staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
     retry: 1,
   });
 
   const errorMsg = error instanceof Error ? error.message : error ? String(error) : null;
 
-  if (!semrushAvailable) {
+  if (!seoDataAvailable) {
     return (
       <SectionCard>
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires SEMRush</p>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure your SEMRush API key in Settings to unlock this feature.</p>
+            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure SEMRush or DataForSEO in Settings to unlock this feature.</p>
           </div>
         </div>
       </SectionCard>
@@ -300,7 +300,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
           </p>
         )}
         <p className="t-caption-sm text-[var(--brand-text-dim)] text-right ml-auto">
-          Data via SEMRush · {usingFallbackGaps
+          Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'
             : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}
         </p>

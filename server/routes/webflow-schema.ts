@@ -1,29 +1,40 @@
 /**
  * webflow-schema routes — extracted from server/index.ts
+ *
+ * @reads workspaces, schema_snapshots, schema_templates, schema_plans, schema_validations, schema_publish_history, schema_cms_field_mappings, workspace_pages, pending_schemas, webflow_api
+ * @writes schema_snapshots, schema_templates, schema_plans, schema_validations, schema_publish_history, schema_cms_field_mappings, pending_schemas, approvals, outcome_actions, seo_changes, activities
  */
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite } from '../schema-store.js';
+import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
-import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
+import { SCHEMA_ROLE_LABELS, type SchemaPageRole, type SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { notifyApprovalReady } from '../email.js';
 import {
   listCollections,
+  getCollectionSchema,
+  getCollectionItem,
+  updateCollectionItem,
+  publishCollectionItems,
   publishSite,
   publishSchemaToPage,
   publishRawSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
+import { buildSiteInventory, detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
+import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { getWorkspaceAllPages } from '../workspace-data.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
@@ -45,20 +56,119 @@ import { isProgrammingError } from '../errors.js';
 const router = Router();
 const log = createLogger('webflow-schema');
 
-router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+const schemaPlanFeedbackSchema = z.object({
+  action: z.enum(['approve', 'request_changes']),
+  note: z.string().max(2000).optional(),
+}).strict();
+
+function schemaHash(schema: Record<string, unknown>): string {
+  return createHash('sha256').update(JSON.stringify(schema)).digest('hex').slice(0, 16);
+}
+
+function sanitizeSchemaJsonForCms(schema: Record<string, unknown>): string {
+  return JSON.stringify(schema).replace(/<\/script/gi, '<\\/script');
+}
+
+function broadcastSchemaSnapshotUpdated(
+  siteId: string,
+  workspaceId: string | undefined,
+  action: 'generated' | 'published' | 'deleted' | 'retracted' | 'rolled_back',
+  pageId?: string,
+): void {
+  if (!workspaceId) return;
+  broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
+    siteId,
+    action,
+    ...(pageId ? { pageId } : {}),
+  });
+}
+
+async function publishSchemaToCmsField(opts: {
+  siteId: string;
+  pageId: string;
+  schema: Record<string, unknown>;
+  publishAfter?: boolean;
+  token?: string;
+}): Promise<SchemaCmsDeliveryStatus | null> {
+  const snapshot = getSchemaSnapshot(opts.siteId);
+  const page = snapshot?.results.find(r => r.pageId === opts.pageId);
+  const collection = page?.generationDiagnostics?.collection;
+  if (!collection?.collectionId || !collection.itemId) return null;
+
+  const mappings = getSchemaCmsFieldMappings(opts.siteId);
+  const mapping = mappings.find(m => m.collectionId === collection.collectionId);
+  const fieldSlug = mapping?.schemaFieldSlug || page?.generationDiagnostics?.cmsDeliveryStatus?.fieldSlug;
+  if (!fieldSlug) {
+    return {
+      mode: 'cms-field',
+      status: 'blocked',
+      message: `CMS publish blocked: no mapped schema field for collection ${collection.collectionName}.`,
+    };
+  }
+  const collectionSchema = await getCollectionSchema(collection.collectionId, opts.token);
+  const mappedField = collectionSchema.fields.find(f => f.slug === fieldSlug);
+  if (!mappedField || !['PlainText', 'RichText'].includes(mappedField.type)) {
+    return {
+      mode: 'cms-field',
+      status: 'blocked',
+      fieldSlug,
+      message: mappedField
+        ? `CMS publish blocked: mapped field ${fieldSlug} is ${mappedField.type}, not a text field.`
+        : `CMS publish blocked: mapped field ${fieldSlug} was not found on ${collection.collectionName}.`,
+    };
+  }
+
+  const schemaJson = sanitizeSchemaJsonForCms(opts.schema);
+  const hash = schemaHash(opts.schema);
+  const currentItem = await getCollectionItem(collection.collectionId, collection.itemId, opts.token);
+  const currentFieldData = (currentItem?.fieldData || currentItem || {}) as Record<string, unknown>;
+  if (currentFieldData[fieldSlug] === schemaJson) {
+    return {
+      mode: 'cms-field',
+      status: 'unchanged',
+      fieldSlug,
+      hash,
+      message: `CMS field unchanged: ${fieldSlug}.`,
+    };
+  }
+
+  const updateResult = await updateCollectionItem(collection.collectionId, collection.itemId, { [fieldSlug]: schemaJson }, opts.token);
+  if (!updateResult.success) {
+    return {
+      mode: 'cms-field',
+      status: 'failed',
+      fieldSlug,
+      hash,
+      message: updateResult.error || `CMS field write failed: ${fieldSlug}.`,
+    };
+  }
+
+  if (opts.publishAfter) {
+    const publishResult = await publishCollectionItems(collection.collectionId, [collection.itemId], opts.token);
+    if (!publishResult.success) {
+      return {
+        mode: 'cms-field',
+        status: 'failed',
+        fieldSlug,
+        hash,
+        message: publishResult.error || `CMS item publish failed after writing ${fieldSlug}.`,
+      };
+    }
+  }
+
+  return {
+    mode: 'cms-field',
+    status: 'written',
+    fieldSlug,
+    hash,
+    message: `CMS field written: ${fieldSlug}, hash changed.`,
+  };
+}
+
+router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
-    // Build per-page validation map so the AI can avoid repeating known mistakes
-    const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
-    const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
-    // Enrich with architecture tree (best-effort — don't block if unavailable)
-    if (ctx.workspaceId) {
-      try {
-        const arch = await getCachedArchitecture(ctx.workspaceId);
-        ctx._architectureTree = arch.tree;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: GET /api/webflow/schema-suggestions/:siteId: programming error'); /* architecture not available — proceed without */ }
-    }
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(req.params.siteId);
     const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
     res.json(result);
   } catch (err) {
@@ -69,7 +179,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
 });
 
 // Load previously saved schema results from disk, annotated with publish dates
-router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getSchemaSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
   // Annotate each page result with its last publish date (for stale schema detection)
@@ -82,7 +192,7 @@ router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQue
 
 // ── Page Type Persistence ──
 
-router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   res.json({ pageTypes: getPageTypes(req.params.siteId) });
 });
 
@@ -91,38 +201,165 @@ const pageTypeSchema = z.object({
   pageType: z.string().min(1),
 });
 
-router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), validate(pageTypeSchema), (req, res) => {
+router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(pageTypeSchema), (req, res) => {
   const { pageId, pageType } = req.body;
   savePageType(req.params.siteId, pageId, pageType);
   res.json({ ok: true });
 });
 
-router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAccessFromQuery(), async (req, res) => {
+// ── Collection-aware schema inventory and CMS delivery mapping ──
+
+router.get('/api/webflow/schema-site-inventory/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
+  try {
+    const siteId = req.params.siteId;
+    const token = getTokenForSite(siteId) || undefined;
+    const { ctx } = await buildSchemaContext(siteId);
+    const ws = ctx.workspaceId ? getWorkspace(ctx.workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const pages = ws ? await getWorkspaceAllPages(ws.id, siteId) : [];
+    const baseUrl = ctx.liveDomain
+      ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`)
+      : '';
+    if (!baseUrl) return res.status(400).json({ error: 'No live domain configured' });
+    const inventory = await buildSiteInventory({
+      siteId,
+      baseUrl,
+      pages,
+      tokenOverride: token,
+      businessProfile: ctx._businessProfile ?? null,
+    });
+    res.json(inventory);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Schema site inventory error');
+    res.status(500).json({ error: `Schema site inventory failed: ${msg}` });
+  }
+});
+
+router.get('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
+  try {
+    const siteId = req.params.siteId;
+    const token = getTokenForSite(siteId) || undefined;
+    const mappings = getSchemaCmsFieldMappings(siteId);
+    const collections = await listCollections(siteId, token);
+    const detected = await Promise.all(collections.map(async collection => {
+      const schema = await getCollectionSchema(collection.id, token);
+      const fields = schema.fields.map(field => ({
+        ...field,
+        target: detectSchemaFieldTarget({
+          id: field.id,
+          slug: field.slug,
+          displayName: field.displayName,
+          type: field.type,
+        }),
+      }));
+      const mapped = mappings.find(m => m.collectionId === collection.id);
+      const recommended = fields.find(f => f.slug === getRecommendedSchemaFieldSlug())
+        ?? fields.find(f => /schema|json-?ld/i.test(`${f.slug} ${f.displayName}`));
+      return {
+        collectionId: collection.id,
+        collectionName: collection.displayName,
+        collectionSlug: collection.slug,
+        fields,
+        recommendedFieldSlug: recommended?.slug,
+        mapping: mapped ?? null,
+      };
+    }));
+    res.json({ mappings, collections: detected });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Schema CMS field mappings error');
+    res.status(500).json({ error: `Schema CMS field mappings failed: ${msg}` });
+  }
+});
+
+const cmsFieldMappingSchema = z.object({
+  collectionId: z.string().min(1),
+  collectionName: z.string().min(1),
+  collectionSlug: z.string().optional().default(''),
+  schemaFieldSlug: z.string().optional(),
+  fieldMappings: z.record(z.string(), z.string()).optional(),
+  collectionRole: z.string().optional().refine(
+    role => !role || role in SCHEMA_ROLE_LABELS,
+    'collectionRole must be a supported schema role',
+  ),
+});
+
+const VALID_SCHEMA_FIELD_TARGETS = new Set<SchemaFieldTarget>([
+  'title',
+  'description',
+  'author',
+  'datePublished',
+  'dateModified',
+  'image',
+  'locationName',
+  'streetAddress',
+  'addressLocality',
+  'addressRegion',
+  'postalCode',
+  'addressCountry',
+  'phone',
+  'email',
+  'openingHours',
+  'serviceName',
+  'serviceType',
+  'areaServed',
+  'teamRole',
+  'credentials',
+  'price',
+  'priceCurrency',
+  'videoUrl',
+  'schemaJsonLd',
+]);
+
+function normalizeFieldMappings(raw: Record<string, string> | undefined): Partial<Record<SchemaFieldTarget, string>> | undefined {
+  if (!raw) return undefined;
+  const out: Partial<Record<SchemaFieldTarget, string>> = {};
+  for (const [target, slug] of Object.entries(raw)) {
+    if (!VALID_SCHEMA_FIELD_TARGETS.has(target as SchemaFieldTarget)) continue;
+    if (typeof slug === 'string' && slug.trim()) out[target as SchemaFieldTarget] = slug.trim();
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(cmsFieldMappingSchema), (req, res) => {
+  const mapping = saveSchemaCmsFieldMapping({
+    siteId: req.params.siteId,
+    collectionId: req.body.collectionId,
+    collectionName: req.body.collectionName,
+    collectionSlug: req.body.collectionSlug || '',
+    schemaFieldSlug: req.body.schemaFieldSlug || undefined,
+    collectionRole: (req.body.collectionRole || undefined) as SchemaPageRole | undefined,
+    fieldMappings: normalizeFieldMappings(req.body.fieldMappings),
+  });
+  const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  if (ws) {
+    broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED, {
+      siteId: req.params.siteId,
+      collectionId: mapping.collectionId,
+      collectionName: mapping.collectionName,
+    });
+    addActivity(
+      ws.id,
+      'schema_mapping_updated',
+      `Updated schema field mapping for ${mapping.collectionName}`,
+      mapping.schemaFieldSlug
+        ? `Schema JSON field: ${mapping.schemaFieldSlug}`
+        : 'Collection schema field mapping updated',
+      { siteId: req.params.siteId, collectionId: mapping.collectionId },
+    );
+  }
+  res.json(mapping);
+});
+
+router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, pageType } = req.body;
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Use explicitly-passed pageType, fall back to persisted type for this page
     const resolvedPageType = pageType || getPageTypes(req.params.siteId)[pageId];
-    if (resolvedPageType) ctx.pageType = resolvedPageType;
-    // Enrich with prior validation errors so the AI avoids repeating known mistakes
-    if (ctx.workspaceId) {
-      const prior = getValidation(ctx.workspaceId, pageId);
-      if (prior?.errors && Array.isArray(prior.errors) && prior.errors.length > 0) {
-        const validErrors = (prior.errors as unknown[]).filter(
-          (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
-        );
-        if (validErrors.length > 0) ctx._existingErrors = validErrors;
-      }
-    }
-    // Enrich with architecture tree for deterministic breadcrumbs
-    if (ctx.workspaceId) {
-      try {
-        const arch = await getCachedArchitecture(ctx.workspaceId);
-        ctx._architectureTree = arch.tree;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: POST /api/webflow/schema-suggestions/:siteId/page: programming error'); /* proceed without architecture */ }
-    }
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, resolvedPageType);
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
@@ -134,7 +371,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
 });
 
 // --- Publish Schema to Webflow Page ---
-router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, schema, publishAfter, skipValidation } = req.body;
   if (!pageId || !schema) return res.status(400).json({ error: 'pageId and schema required' });
 
@@ -161,24 +398,49 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     }
 
     const token = getTokenForSite(req.params.siteId) || undefined;
+    const cmsDelivery = await publishSchemaToCmsField({
+      siteId: req.params.siteId,
+      pageId,
+      schema,
+      publishAfter,
+      token,
+    });
+    if (cmsDelivery) {
+      if (cmsDelivery.status === 'blocked' || cmsDelivery.status === 'failed') {
+        return res.status(422).json({ success: false, cmsDeliveryStatus: cmsDelivery, error: cmsDelivery.message });
+      }
+      const cmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
+      if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, cmsWs?.id, 'published', pageId);
+      if (cmsWs) {
+        recordSchemaPublish(req.params.siteId, pageId, cmsWs.id || '', schema);
+        addActivity(cmsWs.id, 'schema_published', 'Schema written to CMS field', cmsDelivery.message, { pageId });
+        updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
+        recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-cms-field');
+      }
+      return res.json({ success: true, published: !!publishAfter, cmsDeliveryStatus: cmsDelivery });
+    }
+
     const result = await publishSchemaToPage(req.params.siteId, pageId, schema, token);
+    if (result.delivery.status === 'manual-required') return res.json(result);
     if (!result.success) return res.status(500).json(result);
 
     // Optionally publish the site so changes go live
-    let published = false;
+    let sitePublished = false;
     if (publishAfter) {
       const pubResult = await publishSite(req.params.siteId, token);
-      published = pubResult.success;
+      sitePublished = pubResult.success;
       if (!pubResult.success) {
         log.error({ detail: pubResult.error }, 'Site publish failed');
       }
     }
 
     // Persist edited schema back to snapshot so it survives reload
-    updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
+    const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
 
     // Record version history for rollback support
     const pubWsForHistory = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, pubWsForHistory?.id, 'published', pageId);
     recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
 
     // Auto-save site template if this is a homepage publish
@@ -204,12 +466,12 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (pubWs) {
-      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
+      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${sitePublished ? 'site published' : 'saved as draft'}`, { pageId });
       updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
       recordSeoChange(pubWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema');
     }
 
-    res.json({ success: true, published });
+    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
 
     // Record for outcome tracking (only when workspace is known).
     // Idempotency guard: skip if this page already has a tracked schema action in this workspace.
@@ -253,7 +515,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 });
 
 // --- CMS Template Schema ---
-router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { collectionId } = req.body;
   if (!collectionId) return res.status(400).json({ error: 'collectionId required' });
   try {
@@ -269,7 +531,7 @@ router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceAccessFr
   }
 });
 
-router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, templateString, publishAfter } = req.body;
   if (!pageId || !templateString) return res.status(400).json({ error: 'pageId and templateString required' });
   try {
@@ -277,10 +539,10 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
     const result = await publishRawSchemaToPage(req.params.siteId, pageId, templateString, token);
     if (!result.success) return res.status(500).json(result);
 
-    let published = false;
+    let sitePublished = false;
     if (publishAfter) {
       const pubResult = await publishSite(req.params.siteId, token);
-      published = pubResult.success;
+      sitePublished = pubResult.success;
     }
 
     // Track schema change
@@ -290,7 +552,7 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
       recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-template');
     }
 
-    res.json({ success: true, published });
+    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'CMS template publish error');
@@ -299,7 +561,7 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
 });
 
 // --- List CMS template pages (pages with collectionId) ---
-router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const siteId = req.params.siteId;
     const token = getTokenForSite(siteId) || undefined;
@@ -329,7 +591,7 @@ router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFrom
 // ── Site template endpoints ──
 
 // GET: retrieve the site template (auto-seeds from existing snapshot if needed)
-router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.get('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { ctx } = await buildSchemaContext(req.params.siteId);
     const template = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
@@ -345,7 +607,7 @@ router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PUT: replace the full site template (Organization + WebSite nodes)
-router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.put('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     if (!organizationNode || !websiteNode) {
@@ -362,7 +624,7 @@ router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PATCH: update specific fields on the template (e.g. logo URL)
-router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     // Auto-seed first if no template exists
@@ -383,7 +645,7 @@ router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQ
 // ── Schema Site Plan endpoints ──
 
 // POST: generate a new schema plan for the site
-router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const { ctx } = await buildSchemaContext(req.params.siteId);
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
@@ -425,14 +687,14 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
 });
 
 // GET: retrieve the current plan for a site
-router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.json(null);
   res.json(plan);
 });
 
 // PUT: update page roles / canonical entities on the plan
-router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const { pageRoles, canonicalEntities } = req.body;
   if (!pageRoles) return res.status(400).json({ error: 'pageRoles required' });
   const plan = updateSchemaPlanRoles(req.params.siteId, pageRoles, canonicalEntities);
@@ -441,7 +703,7 @@ router.put('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery()
 });
 
 // POST: send plan preview to client for review (in dedicated Schema tab, not Inbox)
-router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const plan = getSchemaPlan(req.params.siteId);
     if (!plan) return res.status(404).json({ error: 'No plan found. Generate one first.' });
@@ -476,14 +738,14 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceA
 });
 
 // POST: mark plan as active (approved or admin-confirmed)
-router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.post('/api/webflow/schema-plan/:siteId/activate', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = updateSchemaPlanStatus(req.params.siteId, 'active');
   if (!plan) return res.status(404).json({ error: 'No plan found' });
   res.json(plan);
 });
 
 // DELETE: retract (delete) the entire schema plan for a site
-router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   // Read plan first to grab the approval batch ID before deleting
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.status(404).json({ error: 'No plan found for this site' });
@@ -491,7 +753,8 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuer
   deleteSchemaPlan(req.params.siteId);
 
   // Also clear the schema snapshot so the client dashboard doesn't show stale data
-  deleteSchemaSnapshot(req.params.siteId);
+  const snapshotDeleted = deleteSchemaSnapshot(req.params.siteId);
+  if (snapshotDeleted) broadcastSchemaSnapshotUpdated(req.params.siteId, plan.workspaceId, 'deleted');
 
   // Delete the associated approval batch (sent-to-client preview) if one exists
   if (plan.clientPreviewBatchId) {
@@ -506,7 +769,7 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuer
 });
 
 // DELETE: retract (remove) published schema from a specific page
-router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId, pageId } = req.params;
   try {
     const token = getTokenForSite(siteId) || undefined;
@@ -521,10 +784,11 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAcc
     }
 
     // Remove from snapshot so it doesn't show as "existing" on reload
-    removePageFromSnapshot(siteId, pageId);
+    const snapshotUpdated = removePageFromSnapshot(siteId, pageId);
 
     // Update page state + activity
     const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(siteId, ws?.id, 'retracted', pageId);
     if (ws) {
       addActivity(ws.id, 'schema_published', 'Schema retracted from page', `Page ${pageId.slice(0, 8)}… — ${result.removed} script(s) removed`, { pageId });
       updatePageState(ws.id, pageId, { status: 'clean', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
@@ -540,12 +804,12 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAcc
 
 // ── Schema Version History + Rollback ──
 
-router.get('/api/webflow/schema-history/:siteId/:pageId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-history/:siteId/:pageId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const history = getSchemaPublishHistory(req.params.siteId, req.params.pageId, 20);
   res.json({ history });
 });
 
-router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { pageId, historyId } = req.body;
   if (!pageId || !historyId) return res.status(400).json({ error: 'pageId and historyId required' });
   try {
@@ -558,13 +822,15 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQu
     // Re-publish the old schema to the Webflow page
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await publishSchemaToPage(req.params.siteId, pageId, entry.schemaJson, token);
+    if (result.delivery.status === 'manual-required') return res.status(409).json(result);
     if (!result.success) return res.status(500).json(result);
 
     // Update snapshot with restored schema
-    updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
+    const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
 
     // Record this rollback as a new publish event
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, ws?.id, 'rolled_back', pageId);
     recordSchemaPublish(req.params.siteId, pageId, ws?.id || '', entry.schemaJson);
 
     // Activity log
@@ -574,7 +840,7 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQu
         { pageId, historyId });
     }
 
-    res.json({ success: true, restoredSchema: entry.schemaJson });
+    res.json({ ...result, success: true, restoredSchema: entry.schemaJson });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema rollback error');
@@ -610,17 +876,18 @@ router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (r
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const plan = getSchemaPlan(ws.webflowSiteId);
   if (!plan) return res.json(null);
+  if (!['sent_to_client', 'client_approved', 'client_changes_requested', 'active'].includes(plan.status)) return res.json(null);
   res.json(plan);
 });
 
 // POST: client feedback on schema plan (approve / request changes)
-router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortalAuth(), (req, res) => {
+router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortalAuth(), validate(schemaPlanFeedbackSchema), (req, res) => {
   const { action, note } = req.body;
-  if (!action || !['approve', 'request_changes'].includes(action)) {
-    return res.status(400).json({ error: 'action must be "approve" or "request_changes"' });
-  }
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
+  const existing = getSchemaPlan(ws.webflowSiteId);
+  if (!existing) return res.status(404).json({ error: 'No plan found' });
+  if (existing.status !== 'sent_to_client') return res.status(409).json({ error: 'Schema plan is not ready for client feedback' });
 
   const newStatus = action === 'approve' ? 'client_approved' : 'client_changes_requested';
   const plan = updateSchemaPlanStatus(ws.webflowSiteId, newStatus as SchemaSitePlan['status']);
@@ -628,13 +895,13 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
 
   const label = action === 'approve' ? 'approved' : 'requested changes on';
   addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
-  broadcastToWorkspace(ws.id, 'approval:update', { action: 'schema_plan_feedback', status: newStatus });
+  broadcastToWorkspace(ws.id, WS_EVENTS.APPROVAL_UPDATE, { action: 'schema_plan_feedback', status: newStatus });
   res.json(plan);
 });
 
 // ── Pending Schemas (D7: pre-generated schema skeletons) ──
 
-router.get('/api/pending-schemas/:workspaceId', (req, res) => {
+router.get('/api/pending-schemas/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const pendingSchemas = listPendingSchemas(req.params.workspaceId);
     res.json({ pendingSchemas });
@@ -659,7 +926,7 @@ const schemaConsistencyBody = z.object({
 });
 
 // Validate a single page schema against Google Rich Results rules
-router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
+router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
   try {
     const { pageId, schema } = req.body as { pageId: string; schema: Record<string, unknown> };
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
@@ -683,7 +950,7 @@ router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQu
 });
 
 // Batch validate all schemas for entity consistency across a workspace
-router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
+router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
   try {
     const { schemas } = req.body as { schemas: Array<{ pageId: string; schema: Record<string, unknown> }> };
     const result = validateEntityConsistency(schemas);
@@ -695,7 +962,7 @@ router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspace
 });
 
 // Get validation status for a single page
-router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
@@ -712,7 +979,7 @@ router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQ
 });
 
 // Get all validations for a workspace
-router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     const workspaceId = ws?.id || req.params.siteId;
@@ -726,7 +993,7 @@ router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceAccessFrom
 });
 
 // Delete a validation record
-router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   try {
     const pageId = req.query.pageId as string;
     if (!pageId) return res.status(400).json({ error: 'pageId query param required' });

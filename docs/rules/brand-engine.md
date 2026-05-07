@@ -2,7 +2,7 @@
 
 Reference for developers working with the Copy & Brand Engine (Phase 1: Brandscript + Voice Calibration + Brand Identity; Phase 3: Copy Pipeline).
 
-Read this before touching: `server/prompt-assembly.ts`, `server/voice-calibration.ts`, `server/seo-context.ts`, `server/brand-identity.ts`, or any endpoint that injects voice context into an AI prompt.
+Read this before touching: `server/prompt-assembly.ts`, `server/voice-calibration.ts`, `server/intelligence/seo-context-source.ts`, `server/intelligence/seo-context-slice.ts`, `server/brand-identity.ts`, or any endpoint that injects voice context into an AI prompt.
 
 ---
 
@@ -16,7 +16,7 @@ The brand engine has three phases:
 
 Data flow: raw source material (transcripts, docs) is ingested and extracted into voice patterns and story elements. Those feed a `VoiceProfile` (DNA + guardrails + samples) and a `Brandscript`. Brand Identity deliverables are generated from both. Approved deliverables and approved copy sections feed back as voice samples for the next calibration cycle.
 
-All context builders live in `server/seo-context.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. State machine enforcement lives in `server/voice-calibration.ts`.
+Workspace intelligence assembles the SEO context in `server/intelligence/seo-context-slice.ts`. Raw brand/knowledge reads and voice-profile authority live in `server/intelligence/seo-context-source.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. State machine enforcement lives in `server/voice-calibration.ts`.
 
 ---
 
@@ -104,7 +104,7 @@ This helper is the only correct way to build voice context for user prompts. Pha
 
 ## Voice Profile Authority Rule
 
-**Where it lives:** `isVoiceProfileAuthoritative()` in `server/seo-context.ts` (not exported — internal to that module)
+**Where it lives:** `isVoiceProfileAuthoritative()` in `server/intelligence/seo-context-source.ts` (not exported — internal to that module)
 
 **Rule:** the modern voice profile replaces the legacy `workspace.brandVoice` + brand-docs block only when one of two conditions is met:
 
@@ -113,23 +113,15 @@ This helper is the only correct way to build voice context for user prompts. Pha
 
 Voice samples alone do NOT trigger the authority override. A draft profile with only uploaded samples is in a "preparing to calibrate" state. The legacy brand voice remains active until the admin explicitly saves DNA or guardrails, or runs calibration to completion.
 
-This decision is applied consistently in both branches of `buildSeoContext()` (with strategy and without strategy) using the shared helper. Do not hand-roll this check — copy it from the helper or call the helper.
+This decision is applied inside `buildEffectiveBrandVoiceBlock()` and consumed by `assembleSeoContext()`. Do not hand-roll this check — keep authority decisions in the source helper.
 
-**Effect:** `SeoContext.brandVoiceBlock` (returned by `buildSeoContext`) always reflects whichever source was actually injected into the prompt. When the voice profile is authoritative, `brandVoiceBlock` is the voice profile block, not the legacy field.
+**Effect:** `SeoContextSlice.effectiveBrandVoiceBlock` always reflects whichever source was actually injected into the prompt. When the voice profile is authoritative, the effective block is the voice profile block, not the legacy workspace/doc field.
 
 ---
 
-## Context Assembly Functions
+## SEO Context Voice Source
 
-All three builders live in `server/seo-context.ts`. These are the Phase 1 → Phase 2 contract surface; Phase 3 also calls them directly.
-
-### buildBrandscriptContext()
-
-```typescript
-buildBrandscriptContext(workspaceId: string, emphasis?: ContextEmphasis): string
-```
-
-Returns a `BRAND NARRATIVE` block from the most recently created brandscript. Only includes sections with non-empty `content`. Returns `''` if no brandscript exists or all sections are empty. Wrapped in `safeBrandEngineRead` — degrades to `''` if the `brandscripts` table doesn't exist (test environments).
+`assembleSeoContext()` owns the prompt-facing SEO context. It calls `buildEffectiveBrandVoiceBlock()` from `server/intelligence/seo-context-source.ts`, which chooses between the legacy workspace/docs brand voice and the modern voice profile using the authority rule above.
 
 ### buildVoiceProfileContext()
 
@@ -141,17 +133,9 @@ buildVoiceProfileContext(
 ): string
 ```
 
-Returns a `BRAND VOICE PROFILE` block. Respects the calibration status contract: when calibrated, injects only voice samples (DNA + guardrails come from Layer 2). When not calibrated, injects DNA + samples + guardrails.
+Internal helper in `server/intelligence/seo-context-source.ts`. Returns a `BRAND VOICE PROFILE` block. Respects the calibration status contract: when calibrated, injects only voice samples (DNA + guardrails come from Layer 2). When not calibrated, injects DNA + samples + guardrails.
 
 The `profileArg` parameter is a hot-path optimization. Pass the already-fetched profile to avoid a second DB read. Sentinel semantics: `undefined` means "fetch it"; `null` means "caller already checked, no profile — return empty." Do not pass `null` speculatively — only pass it when you know the profile does not exist.
-
-### buildIdentityContext()
-
-```typescript
-buildIdentityContext(workspaceId: string, emphasis?: ContextEmphasis): string
-```
-
-Returns a `BRAND IDENTITY` block from approved (`status === 'approved'`) brand identity deliverables only. Draft deliverables are excluded. Returns `''` if no approved deliverables exist. Wrapped in `safeBrandEngineRead`.
 
 ### ContextEmphasis
 
@@ -159,7 +143,7 @@ Returns a `BRAND IDENTITY` block from approved (`status === 'approved'`) brand i
 type ContextEmphasis = 'full' | 'summary' | 'minimal';
 ```
 
-Controls how much context each builder emits. Defaults to `'full'`. Phase 3 uses `'summary'` or `'minimal'` for token-sensitive generation paths. See each function's implementation for what each level includes.
+Controls how much voice profile context is emitted. Defaults to `'full'`. Token-sensitive generation paths can request `'summary'` or `'minimal'`. See the source helper for what each level includes.
 
 ---
 
@@ -255,11 +239,11 @@ Reverting a deliverable to `draft` does not delete the auto-created sample.
 
 ## safeBrandEngineRead()
 
-**File:** `server/seo-context.ts` (internal, not exported)
+**File:** `server/intelligence/seo-context-source.ts` (internal, not exported)
 
-A narrow try/catch wrapper used around all brand-engine DB reads inside `buildSeoContext`. It catches only `no such table` and `no such column` SQLite errors (test environments without migrations) and returns the provided fallback. All other errors are re-thrown so programming bugs surface loudly rather than silently degrading in production.
+A narrow try/catch wrapper used around brand-engine DB reads inside the SEO context source. It catches only `no such table` and `no such column` SQLite errors (test environments without migrations) and returns the provided fallback. All other errors are re-thrown so programming bugs surface loudly rather than silently degrading in production.
 
-Pattern used by: `buildBrandscriptContext`, `buildVoiceProfileContext`, `buildIdentityContext`, `buildCopyIntelligenceContext`, `buildBlueprintContext`, and the `getVoiceProfile` calls inside `buildSeoContext`.
+Pattern used by: `buildVoiceProfileContext()` fallback reads and the `getVoiceProfile()` call inside `buildEffectiveBrandVoiceBlock()`.
 
 ---
 

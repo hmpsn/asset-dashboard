@@ -78,8 +78,8 @@ beforeAll(async () => {
   }
 }, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   if (workspaceId) deleteWorkspace(workspaceId);
 });
 

@@ -1,0 +1,8 @@
+# Codex project configuration
+# CLAUDE.md is the single source of truth for all AI agent rules.
+# This config tells Codex to read CLAUDE.md when no AGENTS.md file exists.
+
+project_doc_fallback_filenames = ["CLAUDE.md"]
+
+# CLAUDE.md is ~36 KB, above the 32 KB default limit.
+project_doc_max_bytes = 65536

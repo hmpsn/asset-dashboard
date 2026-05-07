@@ -20,6 +20,8 @@
     "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
+    "verify:platform": "tsx scripts/verify-platform.ts",
+    "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
     "prepare": "husky"
   },
@@ -28,8 +30,6 @@
     "@aws-sdk/client-s3": "^3.1009.0",
     "@sentry/node": "^10.43.0",
     "@sentry/react": "^10.43.0",
-    "@stripe/react-stripe-js": "^5.6.1",
-    "@stripe/stripe-js": "^8.9.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.95.0",
     "@tiptap/extension-bubble-menu": "^3.22.5",
@@ -111,6 +111,6 @@
     "vite": "^8.0.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24 <25"
   }
 }

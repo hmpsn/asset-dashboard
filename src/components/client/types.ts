@@ -41,6 +41,35 @@ export interface AuditDetail {
 }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
+export interface ActivityLogItem {
+  id: string;
+  workspaceId?: string;
+  type: string;
+  title: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  actorId?: string;
+  actorName?: string;
+  createdAt: string;
+}
+
+export interface RankHistoryEntry { date: string; positions: Record<string, number> }
+export interface LatestRank { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
+export interface AnnotationItem { id: string; date: string; label: string; description?: string; color?: string; createdAt: string }
+export interface AnomalyItem { id: string; workspaceId?: string; workspaceName?: string; type: string; severity: string; title: string; description: string; metric: string; currentValue: number; previousValue: number; changePct: number; aiSummary?: string; detectedAt: string; dismissedAt?: string; acknowledgedAt?: string; source: string }
+
+export interface ContentPlanReviewCell {
+  cellId: string;
+  matrixId: string;
+  matrixName: string;
+  targetKeyword: string;
+  plannedUrl?: string;
+  status: string;
+  variableValues?: Record<string, string>;
+}
+
+export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
+
 export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
   status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
@@ -110,9 +139,9 @@ export interface ClientKeywordStrategy {
 }
 
 export const SEV = {
-  error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
-  warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' },
-  info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+  error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-accent-danger' },
+  warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-accent-warning' },
+  info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-accent-info' },
 } as const;
 
 export const CAT_LABELS: Record<string, { label: string; color: string }> = {

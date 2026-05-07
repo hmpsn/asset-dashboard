@@ -34,10 +34,10 @@ beforeAll(async () => {
   headerWsId = createWorkspace('Rate Limit Header Workspace').id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(rlWsId);
   deleteWorkspace(headerWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Rate limiting on POST /api/public/signal', () => {

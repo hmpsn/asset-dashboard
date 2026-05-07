@@ -3,7 +3,7 @@ import {
   Download, FileDown, Flag, Eye, CheckCircle2,
   Clock, FileText, PenTool,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader } from '../ui';
+import { SectionCard, Badge, PageHeader, Button } from '../ui';
 import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/overlay/Modal';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
@@ -18,12 +18,13 @@ interface MatrixProgressViewProps {
 
 const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'emerald' }> = {
   planned:           { label: 'Planned',       icon: Clock,        color: 'text-[var(--brand-text-muted)]',   badgeColor: 'zinc' },
-  keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
-  brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },
-  review:            { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
-  approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-teal-400',   badgeColor: 'teal' },
-  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-orange-400', badgeColor: 'orange' },
-  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-emerald-400',  badgeColor: 'emerald' },
+  keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-accent-info',   badgeColor: 'blue' },
+  brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-accent-warning',  badgeColor: 'amber' },
+  review:            { label: 'Your Review',   icon: Eye,          color: 'text-accent-info',   badgeColor: 'blue' },
+  flagged:           { label: 'Feedback Sent', icon: Flag,         color: 'text-accent-warning', badgeColor: 'amber' },
+  approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-accent-brand',   badgeColor: 'teal' },
+  draft:             { label: 'In Production',  icon: PenTool,      color: 'text-accent-brand', badgeColor: 'teal' },
+  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-accent-success',  badgeColor: 'emerald' },
 };
 
 function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose: () => void; onFlag: (comment: string) => void }) {
@@ -56,8 +57,8 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
           {cell.clientFlag && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <Icon as={Flag} size="sm" className="text-amber-400" />
-                <span className="t-caption text-amber-400 font-medium">Flagged</span>
+                <Icon as={Flag} size="sm" className="text-accent-warning" />
+                <span className="t-caption text-accent-warning font-medium">Flagged</span>
               </div>
               <p className="t-caption text-[var(--brand-text-bright)]">{cell.clientFlag}</p>
             </div>
@@ -73,13 +74,16 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
                 className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={() => { if (flagComment.trim()) { onFlag(flagComment.trim()); setFlagComment(''); setShowFlagForm(false); } }}
                   disabled={!flagComment.trim()}
-                  className="px-3 py-1.5 rounded-[var(--radius-md)] bg-amber-600/20 border border-amber-500/30 t-caption text-amber-300 hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  icon={Flag}
+                  className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
                 >
                   Submit Flag
-                </button>
+                </Button>
                 <button
                   onClick={() => { setShowFlagForm(false); setFlagComment(''); }}
                   className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
@@ -91,7 +95,7 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
           ) : (
             <button
               onClick={() => setShowFlagForm(true)}
-              className="flex items-center gap-1.5 t-caption text-[var(--brand-text)] hover:text-amber-400 transition-colors"
+              className="flex items-center gap-1.5 t-caption text-[var(--brand-text)] hover:text-accent-warning transition-colors"
             >
               <Icon as={Flag} size="sm" /> Flag for changes
             </button>
@@ -138,7 +142,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
         <PageHeader
           title={matrix.name}
           subtitle={`${matrix.stats.total} pages · ${publishedCount} published`}
-          icon={<Icon as={FileText} size="lg" className="text-teal-400" />}
+          icon={<Icon as={FileText} size="lg" className="text-accent-brand" />}
         />
         <div className="flex items-center gap-2">
           <button
@@ -162,18 +166,18 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Overall Progress</span>
           <span className="t-caption text-[var(--brand-text)]">{progressPercent}%</span>
         </div>
-        <div className="w-full h-3 bg-[var(--surface-3)] rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
         <div className="flex items-center gap-4 mt-3 flex-wrap">
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{matrix.stats.planned} planned</span>
-          <span className="t-caption-sm text-amber-400">{matrix.stats.briefGenerated} briefs</span>
-          {reviewCount > 0 && <span className="t-caption-sm text-blue-400">{reviewCount} awaiting review</span>}
-          <span className="t-caption-sm text-orange-400">{matrix.stats.drafted} drafts</span>
-          <span className="t-caption-sm text-emerald-400">{publishedCount} published</span>
+          <span className="t-caption-sm text-accent-warning">{matrix.stats.briefGenerated} briefs</span>
+          {reviewCount > 0 && <span className="t-caption-sm text-accent-info">{reviewCount} awaiting review</span>}
+          <span className="t-caption-sm text-accent-brand">{matrix.stats.drafted} drafts</span>
+          <span className="t-caption-sm text-accent-success">{publishedCount} published</span>
         </div>
       </div>
 
@@ -181,11 +185,11 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
       {reviewCount > 0 && (
         <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="w-8 h-8 rounded-[var(--radius-md)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-            <Icon as={Eye} size="md" className="text-teal-400" />
+            <Icon as={Eye} size="md" className="text-accent-brand" />
           </div>
           <div>
-            <p className="t-caption font-semibold text-teal-200">{reviewCount} page{reviewCount !== 1 ? 's' : ''} ready for your review</p>
-            <p className="t-caption-sm text-teal-400/60 mt-0.5">Click on a cell below to preview and approve</p>
+            <p className="t-caption font-semibold text-accent-brand">{reviewCount} page{reviewCount !== 1 ? 's' : ''} ready for your review</p>
+            <p className="t-caption-sm text-accent-brand mt-0.5">Click on a cell below to preview and approve</p>
           </div>
         </div>
       )}
@@ -228,7 +232,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
                           <div className="px-2.5 py-2 flex items-center gap-1.5">
                             <CellIcon className={`w-3 h-3 flex-shrink-0 ${cfg.color}`} />
                             <span className="t-caption text-[var(--brand-text-bright)] truncate">{pageName}</span>
-                            {cell.clientFlag && <Icon as={Flag} size="xs" className="text-amber-400 flex-shrink-0" />}
+                            {cell.clientFlag && <Icon as={Flag} size="xs" className="text-accent-warning flex-shrink-0" />}
                           </div>
                         </td>
                       );
@@ -255,7 +259,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
                   <RowIcon className={`w-3.5 h-3.5 flex-shrink-0 ${cfg.color}`} />
                   <span className="t-caption text-[var(--brand-text-bright)] flex-1 truncate">{pageName}</span>
                   <Badge label={cfg.label} color={cfg.badgeColor} />
-                  {cell.clientFlag && <Icon as={Flag} size="sm" className="text-amber-400 flex-shrink-0" />}
+                  {cell.clientFlag && <Icon as={Flag} size="sm" className="text-accent-warning flex-shrink-0" />}
                 </div>
               );
             })}
@@ -274,7 +278,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           );
         })}
         <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
-          <Icon as={Flag} size="xs" className="text-amber-400" /> Flagged
+          <Icon as={Flag} size="xs" className="text-accent-warning" /> Flagged
         </span>
       </div>
 

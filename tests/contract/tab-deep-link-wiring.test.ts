@@ -2,12 +2,12 @@
 //
 // CONTRACT: ?tab= deep-link senders and receivers must be wired.
 //
-// When code constructs a URL with ?tab=X targeting an admin page, the
+// When code constructs a URL with ?tab=X targeting an admin or client page, the
 // component that renders that page must read useSearchParams and initialize
 // its tab state from the 'tab' query param.
 //
 // This test does NOT exercise runtime behavior — it statically verifies:
-//   1. Builds a page-slug → component-file map from App.tsx imports + routes
+//   1. Builds page-slug → component-file maps from App.tsx/ClientDashboard.tsx
 //   2. Finds all ?tab= URL constructions (senders)
 //   3. Verifies every sender's target component reads searchParams.get('tab')
 //
@@ -23,6 +23,7 @@ import { describe, it, expect } from 'vitest';
 
 const ROOT = join(__dirname, '../..');
 const SRC_DIR = join(ROOT, 'src');
+const CLIENT_DASHBOARD = join(SRC_DIR, 'components/ClientDashboard.tsx');
 
 /** Recursively collect all .tsx files under a directory. */
 function collectTsxFiles(dir: string): string[] {
@@ -102,14 +103,45 @@ function buildRouteMap(): Map<string, string> {
   return routeMap;
 }
 
+function buildClientRouteMap(): Map<string, string> {
+  const dashboard = readFileSync(CLIENT_DASHBOARD, 'utf8'); // readFile-ok — intentional static analysis of client route table
+  const componentPaths = new Map<string, string>();
+
+  const importRe = /import\s+\{\s*(\w+)[\s,}].*from\s+'([^']+)'/g;
+  let m: RegExpExecArray | null;
+  while ((m = importRe.exec(dashboard)) !== null) {
+    componentPaths.set(m[1], m[2]);
+  }
+
+  const routeRe = /\{tab\s*===\s*'([^']+)'\s*&&\s*\(\s*<(\w+)/g;
+  const routeMap = new Map<string, string>();
+  while ((m = routeRe.exec(dashboard)) !== null) {
+    const [, pageSlug, componentName] = m;
+    const importPath = componentPaths.get(componentName);
+    if (!importPath) continue;
+
+    const base = importPath.replace(/^\.\//, 'components/');
+    for (const ext of ['.tsx', '.ts', '/index.tsx', '/index.ts']) {
+      const resolved = join(SRC_DIR, base + ext);
+      if (existsSync(resolved)) {
+        routeMap.set(pageSlug, resolved);
+        break;
+      }
+    }
+  }
+
+  return routeMap;
+}
+
 // ---------------------------------------------------------------------------
 // Find all ?tab= senders in src/
 // ---------------------------------------------------------------------------
 
 interface TabSender {
+  kind: 'admin' | 'client';
   file: string;       // repo-relative path
   line: number;
-  targetPage: string; // admin page slug
+  targetPage: string; // admin or client page slug
   tabValue: string;   // the tab ID being sent
 }
 
@@ -120,6 +152,7 @@ function findTabSenders(): TabSender[] {
   // Pattern: adminPath(something, 'page-slug') + '?tab=value'
   // Captures the page slug and the tab value from the URL construction.
   const senderRe = /adminPath\([^,]+,\s*'([^']+)'\)\s*\+\s*['"`]\?tab=([^'"`\s]+)['"`]/g;
+  const clientSenderRe = /clientPath\([^,]+,\s*'([^']+)'[^)]*\)\}\?tab=([^`&\s]+)/g;
 
   for (const file of allFiles) {
     const content = readFileSync(file, 'utf8'); // readFile-ok — intentional static analysis of sender URLs
@@ -130,6 +163,17 @@ function findTabSenders(): TabSender[] {
       let match: RegExpExecArray | null;
       while ((match = senderRe.exec(lines[i])) !== null) {
         senders.push({
+          kind: 'admin',
+          file: relative(ROOT, file),
+          line: i + 1,
+          targetPage: match[1],
+          tabValue: match[2],
+        });
+      }
+      clientSenderRe.lastIndex = 0;
+      while ((match = clientSenderRe.exec(lines[i])) !== null) {
+        senders.push({
+          kind: 'client',
           file: relative(ROOT, file),
           line: i + 1,
           targetPage: match[1],
@@ -164,6 +208,7 @@ function readsTabParam(filePath: string): boolean {
 // ---------------------------------------------------------------------------
 
 const routeMap = buildRouteMap();
+const clientRouteMap = buildClientRouteMap();
 const senders = findTabSenders();
 
 // ---------------------------------------------------------------------------
@@ -174,19 +219,23 @@ describe('?tab= deep-link wiring contract', () => {
   it('route map is populated (sanity check)', () => {
     // App.tsx should map at least 15 page slugs to component files
     expect(routeMap.size).toBeGreaterThan(15);
+    expect(clientRouteMap.size).toBeGreaterThan(5);
   });
 
   it('finds at least one ?tab= sender', () => {
     expect(senders.length).toBeGreaterThan(0);
   });
 
-  it('every ?tab= sender targets a known admin page', () => {
-    const unknown = senders.filter((s) => !routeMap.has(s.targetPage));
+  it('every ?tab= sender targets a known page', () => {
+    const unknown = senders.filter((s) => {
+      const map = s.kind === 'client' ? clientRouteMap : routeMap;
+      return !map.has(s.targetPage);
+    });
     if (unknown.length > 0) {
       throw new Error(
         `?tab= sender(s) target unknown page slugs:\n` +
         unknown
-          .map((s) => `  ${s.file}:${s.line} → page '${s.targetPage}' (tab=${s.tabValue})`)
+          .map((s) => `  ${s.file}:${s.line} → ${s.kind} page '${s.targetPage}' (tab=${s.tabValue})`)
           .join('\n') +
         `\nEither the page slug is wrong or the route map parser needs updating.`
       );
@@ -197,16 +246,18 @@ describe('?tab= deep-link wiring contract', () => {
     const broken: string[] = [];
 
     for (const sender of senders) {
-      const componentFile = routeMap.get(sender.targetPage);
+      const componentFile = sender.kind === 'client'
+        ? clientRouteMap.get(sender.targetPage)
+        : routeMap.get(sender.targetPage);
       if (!componentFile) {
-        // Covered by the "targets a known admin page" test above
+        // Covered by the "targets a known page" test above
         continue;
       }
 
       if (!readsTabParam(componentFile)) {
         broken.push(
           `${sender.file}:${sender.line} sends ?tab=${sender.tabValue} → ` +
-          `page '${sender.targetPage}' (${relative(ROOT, componentFile)}) ` +
+          `${sender.kind} page '${sender.targetPage}' (${relative(ROOT, componentFile)}) ` +
           `but that component does NOT read searchParams.get('tab'). ` +
           `The ?tab= param will be silently ignored.`
         );
@@ -229,8 +280,11 @@ describe('?tab= deep-link wiring contract', () => {
     const mismatches: string[] = [];
 
     for (const sender of senders) {
-      const componentFile = routeMap.get(sender.targetPage);
+      const componentFile = sender.kind === 'client'
+        ? clientRouteMap.get(sender.targetPage)
+        : routeMap.get(sender.targetPage);
       if (!componentFile) continue;
+      if (sender.tabValue.startsWith('${')) continue;
 
       try {
         const content = readFileSync(componentFile, 'utf8'); // readFile-ok — intentional static analysis of tab IDs

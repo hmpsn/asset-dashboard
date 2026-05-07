@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: { siteKeywords: [] },
-    brandVoiceBlock: 'Professional',
-    businessContext: 'SaaS company',
-    knowledgeBlock: 'Domain knowledge',
-  })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => 'Professional'),
   getRawBrandVoice: vi.fn(() => 'Professional'),
   getRawKnowledge: vi.fn(() => 'Domain knowledge'),
 }));
@@ -16,6 +11,7 @@ vi.mock('../server/workspaces.js', () => ({
     id: 'ws-1',
     siteId: 'site-1',
     personas: [{ name: 'Dev', role: 'Developer' }],
+    keywordStrategy: { siteKeywords: [], businessContext: 'SaaS company' },
     businessProfile: { industry: 'Tech', goals: ['Growth'], targetAudience: 'B2B' },
   })),
 }));
@@ -85,6 +81,7 @@ describe('assembleSeoContext enrichment', () => {
       id: 'ws-1',
       siteId: 'site-1',
       personas: [{ name: 'Dev', role: 'Developer' }],
+      keywordStrategy: { siteKeywords: [], businessContext: 'SaaS company' },
       businessProfile: { industry: 'Tech', goals: ['Growth'], targetAudience: 'B2B' },
       intelligenceProfile: {
         industry: 'SaaS',

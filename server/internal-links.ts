@@ -10,7 +10,7 @@ import {
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { resolvePagePath, stripHtmlToText, stripCodeFences } from './helpers.js';
 import { createLogger } from './logger.js';
@@ -275,12 +275,13 @@ export async function analyzeInternalLinks(
     : null;
   const seo = intel?.seoContext;
   // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
-  // already computed by `buildSeoContext` with full voice authority applied. When a
+  // computed by the seoContext slice source with full voice authority applied. When a
   // workspace has a calibrated voice profile with zero samples, this is INTENTIONALLY
   // empty: the rule in CLAUDE.md ("Prompt assembly layers must not duplicate content")
   // says Layer 2 `buildSystemPrompt` injects DNA+guardrails into the system message for
-  // calibrated profiles — but this orphan flow calls `callOpenAI` directly with its own
-  // system message, so Layer 2 never fires. Falling back to raw `wsObj.brandVoice` here
+  // calibrated profiles — but this orphan flow builds its own system prompt and passes
+  // it through `callAI` instead of `buildSystemPrompt`, so Layer 2 never fires. Falling
+  // back to raw `wsObj.brandVoice` here
   // would still violate the voice authority rule: once a user calibrates a profile, the
   // legacy `workspace.brandVoice` column is no longer authoritative. Accept the tradeoff
   // (calibrated-empty workspaces get no voice hint in this specific flow) until this
@@ -365,12 +366,10 @@ Return ONLY a JSON array:
 Return ONLY valid JSON array, no markdown fences, no explanation.`;
 
   try {
-    const aiResult = await callOpenAI({
-      model: 'gpt-4.1',
-      messages: [
-        { role: 'system', content: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.' },
-        { role: 'user', content: prompt },
-      ],
+    const aiResult = await callAI({
+      model: 'gpt-5.4',
+      system: 'You are an SEO expert. Return only valid JSON arrays, no markdown, no explanation.',
+      messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.3,
       feature: 'internal-links',

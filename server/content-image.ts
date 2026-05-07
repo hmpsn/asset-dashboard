@@ -1,6 +1,6 @@
 /**
  * Content Image Generation — generates featured images for content posts
- * using DALL-E 3 and uploads them to Webflow via the existing asset pipeline.
+ * using GPT Image and uploads them to Webflow via the existing asset pipeline.
  */
 
 import fs from 'fs';
@@ -21,7 +21,7 @@ interface ImageResult {
 }
 
 /**
- * Generate a featured image for a content post using DALL-E 3,
+ * Generate a featured image for a content post using GPT Image,
  * then upload it to Webflow as a site asset.
  */
 export async function generateFeaturedImage(
@@ -33,7 +33,7 @@ export async function generateFeaturedImage(
   if (!apiKey) return { success: false, error: 'OPENAI_API_KEY not configured' };
 
   try {
-    // Generate image via DALL-E 3
+    // Generate image via GPT Image
     const prompt = buildImagePrompt(post.title, post.targetKeyword);
     log.info(`Generating featured image for "${post.title}"`);
 
@@ -44,29 +44,25 @@ export async function generateFeaturedImage(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-2',
         prompt,
         n: 1,
-        size: '1792x1024',
-        quality: 'standard',
-        response_format: 'url',
+        size: '1536x1024',
+        quality: 'medium',
       }),
       signal: AbortSignal.timeout(120_000),
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      return { success: false, error: `DALL-E error ${res.status}: ${errText.slice(0, 200)}` };
+      return { success: false, error: `GPT Image error ${res.status}: ${errText.slice(0, 200)}` };
     }
 
-    const data = await res.json() as { data?: Array<{ url?: string }> };
-    const imageUrl = data.data?.[0]?.url;
-    if (!imageUrl) return { success: false, error: 'No image URL in DALL-E response' };
+    const data = await res.json() as { data?: Array<{ b64_json?: string }> };
+    const imageBase64 = data.data?.[0]?.b64_json;
+    if (!imageBase64) return { success: false, error: 'No image data in GPT Image response' };
 
-    // Download to temp file
-    const imgRes = await fetch(imageUrl);
-    if (!imgRes.ok) return { success: false, error: 'Failed to download generated image' };
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const buffer = Buffer.from(imageBase64, 'base64');
     const tmpFile = path.join(os.tmpdir(), `featured-${Date.now()}.png`);
     fs.writeFileSync(tmpFile, buffer);
 

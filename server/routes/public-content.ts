@@ -2,9 +2,6 @@
  * public-content routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
@@ -22,15 +19,17 @@ import { sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
-import { getClientActor } from '../middleware.js';
+import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
+import { computeOpportunityScore } from './keyword-strategy.js';
 import {
   createContentRequestSchema,
   submitContentRequestSchema,
@@ -46,9 +45,54 @@ import {
   requestPostChangesSchema,
   clientPostEditSchema,
 } from '../schemas/public-content.js';
-
+import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
 
 const log = createLogger('public-content');
+const router = Router();
+const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
+
+router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
+
+function activityCommentPreview(content: string): string {
+  return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
+    ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
+    : content;
+}
+
+function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
+  const existing = getContentRequest(workspaceId, requestId);
+  if (!existing) {
+    res.status(404).json({ error: 'Request not found' });
+    return null;
+  }
+  if (existing.status !== 'client_review') {
+    res.status(409).json({ error: 'Request is not ready for client review' });
+    return null;
+  }
+  return existing;
+}
+
+function assertUpgradeableBriefRequest(workspaceId: string, requestId: string, res: import('express').Response) {
+  const existing = getContentRequest(workspaceId, requestId);
+  if (!existing) {
+    res.status(404).json({ error: 'Request not found' });
+    return null;
+  }
+  if (existing.serviceType !== 'brief_only' || existing.status !== 'approved') {
+    res.status(409).json({ error: 'Only approved brief requests can be upgraded to a full post' });
+    return null;
+  }
+  return existing;
+}
+
+function findAssociatedPostRequest(
+  requests: ContentTopicRequest[],
+  post: GeneratedPost,
+): ContentTopicRequest | undefined {
+  return requests.find(r => r.postId === post.id)
+    ?? requests.find(r => !r.postId && r.briefId === post.briefId);
+}
+
 // --- Public SEO Strategy (client dashboard) ---
 // seoClientView controls tab visibility in the UI; the data is always safe to return
 // and is needed unconditionally by Overview insights, InsightsDigest, and AI chat context.
@@ -59,7 +103,7 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   if (!strategy) return res.json(null);
   // Reassemble pageMap from page_keywords table
   const fullPageMap = listPageKeywords(ws.id);
-  // Return client-safe subset (no semrushMode, no internal-only fields)
+  // Return client-safe subset (no SEO data mode/provider internals)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
     siteKeywordMetrics: strategy.siteKeywordMetrics || undefined,
@@ -90,6 +134,11 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       volume: g.volume,
       difficulty: g.difficulty,
       impressions: g.impressions,
+      trendDirection: g.trendDirection,
+      serpFeatures: g.serpFeatures,
+      competitorProof: g.competitorProof,
+      questionKeywords: g.questionKeywords,
+      opportunityScore: g.opportunityScore ?? computeOpportunityScore(g),
     })),
     quickWins: (strategy.quickWins || []).map(q => ({
       pagePath: q.pagePath,
@@ -155,6 +204,8 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     priority: r.priority, status: r.status, source: r.source,
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
+    deliveryUrl: ['delivered', 'published'].includes(r.status) ? r.deliveryUrl : undefined,
+    deliveryNotes: ['delivered', 'published'].includes(r.status) ? r.deliveryNotes : undefined,
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond
@@ -212,6 +263,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
 
 // Client approves a brief
 router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
+  if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
@@ -230,6 +282,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
 
 // Client requests changes on a brief
 router.post('/api/public/content-request/:workspaceId/:id/request-changes', validate(requestChangesSchema), (req, res, next) => {
+  if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   const feedback = sanitizeString(req.body.feedback, 2000);
   let updated;
   try {
@@ -259,11 +312,13 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
 
 // Client upgrades from brief_only to full_post
 router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+  if (!assertUpgradeableBriefRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
       serviceType: 'full_post',
       upgradedAt: new Date().toISOString(),
+      status: 'in_progress',
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
@@ -285,6 +340,8 @@ router.post('/api/public/content-request/:workspaceId/:id/comment', validate(add
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
+  const actor = getClientActor(req, req.params.workspaceId);
+  addActivity(req.params.workspaceId, 'content_request_commented', `${actor?.name || 'Client'} commented on "${updated.topic}"`, activityCommentPreview(content), { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
@@ -371,6 +428,7 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)
         .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));
+    // url-fetch-ok: GSC lookup is best-effort external data; malformed provider URLs degrade to fallback keywords.
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-content: POST /api/public/content-request/:workspaceId/from-audit: programming error'); /* GSC unavailable */ }
   }
 
@@ -420,14 +478,35 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords: getTrackedKeywords(ws.id) });
 });
 
-router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), (req, res) => {
+router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
-  const keywords = addTrackedKeyword(ws.id, keyword);
+  const actor = getClientActor(req, ws.id);
+  const existingKeywords = getTrackedKeywords(ws.id);
+  const alreadyTracked = existingKeywords.some(k => k.query === keyword);
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword);
   res.json({ keywords });
+
+  if (!alreadyTracked) {
+    addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
+
+    // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
+    // strategy GET has volume/difficulty data available immediately.
+    // Only enriches when an authenticated actor is present — prevents unauthenticated
+    // callers from amplifying SEO provider spend on passwordless workspaces.
+    const provider = actor ? getConfiguredProvider(ws.seoDataProvider ?? undefined) : null;
+    if (provider) {
+      provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+        // url-fetch-ok: async keyword enrichment is best-effort provider prewarming.
+        if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
+        // Non-critical — enrichment will run again on next strategy generation
+      });
+    }
+  }
 });
 
 router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTrackedKeywordSchema), (req, res) => {
@@ -435,8 +514,15 @@ router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTracke
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
-  const keywords = removeTrackedKeyword(ws.id, keyword);
+  const existingKeywords = getTrackedKeywords(ws.id);
+  const wasTracked = existingKeywords.some(k => k.query === keyword);
+  const keywords = wasTracked ? removeTrackedKeyword(ws.id, keyword) : existingKeywords;
   res.json({ keywords });
+  if (wasTracked) {
+    const actor = getClientActor(req, ws.id);
+    addActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword, removed: true });
+  }
 });
 
 // Client reads a post (only allowed when request is in post_review status)
@@ -448,7 +534,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
 
   // Verify the associated request is in post_review (or delivered for read-only view)
   const requests = listContentRequests(req.params.workspaceId);
-  const req_ = requests.find(r => r.briefId === post.briefId);
+  const req_ = findAssociatedPostRequest(requests, post);
   if (!req_ || !['post_review', 'changes_requested', 'delivered', 'published'].includes(req_.status)) {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
@@ -531,7 +617,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   // Only allow edits when request is in post_review
   const requests = listContentRequests(req.params.workspaceId);
-  const associatedReq = requests.find(r => r.briefId === post.briefId);
+  const associatedReq = findAssociatedPostRequest(requests, post);
   if (!associatedReq || associatedReq.status !== 'post_review') {
     return res.status(403).json({ error: 'Post is not open for editing' });
   }

@@ -4,7 +4,7 @@ import { EmptyState, MetricRing, Icon, PageHeader } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
-  Sparkles, X, Globe, Check,
+  Sparkles, X, Globe, Check, AlertTriangle,
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
@@ -18,7 +18,7 @@ interface PostSummary {
   title: string;
   metaDescription: string;
   totalWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved';
+  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
   publishedAt?: string;
   webflowItemId?: string;
   createdAt: string;
@@ -29,13 +29,14 @@ interface PostSummary {
 }
 
 type SortField = 'date' | 'title' | 'status' | 'words';
-type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved';
+type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved' | 'error';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string }> = {
-  generating: { icon: Sparkles, color: 'text-amber-400', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20' },
-  draft: { icon: PenLine, color: 'text-blue-400', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20' },
-  review: { icon: Eye, color: 'text-cyan-400', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20' },
-  approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20' },
+  error: { icon: AlertTriangle, color: 'text-accent-danger', label: 'Failed', bg: 'bg-red-500/10 border-red-500/20' },
+  draft: { icon: PenLine, color: 'text-accent-info', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20' },
+  review: { icon: Eye, color: 'text-accent-cyan', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20' },
+  approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 };
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
@@ -107,7 +108,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
         case 'date': cmp = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
         case 'title': cmp = a.title.localeCompare(b.title); break;
         case 'status': {
-          const order = { generating: 0, draft: 1, review: 2, approved: 3 };
+          const order = { generating: 0, error: 1, draft: 2, review: 3, approved: 4 };
           cmp = (order[a.status] || 0) - (order[b.status] || 0);
           break;
         }
@@ -119,6 +120,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const statusCounts = {
     all: posts.length,
     generating: posts.filter(p => p.status === 'generating').length,
+    error: posts.filter(p => p.status === 'error').length,
     draft: posts.filter(p => p.status === 'draft').length,
     review: posts.filter(p => p.status === 'review').length,
     approved: posts.filter(p => p.status === 'approved').length,
@@ -159,12 +161,12 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <PageHeader
         title="Content Posts"
         subtitle={`${posts.length} post${posts.length !== 1 ? 's' : ''}`}
-        icon={<Icon as={FileText} size="lg" className="text-blue-400" />}
+        icon={<Icon as={FileText} size="lg" className="text-accent-info" />}
       />
 
       {/* Header stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {(['draft', 'review', 'approved', 'generating'] as const).map(status => {
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {(['draft', 'review', 'approved', 'generating', 'error'] as const).map(status => {
           const cfg = STATUS_CONFIG[status];
           const StatusIcon = cfg.icon;
           return (
@@ -226,7 +228,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       {/* Filtered empty state */}
       {posts.length > 0 && filtered.length === 0 && (
         <EmptyState icon={Filter} title="No content matches your filters" className="py-8" action={
-          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="t-caption-sm text-teal-400 hover:text-teal-300">Clear filters</button>
+          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="t-caption-sm text-accent-brand hover:text-accent-brand">Clear filters</button>
         } />
       )}
 
@@ -252,7 +254,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     onClick={() => setActivePostId(post.id)}
                     className="flex-1 min-w-0 text-left group"
                   >
-                    <div className="text-sm font-medium text-[var(--brand-text-bright)] group-hover:text-teal-300 transition-colors truncate">
+                    <div className="text-sm font-medium text-[var(--brand-text-bright)] group-hover:text-accent-brand transition-colors truncate">
                       {post.title}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5">
@@ -266,7 +268,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       {isGenerating && totalSections > 0 && (
                         <>
                           <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
-                          <span className="t-caption-sm text-amber-400">
+                          <span className="t-caption-sm text-accent-warning">
                             {sectionsComplete}/{totalSections} sections
                           </span>
                         </>
@@ -285,7 +287,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                             title={`Voice match: ${post.voiceScore}/100 — click for details`}
                           >
                             <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
-                            <span className="t-caption-sm text-blue-400 font-medium">Voice {post.voiceScore}</span>
+                            <span className="t-caption-sm text-accent-info font-medium">Voice {post.voiceScore}</span>
                           </button>
                         </>
                       )}
@@ -306,7 +308,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'review')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
                             title="Send for review"
                           >
                             <Icon as={Send} size="sm" />
@@ -317,14 +319,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'approved')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                             title="Approve content"
                           >
                             <Icon as={CheckCircle2} size="sm" />
                             Approve
                           </button>
                         )}
-                        {(post.status === 'review' || post.status === 'approved') && (
+                        {post.status === 'review' && (
                           <button
                             onClick={() => updateStatus(post.id, 'draft')}
                             disabled={updatingStatus === post.id}
@@ -340,14 +342,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {/* Publish to Webflow */}
                     {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
                       post.publishedAt ? (
-                        <span className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
+                        <span className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success font-medium">
                           <Icon as={Check} size="sm" /> Published
                         </span>
                       ) : (
                         <button
                           onClick={() => publishPost(post.id)}
                           disabled={publishingPost === post.id}
-                          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
+                          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-teal-500/10 border border-teal-500/20 text-accent-brand hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
                           title="Publish to Webflow CMS"
                         >
                           <Icon as={publishingPost === post.id ? Loader2 : Globe} size="sm" className={publishingPost === post.id ? 'animate-spin' : ''} />
@@ -361,7 +363,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       <button
                         onClick={() => scoreVoice(post.id)}
                         disabled={scoringVoice === post.id}
-                        className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 border border-blue-500/20 text-accent-info hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                         title="Score brand voice match"
                       >
                         <Icon as={scoringVoice === post.id ? Loader2 : Sparkles} size="sm" className={scoringVoice === post.id ? 'animate-spin' : ''} />
@@ -385,13 +387,13 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {/* Delete */}
                     {deleteConfirm === post.id ? (
                       <div className="flex items-center gap-1">
-                        <button onClick={() => deletePost(post.id)} className="t-caption-sm px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Delete</button>
+                        <button onClick={() => deletePost(post.id)} className="t-caption-sm px-2 py-1 rounded bg-red-500/20 text-accent-danger hover:bg-red-500/30">Delete</button>
                         <button onClick={() => setDeleteConfirm(null)} className="t-caption-sm px-2 py-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
                       </div>
                     ) : (
                       <button
                         onClick={() => setDeleteConfirm(post.id)}
-                        className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1"
+                        className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors p-1"
                         title="Delete"
                       >
                         <Icon as={Trash2} size="md" />
@@ -413,7 +415,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     <button
                       onClick={() => scoreVoice(post.id)}
                       disabled={scoringVoice === post.id}
-                      className="ml-auto t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                      className="ml-auto t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-accent-info hover:bg-blue-500/10 transition-colors disabled:opacity-50"
                     >
                       {scoringVoice === post.id ? <Icon as={Loader2} size="sm" className="animate-spin mr-1" /> : null}
                       Re-score

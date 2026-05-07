@@ -18,12 +18,16 @@ export interface ActionPillProps
 }
 
 const VARIANT: Record<ActionPillVariant, string> = {
-  start: 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/15',
-  approve: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15',
-  decline: 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15',
-  send: 'border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/15',
+  start:
+    'border-[color:color-mix(in_srgb,var(--teal)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--teal)_10%,transparent)] text-[var(--teal)] hover:bg-[color:color-mix(in_srgb,var(--teal)_15%,transparent)]',
+  approve:
+    'border-[color:color-mix(in_srgb,var(--emerald)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--emerald)_10%,transparent)] text-[var(--emerald)] hover:bg-[color:color-mix(in_srgb,var(--emerald)_15%,transparent)]',
+  decline:
+    'border-[color:color-mix(in_srgb,var(--red)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--red)_10%,transparent)] text-[var(--red)] hover:bg-[color:color-mix(in_srgb,var(--red)_15%,transparent)]',
+  send:
+    'border-[color:color-mix(in_srgb,var(--blue)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--blue)_10%,transparent)] text-[var(--blue)] hover:bg-[color:color-mix(in_srgb,var(--blue)_15%,transparent)]',
   'request-changes':
-    'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15',
+    'border-[color:color-mix(in_srgb,var(--amber)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--amber)_10%,transparent)] text-[var(--amber)] hover:bg-[color:color-mix(in_srgb,var(--amber)_15%,transparent)]',
 };
 
 export const ActionPill = React.forwardRef<HTMLButtonElement, ActionPillProps>(function ActionPill(
@@ -36,7 +40,7 @@ export const ActionPill = React.forwardRef<HTMLButtonElement, ActionPillProps>(f
       type={type}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center gap-1 px-2.5 py-1 border rounded-md text-[11px] font-medium transition-colors',
+        'inline-flex items-center gap-1 px-2.5 py-1 border rounded-md t-caption-sm font-medium transition-colors',
         VARIANT[variant],
         disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
         className,

@@ -204,6 +204,20 @@ const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 250;
  *  balancer never reaches zero (e.g. malformed input). */
 const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
+const ROUTE_CONTRACT_REQUIRED_BASENAMES = new Set([
+  'keyword-strategy.ts',
+  'jobs.ts',
+  'webflow-seo-audit.ts',
+  'webflow-seo-jobs.ts',
+  'webflow-schema.ts',
+  'workspaces.ts',
+  'public-portal.ts',
+  'content-requests.ts',
+  'public-analytics.ts',
+  'content-briefs.ts',
+  'webflow-alt-text.ts',
+]);
+
 // ─── Check definitions ────────────────────────────────────────────────────────
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
@@ -483,7 +497,8 @@ export function extractDbPrepareArg(chunk: string): string {
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
 // declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
-// in their corresponding format*Section function (server/workspace-intelligence.ts).
+// in their corresponding format*Section function (server/workspace-intelligence.ts
+// or a focused extracted formatter module).
 // Must live at module scope because the rule lives in the CHECKS array and its
 // customCheck closure looks these up by lexical binding at invocation time.
 
@@ -599,7 +614,9 @@ function extractFormatterBody(formatterFileContent: string, formatterName: strin
  *
  * Returns a list of matches for fields declared in any *Slice interface in
  * `typesContent` but never referenced in the corresponding format*Section
- * function in `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS are skipped.
+ * function in `serverContent`. Callers may concatenate focused extracted
+ * formatter modules into `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS
+ * are skipped.
  */
 export function findUnrenderedSliceFields(
   typesContent: string,
@@ -786,6 +803,50 @@ function loadClientVisibleTypes(): Set<string> {
   return values;
 }
 
+const BACKGROUND_GENERATION_ROUTE_BASENAMES = new Set([
+  'jobs.ts',
+  'content-posts.ts',
+  'content-briefs.ts',
+  'content-requests.ts',
+  'keyword-strategy.ts',
+  'webflow-schema.ts',
+  'workspaces.ts',
+]);
+
+const BACKGROUND_GENERATION_ALLOWLIST = new Set([
+  'server/routes/jobs.ts::*',
+]);
+
+const BACKGROUND_GENERATION_SITE_ALLOWLIST = new Set([
+  "server/routes/keyword-strategy.ts::queueLlmsTxtRegeneration::queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');",
+  'server/routes/keyword-strategy.ts::generateRecommendations::generateRecommendations(ws.id)',
+  "server/routes/webflow-schema.ts::queueLlmsTxtRegeneration::if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');",
+]);
+
+function backgroundGenerationRoutePath(file: string): string {
+  const normalized = file.split(path.sep).join('/');
+  const routeIdx = normalized.lastIndexOf('server/routes/');
+  if (routeIdx >= 0) return normalized.slice(routeIdx);
+  return path.relative(ROOT, file).split(path.sep).join('/');
+}
+
+function backgroundGenerationAllowlistKey(file: string, callee: string): string {
+  return `${backgroundGenerationRoutePath(file)}::${callee}`;
+}
+
+function backgroundGenerationSiteKey(file: string, callee: string, line: string): string {
+  return `${backgroundGenerationAllowlistKey(file, callee)}::${line.trim().replace(/\s+/g, ' ')}`;
+}
+
+function isBackgroundGenerationAllowed(file: string, callee: string, line: string): boolean {
+  const rel = backgroundGenerationRoutePath(file);
+  return (
+    BACKGROUND_GENERATION_ALLOWLIST.has(`${rel}::*`) ||
+    BACKGROUND_GENERATION_ALLOWLIST.has(`${rel}::${callee}`) ||
+    BACKGROUND_GENERATION_SITE_ALLOWLIST.has(backgroundGenerationSiteKey(file, callee, line))
+  );
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -833,7 +894,6 @@ export const CHECKS: Check[] = [
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
       'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
-      'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
@@ -853,7 +913,6 @@ export const CHECKS: Check[] = [
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
-      'server/workspace-intelligence.ts', // disk file: AEO review JSON from aeo-reviews/ directory (not DB columns)
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
       'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
@@ -916,7 +975,7 @@ export const CHECKS: Check[] = [
     // Do-not-reintroduce rule. `formatBrandVoiceForPrompt` was deleted in PR #168
     // because it bypassed voice-profile authority: any caller that grabbed the
     // helper and wrapped the raw `seo?.brandVoice` field silently dropped the
-    // calibrated DNA/samples/guardrails layers that `buildSeoContext` applies
+    // calibrated DNA/samples/guardrails layers that the SEO context source applies
     // via `effectiveBrandVoiceBlock`. The TypeScript signature didn't change
     // when voice profiles were added, so the compiler couldn't catch the bypass
     // — that's why we mechanize the ban here. See CLAUDE.md
@@ -933,7 +992,7 @@ export const CHECKS: Check[] = [
       '.codesight/',
       'scripts/pr-check.ts', // this rule itself references the name
     ],
-    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by buildSeoContext with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by the SEO context source with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
     severity: 'error',
     rationale: 'A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`.',
     claudeMdRef: '#code-conventions',
@@ -1120,8 +1179,8 @@ export const CHECKS: Check[] = [
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts'],
-    message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
+    exclude: [],
+    message: 'buildSeoContext() was retired. Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) or the owned intelligence source/formatter APIs.',
     severity: 'error',
   },
   {
@@ -1358,12 +1417,13 @@ export const CHECKS: Check[] = [
   {
     // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
     // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
-    name: 'getBacklinksOverview called outside workspace-intelligence',
+    name: 'getBacklinksOverview called outside workspace intelligence SEO context',
     pattern: 'getBacklinksOverview\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: [
       'server/workspace-intelligence.ts',
+      'server/intelligence/seo-context-slice.ts',
       'server/semrush.ts',                      // function definition
       'server/seo-data-provider.ts',             // interface definition
       'server/providers/semrush-provider.ts',    // provider implementation
@@ -1371,7 +1431,7 @@ export const CHECKS: Check[] = [
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
       'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
     ],
-    message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
+    message: 'getBacklinksOverview() is an expensive external API call. Only call it from the workspace intelligence SEO context path where caching and rate-limiting are enforced.',
     severity: 'error',
   },
   {
@@ -2070,15 +2130,14 @@ export const CHECKS: Check[] = [
     // assembled at query time and silently dropped at prompt time — they
     // never reach the AI. Add to KNOWN_UNRENDERED_FIELDS if intentional.
     //
-    // Scope: diff-mode fires when either `shared/types/intelligence.ts` or
-    // `server/workspace-intelligence.ts` changes; the customCheck always
-    // reads both from disk. The fileGlobs include both basenames so that
-    // the diff-mode filter matches whichever file triggered the run; the
-    // customCheck then operates on the fixed pair.
+    // Scope: diff-mode fires when either `shared/types/intelligence.ts`,
+    // `server/workspace-intelligence.ts`, or an extracted intelligence
+    // formatter module changes; the customCheck always reads the fixed type
+    // file plus formatter sources from disk.
     name: 'Assembled-but-never-rendered slice fields',
-    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts'],
+    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'formatters.ts', 'page-elements-slice.ts'],
     exclude: ['.test.ts'],
-    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
+    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts + extracted intelligence formatters',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
     severity: 'error',
     rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
@@ -2090,9 +2149,17 @@ export const CHECKS: Check[] = [
       if (files.length === 0) return [];
       const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
       const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+      const formatterModules = [
+        path.join(ROOT, 'server/intelligence/formatters.ts'),
+        path.join(ROOT, 'server/intelligence/page-elements-slice.ts'),
+      ];
+      const serverContent = [
+        readFileOrEmpty(serverPath),
+        ...formatterModules.map(readFileOrEmpty),
+      ].join('\n');
       return findUnrenderedSliceFields(
         readFileOrEmpty(typesPath),
-        readFileOrEmpty(serverPath),
+        serverContent,
         typesPath,
         serverPath,
       );
@@ -2425,8 +2492,7 @@ export const CHECKS: Check[] = [
     // the legacy `workspace.brandVoice` + brand-docs block — must go through
     // the `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` helper.
     // PR #168 commit 3c8a6cd factored the helper out of three inline call
-    // sites (`buildSeoContext` no-strategy branch, with-strategy branch, and
-    // the shadow-mode parity check). The shadow-mode copy had drifted,
+    // sites in the old builder. The shadow-mode copy had drifted,
     // missing the `hasExplicitConfig` gate, so draft profiles with voice
     // samples but no saved DNA/guardrails were incorrectly treated as
     // authoritative — silently hiding the legacy brand voice from the
@@ -2439,14 +2505,13 @@ export const CHECKS: Check[] = [
     // go through the helper instead. The only legitimate site is the helper
     // body itself (line 115), which is hatched inline with `// voice-authority-ok`.
     //
-    // Scope: server/seo-context.ts ONLY. Other files don't render a
-    // `voiceProfileBlock` — if this name appears elsewhere in the future it
-    // should also route through the helper.
+    // Scope: server/intelligence/seo-context-source.ts ONLY. This is the
+    // owned module that renders a `voiceProfileBlock`.
     name: 'Inline voice-profile authority check (use isVoiceProfileAuthoritative helper)',
     pattern: 'voiceProfileBlock\\.length',
-    fileGlobs: ['seo-context.ts'],
-    pathFilter: 'server/',
-    displayScope: 'server/seo-context.ts',
+    fileGlobs: ['seo-context-source.ts'],
+    pathFilter: 'server/intelligence/',
+    displayScope: 'server/intelligence/seo-context-source.ts',
     excludeLines: ['// voice-authority-ok'],
     message: 'Do not inline `voiceProfileBlock.length > 0` authority checks. Call `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` — the helper encodes the full calibration + hasExplicitConfig decision so every call site stays in sync. Suppress with // voice-authority-ok only inside the helper definition itself.',
     severity: 'error',
@@ -2456,13 +2521,13 @@ export const CHECKS: Check[] = [
   {
     // Added post-PR #168 scaled-review cleanup (2026-04-11).
     //
-    // Brand-engine reader calls from inside `server/seo-context.ts` must be
+    // Brand-engine reader calls from inside `server/intelligence/seo-context-source.ts` must be
     // wrapped in `safeBrandEngineRead<T>(context, workspaceId, fn, fallback)`.
     // In production the `voice_profiles`, `brandscripts`, and
     // `brand_identity_deliverables` tables always exist because migrations
     // run at startup, but test environments may skip migrations entirely
     // and a missing table throws from `db.prepare()` inside the stmt-cache
-    // initializer — crashing the entire `buildSeoContext` call tree.
+    // initializer — crashing the entire seoContext slice assembly path.
     //
     // The wrapper narrowly swallows `no such table|column` errors (the
     // specific test-env scenario) and re-throws everything else so
@@ -2472,32 +2537,32 @@ export const CHECKS: Check[] = [
     // working in production" — the exact silent-failure class this
     // codebase is trying to eliminate.
     //
-    // Scope: server/seo-context.ts ONLY. Route handlers that call these
+    // Scope: server/intelligence/seo-context-source.ts ONLY. Route handlers that call these
     // functions directly are fine — errors at the request boundary become
     // 500s, which are loud and visible.
     //
     // Functions enforced: `getVoiceProfile`, `listBrandscripts`,
     // `listDeliverables`. Add to the customCheck's `targetFns` set if a new
     // brand-engine reader is introduced with the same schema-missing risk.
-    name: 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
-    fileGlobs: ['seo-context.ts'],
-    pathFilter: 'server/',
-    displayScope: 'server/seo-context.ts',
+    name: 'Bare brand-engine read in seo-context source (use safeBrandEngineRead)',
+    fileGlobs: ['seo-context-source.ts'],
+    pathFilter: 'server/intelligence/',
+    displayScope: 'server/intelligence/seo-context-source.ts',
     // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
     // '// safe-read-ok')` — this `excludeLines` entry is a no-op at runtime
     // but drives the `Escape hatch` column of docs/rules/automated-rules.md
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// safe-read-ok'],
-    message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing buildSeoContext. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
+    message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing seoContext slice assembly. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
     severity: 'error',
-    rationale: 'A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation.',
+    rationale: 'A missing brand-engine table in a non-production env crashes seoContext slice assembly, and an unnarrowed catch would hide real programming bugs as silent degradation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       const targetFns = /\b(getVoiceProfile|listBrandscripts|listDeliverables)\s*\(/;
       for (const file of files) {
-        if (path.basename(file) !== 'seo-context.ts') continue;
-        if (!file.includes(`server${path.sep}seo-context.ts`) && !file.includes('server/seo-context.ts')) continue;
+        if (path.basename(file) !== 'seo-context-source.ts') continue;
+        if (!file.includes(`server${path.sep}intelligence${path.sep}seo-context-source.ts`) && !file.includes('server/intelligence/seo-context-source.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -2805,66 +2870,25 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'seo-context.ts import restriction (deprecated module)',
+    name: 'seo-context.ts import restriction (retired module)',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'server/',
-    // Existing callers that are already imported — these are grandfathered until migrated.
-    // seo-context.ts itself and workspace-intelligence.ts (shadow-mode comparison) are allowed.
-    exclude: [
-      'server/seo-context.ts',
-      'server/workspace-intelligence.ts',
-      'server/prompt-assembly.ts',
-      'server/admin-chat-context.ts',
-      'server/helpers.ts',
-      'server/copy-review.ts',
-      'server/internal-links.ts',
-      'server/aeo-page-review.ts',
-      'server/deep-diagnostic.ts',
-      'server/schema-generator.ts',
-      'server/content-brief.ts',
-      'server/routes/ai-chat.ts',
-      'server/routes/content-generation.ts',
-      'server/routes/seo-audit.ts',
-      'server/routes/schema-generator.ts',
-      'server/routes/content-matrix.ts',
-      'server/routes/aeo-review.ts',
-      'server/routes/copy-generation.ts',
-      'server/routes/page-strategy.ts',
-      'server/routes/content-brief.ts',
-      'server/routes/ai-rewrite.ts',
-      'server/routes/internal-links.ts',
-      'server/routes/diagnostics.ts',
-      'server/routes/public-analytics.ts',
-      'server/routes/workspaces.ts',
-      'server/routes/voice-calibration.ts',
-      'server/routes/webflow-seo.ts',
-      'server/routes/discovery-ingestion.ts',
-      'server/routes/google.ts',
-      'server/routes/webflow-keywords.ts',
-      'server/routes/copy-pipeline.ts',
-      'server/routes/brandscript.ts',
-      'server/routes/brand-identity.ts',
-      'server/routes/jobs.ts',
-      'server/routes/public-portal.ts',
-      'server/routes/keyword-strategy.ts',
-      'tests/',
-    ],
-    excludeLines: ['// seo-context-ok'],
-    message: 'seo-context.ts is deprecated — use buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts instead. Add // seo-context-ok on the import line if this is a grandfathered caller awaiting migration.',
+    exclude: ['tests/'],
+    message: 'seo-context.ts was retired — production server code must use workspace-intelligence.ts, prompt-rich-blocks.ts, or server/intelligence/* owned modules instead.',
     severity: 'error',
-    rationale: 'seo-context.ts is being retired in favor of the unified workspace intelligence system. New callers must use the intelligence assembler.',
+    rationale: 'seo-context.ts has been retired in favor of the unified workspace intelligence system. Keeping bridge imports would silently revive the deprecated cache and authority path.',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const importRe = /from\s+['"][^'"]*seo-context/;
+      const importRe = /(?:from\s+['"][^'"]*seo-context(?:\.js)?['"]|import\s*\(\s*['"][^'"]*seo-context(?:\.js)?['"])/;
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.includes(`${path.sep}tests${path.sep}`) || file.includes('/tests/')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!importRe.test(lines[i])) continue;
-          if (hasHatch(lines, i, '// seo-context-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i] });
         }
       }
@@ -3370,7 +3394,7 @@ export const CHECKS: Check[] = [
     // path with no indication that the page was not actually updated.
     //
     // PR #1 of the Platform Health Sprint fixed 4 such call sites in
-    // server/routes/webflow-seo.ts; this rule prevents recurrence wherever
+    // server/routes/webflow-seo-apply.ts; this rule prevents recurrence wherever
     // the function is called in the future.
     //
     // Escape hatch: `// seo-ok` on the same line or one line above, for any
@@ -3721,9 +3745,31 @@ export const CHECKS: Check[] = [
         );
       }
 
-      // ── Scan src/ files for inline [WS_EVENTS.X] patterns whose event is centralized ──
+      // Build a reverse lookup so raw string handler keys (e.g. 'activity:new')
+      // get the same protection as [WS_EVENTS.ACTIVITY_NEW]. This matters
+      // because string-literal duplicates are exactly where drift hides: the
+      // import-free file otherwise never mentions WS_EVENTS and would be
+      // skipped by a computed-key-only scanner.
+      const wsEventsPath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
+      const wsEventsContent = readFileOrEmpty(wsEventsPath);
+      const wsEventsBlock = wsEventsContent.match(/export const WS_EVENTS = \{([\s\S]*?)\n\} as const;/)?.[1] ?? '';
+      const eventValueToName = new Map<string, string>();
+      const eventConstRe = /^\s*([A-Z_]+):\s*['"]([^'"]+)['"]/gm;
+      let em: RegExpExecArray | null;
+      while ((em = eventConstRe.exec(wsEventsBlock)) !== null) {
+        eventValueToName.set(em[2], em[1]);
+      }
+      if (eventValueToName.size === 0) {
+        throw new Error(
+          'useWorkspaceEvents-centralization rule: found zero WS_EVENTS values in ' +
+          'src/lib/wsEvents.ts. Expected pattern: `EVENT_NAME: \'event:value\'`'
+        );
+      }
+
+      // ── Scan src/ files for inline handlers whose event is centralized ──
       const hits: CustomCheckMatch[] = [];
       const lineRe = /\[WS_EVENTS\.([A-Z_]+)\]/;
+      const stringKeyRe = /^\s*(?:\[\s*)?['"]([^'"]+)['"](?:\s*\])?\s*:/;
 
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
@@ -3734,20 +3780,175 @@ export const CHECKS: Check[] = [
 
         const content = readFileOrEmpty(file);
         if (!content) continue;
-        // Quick pre-filter: skip files that don't reference WS_EVENTS at all.
-        if (!content.includes('WS_EVENTS.')) continue;
+        // Quick pre-filter: only files with workspace subscriptions can
+        // duplicate the centralized invalidation map.
+        if (!content.includes('useWorkspaceEvents(')) continue;
 
         const lines = content.split('\n');
+        let inUseWorkspaceEventsCall = false;
+        let parenDepth = 0;
+
         for (let i = 0; i < lines.length; i++) {
-          const m = lines[i].match(lineRe);
-          if (!m) continue;
-          const eventName = m[1];
-          if (!centralizedEvents.has(eventName)) continue;
-          // Check escape hatch on this line or the line immediately above.
-          if (hasHatch(lines, i, '// ws-invalidation-ok')) continue;
-          hits.push({ file, line: i + 1, text: lines[i].trim() });
+          const line = lines[i];
+          if (!inUseWorkspaceEventsCall && !line.includes('useWorkspaceEvents(')) continue;
+
+          if (!inUseWorkspaceEventsCall) {
+            inUseWorkspaceEventsCall = true;
+            parenDepth = 0;
+          }
+
+          const computedKey = line.match(lineRe)?.[1];
+          const rawEventValue = line.match(stringKeyRe)?.[1];
+          const rawKey = rawEventValue ? eventValueToName.get(rawEventValue) : undefined;
+          const eventName = computedKey ?? rawKey;
+
+          if (eventName && centralizedEvents.has(eventName) && !hasHatch(lines, i, '// ws-invalidation-ok')) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+
+          parenDepth += (line.match(/\(/g) ?? []).length;
+          parenDepth -= (line.match(/\)/g) ?? []).length;
+          if (inUseWorkspaceEventsCall && parenDepth <= 0) {
+            inUseWorkspaceEventsCall = false;
+          }
         }
       }
+      return hits;
+    },
+  },
+  {
+    // Phase 1 platform-consolidation guardrail.
+    //
+    // This intentionally starts narrower than "every synchronous generation
+    // route must be job-backed." Phase 2 still needs to migrate several
+    // audited synchronous routes. For Phase 1, prevent the riskier pattern:
+    // post-response generation work in high-churn admin routes that is neither
+    // the canonical jobs dispatcher nor an explicitly reviewed legacy site.
+    //
+    // Escape hatch: add `// background-generation-ok — reason` on the same line
+    // or immediately above for reviewed short-lived exceptions.
+    name: 'Background generation in high-churn routes must be allowlisted',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// background-generation-ok'],
+    message:
+      'Post-response admin generation must use the background job platform or be explicitly allowlisted. ' +
+      'Move long-running work behind createJob()/updateJob() and return { jobId }, or add ' +
+      '// background-generation-ok with a reason for reviewed short-lived exceptions.',
+    severity: 'warn',
+    rationale:
+      'Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const detachedGenerationRe =
+        /\b(generate[A-Z]\w*|regenerate[A-Z]\w*|createCollectionItem|generateRecommendations)\s*\([^;]*?\)\s*\.(then|catch|finally)\s*\(|\b(queue[A-Z]\w*(?:Generation|Regeneration))\s*\(/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        const basename = path.basename(file);
+        if (!BACKGROUND_GENERATION_ROUTE_BASENAMES.has(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const lineStarts = [0];
+        for (let i = 0; i < content.length; i++) {
+          if (content[i] === '\n') lineStarts.push(i + 1);
+        }
+
+        for (const match of content.matchAll(detachedGenerationRe)) {
+          const callee = match[1] || match[3];
+          if (!callee) continue;
+          let lineIndex = -1;
+          for (let i = lineStarts.length - 1; i >= 0; i--) {
+            if (lineStarts[i] <= match.index) {
+              lineIndex = i;
+              break;
+            }
+          }
+          if (lineIndex < 0) continue;
+          if (hasHatch(lines, lineIndex, '// background-generation-ok')) continue;
+          if (isBackgroundGenerationAllowed(file, callee, lines[lineIndex])) continue;
+          hits.push({
+            file,
+            line: lineIndex + 1,
+            text: `${backgroundGenerationAllowlistKey(file, callee)} ${lines[lineIndex].trim()}`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Route read/write contracts ────────────────────────────────────────
+    //
+    // High-churn route files need an explicit, grep-friendly contract for the
+    // tables or stores they read and write. This is intentionally a first-pass
+    // convention rule: it locks the annotation shape for the most-touched route
+    // modules before we expand coverage to every server route.
+    name: 'Route read/write contract annotations',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    displayScope: 'server/routes/{keyword-strategy,jobs,webflow-seo,webflow-schema,workspaces,public-portal,content-requests,public-analytics,content-briefs,webflow-alt-text}.ts',
+    excludeLines: ['// route-contract-ok'],
+    message:
+      'High-churn server route files must declare file-level @reads and @writes contracts. ' +
+      'Use comma-separated store/table names, or `none` when a side is intentionally empty. ' +
+      'Example: `* @reads workspaces, page_keywords` and `* @writes page_keywords`.',
+    severity: 'error',
+    rationale:
+      'Route modules with implicit data dependencies are hard to review safely; explicit read/write contracts make cross-route mutations, broadcasts, and tests auditable before edits land.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const tagLineRe = /@(reads|writes)\b:?\s*(.*)$/;
+      const tokenRe = /^[a-zA-Z][a-zA-Z0-9_.:-]*$/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('server/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        if (content.includes('// route-contract-ok')) continue;
+
+        const basename = path.basename(file);
+        const requiresContract = ROUTE_CONTRACT_REQUIRED_BASENAMES.has(basename);
+        const contractHeaderLines = lines.slice(0, 40);
+        const readsLine = contractHeaderLines.findIndex((line) => line.match(tagLineRe)?.[1] === 'reads');
+        const writesLine = contractHeaderLines.findIndex((line) => line.match(tagLineRe)?.[1] === 'writes');
+
+        if (requiresContract && readsLine === -1) {
+          hits.push({ file, line: 1, text: 'missing @reads contract' });
+        }
+        if (requiresContract && writesLine === -1) {
+          hits.push({ file, line: 1, text: 'missing @writes contract' });
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const tagMatch = lines[i].match(tagLineRe);
+          if (!tagMatch) continue;
+          const raw = tagMatch[2].replace(/\*\/.*$/, '').trim();
+          const values = raw.split(',').map((value) => value.trim()).filter(Boolean);
+          const isInvalid =
+            values.length === 0 ||
+            values.some((value) =>
+              /^todo$/i.test(value) ||
+              value.includes('?') ||
+              (!tokenRe.test(value) && value.toLowerCase() !== 'none')
+            );
+          if (isInvalid) {
+            hits.push({
+              file,
+              line: i + 1,
+              text: `malformed route contract value: ${raw || '<empty>'}`,
+            });
+          }
+        }
+      }
+
       return hits;
     },
   },
@@ -4294,8 +4495,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',                  // Button primitive owns its own zinc shades for variants
-      'src/components/StripePaymentForm.tsx',           // Stripe Elements is theme:'night' — must stay dark regardless of theme
-      'src/components/StripePaymentModal.tsx',          // Stripe modal must be ALWAYS DARK
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use text-[var(--brand-text)], text-[var(--brand-text-bright)], or text-[var(--brand-text-muted)] instead of text-zinc-N. Raw zinc shades do not theme-switch in light mode. Add // raw-zinc-ok inline if dark-only is intentional (e.g. always-dark surfaces like Stripe Elements).',
@@ -4312,8 +4511,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',
-      'src/components/StripePaymentForm.tsx',
-      'src/components/StripePaymentModal.tsx',
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use bg-[var(--surface-1)], bg-[var(--surface-2)], or bg-[var(--surface-3)] instead of bg-zinc-N. Raw zinc backgrounds do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
@@ -4330,8 +4527,6 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: [
       'src/components/ui/Button.tsx',
-      'src/components/StripePaymentForm.tsx',
-      'src/components/StripePaymentModal.tsx',
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use border-[var(--brand-border)] or border-[var(--brand-border-hover)] instead of border-zinc-N. Raw zinc borders do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
@@ -4707,12 +4902,14 @@ export const CHECKS: Check[] = [
     // Identity fields are allowed freely: ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl,
     // ws.siteHasSearch, siteId — these are cheap, stable, and not on any slice.
     //
-    // Legacy direct reads (brandVoice, businessContext, knowledgeBase, personas,
-    // businessProfile) have been grandfathered in with `// schema-context-direct-read-ok`
-    // hatches and are tracked for opportunistic Pattern B migration.
+    // Legacy direct reads for migrated fields are now forbidden:
+    //   - ws.brandVoice
+    //   - ws.keywordStrategy (businessContext path)
+    //   - ws.businessProfile
+    // These may NOT be bypassed with schema-context hatches.
     //
-    // Escape hatch: add `// schema-context-direct-read-ok: <reason>` on the flagged line
-    // or the line immediately above for justified exceptions.
+    // Escape hatch: `// schema-context-direct-read-ok: <reason>` still works for
+    // justified non-identity reads, except for the migrated-forbidden fields above.
     name: 'schema-context-direct-read-not-on-allowlist',
     pattern: '',
     fileGlobs: ['*.ts'],
@@ -4735,6 +4932,11 @@ export const CHECKS: Check[] = [
         'ws.brandLogoUrl',
         'ws.siteHasSearch',
         'siteId',
+      ]);
+      const SCHEMA_CONTEXT_MIGRATED_FORBIDDEN = new Set([
+        'ws.brandVoice',
+        'ws.keywordStrategy',
+        'ws.businessProfile',
       ]);
       const hits: CustomCheckMatch[] = [];
       for (const file of files) {
@@ -4809,21 +5011,25 @@ export const CHECKS: Check[] = [
         for (let i = bodyStart + 1; i < funcEnd; i++) {
           const line = lines[i];
 
-          // Skip lines with the inline hatch (same line or line above).
-          if (hasHatch(lines, i, '// schema-context-direct-read-ok')) continue;
-
           // Pattern: assignment to ctx.X or local const that reads ws.Y or
-          // calls a helper that does direct DB/ws reads (getRawKnowledge,
-          // buildPersonasContext, getInsights, listSites, listSitesCached).
+          // calls a helper that does direct DB/ws reads (getInsights,
+          // listSites, listSitesCached).
           // ws.\w+ matches the first segment — ws.keywordStrategy?.businessContext
           // is flagged via ws.keywordStrategy (which is not in the allow-list).
           const m = line.match(
-            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getRawKnowledge|buildPersonasContext|getInsights|listSites\b|listSitesCached)\b/,
+            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/,
           );
           if (!m) continue;
 
           const rhs = m[1];
+          // Migrated fields are hard-forbidden direct reads (no hatch).
+          if (SCHEMA_CONTEXT_MIGRATED_FORBIDDEN.has(rhs)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+            continue;
+          }
           if (SCHEMA_CONTEXT_ALLOWLIST.has(rhs)) continue;
+          // Skip lines with the inline hatch (same line or line above).
+          if (hasHatch(lines, i, '// schema-context-direct-read-ok')) continue;
 
           hits.push({ file, line: i + 1, text: line.trim() });
         }
@@ -4848,6 +5054,53 @@ export const CHECKS: Check[] = [
     severity: 'error',
     rationale: 'Counting words on rich-text HTML treats `<p>` and `</p>` as words. The dedicated HTML-aware helpers strip tags first. Same root cause as the section.wordCount drift Devin flagged in PR #356.',
     claudeMdRef: '#code-conventions',
+  },
+  {
+    // schema.org uses `foundingDate`, not `foundedDate`. The BusinessProfile internal
+    // field is `foundedDate` (intentional internal naming), but JSON-LD output keys must
+    // match schema.org canonical names. Google silently ignores unrecognised properties,
+    // so `foundedDate` in the output causes the value to be discarded. Caught in PR #406
+    // review; this rule prevents the same mistake in future templates.
+    // Escape hatch: // schema-property-name-ok
+    name: 'schema.org property key foundedDate (should be foundingDate)',
+    pattern: "'foundedDate'[[:space:]]*:",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['schema-property-name-ok'],
+    message:
+      "JSON-LD output uses 'foundedDate' but schema.org's canonical property is 'foundingDate'. Google silently ignores unrecognised properties, so this value is discarded. Fix: change the output key to 'foundingDate'. The BusinessProfile.foundedDate source field can keep its name — only the JSON-LD key matters. Escape hatch: // schema-property-name-ok",
+    severity: 'error',
+    rationale: "foundedDate is not a schema.org property. foundingDate is. Caught in PR #406 review where the pre-existing wrong key prevented the newly-extracted semantics.foundingDate from reaching Google.",
+  },
+  {
+    // Staff Person nodes emit 'image': s.image directly from AI-extracted data.
+    // s.image originates from Haiku parsing attacker-controllable page HTML, so
+    // non-HTTP scheme URLs (javascript:, data:) must be filtered before they reach
+    // JSON-LD that gets published to live Webflow pages via the Custom Code API.
+    // Correct pattern: filterHttpUrls([s.image ?? ''])[0]
+    // Escape hatch: // staff-image-filter-ok
+    name: "Unfiltered staff image URL in schema template (use filterHttpUrls)",
+    pattern: "'image'[[:space:]]*:[[:space:]]*s\\.image",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['staff-image-filter-ok'],
+    message:
+      "Staff Person 'image' field uses s.image directly — AI-extracted image URLs must go through filterHttpUrls([s.image ?? ''])[0] before entering JSON-LD output published to live pages. Prevents javascript:/data: scheme injection via Haiku-extracted page content. Escape hatch: // staff-image-filter-ok",
+    severity: 'error',
+    rationale: "s.image is AI-extracted from attacker-controllable page HTML. filterHttpUrls blocks non-http(s) scheme URLs from reaching JSON-LD published to live Webflow pages. Caught in PR #406 review where static.ts missed the fix applied to local-business.ts and service.ts.",
+  },
+  {
+    // Correct pattern: filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]
+    // Escape hatch: // primary-image-filter-ok
+    name: "Unfiltered semantics.primaryImage in schema template (use filterHttpUrls)",
+    pattern: "'image'[[:space:]]*:[[:space:]]*semantics?\\??\\.primaryImage",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['primary-image-filter-ok'],
+    message:
+      "semantics?.primaryImage used directly in 'image' field — AI-extracted image URLs must go through filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]. Prevents javascript:/data: scheme injection. Escape hatch: // primary-image-filter-ok",
+    severity: 'error',
+    rationale: "semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct.",
   },
 ];
 
@@ -5088,7 +5341,7 @@ const manualChecks = [
   'BRAND_DESIGN_LANGUAGE.md updated if UI changed',
   'Feature flag added if this is a multi-phase feature',
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
-  'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
+  'No production server imports from retired seo-context.ts (run pr-check and grep for seo-context.js)',
   'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
   'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
   'AI-generating endpoints (callCreativeAI/callOpenAI → db write): existence check + INSERT/UPDATE inside db.transaction() — not just the write, the check too',

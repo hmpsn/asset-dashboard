@@ -121,7 +121,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       <PageHeader
         title="Content Pipeline"
         subtitle="Plan, brief, write, and publish content at scale"
-        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
       />
 
       {/* Calendar tab has no workflow phase — stepper only shown for pipeline tabs */}
@@ -130,25 +130,25 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
         <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
-          {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-amber-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
-          {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
-          {summary.cells > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-[var(--brand-text-bright)]">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-emerald-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
+          {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-accent-brand" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
+          {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-accent-warning" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
+          {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-accent-brand" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.cells > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-[var(--brand-text-bright)]">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-accent-success ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
         </div>
       )}
 
       {/* Content decay alert */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
         <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: 'var(--radius-signature)' }}>
-          <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-red-400' : 'text-amber-400')} />
+          <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-accent-danger' : 'text-accent-warning')} />
           <div className="flex-1">
             <span className="font-medium text-[var(--brand-text-bright)]">
               {decay.totalDecaying} page{decay.totalDecaying !== 1 ? 's' : ''} losing traffic
             </span>
             <span className="text-[var(--brand-text-muted)] ml-1.5">
-              {decay.critical > 0 && <span className="text-red-400">{decay.critical} critical</span>}
+              {decay.critical > 0 && <span className="text-accent-danger">{decay.critical} critical</span>}
               {decay.critical > 0 && decay.warning > 0 && <span> · </span>}
-              {decay.warning > 0 && <span className="text-amber-400">{decay.warning} warning</span>}
+              {decay.warning > 0 && <span className="text-accent-warning">{decay.warning} warning</span>}
               <span className="ml-1.5">· avg {Math.abs(decay.avgDeclinePct).toFixed(0)}% decline</span>
             </span>
           </div>
@@ -179,7 +179,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
             <button
               key={t.id}
               onClick={() => handleTabChange(t.id)}
-              className={cn('flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+              className={cn('flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
             >
               <Icon as={TabIcon} size="md" />
               {t.label}
@@ -204,8 +204,8 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
                 <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--surface-3)] group">
                   <span className="text-xs text-[var(--brand-text-bright)]">{exp.label}</span>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleExport(exp.key, 'csv')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors">CSV</button>
-                    <button onClick={() => handleExport(exp.key, 'json')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors">JSON</button>
+                    <button onClick={() => handleExport(exp.key, 'csv')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-accent-brand hover:bg-teal-500/10 transition-colors">CSV</button>
+                    <button onClick={() => handleExport(exp.key, 'json')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-accent-brand hover:bg-teal-500/10 transition-colors">JSON</button>
                   </div>
                 </div>
               ))}
@@ -237,11 +237,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Floating help button */}
       <button
         onClick={() => setGuideOpen(true)}
-        className={"fixed bottom-6 right-6 z-[var(--z-tooltip)] w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group" // rounded-literal-ok
+        className={"fixed bottom-6 right-6 z-[var(--z-tooltip)] w-10 h-10 rounded-[var(--radius-pill)] bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group" // rounded-literal-ok
         }
         title="Content Pipeline Guide"
       >
-        <Icon as={HelpCircle} size="md" className="text-[var(--brand-text)] group-hover:text-teal-400 transition-colors" />
+        <Icon as={HelpCircle} size="md" className="text-[var(--brand-text)] group-hover:text-accent-brand transition-colors" />
       </button>
 
       {/* Guide slide-over */}

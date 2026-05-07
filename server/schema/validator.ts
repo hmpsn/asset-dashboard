@@ -13,24 +13,29 @@ interface RequiredFields {
 
 const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   BlogPosting: {
+    // breadcrumb is validated conditionally in validateCrossRefs (required only when a BreadcrumbList is in the graph).
     required: [
       'headline', 'description', 'image', 'datePublished', 'dateModified',
-      'author', 'publisher', 'mainEntityOfPage',
-      'isPartOf', 'breadcrumb', 'inLanguage', 'articleSection',
+      'author', 'publisher',
+      'isPartOf', 'inLanguage', 'articleSection',
     ],
   },
   Article: {
+    // breadcrumb is validated conditionally in validateCrossRefs (required only when a BreadcrumbList is in the graph).
     required: [
       'headline', 'description', 'image', 'datePublished', 'dateModified',
-      'author', 'publisher', 'mainEntityOfPage',
-      'isPartOf', 'breadcrumb', 'inLanguage',
+      'author', 'publisher',
+      'isPartOf', 'inLanguage',
     ],
   },
   Service: {
-    required: ['name', 'description', 'provider', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // Service is not a WebPage subtype; isPartOf lives on the sibling WebPage node.
+    // breadcrumb is validated conditionally in validateCrossRefs.
+    required: ['name', 'description', 'provider', 'inLanguage'],
   },
   Product: {
-    required: ['name', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // breadcrumb is validated conditionally in validateCrossRefs.
+    required: ['name', 'description', 'isPartOf', 'inLanguage'],
   },
   LocalBusiness: {
     // address + telephone are GOOGLE-RECOMMENDED but workspace-data-dependent. A workspace
@@ -39,6 +44,14 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     // required list until we add a "recommended" tier with admin-facing prompts to fix
     // workspace settings. Tracked: schema-yoast-parity-fields will introduce that tier.
     required: ['name', 'url', 'inLanguage'],
+  },
+  MedicalOrganization: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
+  },
+  FinancialService: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
   },
   Organization: {
     // logo is GOOGLE-RECOMMENDED but tied to workspace.brandLogoUrl. Same rationale as
@@ -69,11 +82,17 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   OfferCatalog: {
     required: ['name'],
   },
+  Offer: {
+    required: ['price', 'priceCurrency'],
+    recommended: ['name', 'url', 'availability'],
+  },
   ItemList: {
     required: ['itemListElement'],
   },
   WebPage: {
-    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // breadcrumb is omitted from required because homepage WebPage nodes have no
+    // BreadcrumbList to reference (single-item breadcrumb -> no BreadcrumbList emitted).
+    required: ['name', 'url', 'description', 'isPartOf', 'inLanguage'],
   },
   VideoObject: {
     required: ['name', 'description', 'uploadDate'],
@@ -187,6 +206,17 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
           message: `${t}.breadcrumb references @id "${target}" but no BreadcrumbList with that @id is in the @graph`,
         });
       }
+    }
+  } else {
+    const hasBreadcrumbList = allNodes.some(n => n['@type'] === 'BreadcrumbList');
+    if (hasBreadcrumbList && (t === 'BlogPosting' || t === 'Article' || t === 'Service' || t === 'Product' || t === 'WebPage')) {
+      findings.push({
+        severity: 'error',
+        type: t,
+        field: 'breadcrumb',
+        ruleId: 'required-field-missing',
+        message: `${t} missing required field: breadcrumb`,
+      });
     }
   }
 
@@ -391,27 +421,29 @@ function validateArticleShape(node: Record<string, unknown>): ValidationFinding[
  * three locator fields — Google rejects bare-string addresses.
  */
 function validateLocalBusinessShape(node: Record<string, unknown>): ValidationFinding[] {
-  if (node['@type'] !== 'LocalBusiness') return [];
+  const localTypes = new Set(['LocalBusiness', 'MedicalOrganization', 'FinancialService']);
+  const nodeType = typeof node['@type'] === 'string' ? node['@type'] : 'LocalBusiness';
+  if (!localTypes.has(nodeType)) return [];
   const findings: ValidationFinding[] = [];
   const address = node.address;
   if (address !== undefined) {
     if (typeof address !== 'object' || address === null) {
       findings.push({
         severity: 'error',
-        type: 'LocalBusiness',
+        type: nodeType,
         field: 'address',
         ruleId: 'localbusiness-address-not-object',
-        message: `LocalBusiness.address must be a PostalAddress object (got ${typeof address})`,
+        message: `${nodeType}.address must be a PostalAddress object (got ${typeof address})`,
       });
     } else {
       const a = address as Record<string, unknown>;
       if (a['@type'] !== 'PostalAddress') {
         findings.push({
           severity: 'error',
-          type: 'LocalBusiness',
+          type: nodeType,
           field: 'address.@type',
           ruleId: 'localbusiness-address-type-invalid',
-          message: `LocalBusiness.address.@type must be "PostalAddress"`,
+          message: `${nodeType}.address.@type must be "PostalAddress"`,
         });
       }
       const hasLocator = typeof a.streetAddress === 'string' && (a.streetAddress as string).trim()
@@ -420,10 +452,10 @@ function validateLocalBusinessShape(node: Record<string, unknown>): ValidationFi
       if (!hasLocator) {
         findings.push({
           severity: 'error',
-          type: 'LocalBusiness',
+          type: nodeType,
           field: 'address',
           ruleId: 'localbusiness-address-no-locator',
-          message: `LocalBusiness.address must have at least one of streetAddress, addressLocality, postalCode`,
+          message: `${nodeType}.address must have at least one of streetAddress, addressLocality, postalCode`,
         });
       }
     }
@@ -499,7 +531,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   //    Review nodes — each pointing at the parent via itemReviewed.@id)
   // Homepage may have BOTH Organization + WebSite (different @types), so the
   // rule is per-type, not "exactly one primary".
-  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review']);
+  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review', 'Offer']);
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;

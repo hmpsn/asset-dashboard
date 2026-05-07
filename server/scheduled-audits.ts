@@ -145,9 +145,13 @@ async function runScheduledAudit(schedule: AuditSchedule) {
     // resolve the site-level audit_finding insight.
     fireBridge('bridge-audit-auto-resolve', ws.id, async () => {
       const { getInsights: fetchAll, resolveInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const autoResolvableSources = new Set(['bridge-audit-page-health', 'bridge-audit-site-health']);
       const allInsights = fetchAll(ws.id);
       const auditFindings = allInsights.filter(
-        i => i.insightType === 'audit_finding' && i.resolutionStatus !== 'resolved',
+        i => i.insightType === 'audit_finding'
+          && i.resolutionStatus !== 'resolved'
+          && i.bridgeSource != null
+          && autoResolvableSources.has(i.bridgeSource),
       );
       if (auditFindings.length === 0) return { modified: 0 };
 
