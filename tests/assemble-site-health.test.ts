@@ -2,6 +2,8 @@
 // Tests for the siteHealth slice assembler in workspace-intelligence.ts
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ── Module mocks (must be hoisted before any imports) ─────────────────────
 
@@ -358,6 +360,44 @@ describe('assembleSiteHealth', () => {
     expect(health.cwvPassRate.desktop).toBeNull();
     expect(health.anomalyCount).toBe(0);
     expect(health.seoChangeVelocity).toBe(0);
+  });
+
+  it('keeps valid AEO review page scores when one saved page has a legacy score shape', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace());
+    getLatestSnapshot.mockReturnValue(null);
+    listSnapshots.mockReturnValue([]);
+    getPageSpeed.mockReturnValue(null);
+    getLinkCheck.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue({ ...makeMockArchitecture(), orphanPaths: [] });
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const { getDataDir } = await import('../server/data-dir.js');
+    const reviewDir = getDataDir('aeo-reviews');
+    const reviewFile = path.join(reviewDir, 'ws-aeo-legacy.json');
+    fs.writeFileSync(reviewFile, JSON.stringify({
+      pages: [
+        { overallScore: 80 },
+        { overallScore: '72' },
+        { overallScore: null },
+        { overallScore: 'not-a-score' },
+      ],
+    }));
+
+    try {
+      const intel = await buildWorkspaceIntelligence('ws-aeo-legacy', { slices: ['siteHealth'] });
+      const health = intel.siteHealth as SiteHealthSlice;
+
+      expect(health.aeoReadiness).toEqual({
+        pagesChecked: 4,
+        passingRate: 0.5,
+      });
+    } finally {
+      fs.rmSync(reviewFile, { force: true });
+    }
   });
 
   // ── Test 3: Source failure survival ─────────────────────────────────────

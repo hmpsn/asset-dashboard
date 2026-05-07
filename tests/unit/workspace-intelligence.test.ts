@@ -32,6 +32,7 @@ vi.mock('../../server/feature-flags.js', () => ({
 vi.mock('../../server/intelligence-cache.js', () => {
   class MockLRUCache {
     get = vi.fn().mockReturnValue(null);
+    peek = vi.fn().mockReturnValue(null);
     set = vi.fn();
     deleteByPrefix = vi.fn().mockReturnValue(0);
     stats = vi.fn().mockReturnValue({ entries: 0, maxEntries: 200 });
@@ -43,6 +44,7 @@ vi.mock('../../server/intelligence-cache.js', () => {
 });
 
 import { buildWorkspaceIntelligence, formatForPrompt } from '../../server/workspace-intelligence.js';
+import { singleFlight } from '../../server/intelligence-cache.js';
 import { buildSeoContext } from '../../server/seo-context.js';
 import { getInsights } from '../../server/analytics-insights-store.js';
 import { getWorkspaceLearnings } from '../../server/workspace-learnings.js';
@@ -52,6 +54,7 @@ const mockBuildSeoContext = vi.mocked(buildSeoContext);
 const mockGetInsights = vi.mocked(getInsights);
 const mockGetLearnings = vi.mocked(getWorkspaceLearnings);
 const mockGetWorkspace = vi.mocked(getWorkspace);
+const mockSingleFlight = vi.mocked(singleFlight);
 
 describe('buildWorkspaceIntelligence', () => {
   beforeEach(() => {
@@ -114,6 +117,41 @@ describe('buildWorkspaceIntelligence', () => {
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['insights'] });
     expect(result.insights!.all.length).toBeLessThanOrEqual(100);
     expect(result.insights!.all[0].impactScore).toBe(149);
+  });
+
+  it('isolates siteInventory cache keys by site identity without storing raw Webflow tokens', async () => {
+    mockSingleFlight.mockClear();
+
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-a',
+      siteBaseUrl: 'https://alpha.example',
+      webflowToken: 'secret-token-alpha',
+    });
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-b',
+      siteBaseUrl: 'https://beta.example',
+      webflowToken: 'secret-token-beta',
+    });
+    await buildWorkspaceIntelligence('ws-cache', {
+      slices: ['siteInventory'],
+      siteId: 'site-a',
+      siteBaseUrl: 'https://alpha.example',
+      webflowToken: 'rotated-secret-token-alpha',
+    });
+
+    const keys = mockSingleFlight.mock.calls
+      .map(call => call[0] as string)
+      .filter(key => key.startsWith('intelligence:ws-cache:'));
+    expect(keys).toHaveLength(3);
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(keys[0]).not.toBe(keys[2]);
+    expect(keys[0]).toContain('site=site-a');
+    expect(keys[1]).toContain('site=site-b');
+    expect(keys.join('\n')).not.toContain('secret-token-alpha');
+    expect(keys.join('\n')).not.toContain('secret-token-beta');
+    expect(keys.join('\n')).not.toContain('rotated-secret-token-alpha');
   });
 });
 

@@ -1418,6 +1418,11 @@ describe('Rule: Assembled-but-never-rendered slice fields', () => {
     expect(hits.some(h => h.text.includes('catalog'))).toBe(false);
   });
 
+  it('diff scope includes the extracted workspace intelligence formatter module', () => {
+    const rule = CHECKS.find(c => c.name === 'Assembled-but-never-rendered slice fields');
+    expect(rule?.fileGlobs).toContain('formatters.ts');
+  });
+
   it('emits a "formatter not found" hit when the format*Section function is missing', () => {
     const typesSrc = lines(
       "export interface SeoContextSlice {",
@@ -2570,6 +2575,18 @@ describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
       lines(
         "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",  // 1
         "export function doStuff() { return buildWorkspaceIntelligence('ws1'); }",    // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('allows the workspace intelligence SEO context slice to bridge the deprecated builder', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/intelligence/seo-context-slice.ts'),
+      lines(
+        "const { buildSeoContext } = await import('../seo-context.js');",
+        "export function bridge() { return buildSeoContext('ws1'); }",
       )
     );
     const hits = runRule(RULE, [file]);

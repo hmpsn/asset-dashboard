@@ -913,7 +913,6 @@ export const CHECKS: Check[] = [
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
-      'server/workspace-intelligence.ts', // disk file: AEO review JSON from aeo-reviews/ directory (not DB columns)
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
       'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
@@ -1180,7 +1179,7 @@ export const CHECKS: Check[] = [
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts'],
+    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/intelligence/seo-context-slice.ts'],
     message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
     severity: 'error',
   },
@@ -1418,12 +1417,13 @@ export const CHECKS: Check[] = [
   {
     // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
     // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
-    name: 'getBacklinksOverview called outside workspace-intelligence',
+    name: 'getBacklinksOverview called outside workspace intelligence SEO context',
     pattern: 'getBacklinksOverview\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: [
       'server/workspace-intelligence.ts',
+      'server/intelligence/seo-context-slice.ts',
       'server/semrush.ts',                      // function definition
       'server/seo-data-provider.ts',             // interface definition
       'server/providers/semrush-provider.ts',    // provider implementation
@@ -1431,7 +1431,7 @@ export const CHECKS: Check[] = [
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
       'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
     ],
-    message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
+    message: 'getBacklinksOverview() is an expensive external API call. Only call it from the workspace intelligence SEO context path where caching and rate-limiting are enforced.',
     severity: 'error',
   },
   {
@@ -2135,7 +2135,7 @@ export const CHECKS: Check[] = [
     // formatter module changes; the customCheck always reads the fixed type
     // file plus formatter sources from disk.
     name: 'Assembled-but-never-rendered slice fields',
-    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'page-elements-slice.ts'],
+    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts', 'formatters.ts', 'page-elements-slice.ts'],
     exclude: ['.test.ts'],
     displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts + extracted intelligence formatters',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
@@ -2150,6 +2150,7 @@ export const CHECKS: Check[] = [
       const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
       const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
       const formatterModules = [
+        path.join(ROOT, 'server/intelligence/formatters.ts'),
         path.join(ROOT, 'server/intelligence/page-elements-slice.ts'),
       ];
       const serverContent = [
@@ -2880,6 +2881,7 @@ export const CHECKS: Check[] = [
     exclude: [
       'server/seo-context.ts',
       'server/workspace-intelligence.ts',
+      'server/intelligence/seo-context-slice.ts',
       'server/prompt-assembly.ts',
       'server/admin-chat-context.ts',
       'server/helpers.ts',
