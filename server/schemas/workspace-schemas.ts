@@ -3,6 +3,7 @@
  * Uses .passthrough() on all object schemas for forward compatibility.
  */
 import { z } from 'zod';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 
 // ── Event config ──
 
@@ -28,11 +29,61 @@ export const eventGroupArraySchema = z.array(eventGroupSchema);
 
 // ── Keyword strategy ──
 
+// Mirrors the PageKeywordMap interface in shared/types/workspace.ts.
+// Required fields match the write-time shape; everything else is optional so
+// historical or partial blobs (e.g. before SEMRush enrichment ran) round-trip
+// through parseJsonSafe without being rejected. .passthrough() preserves any
+// fields not yet captured here.
 export const pageKeywordMapSchema = z.object({
   pagePath: z.string(),
   pageTitle: z.string(),
   primaryKeyword: z.string(),
   secondaryKeywords: z.array(z.string()),
+  searchIntent: z.string().optional(),
+  currentPosition: z.number().optional(),
+  previousPosition: z.number().optional(),
+  impressions: z.number().optional(),
+  clicks: z.number().optional(),
+  gscKeywords: z.array(z.object({
+    query: z.string(),
+    clicks: z.number(),
+    impressions: z.number(),
+    position: z.number(),
+  }).passthrough()).optional(),
+  volume: z.number().optional(),
+  difficulty: z.number().optional(),
+  cpc: z.number().optional(),
+  secondaryMetrics: z.array(z.object({
+    keyword: z.string(),
+    volume: z.number(),
+    difficulty: z.number(),
+  }).passthrough()).optional(),
+  metricsSource: z.enum([
+    METRICS_SOURCE.EXACT,
+    METRICS_SOURCE.PARTIAL_MATCH,
+    METRICS_SOURCE.BULK_LOOKUP,
+    METRICS_SOURCE.AI_ESTIMATE,
+  ]).optional(),
+  validated: z.boolean().optional(),
+  optimizationIssues: z.array(z.string()).optional(),
+  recommendations: z.array(z.string()).optional(),
+  contentGaps: z.array(z.string()).optional(),
+  optimizationScore: z.number().optional(),
+  analysisGeneratedAt: z.string().optional(),
+  primaryKeywordPresence: z.object({
+    inTitle: z.boolean(),
+    inMeta: z.boolean(),
+    inContent: z.boolean(),
+    inSlug: z.boolean(),
+  }).passthrough().optional(),
+  longTailKeywords: z.array(z.string()).optional(),
+  competitorKeywords: z.array(z.string()).optional(),
+  estimatedDifficulty: z.string().optional(),
+  keywordDifficulty: z.number().optional(),
+  monthlyVolume: z.number().optional(),
+  topicCluster: z.string().optional(),
+  searchIntentConfidence: z.number().optional(),
+  serpFeatures: z.array(z.string()).optional(),
 }).passthrough();
 
 // NOTE: pageMap is stored in a separate page_keywords table and stripped from this
@@ -146,3 +197,143 @@ export const intelligenceProfileSchema = z.object({
 // ── Competitor domains (simple string array) ──
 
 export const competitorDomainsSchema = z.array(z.string());
+
+// ── Recommendation set (recommendation_sets table) ──
+
+// Mirrors the Recommendation interface in shared/types/recommendations.ts.
+// .passthrough() preserves any new fields added to the in-memory model that
+// aren't yet captured in the schema. parseJsonSafeArray validates each
+// recommendation individually so a single malformed row doesn't drop the
+// entire set.
+export const recommendationSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  priority: z.enum(['fix_now', 'fix_soon', 'fix_later', 'ongoing']),
+  type: z.enum([
+    'technical', 'content', 'content_refresh', 'schema', 'metadata',
+    'performance', 'accessibility', 'strategy', 'aeo',
+  ]),
+  title: z.string(),
+  description: z.string(),
+  insight: z.string(),
+  impact: z.enum(['high', 'medium', 'low']),
+  effort: z.enum(['low', 'medium', 'high']),
+  impactScore: z.number(),
+  source: z.string(),
+  affectedPages: z.array(z.string()),
+  trafficAtRisk: z.number(),
+  impressionsAtRisk: z.number(),
+  estimatedGain: z.string(),
+  actionType: z.enum(['automated', 'manual', 'content_creation', 'purchase']),
+  productType: z.string().optional(),
+  productPrice: z.number().optional(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'dismissed']),
+  assignedTo: z.enum(['team', 'client']).optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+
+// Mirrors RecommendationSet['summary'] in shared/types/recommendations.ts.
+export const recommendationSummarySchema = z.object({
+  fixNow: z.number(),
+  fixSoon: z.number(),
+  fixLater: z.number(),
+  ongoing: z.number(),
+  totalImpactScore: z.number(),
+  trafficAtRisk: z.number(),
+  estimatedRecoverableClicks: z.number(),
+  estimatedRecoverableImpressions: z.number(),
+}).passthrough();
+
+// ── Audit snapshots (audit_snapshots table) ──
+
+// Mirrors SeoIssue / PageSeoResult / SeoAuditResult / ActionItem from
+// server/seo-audit.ts and server/audit-page.ts. Read-time schemas mark
+// non-essential fields optional so historical and simplified blobs round-trip
+// without being rejected (matches the lenient .partial() pattern used in
+// insight-schemas.ts). category is z.string() rather than the strict
+// CheckCategory enum so legacy snapshots with non-canonical categories pass.
+// .passthrough() preserves unknown fields.
+
+const seoIssueSchema = z.object({
+  check: z.string(),
+  severity: z.enum(['error', 'warning', 'info']),
+  category: z.string().optional(),
+  message: z.string().optional(),
+  recommendation: z.string().optional(),
+  value: z.string().optional(),
+  suggestedFix: z.string().optional(),
+  affectedPages: z.array(z.string()).optional(),
+}).passthrough();
+
+const pageSeoResultSchema = z.object({
+  pageId: z.string(),
+  url: z.string(),
+  score: z.number(),
+  issues: z.array(seoIssueSchema).default([]),
+  page: z.string().optional(),
+  slug: z.string().optional(),
+  noindex: z.boolean().optional(),
+  publishedPath: z.string().nullable().optional(),
+}).passthrough();
+
+const cwvMetricSummarySchema = z.object({
+  value: z.number().nullable(),
+  rating: z.enum(['good', 'needs-improvement', 'poor']).nullable(),
+}).passthrough();
+
+const cwvStrategyResultSchema = z.object({
+  assessment: z.enum(['good', 'needs-improvement', 'poor', 'no-data']),
+  fieldDataAvailable: z.boolean(),
+  lighthouseScore: z.number(),
+  metrics: z.object({
+    LCP: cwvMetricSummarySchema,
+    INP: cwvMetricSummarySchema,
+    CLS: cwvMetricSummarySchema,
+  }).passthrough(),
+}).passthrough();
+
+const cwvSummarySchema = z.object({
+  mobile: cwvStrategyResultSchema.optional(),
+  desktop: cwvStrategyResultSchema.optional(),
+}).passthrough();
+
+const deadLinkSchema = z.object({
+  url: z.string(),
+  status: z.union([z.number(), z.literal('timeout'), z.literal('error')]),
+  statusText: z.string(),
+  foundOn: z.string(),
+  foundOnSlug: z.string(),
+  anchorText: z.string(),
+  type: z.enum(['internal', 'external']),
+}).passthrough();
+
+export const seoAuditResultSchema = z.object({
+  siteScore: z.number(),
+  totalPages: z.number(),
+  errors: z.number(),
+  warnings: z.number(),
+  infos: z.number().optional().default(0),
+  pages: z.array(pageSeoResultSchema).default([]),
+  siteWideIssues: z.array(seoIssueSchema).default([]),
+  cwvSummary: cwvSummarySchema.optional(),
+  deadLinkSummary: z.object({
+    total: z.number(),
+    internal: z.number(),
+    external: z.number(),
+    redirects: z.number(),
+  }).passthrough().optional(),
+  deadLinkDetails: z.array(deadLinkSchema).optional(),
+}).passthrough();
+
+export const actionItemSchema = z.object({
+  id: z.string(),
+  snapshotId: z.string(),
+  title: z.string(),
+  description: z.string(),
+  status: z.enum(['planned', 'in-progress', 'completed']),
+  priority: z.enum(['high', 'medium', 'low']),
+  category: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
