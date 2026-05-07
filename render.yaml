@@ -24,7 +24,7 @@ services:
     plan: starter
     branch: main
     buildCommand: npm ci && npm run build
-    startCommand: npm start
+    startCommand: node scripts/ensure-native-modules.mjs && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -74,7 +74,7 @@ services:
     plan: starter
     branch: staging
     buildCommand: npm ci && npm run build
-    startCommand: npm start
+    startCommand: node scripts/ensure-native-modules.mjs && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
