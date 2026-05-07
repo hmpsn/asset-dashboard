@@ -4711,3 +4711,21 @@ Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E i
 **Mutual:** Creates a stable seam for future SeoEditor phase extractions without changing route contracts or page-level UX.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorBulkHelpers.ts`; `tests/unit/seo-editor-bulk-helpers.test.ts`; `data/roadmap.json`.
+
+### 365. Platform Consolidation — SeoEditor Persistence Helper Extraction (Phase 4)
+**What it does:** Continues SeoEditor decomposition by extracting draft/session/job-id persistence concerns out of `SeoEditor.tsx` into `src/components/editor/seoEditorPersistence.ts`. The new helper module now owns:
+- cache key helpers for editor edits/expanded state/variations and bulk analyze/rewrite job IDs
+- safe read/write wrappers for session-backed SeoEditor state
+- draft-key generation and draft hydration logic for initializing per-page edit state from local storage
+
+`SeoEditor.tsx` now delegates all storage-key and JSON parse/write logic to this module, leaving the component focused on workflow orchestration and rendering. Behavior remains unchanged for cache restore, draft hydration, and bulk job remount recovery.
+
+Bug sniffing fix included: cache readers now reject array payloads when object records are expected (`!Array.isArray`), preventing malformed session payloads from being treated as valid variation/edit maps.
+
+**Agency value:** Lowers regression risk in one of the most error-prone parts of the editor (state restore/draft hydration) and makes cache semantics testable without mounting the full component.
+
+**Client value:** No contract changes in UI or API behavior; cached edits, expanded rows, and draft restoration continue to work with better malformed-payload safety.
+
+**Mutual:** Shrinks the monolith surface and adds a guardrail against persistence regressions before larger workflow-hook extractions.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorPersistence.ts`; `tests/unit/seo-editor-persistence.test.ts`; `tests/contract/seo-editor-persistence-extraction.test.ts`; `data/roadmap.json`.
