@@ -6,8 +6,64 @@ on:
   pull_request:
     branches: [main, staging]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      quality: ${{ steps.filter.outputs.quality }}
+      test: ${{ steps.filter.outputs.test }}
+      coverage: ${{ steps.filter.outputs.coverage }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            quality:
+              - 'src/**'
+              - 'server/**'
+              - 'shared/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'data/**'
+              - '.github/workflows/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'vite.config.ts'
+              - 'playwright*.ts'
+            test:
+              - 'src/**'
+              - 'server/**'
+              - 'shared/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'vite.config.ts'
+              - 'playwright*.ts'
+            coverage:
+              - 'src/**'
+              - 'server/**'
+              - 'shared/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'vite.config.ts'
+              - 'playwright*.ts'
+
+  quality:
+    needs: changes
+    if: needs.changes.outputs.quality == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -37,9 +93,6 @@ jobs:
       # See CLAUDE.md "Commands" table for the full explanation.
       - name: Type check
         run: npm run typecheck
-
-      - name: Run tests with coverage
-        run: npm run test:coverage
 
       - name: Build
         run: npm run build
@@ -92,5 +145,78 @@ jobs:
           npm run rules:generate
           if ! git diff --exit-code docs/rules/automated-rules.md; then
             echo "::error::docs/rules/automated-rules.md is out of sync. Run 'npm run rules:generate' and commit the result."
+            exit 1
+          fi
+
+  test:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.test == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test -- --reporter=dot
+
+  coverage:
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.coverage == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+  check:
+    if: always()
+    needs: [changes, quality, test, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required CI jobs passed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          QUALITY_NEEDED: ${{ needs.changes.outputs.quality }}
+          TEST_NEEDED: ${{ needs.changes.outputs.test }}
+          COVERAGE_NEEDED: ${{ needs.changes.outputs.coverage }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+        run: |
+          echo "quality needed:  $QUALITY_NEEDED"
+          echo "test needed:     $TEST_NEEDED"
+          echo "coverage needed: $COVERAGE_NEEDED"
+          echo "quality:  $QUALITY_RESULT"
+          echo "test:     $TEST_RESULT"
+          echo "coverage: $COVERAGE_RESULT"
+
+          if [[ "$QUALITY_NEEDED" == "true" && "$QUALITY_RESULT" != "success" ]]; then
+            echo "::error::quality job failed"
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" && "$TEST_NEEDED" == "true" && "$TEST_RESULT" != "success" ]]; then
+            echo "::error::test job failed"
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" && "$COVERAGE_NEEDED" == "true" && "$COVERAGE_RESULT" != "success" ]]; then
+            echo "::error::coverage job failed"
             exit 1
           fi
