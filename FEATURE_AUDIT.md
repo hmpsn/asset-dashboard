@@ -4678,3 +4678,19 @@ Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E i
 **Mutual:** Keeps required-check semantics predictable while making routine non-impacting edits substantially cheaper to validate.
 
 **Files:** `.github/workflows/ci.yml`; `.github/workflows/e2e.yml`; `data/roadmap.json`.
+
+### 363. Platform Consolidation — SeoEditor Derived Logic Extraction (Phase 2)
+**What it does:** Continues the SeoEditor monolith decomposition by extracting duplicated derived logic from `SeoEditor.tsx` into `src/components/editor/seoEditorDerived.ts`. The new helper module now owns:
+- approval payload assembly for single-page sends (`buildSeoApprovalItemsForPage`)
+- approval payload assembly for bulk sends (`buildSeoApprovalItemsForSelection`)
+- page filtering and priority ranking (`filterAndSortSeoPages`)
+
+`SeoEditor.tsx` now delegates to these helpers for both `sendPageToClient` and `sendForApproval`, reducing duplicated null/changed-field comparisons and keeping CMS exclusion behavior consistent through one path. The filtering/sorting path now precomputes metadata recommendation counts per page once per render-cycle and applies ranking from that map, preserving existing output ordering while avoiding repeated recommendation scans inside sort comparisons.
+
+**Agency value:** Lower regression risk for approval payload behavior because changed-field and null-normalization logic now lives in one tested module instead of two hand-rolled call paths.
+
+**Client value:** Approval batches keep the same visible behavior (changed fields only, no `collectionId`, CMS pages excluded) with less chance of drift between single-page and multi-page send flows.
+
+**Mutual:** Shrinks the SeoEditor controller surface and creates a reusable seam for later extraction phases without changing API or UI contracts.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorDerived.ts`; `tests/unit/seo-editor-derived.test.ts`; `data/roadmap.json`.

@@ -30,6 +30,11 @@ import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { resolvePagePath } from '../lib/pathUtils';
 import type { SeoBulkMode, SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
+import {
+  buildSeoApprovalItemsForPage,
+  buildSeoApprovalItemsForSelection,
+  filterAndSortSeoPages,
+} from './editor/seoEditorDerived';
 
 interface Props {
   siteId: string;
@@ -670,19 +675,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
     // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
     if (!page || !edit || page.source === 'cms') return;
-    // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
-    const proposedTitle = edit.seoTitle ?? '';
-    const proposedDesc = edit.seoDescription ?? '';
-    const currentTitle = page.seo?.title ?? '';
-    const currentDesc = page.seo?.description ?? '';
-    const pageSlug = page.slug ?? '';
-    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
-    if (proposedTitle !== currentTitle) {
-      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle });
-    }
-    if (proposedDesc !== currentDesc) {
-      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc });
-    }
+    const items = buildSeoApprovalItemsForPage(page, edit);
     if (items.length === 0) return;
     setSendingPage(prev => new Set(prev).add(pageId));
     try {
@@ -702,37 +695,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     try {
-      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
       // filterWritableIds excludes CMS pages (source === 'cms') — these cannot be written
       // via the approvals API. collectionId is intentionally omitted: on Webflow template
       // pages it means "renders this collection", not "this is a collection item ID".
       // Passing it would mis-route items into updateCollectionItem(collectionId, pageId)
       // where pageId ≠ itemId → 404.
-      for (const pageId of filterWritableIds(Array.from(approvalSelected), pages)) {
-        const page = pages.find(p => p.id === pageId);
-        const edit = edits[pageId];
-        if (!page || !edit) continue;
-        // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
-        const proposedTitle = edit.seoTitle ?? '';
-        const proposedDesc = edit.seoDescription ?? '';
-        const currentTitle = page.seo?.title ?? '';
-        const currentDesc = page.seo?.description ?? '';
-        const pageSlug = page.slug ?? '';
-        // Include title if changed from original
-        if (proposedTitle !== currentTitle) {
-          items.push({
-            pageId, pageTitle: page.title, pageSlug,
-            field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle,
-          });
-        }
-        // Include description if changed from original
-        if (proposedDesc !== currentDesc) {
-          items.push({
-            pageId, pageTitle: page.title, pageSlug,
-            field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc,
-          });
-        }
-      }
+      const writablePageIds = filterWritableIds(Array.from(approvalSelected), pages);
+      const items = buildSeoApprovalItemsForSelection(writablePageIds, pages, edits);
       if (items.length === 0) {
         toast('No changes detected on selected pages. Edit SEO fields first.');
         setSendingApproval(false);
@@ -770,16 +739,20 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
-  const filteredPages = pages.filter(p => {
-    if (showCmsOnly && p.source !== 'cms') return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return p.title.toLowerCase().includes(q) || (p.slug || '').toLowerCase().includes(q);
-  }).sort((a, b) => {
-    const scoreA = (!a.seo?.title ? 2 : 0) + (!a.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(resolvePagePath(a)).filter((r: { type: string }) => r.type === 'metadata').length : 0);
-    const scoreB = (!b.seo?.title ? 2 : 0) + (!b.seo?.description ? 2 : 0) + (recsLoaded ? recsForPage(resolvePagePath(b)).filter((r: { type: string }) => r.type === 'metadata').length : 0);
-    return scoreB - scoreA;
-  });
+  const metadataRecommendationCountByPageId = useMemo(() => {
+    if (!recsLoaded) return new Map<string, number>();
+    return new Map(
+      pages.map(page => [
+        page.id,
+        recsForPage(resolvePagePath(page)).filter((recommendation: { type: string }) => recommendation.type === 'metadata').length,
+      ]),
+    );
+  }, [pages, recsLoaded, recsForPage]);
+
+  const filteredPages = useMemo(
+    () => filterAndSortSeoPages(pages, { search, showCmsOnly, metadataRecommendationCountByPageId }),
+    [pages, search, showCmsOnly, metadataRecommendationCountByPageId],
+  );
 
   if (loading) {
     return (
