@@ -4841,3 +4841,22 @@ Bug sniffing check included: preserved CMS write-guard behavior by keeping stati
 **Mutual:** Keeps the phase-per-PR decomposition cadence while strengthening guardrails against page-list markup drifting back into `SeoEditor.tsx`.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorPageList.tsx`; `tests/contract/seo-editor-page-list-extraction.test.ts`; `data/roadmap.json`.
+
+### 372. Platform Consolidation — SeoEditor Workflow Panels Extraction (Phase 11)
+**What it does:** Continues SeoEditor decomposition by extracting the remaining workflow panel composition from `SeoEditor.tsx` into `src/components/editor/SeoEditorWorkflowPanels.tsx`. The new component owns:
+- pending approval batch surface wiring (`PendingApprovals`)
+- unsaved-changes warning banner rendering
+- persistent SEO suggestions panel gating/rendering
+- bulk operations panel composition (`BulkOperations`)
+
+`SeoEditor.tsx` now delegates those mid-page workflow sections to one focused composition component while keeping all data/workflow orchestration in the parent.
+
+Bug sniffing check included: preserved approval refresh behavior by keeping retract callbacks wired to the same `refreshStates()` path, and preserved suggestion apply refresh behavior by continuing to invalidate the existing SeoEditor React Query key after apply.
+
+**Agency value:** Further reduces parent-shell JSX churn and centralizes workflow panel composition behind a stable boundary, making the final monolith passes lower-risk.
+
+**Client value:** No UI/API contract changes; approvals, unsaved warning, suggestions, and bulk flows remain unchanged.
+
+**Mutual:** Maintains the one-phase-per-PR decomposition loop and adds a contract guard to prevent workflow panel markup from drifting back into `SeoEditor.tsx`.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorWorkflowPanels.tsx`; `tests/contract/seo-editor-workflow-panels-extraction.test.ts`; `data/roadmap.json`.
