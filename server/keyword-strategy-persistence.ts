@@ -2,6 +2,7 @@ import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { updateWorkspace } from './workspaces.js';
 import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from './page-keywords.js';
+import { listContentGaps, replaceAllContentGaps } from './content-gaps.js';
 import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
@@ -9,7 +10,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
-import type { Workspace, PageKeywordMap, KeywordStrategy } from '../shared/types/workspace.js';
+import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type {
   KeywordStrategyCannibalizationIssue,
@@ -68,10 +69,16 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   } = searchData;
 
   const pageMap = (strategy.pageMap || []) as PageKeywordMap[];
-  // Snapshot previous page map BEFORE replacing (needed for strategy diff)
+  const newContentGaps = (strategy.contentGaps || []) as ContentGap[];
+  // Snapshot previous page map AND content gaps BEFORE replacing (needed for
+  // strategy diff). The previous strategy blob no longer holds contentGaps
+  // (#365 normalized them out), so we read from the table — those rows
+  // represent the previous strategy until replaceAllContentGaps overwrites
+  // them below.
   // NOTE: for incremental mode the orchestrator already reads page keywords during discovery,
   // but we re-read here to get the freshest snapshot right before writing.
   const prevPageMapForHistory = listPageKeywords(ws.id);
+  const prevContentGapsForHistory = listContentGaps(ws.id);
 
   // Save pageMap to dedicated table.
   // Full mode: upsert + delete stale rows (clean replacement).
@@ -99,9 +106,14 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
   });
 
-  // Strategy-level data (no pageMap) goes to workspace JSON blob
+  // Save contentGaps to dedicated table (replaces any existing rows for this workspace).
+  // The blob copy below has contentGaps stripped so the table is the single source of truth.
+  replaceAllContentGaps(ws.id, newContentGaps);
+
+  // Strategy-level data (no pageMap, no contentGaps) goes to workspace JSON blob
   const strategyMeta = { ...strategy };
   delete strategyMeta.pageMap;
+  delete strategyMeta.contentGaps;
   const keywordStrategy = {
     ...strategyMeta,
     siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
@@ -134,7 +146,11 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   // narrowing through the closure boundary on its own).
   const previousStrategy = ws.keywordStrategy;
   if (previousStrategy?.generatedAt) {
-    const previousStrategyJson = JSON.stringify(previousStrategy);
+    // Merge the previous-state contentGaps from the table back into the
+    // history snapshot so the diff endpoint can reassemble the full prior
+    // strategy without needing to query the table for historical state.
+    const previousStrategySnapshot = { ...previousStrategy, contentGaps: prevContentGapsForHistory };
+    const previousStrategyJson = JSON.stringify(previousStrategySnapshot);
     const previousGeneratedAt = previousStrategy.generatedAt;
     const saveStrategyHistory = db.transaction(() => {
       db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(

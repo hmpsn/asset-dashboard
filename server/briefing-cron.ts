@@ -44,6 +44,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
+import { listContentGaps } from './content-gaps.js';
 import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
 import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';
 import {
@@ -377,7 +378,9 @@ async function runBriefingForWorkspaceInner(
           }
         }
       } else if (candidate.referenceType === 'recommendation' && candidate.id.startsWith('gap-')) {
-        const gap = ws.keywordStrategy?.contentGaps?.find(
+        // contentGaps live in the content_gaps table (post-#365 normalization).
+        // The blob is no longer the source of truth.
+        const gap = listContentGaps(ws.id).find(
           (g) => g.targetKeyword === candidate.referenceId,
         );
         if (gap) story = buildStoryFromContentGap(gap, templateContext);

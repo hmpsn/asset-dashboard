@@ -2,7 +2,7 @@
 import { getInsights } from './analytics-insights-store.js';
 import { loadRecommendations } from './recommendations.js';
 import { getSchedule } from './scheduled-audits.js';
-import { getWorkspace } from './workspaces.js';
+import { listContentGaps } from './content-gaps.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { computeROI } from './roi.js';
 import { createLogger } from './logger.js';
@@ -226,9 +226,10 @@ export function collectAuditDeltaCandidates(workspaceId: string): Candidate[] {
  * target keyword for traceability.
  */
 export function collectContentGapCandidates(workspaceId: string): Candidate[] {
-  const ws = getWorkspace(workspaceId);
-  const gaps = ws?.keywordStrategy?.contentGaps;
-  if (!gaps || gaps.length === 0) return [];
+  // contentGaps live in the content_gaps table (post-#365 normalization).
+  // The workspace blob no longer carries them.
+  const gaps = listContentGaps(workspaceId);
+  if (gaps.length === 0) return [];
 
   const now = Date.now();
   const out: Candidate[] = [];

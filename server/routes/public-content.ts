@@ -19,6 +19,7 @@ import { sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
+import { listContentGaps } from '../content-gaps.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -103,6 +104,8 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   if (!strategy) return res.json(null);
   // Reassemble pageMap from page_keywords table
   const fullPageMap = listPageKeywords(ws.id);
+  // Reassemble contentGaps from content_gaps table (post-#365 normalization)
+  const contentGapsList = listContentGaps(ws.id);
   // Return client-safe subset (no SEO data mode/provider internals)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
@@ -124,7 +127,7 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       gscKeywords: p.gscKeywords || [],
     })),
     opportunities: strategy.opportunities || [],
-    contentGaps: (strategy.contentGaps || []).map(g => ({
+    contentGaps: contentGapsList.map(g => ({
       topic: g.topic,
       targetKeyword: g.targetKeyword,
       intent: g.intent,
