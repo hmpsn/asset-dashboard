@@ -25,7 +25,7 @@ vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
 }));
 
 vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
-  useBackgroundTasks: () => ({ cancelJob: vi.fn() }),
+  useBackgroundTasks: () => ({ cancelJob: vi.fn(), trackJob: vi.fn() }),
 }));
 
 vi.mock('../../../src/api/misc', () => ({

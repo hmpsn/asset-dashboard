@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkAcceptPanel } from '../../../src/components/audit/BulkAcceptPanel';
 import { seoBulkJobs } from '../../../src/api/seo';
 import type { SeoAuditResult } from '../../../src/components/audit/types';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 
 // ── Module mocks ────────────────────────────────────────────────────────────
 
@@ -18,8 +19,13 @@ vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: vi.fn(),
 }));
 
+const backgroundTaskMocks = vi.hoisted(() => ({
+  cancelJob: vi.fn(),
+  trackJob: vi.fn(),
+}));
+
 vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
-  useBackgroundTasks: () => ({ cancelJob: vi.fn() }),
+  useBackgroundTasks: () => backgroundTaskMocks,
 }));
 
 const mockJobsGet = vi.fn();
@@ -108,6 +114,8 @@ describe('BulkAcceptPanel — sessionStorage job recovery', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.clearAllMocks();
+    backgroundTaskMocks.cancelJob.mockReset();
+    backgroundTaskMocks.trackJob.mockReset();
   });
 
   afterEach(() => {
@@ -228,6 +236,12 @@ describe('BulkAcceptPanel — sessionStorage job recovery', () => {
     await waitFor(() => {
       expect(sessionStorage.getItem(SESSION_KEY)).toBe('persisted-job-123');
     });
+
+    expect(backgroundTaskMocks.trackJob).toHaveBeenCalledWith(
+      BACKGROUND_JOB_TYPES.SEO_BULK_ACCEPT_FIXES,
+      'persisted-job-123',
+      { workspaceId: WORKSPACE_ID },
+    );
   });
 
   it('registers acceptAll and cancel handlers with parent', async () => {

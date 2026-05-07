@@ -5,8 +5,7 @@
  * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, seo_changes, usage_tracking, activities, content_posts
  */
 import { Router } from 'express';
-
-const router = Router();
+import { broadcastToWorkspace } from '../broadcast.js';
 
 import fs from 'fs';
 import path from 'path';
@@ -45,6 +44,7 @@ import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
+import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import {
   updateAsset,
   deleteAsset,
@@ -75,8 +75,10 @@ import { buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspac
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
 import { isProgrammingError } from '../errors.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('jobs');
+const router = Router();
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
@@ -174,7 +176,9 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
             const result = await runSeoAudit(siteId, token, params.workspaceId as string, params.skipLinkCheck === true);
             // Auto-save snapshot so overview + client dashboard stay in sync
-            const ws = getWorkspace(params.workspaceId as string);
+            const ws = typeof params.workspaceId === 'string'
+              ? getWorkspace(params.workspaceId)
+              : listWorkspaces().find(w => w.webflowSiteId === siteId);
             const siteName = getBrandName(ws) || siteId;
             const snapshot = saveSnapshot(siteId, siteName, result);
             const effectiveResult = ws?.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
@@ -182,6 +186,8 @@ router.post('/api/jobs', async (req, res) => {
               addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
                 `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
                 { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
+              handleOnDemandSeoAuditResult(ws, result);
+              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
             }
             updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${effectiveResult.siteScore}` });
             // Auto-regenerate recommendations after audit
