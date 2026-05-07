@@ -39,10 +39,11 @@ function flattenInlineText(html: string): string {
 }
 
 // Finds the matching </tag> for a tag that opens at openEnd (position right
-// after the opening <tag...> tag). Returns -1 if unbalanced. Used for <div>
-// because a non-greedy regex would stop at the first inner </div> and treat
-// nested wrappers as if they were content.
-function findBalancedClose(html: string, openEnd: number, tag: string): number {
+// after the opening <tag...> tag). Returns the start (inclusive) and end
+// (exclusive of the trailing `>`) of the closing tag, or null if unbalanced.
+// Used for <div> because a non-greedy regex would stop at the first inner
+// </div> and treat nested wrappers as if they were content.
+function findBalancedClose(html: string, openEnd: number, tag: string): { start: number; end: number } | null {
   const re = new RegExp(`<(/)?${tag}\\b[^>]*>`, 'gi');
   re.lastIndex = openEnd;
   let depth = 1;
@@ -50,12 +51,12 @@ function findBalancedClose(html: string, openEnd: number, tag: string): number {
   while ((m = re.exec(html)) !== null) {
     if (m[1]) {
       depth--;
-      if (depth === 0) return m.index;
+      if (depth === 0) return { start: m.index, end: m.index + m[0].length };
     } else {
       depth++;
     }
   }
-  return -1;
+  return null;
 }
 
 export function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string; preamble: string } {
@@ -103,15 +104,15 @@ export function extractPageSections(html: string): { title: string; sections: Pa
     } else {
       // <div> opening — find balanced </div>, then decide content vs wrapper.
       const openEnd = m.index + m[0].length;
-      const closeIdx = findBalancedClose(contentHtml, openEnd, 'div');
-      if (closeIdx < 0) continue; // unbalanced — let inner tags tokenise on their own
-      const inner = contentHtml.slice(openEnd, closeIdx);
+      const close = findBalancedClose(contentHtml, openEnd, 'div');
+      if (!close) continue; // unbalanced — let inner tags tokenise on their own
+      const inner = contentHtml.slice(openEnd, close.start);
       const directOnly = inner.replace(NESTED_BLOCK_RE, ' ');
       if (flattenInlineText(directOnly).length > 0) {
         // Content div — emit as a single 'p' token and skip past </div>.
         const text = flattenInlineText(inner);
         if (text) tokens.push({ type: 'p', text });
-        tokenRegex.lastIndex = closeIdx + '</div>'.length;
+        tokenRegex.lastIndex = close.end;
       }
       // else wrapper div: lastIndex already at openEnd, inner block elements
       // will be tokenised on subsequent iterations.
