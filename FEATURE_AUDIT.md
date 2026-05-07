@@ -4916,3 +4916,21 @@ Bug sniffing outcomes: sample add/delete loading/disabled behavior remains intac
 **Mutual:** Maintains one-phase-per-PR decomposition velocity and adds phase-2 source contract guards to prevent section logic from drifting back into the root shell.
 
 **Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/SamplesSection.tsx`; `src/components/brand/voice-tab/DNASection.tsx`; `tests/contract/voice-tab-phase2-extraction.test.ts`; `data/roadmap.json`.
+
+### 376. Platform Consolidation — VoiceTab Guardrails + Calibration Workflow Extraction (Phase 3)
+**What it does:** Continues VoiceTab decomposition by extracting guardrails and calibration surfaces from `src/components/brand/VoiceTab.tsx` into focused phase-3 modules:
+- `src/components/brand/voice-tab/GuardrailsSection.tsx` now owns guardrail editing state, normalized add/remove behavior, and save orchestration.
+- `src/components/brand/voice-tab/CalibrationSection.tsx` now owns calibration UI rendering.
+- `src/components/brand/voice-tab/useVoiceCalibrationWorkflow.ts` now owns calibration state/actions (generate, rate, refine, save-feedback, save-sample).
+
+`VoiceTab.tsx` remains the public entrypoint and is now a shell that composes extracted sections.
+
+Bug sniffing fixes included: added `aria-pressed` on rating controls to tighten accessibility state feedback, and guarded refine flow against empty variation sets in the extracted workflow hook.
+
+**Agency value:** Shrinks the remaining monolith shell and isolates high-churn workflow logic behind owned modules that are easier to test and review independently.
+
+**Client value:** No UI/API contract changes; generate/refine/feedback/sample flows and guardrails behavior remain unchanged.
+
+**Mutual:** Keeps phase-per-PR decomposition velocity while adding source-contract guardrails that prevent guardrails/calibration logic from drifting back into the root shell.
+
+**Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/GuardrailsSection.tsx`; `src/components/brand/voice-tab/CalibrationSection.tsx`; `src/components/brand/voice-tab/useVoiceCalibrationWorkflow.ts`; `tests/contract/voice-tab-model-extraction.test.ts`; `tests/contract/voice-tab-phase3-extraction.test.ts`; `data/roadmap.json`.
