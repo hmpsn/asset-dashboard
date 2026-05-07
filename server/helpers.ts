@@ -417,7 +417,7 @@ export async function buildSchemaContext(
       };
     }
 
-    ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
+    ctx._siteHasSearch = ws.siteHasSearch === true;
 
   }
   // Fetch analytics maps when requested (for schema generation routes)
@@ -478,8 +478,10 @@ export async function buildSchemaContext(
 
       // Build insights map from intelligence layer (SQLite — synchronous)
       try {
+        const insightsWorkspaceId = ctx.workspaceId;
+        if (!insightsWorkspaceId) throw new Error('workspaceId missing while building schema insights map');
         // schema-context-direct-read-ok: legacy analytics store path (intentionally retained for map-shape parity)
-        const allInsights = getInsights(ws.id);
+        const allInsights = getInsights(insightsWorkspaceId);
         insightsMap = new Map();
         // ranking_opportunity pageIds are stored as relative paths after the
         // page-identity normalisation; legacy composite-key form ("path::query")

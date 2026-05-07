@@ -601,9 +601,9 @@
           "source": "Follow-up surfaced during workspace intelligence decomposition review",
           "est": "4-6h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-07",
-          "notes": "Complete the buildSchemaContext Pattern B migration by moving the remaining non-identity direct workspace reads to buildWorkspaceIntelligence slices, remove now-obsolete schema-context-direct-read-ok hatches, and keep the identity-field allow-list only."
+          "notes": "Completed 2026-05-07. Follow-up audit confirmed the Pattern B migration was functionally completed during SEO context retirement: buildSchemaContext reads businessContext, knowledgeBase, personas, siteKeywords, and business profile from `buildWorkspaceIntelligence({ slices: ['seoContext'] })`, while direct workspace reads are identity/analytics-only. This pass removed obsolete `schema-context-direct-read-ok` hatches in server/helpers.ts so the function now relies on the allow-list rule directly."
         },
         {
           "id": "platform-consolidation-keyword-strategy-compat-retirement",
