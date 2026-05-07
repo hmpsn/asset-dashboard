@@ -4626,3 +4626,16 @@ The migration replaces old SEO-context cache invalidation with `invalidateIntell
 **Mutual:** Reduces AI prompt drift risk by keeping voice, knowledge, personas, and rich prompt helpers under owned modules with explicit guardrails.
 
 **Files:** `server/intelligence/seo-context-slice.ts`; `server/intelligence/seo-context-source.ts`; `server/prompt-rich-blocks.ts`; `server/workspace-intelligence.ts`; `server/helpers.ts`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/verified-clean-rules.md`; `tests/unit/seo-context-voice-profile.test.ts`; `tests/unit/helpers.buildSchemaContext.test.ts`; `tests/unit/prompt-rich-blocks.test.ts`; `tests/pr-check.test.ts`.
+
+### 359. Platform Consolidation — Keyword Strategy Compatibility Wrapper Retirement
+**What it does:** Retires obsolete frontend compatibility paths left behind after keyword strategy generation moved to background jobs. Removed the unused direct-generation route wrapper (`keywords.generateStrategy`) and the unused SSE wrapper (`streamKeywordStrategy`) from `src/api/seo.ts`, then removed the dead SSE stream parser (`readSseStream`) from `src/api/streamUtils.ts`. Updated `src/main.tsx` auth-injection comment to reflect the remaining raw-fetch NDJSON path (`bulkGenerateAltText`) only.
+
+Added a contract guard in `tests/contract/keyword-strategy-compat-retirement.test.ts` that pins the canonical orchestration path (`startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)`) and fails if direct-generation wrappers are reintroduced.
+
+**Agency value:** Removes dead API surface area and reduces the chance of accidental reintroduction of direct long-running request paths that bypass job orchestration and shared progress handling.
+
+**Client value:** N/A — infrastructure-only cleanup with no UI behavior change.
+
+**Mutual:** Keeps keyword strategy generation on the single background-job pathway, making future workflow and reliability changes easier to reason about.
+
+**Files:** `src/api/seo.ts`; `src/api/streamUtils.ts`; `src/main.tsx`; `tests/contract/keyword-strategy-compat-retirement.test.ts`.
