@@ -4667,9 +4667,9 @@ Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to exp
 ### 362. CI Optimization — Change-Aware Job Gating + Caching
 **What it does:** Reduces GitHub Actions wall-clock time and redundant work by making CI and E2E workflows change-aware. `ci.yml` now starts with a `changes` gate (`dorny/paths-filter`) and conditionally runs `quality`, `test` (PR only), and `coverage` (push only) based on touched file classes. A final `check` job preserves a stable required status check while treating non-needed jobs as intentional skips.
 
-`e2e.yml` now uses a three-stage flow: `changes` detection, `e2e-shard` matrix execution (2 Playwright shards via `--shard=1/2` and `--shard=2/2`), and a stable top-level `e2e` aggregator check that fails only when shards fail and no-ops when E2E-relevant files did not change. This keeps branch-protection required-check semantics stable while parallelizing test runtime.
+`e2e.yml` now uses a five-stage flow: `changes` detection, `e2e-build` (single frontend build artifact), `e2e-shard` matrix execution (2 Playwright shards via `--shard=1/2` and `--shard=2/2`), `e2e-merge-report` (merge shard blob reports into one HTML report), and a stable top-level `e2e` aggregator check that fails only when required upstream jobs fail and no-ops when E2E-relevant files did not change. This keeps branch-protection required-check semantics stable while parallelizing runtime and removing duplicate per-shard frontend builds.
 
-Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E includes Playwright browser caching keyed by Playwright version to avoid repeated browser downloads.
+Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E includes Playwright browser caching keyed by Playwright version to avoid repeated browser downloads. Shard runs now emit blob reports that are merged into a single `playwright-report-merged` artifact for one-pane debugging.
 
 **Agency value:** Faster feedback on PRs, fewer wasted runner minutes, and less queue contention from duplicate in-flight runs.
 
