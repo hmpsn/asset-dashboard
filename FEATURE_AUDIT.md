@@ -4803,3 +4803,22 @@ Bug sniffing fix included: reset tracking now routes through one shared helper p
 **Mutual:** Advances the monolith decomposition with a low-risk, composition-first slice while preserving workflow behavior and adding guardrail coverage for extracted shell controls.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorTrackingSummary.tsx`; `src/components/editor/SeoEditorTableControls.tsx`; `tests/contract/seo-editor-shell-controls-extraction.test.ts`; `data/roadmap.json`.
+
+### 370. Platform Consolidation — SeoEditor Header Actions Extraction (Phase 9)
+**What it does:** Continues SeoEditor decomposition by extracting the top action/status surface from `SeoEditor.tsx` into `src/components/editor/SeoEditorHeaderActions.tsx`. The new component owns:
+- stats row rendering for total pages + missing title/description badges
+- refresh/AI bulk-fix/publish action controls
+- approval send panel placement in the header action row
+- bulk-fix progress/success banners
+
+`SeoEditor.tsx` now delegates this shell block and keeps orchestration/state ownership in the parent.
+
+Bug sniffing check included: preserved existing enable/disable behavior and publish/approval wiring exactly through callback props, with a contract guard that blocks toolbar markup from drifting back into the monolith shell.
+
+**Agency value:** Removes another high-density JSX block from the remaining shell and narrows the parent component’s responsibility to data orchestration and composition.
+
+**Client value:** No UI/API contract changes; header controls and status banners keep the same behavior and copy.
+
+**Mutual:** Keeps decomposition velocity steady with a low-risk extraction while improving maintainability and regression guardrails.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorHeaderActions.tsx`; `tests/contract/seo-editor-header-actions-extraction.test.ts`; `data/roadmap.json`.
