@@ -4663,3 +4663,16 @@ Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to exp
 **Mutual:** Keeps the schema-context migration story internally consistent and easier to audit going forward.
 
 **Files:** `server/helpers.ts`; `data/roadmap.json`.
+
+### 362. CI Optimization — Change-Aware Job Gating + Caching
+**What it does:** Reduces GitHub Actions wall-clock time and redundant work by making CI and E2E workflows change-aware. `ci.yml` now starts with a `changes` gate (`dorny/paths-filter`) and conditionally runs `quality`, `test` (PR only), and `coverage` (push only) based on touched file classes. A final `check` job preserves a stable required status check while treating non-needed jobs as intentional skips. `e2e.yml` keeps a single stable `e2e` job but gates heavy setup/test steps behind an E2E-relevant file filter and emits a skip summary when no relevant changes are detected.
+
+Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E adds Playwright browser caching keyed by Playwright version to avoid repeated browser downloads.
+
+**Agency value:** Faster feedback on PRs, fewer wasted runner minutes, and less queue contention from duplicate in-flight runs.
+
+**Client value:** N/A — delivery pipeline optimization with no direct user-facing UI/API behavior change.
+
+**Mutual:** Keeps required-check semantics predictable while making routine non-impacting edits substantially cheaper to validate.
+
+**Files:** `.github/workflows/ci.yml`; `.github/workflows/e2e.yml`; `data/roadmap.json`.

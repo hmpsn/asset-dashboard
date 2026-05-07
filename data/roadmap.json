@@ -87,6 +87,16 @@
           "priority": "P1",
           "status": "done",
           "notes": "Shipped — Phase 1: replaced all PostEditor/SectionEditor/PostReviewCard textareas with TipTap v3 rich text editor (bold/italic/H2/H3/links via BubbleMenu). New useAutoSave hook (debounced 2s, stale-closure-safe). Reading time added to PostPreview. Phase 2: AI 'Fix This' button on failed ReviewChecklist items. POST /api/content-posts/:wsId/:postId/ai-fix with 6 issue-key strategies (factual_accuracy, brand_voice, internal_links, no_hallucinations, meta_optimized, word_count_target). FixDiffModal shows two-column before/after diff. AiFixResult + IssueKey shared types. POST_UPDATED broadcast added to PATCH handler. 6 unit tests (useAutoSave) + 6 integration tests (ai-fix endpoint)."
+        },
+        {
+          "id": 628,
+          "title": "CI runtime optimization — path-filtered jobs, concurrency cancellation, and Playwright cache",
+          "source": "PR CI optimization follow-up (May 2026)",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-07",
+          "notes": "Shipped in .github/workflows/ci.yml and .github/workflows/e2e.yml. Added workflow-level concurrency cancel-in-progress to avoid duplicate runs per branch/PR. Split CI into change-detection + conditional quality/test/coverage jobs, moved coverage off PRs to push-only, and added required-check aggregation so branch protections stay stable. Added file-change gating via dorny/paths-filter for both CI and E2E so unchanged docs/non-runtime edits skip heavy jobs. Added Playwright browser cache keyed by Playwright version to avoid re-downloading browsers on every run."
         }
       ]
     },

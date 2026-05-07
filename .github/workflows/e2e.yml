@@ -6,40 +6,85 @@ on:
   pull_request:
     branches: [main, staging]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pull-requests: read
     env:
       DATA_DIR: /tmp/asset-dashboard-ci
+      LOG_LEVEL: warn
     steps:
       - uses: actions/checkout@v5
 
+      - name: Detect E2E-relevant changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            e2e:
+              - 'src/**'
+              - 'server/**'
+              - 'shared/**'
+              - 'tests/e2e/**'
+              - 'playwright.config.ts'
+              - 'playwright.visual.config.ts'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/e2e.yml'
+
+      - name: E2E skip summary
+        if: steps.changes.outputs.e2e != 'true'
+        run: 'echo "Skipping E2E: no E2E-relevant file changes detected."'
+
       - uses: actions/setup-node@v5
+        if: steps.changes.outputs.e2e == 'true'
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
+        if: steps.changes.outputs.e2e == 'true'
         run: npm ci
 
+      - name: Get Playwright version
+        if: steps.changes.outputs.e2e == 'true'
+        id: playwright-version
+        run: echo "version=$(node -p \"require('@playwright/test/package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        if: steps.changes.outputs.e2e == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.changes.outputs.e2e == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Build frontend
+        if: steps.changes.outputs.e2e == 'true'
         run: npm run build
 
       - name: Create data directory
+        if: steps.changes.outputs.e2e == 'true'
         run: mkdir -p $DATA_DIR
 
       - name: Run Playwright tests
+        if: steps.changes.outputs.e2e == 'true'
         run: npx playwright test
         env:
           CI: true
           JWT_SECRET: e2e-test-secret
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.e2e == 'true' }}
         uses: actions/upload-artifact@v5
         with:
           name: playwright-report
