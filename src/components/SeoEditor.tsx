@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertCircle,
-} from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions } from '../api/seo';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -11,15 +8,13 @@ import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor, usePageJoin } from '../hooks/admin';
-import { LoadingState, Icon } from './ui';
+import { LoadingState } from './ui';
 import { useToast } from './Toast';
-import { BulkOperations } from './editor/BulkOperations';
-import { PendingApprovals } from './PendingApprovals';
-import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { SeoEditorTableControls } from './editor/SeoEditorTableControls';
 import { SeoEditorTrackingSummary } from './editor/SeoEditorTrackingSummary';
 import { SeoEditorHeaderActions } from './editor/SeoEditorHeaderActions';
 import { SeoEditorPageList } from './editor/SeoEditorPageList';
+import { SeoEditorWorkflowPanels } from './editor/SeoEditorWorkflowPanels';
 import { resolvePagePath } from '../lib/pathUtils';
 import type { SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
@@ -317,16 +312,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onPublish={handlePublish}
       />
 
-      {/* Pending approval batches sent to client */}
-      {workspaceId && (
-        <PendingApprovals
-          workspaceId={workspaceId}
-          refreshKey={approvalRefreshKey}
-          nameFilter="SEO"
-          onRetracted={() => refreshStates()}
-        />
-      )}
-
       <SeoEditorTrackingSummary
         workspaceId={workspaceId}
         summary={summary}
@@ -351,35 +336,37 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onSearchChange={setSearch}
       />
 
-      {hasUnsaved && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-[var(--radius-lg)] t-caption-sm text-accent-warning">
-          <Icon as={AlertCircle} size="md" /> You have unsaved changes. Save individual pages then publish to go live.
-        </div>
-      )}
-
-      {/* Persistent SEO Suggestions Panel */}
-      {workspaceId && suggestionsData && suggestionsData.suggestions.length > 0 && (
-        <SeoSuggestionsPanel
-          workspaceId={workspaceId}
-          suggestions={suggestionsData.suggestions}
-          counts={suggestionsData.counts}
-          onRefresh={() => refetchSuggestions()}
-          onApplied={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) })}
-        />
-      )}
-
-      <BulkOperations
-        filteredPages={filteredPages} approvalSelected={approvalSelected}
-        bulkMode={bulkMode} bulkField={bulkField} patternAction={patternAction}
-        patternText={patternText} bulkPreview={bulkPreview} bulkProgress={bulkProgress}
-        bulkSource={bulkSource} pages={pages}
-        onSelectAll={selectAllForApproval} onSetBulkField={setBulkField}
-        onSetBulkMode={setBulkMode} onSetPatternAction={setPatternAction}
-        onSetPatternText={setPatternText} onPreviewPattern={previewPattern}
-        onApplyPattern={applyPattern} onApplyBulkRewrite={applyBulkRewrite}
-        onBulkAiRewrite={bulkAiRewrite}
-        onCancelRewrite={cancelRewrite}
-        onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
+      <SeoEditorWorkflowPanels
+        workspaceId={workspaceId}
+        approvalRefreshKey={approvalRefreshKey}
+        onApprovalsRetracted={refreshStates}
+        hasUnsaved={hasUnsaved}
+        suggestionsData={suggestionsData}
+        onRefreshSuggestions={() => refetchSuggestions()}
+        onSuggestionsApplied={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) })}
+        bulkOperationsProps={{
+          filteredPages,
+          approvalSelected,
+          bulkMode,
+          bulkField,
+          patternAction,
+          patternText,
+          bulkPreview,
+          bulkProgress,
+          bulkSource,
+          pages,
+          onSelectAll: selectAllForApproval,
+          onSetBulkField: setBulkField,
+          onSetBulkMode: setBulkMode,
+          onSetPatternAction: setPatternAction,
+          onSetPatternText: setPatternText,
+          onPreviewPattern: previewPattern,
+          onApplyPattern: applyPattern,
+          onApplyBulkRewrite: applyBulkRewrite,
+          onBulkAiRewrite: bulkAiRewrite,
+          onCancelRewrite: cancelRewrite,
+          onClearPreview: () => { setBulkMode('idle'); setBulkPreview([]); },
+        }}
       />
 
       <SeoEditorPageList
