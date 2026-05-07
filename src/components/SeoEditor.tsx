@@ -31,8 +31,6 @@ import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { resolvePagePath } from '../lib/pathUtils';
 import type { SeoBulkMode, SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
-  buildSeoApprovalItemsForPage,
-  buildSeoApprovalItemsForSelection,
   filterAndSortSeoPages,
 } from './editor/seoEditorDerived';
 import {
@@ -41,6 +39,7 @@ import {
   buildPatternApplyPayload,
   buildPatternPreviewItems,
 } from './editor/seoEditorBulkHelpers';
+import { useSeoEditorApprovalWorkflow } from './editor/useSeoEditorApprovalWorkflow';
 import {
   buildSeoEditsFromPages,
   getSeoDraftKey,
@@ -113,12 +112,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showCmsOnly, setShowCmsOnly] = useState(false);
-  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
-  const [sendingApproval, setSendingApproval] = useState(false);
-  const [approvalSent, setApprovalSent] = useState(false);
-  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
-  const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
-  const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
     return readCachedSeoVariations(siteId);
   });
@@ -540,22 +533,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     }
   };
 
-  const toggleApprovalSelect = (pageId: string) => {
-    setApprovalSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
-      return next;
-    });
-  };
-
-  const selectAllForApproval = () => {
-    if (approvalSelected.size === filteredPages.length) {
-      setApprovalSelected(new Set());
-    } else {
-      setApprovalSelected(new Set(filteredPages.map(p => p.id)));
-    }
-  };
-
   // ── Bulk Pattern Apply ──
   const previewPattern = () => {
     if (!patternText.trim()) return;
@@ -634,62 +611,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };
 
-  const sendPageToClient = async (pageId: string) => {
-    if (!workspaceId) return;
-    const page = pages.find(p => p.id === pageId);
-    const edit = edits[pageId];
-    // CMS pages (sitemap-discovered or template pages) cannot be written via the approvals
-    // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
-    // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
-    if (!page || !edit || page.source === 'cms') return;
-    const items = buildSeoApprovalItemsForPage(page, edit);
-    if (items.length === 0) return;
-    setSendingPage(prev => new Set(prev).add(pageId));
-    try {
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: `SEO Review — ${page.title}`, items });
-      setSentPage(prev => new Set(prev).add(pageId));
-      refreshStates();
-      setTimeout(() => setSentPage(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 4000);
-    } catch (err) {
-      console.error('SeoEditor sendPageToClient failed:', err);
-      const msg = err instanceof Error ? err.message : 'Failed to send for review';
-      toast(msg);
-    }
-    setSendingPage(prev => { const n = new Set(prev); n.delete(pageId); return n; });
-  };
-
-  const sendForApproval = async () => {
-    if (!workspaceId || approvalSelected.size === 0) return;
-    setSendingApproval(true);
-    try {
-      // filterWritableIds excludes CMS pages (source === 'cms') — these cannot be written
-      // via the approvals API. collectionId is intentionally omitted: on Webflow template
-      // pages it means "renders this collection", not "this is a collection item ID".
-      // Passing it would mis-route items into updateCollectionItem(collectionId, pageId)
-      // where pageId ≠ itemId → 404.
-      const writablePageIds = filterWritableIds(Array.from(approvalSelected), pages);
-      const items = buildSeoApprovalItemsForSelection(writablePageIds, pages, edits);
-      if (items.length === 0) {
-        toast('No changes detected on selected pages. Edit SEO fields first.');
-        setSendingApproval(false);
-        return;
-      }
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: `SEO Changes — ${new Date().toLocaleDateString()}`, items });
-      setApprovalSent(true);
-      // Refresh page edit states to reflect the new 'in-review' status
-      refreshStates();
-      setApprovalSelected(new Set());
-      setApprovalRefreshKey(k => k + 1);
-      setTimeout(() => setApprovalSent(false), 4000);
-    } catch (err) {
-      console.error('Failed to send for approval:', err);
-      const msg = err instanceof Error ? err.message : 'Failed to send for approval';
-      toast(msg);
-    } finally {
-      setSendingApproval(false);
-    }
-  };
-
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -720,6 +641,27 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     () => filterAndSortSeoPages(pages, { search, showCmsOnly, metadataRecommendationCountByPageId }),
     [pages, search, showCmsOnly, metadataRecommendationCountByPageId],
   );
+  const {
+    approvalSelected,
+    setApprovalSelected,
+    sendingApproval,
+    approvalSent,
+    approvalRefreshKey,
+    sendingPage,
+    sentPage,
+    toggleApprovalSelect,
+    selectAllForApproval,
+    sendPageToClient,
+    sendForApproval,
+  } = useSeoEditorApprovalWorkflow({
+    workspaceId,
+    siteId,
+    pages,
+    edits,
+    filteredPageIds: filteredPages.map(page => page.id),
+    refreshStates,
+    toast,
+  });
 
   if (loading) {
     return (

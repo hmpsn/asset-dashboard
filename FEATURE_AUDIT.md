@@ -4729,3 +4729,22 @@ Bug sniffing fix included: cache readers now reject array payloads when object r
 **Mutual:** Shrinks the monolith surface and adds a guardrail against persistence regressions before larger workflow-hook extractions.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorPersistence.ts`; `tests/unit/seo-editor-persistence.test.ts`; `tests/contract/seo-editor-persistence-extraction.test.ts`; `data/roadmap.json`.
+
+### 366. Platform Consolidation — SeoEditor Approval Workflow Hook Extraction (Phase 5)
+**What it does:** Continues SeoEditor decomposition by extracting approval orchestration state/handlers out of `SeoEditor.tsx` into `src/components/editor/useSeoEditorApprovalWorkflow.ts`. The new hook now owns:
+- approval-selection/sending/sent state (`approvalSelected`, `sendingApproval`, `approvalSent`, `approvalRefreshKey`, `sendingPage`, `sentPage`)
+- page-level approval submission (`sendPageToClient`)
+- bulk approval submission (`sendForApproval`)
+- selection toggles (`toggleApprovalSelect`, `selectAllForApproval`)
+
+`SeoEditor.tsx` now delegates approval workflow orchestration through the hook and keeps rendering wiring unchanged for `PageEditRow` and `ApprovalPanel`.
+
+Bug sniffing fix included: select-all logic now checks whether all filtered IDs are actually selected (not just matching set size), preventing mismatched selections from being incorrectly cleared when filters change.
+
+**Agency value:** Reduces workflow-state density in the monolith and makes approval orchestration easier to review/test in isolation.
+
+**Client value:** No UI/API contract changes; approval send flows behave the same with a safer edge-case selection toggle path.
+
+**Mutual:** Creates the next stable extraction seam while tightening behavior around filtered multi-select approval actions.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorApprovalWorkflow.ts`; `tests/unit/seo-editor-approval-workflow.test.ts`; `tests/contract/seo-editor-approval-extraction.test.ts`; `data/roadmap.json`.
