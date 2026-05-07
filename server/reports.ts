@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { seoAuditResultSchema, actionItemSchema } from './schemas/workspace-schemas.js';
 import { fireBridge, withWorkspaceLock } from './bridge-infrastructure.js';
 import { listWorkspaces } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
@@ -112,15 +113,25 @@ interface SnapshotRow {
   previous_score: number | null;
 }
 
+// No type annotation so empty arrays widen to `never[]`, which assigns to both
+// the SeoAuditResult interface and the passthrough Zod fallback parameter.
+const EMPTY_AUDIT = {
+  siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [],
+};
+
 function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
   return {
     id: row.id,
     siteId: row.site_id,
     siteName: row.site_name,
     createdAt: row.created_at,
-    audit: parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult),
+    audit: parseJsonSafe(row.audit, seoAuditResultSchema, EMPTY_AUDIT, {
+      table: 'audit_snapshots', field: 'audit',
+    }) as SeoAuditResult,
     logoUrl: row.logo_url ?? undefined,
-    actionItems: row.action_items ? parseJsonFallback(row.action_items, []) : [],
+    actionItems: parseJsonSafeArray(row.action_items, actionItemSchema, {
+      table: 'audit_snapshots', field: 'action_items',
+    }) as ActionItem[],
     previousScore: row.previous_score ?? undefined,
   };
 }
@@ -423,7 +434,9 @@ export function getSnapshot(id: string): AuditSnapshot | null {
 export function listSnapshots(siteId: string): SnapshotSummary[] {
   const rows = listSnapshotsStmt().all(siteId) as SnapshotRow[];
   return rows.map(row => {
-    const audit = parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult);
+    const audit = parseJsonSafe(row.audit, seoAuditResultSchema, EMPTY_AUDIT, {
+      table: 'audit_snapshots', field: 'audit',
+    }) as SeoAuditResult;
     return {
       id: row.id,
       createdAt: row.created_at,
