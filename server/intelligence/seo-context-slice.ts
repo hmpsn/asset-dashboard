@@ -31,9 +31,24 @@ export async function assembleSeoContext(
     log.warn({ err: pkErr, workspaceId }, 'assembleSeoContext: listPageKeywords failed, falling back to stored pageMap');
   }
 
+  // contentGaps now live in the content_gaps table (post-#365 normalization).
+  // The stored keyword_strategy blob has them stripped, so always reassemble
+  // from the table here.
+  let liveContentGaps: Awaited<ReturnType<typeof import('../content-gaps.js').listContentGaps>> = [];
+  try {
+    const { listContentGaps } = await import('../content-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    liveContentGaps = listContentGaps(workspaceId);
+  } catch (cgErr) {
+    log.warn({ err: cgErr, workspaceId }, 'assembleSeoContext: listContentGaps failed, content gaps unavailable');
+  }
+
   const base: SeoContextSlice = {
     strategy: workspace?.keywordStrategy
-      ? { ...workspace.keywordStrategy, pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap }
+      ? {
+          ...workspace.keywordStrategy,
+          pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap,
+          contentGaps: liveContentGaps,
+        }
       : workspace?.keywordStrategy,
     // Store RAW brand voice value (no headers) for legacy read-only consumers that need
     // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST

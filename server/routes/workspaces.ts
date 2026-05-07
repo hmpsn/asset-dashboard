@@ -332,6 +332,9 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     const siteName = ws.name || 'this website';
     const keywordBlock = seoCtx ? formatKeywordsForPrompt(seoCtx) : '';
     const bizContext = seoCtx?.businessContext ?? '';
+    // assembleSeoContext now reassembles `strategy.contentGaps` from the
+    // dedicated content_gaps table (post-#365 normalization), so reading off
+    // the slice here continues to work — the blob no longer carries them.
     const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map(g => g.topic).join(', ') ?? '';
 
     const contextParts: string[] = [`Site name: ${siteName}`];

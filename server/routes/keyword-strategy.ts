@@ -13,12 +13,13 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
+import { listContentGaps, replaceAllContentGaps } from '../content-gaps.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordStrategy } from '../../shared/types/workspace.js';
+import type { KeywordStrategy, ContentGap } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
@@ -44,12 +45,20 @@ function readSeoDataMode(body: unknown): string | undefined {
   return typeof candidate === 'string' ? candidate : undefined;
 }
 
-function serializeKeywordStrategy(strategy: KeywordStrategy, pageMap: ReturnType<typeof listPageKeywords>) {
-  const { semrushMode, ...rest } = strategy;
+function serializeKeywordStrategy(
+  strategy: KeywordStrategy,
+  pageMap: ReturnType<typeof listPageKeywords>,
+  contentGaps: ContentGap[],
+) {
+  // Strip any stale `contentGaps` left in the blob in favor of the table —
+  // the migration on startup removes it from the blob, but be defensive
+  // against callers that still mutate the blob in-memory.
+  const { semrushMode, contentGaps: _staleGaps, ...rest } = strategy;
   return {
     ...rest,
     seoDataMode: strategy.seoDataMode ?? semrushMode ?? 'none',
     pageMap,
+    contentGaps,
   };
 }
 
@@ -145,16 +154,18 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
   const pageMap = listPageKeywords(ws.id);
+  const contentGaps = listContentGaps(ws.id);
   if (!strategy && pageMap.length === 0) return res.json(null);
   if (!strategy) {
     return res.json({
       siteKeywords: [],
       opportunities: [],
       pageMap,
+      contentGaps,
       generatedAt: null,
     });
   }
-  res.json(serializeKeywordStrategy(strategy, pageMap));
+  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps));
 });
 
 // Get strategy diff (compare current vs previous)
@@ -182,8 +193,13 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAc
   const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
   const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
 
+  // Previous gaps come from the history snapshot (which now bakes in the
+  // table state at save-time, see keyword-strategy-persistence.ts).
+  // Current gaps come from the live content_gaps table — the blob no longer
+  // carries them after #365 normalization.
+  const currentContentGaps = listContentGaps(ws.id);
   const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
-  const currGapKws = new Set<string>((current.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const currGapKws = new Set<string>(currentContentGaps.map((g) => g.targetKeyword));
   const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
   const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
 
@@ -237,19 +253,26 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
     });
   }
-  // Save non-pageMap fields to workspace blob.
-  // Guard: if the workspace has no existing strategy blob AND the patch only updates pageMap
-  // (no siteKeywords/opportunities/etc.), don't silently fabricate a blob with just a timestamp —
-  // that would promote a shell-state workspace to a "real" strategy without any AI-generated content.
-  // This matters for callers like PageIntelligence that only patch pageMap.
-  const { pageMap: _pm, ...rest } = req.body;
+  // If contentGaps is being updated, save to dedicated table (replace-all
+  // semantics — same as the strategy generation write path).
+  if (Array.isArray(req.body.contentGaps)) {
+    replaceAllContentGaps(ws.id, req.body.contentGaps as ContentGap[]);
+  }
+  // Save non-pageMap, non-contentGaps fields to workspace blob.
+  // Guard: if the workspace has no existing strategy blob AND the patch only updates
+  // table-backed fields (pageMap and/or contentGaps), don't silently fabricate a
+  // blob with just a timestamp — that would promote a shell-state workspace to a
+  // "real" strategy without any AI-generated content. This matters for callers
+  // like PageIntelligence that only patch pageMap.
+  const { pageMap: _pm, contentGaps: _cg, ...rest } = req.body;
   const hasBlobFields = Object.keys(rest).length > 0;
   const blobExists = ws.keywordStrategy != null;
   let updated: KeywordStrategy | null = null;
   if (hasBlobFields || blobExists) {
-    // Only bump generatedAt when strategy-level fields change. A pure-pageMap patch on an
-    // existing blob should preserve the original generation timestamp — otherwise the
-    // KeywordStrategy panel misleadingly shows "Generated [today]" for every per-page edit.
+    // Only bump generatedAt when strategy-level fields change. A pure-pageMap or
+    // pure-contentGaps patch on an existing blob should preserve the original
+    // generation timestamp — otherwise the KeywordStrategy panel misleadingly
+    // shows "Generated [today]" for every per-page or per-gap edit.
     const preservedGeneratedAt = blobExists && !hasBlobFields
       ? ws.keywordStrategy?.generatedAt
       : undefined;
@@ -258,6 +281,9 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       ...rest,
       generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
     } as KeywordStrategy;
+    // Strip any stray `contentGaps` from the merged blob — the table is the
+    // source of truth post-#365 normalization.
+    delete (updated as { contentGaps?: unknown }).contentGaps;
     updateWorkspace(ws.id, { keywordStrategy: updated });
   }
   invalidateIntelligenceCache(ws.id);
@@ -265,6 +291,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   // invalidate their React Query caches. Without this, pageMap edits from PageIntelligence
   // leave KeywordStrategy/SeoEditor showing stale pageMap until staleTime expires.
   const responsePageMap = listPageKeywords(ws.id);
+  const responseContentGaps = listContentGaps(ws.id);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: responsePageMap.length,
     siteKeywords: updated?.siteKeywords?.length ?? 0,
@@ -279,12 +306,13 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   // surface a synthesized shell (same shape as GET) so the client can render pageMap
   // without assuming a real strategy.
   if (updated) {
-    res.json({ ...updated, pageMap: responsePageMap });
+    res.json({ ...updated, pageMap: responsePageMap, contentGaps: responseContentGaps });
   } else {
     res.json({
       siteKeywords: [],
       opportunities: [],
       pageMap: responsePageMap,
+      contentGaps: responseContentGaps,
       generatedAt: null,
     });
   }

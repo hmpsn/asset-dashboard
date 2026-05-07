@@ -32,6 +32,7 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { addTrackedKeyword } from '../rank-tracking.js';
+import { listContentGaps } from '../content-gaps.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -868,9 +869,12 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // is workspace-scoped strategy data with no admin-only fields TODAY, but a
   // future field added there must NOT silently leak through `...gap`. Any
   // change to the public projection now requires touching this list.
-  const gaps = ws.keywordStrategy?.contentGaps ?? [];
+  // Source contentGaps from the dedicated table (post-#365 normalization).
+  // The blob no longer carries them — listContentGaps is the only source of truth.
+  const gaps = listContentGaps(ws.id);
+  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number };
   const recommendations: BriefingRecommendation[] = gaps
-    .map((gap) => ({
+    .map((gap): GapMapped => ({
       topic: gap.topic,
       targetKeyword: gap.targetKeyword,
       intent: gap.intent,

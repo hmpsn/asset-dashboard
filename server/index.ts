@@ -46,6 +46,10 @@ runMigrations();
 import { migrateFromJsonBlob } from './page-keywords.js';
 migrateFromJsonBlob();
 
+// Migrate keywordStrategy.contentGaps from workspace JSON blobs into the content_gaps table (idempotent)
+import { migrateFromJsonBlob as migrateContentGapsFromJsonBlob } from './content-gaps.js';
+migrateContentGapsFromJsonBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

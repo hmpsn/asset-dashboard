@@ -25,6 +25,7 @@ import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
+import { listContentGaps } from './content-gaps.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -918,8 +919,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // Content gaps → ongoing
-    if (strategy.contentGaps) {
-      for (const cg of strategy.contentGaps) {
+    // Sourced from the content_gaps table (post-#365 normalization), not the
+    // strategy blob — the blob no longer carries contentGaps after generation.
+    const strategyContentGaps = listContentGaps(workspaceId);
+    if (strategyContentGaps.length > 0) {
+      for (const cg of strategyContentGaps) {
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 
