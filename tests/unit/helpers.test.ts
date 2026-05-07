@@ -1,5 +1,6 @@
 /**
  * Unit tests for server/helpers.ts — pure utility functions.
+ * CI benchmark note: metadata-only edit to trigger PR test-shard runtime measurement.
  */
 import { describe, it, expect } from 'vitest';
 import {
