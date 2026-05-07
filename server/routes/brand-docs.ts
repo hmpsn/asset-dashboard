@@ -1,6 +1,6 @@
 /**
  * Brand Docs — list, upload, and delete .txt/.md files from workspace brand-docs/ folder.
- * These files are read by readBrandDocs() in seo-context.ts and injected into all AI prompts.
+ * These files are read by the SEO context intelligence source and injected into AI prompts.
  */
 import { Router } from 'express';
 import fs from 'fs';

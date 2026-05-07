@@ -591,9 +591,9 @@
           "source": "Follow-up surfaced during workspace intelligence decomposition review",
           "est": "4-6h",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-07",
-          "notes": "Move RICH_BLOCKS_PROMPT and raw brand/knowledge/persona helpers to owned modules, replace clearSeoContextCache callers with invalidateIntelligenceCache, port the voice-authority behavior into the seoContext slice with parity tests, then remove the remaining seo-context.ts bridge exception from pr-check."
+          "notes": "Completed 2026-05-07. Deleted server/seo-context.ts after moving RICH_BLOCKS_PROMPT to server/prompt-rich-blocks.ts and raw brand/knowledge plus voice-authority helpers to server/intelligence/seo-context-source.ts. assembleSeoContext now computes effectiveBrandVoiceBlock directly, schema context reads knowledge/personas from the seoContext slice, old clearSeoContextCache callers use invalidateIntelligenceCache, and pr-check now hard-blocks production imports from the retired module. See FEATURE_AUDIT entry 358."
         },
         {
           "id": "platform-consolidation-schema-context-slice-migration",
@@ -886,8 +886,9 @@
           "est": "2-3h cumulative across opportunistic PRs",
           "priority": "P1",
           "sprint": "I",
-          "status": "in-progress",
-          "notes": "Trajectory 3 → 1 migration. Direct reads in server/helpers.ts:buildSchemaContext → corresponding seoContext slice fields. Each migration is opportunistic — done when adjacent code is touched for other reasons. Completion gates Pillar 3 reactivation.\n\nRemaining queue (5 fields):\n  1. brandVoice            → seoContext.brandVoice\n  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)\n  3. knowledgeBase         → seoContext.knowledgeBase\n  4. _businessProfile      → seoContext.businessProfile\n  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)\n\nPR1 (schema-yoast-parity-fields) ports siteKeywords as the pattern anchor (committed outside this queue since it shipped with the PR). Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) intentionally stay as direct reads — they're per-entity DB fields, not on a slice.\n\nMigration completion criterion: zero non-allowlisted direct reads in buildSchemaContext (verified by pr-check rule schema-context-direct-read-not-on-allowlist). At that point, Pillar 3 (compile-time + CI gates) reactivates."
+          "status": "done",
+          "shippedAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. buildSchemaContext now reads schema context from `buildWorkspaceIntelligence({ slices: ['seoContext'] })` for businessContext, knowledgeBase, personas, siteKeywords, and business profile (including structured address + foundedDate/numberOfEmployees via seoContext.businessProfile). Legacy `ctx.brandVoice` assignment was removed as dead schema context. Remaining direct reads are identity-only (`ws.name`, `ws.id`, `ws.liveDomain`, `ws.brandLogoUrl`, `ws.siteHasSearch`, `_siteId`) plus analytics maps, matching the allowlist intent behind `schema-context-direct-read-not-on-allowlist`."
         },
         {
           "id": "schema-cleanup-dead-pageKeywordMap",

@@ -1,4 +1,3 @@
-import { clearSeoContextCache } from './seo-context.js'; // seo-context-ok: strategy persistence must invalidate legacy SEO context caches after writes.
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { updateWorkspace } from './workspaces.js';
@@ -95,7 +94,6 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   }
   // Bridge #5: page keywords replaced — invalidate page caches
   debouncedPageAnalysisInvalidate(ws.id, () => {
-    clearSeoContextCache(ws.id);
     invalidateIntelligenceCache(ws.id);
     invalidateSubCachePrefix(ws.id, 'slice:seoContext');
     invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
@@ -154,7 +152,6 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     pageCount: pageMap.length,
     siteKeywords: keywordStrategy.siteKeywords?.length || 0,
   });
-  clearSeoContextCache(ws.id);
   invalidateIntelligenceCache(ws.id);
   // Bridge #3: strategy updated — debounced intelligence invalidation
   debouncedStrategyInvalidate(ws.id, () => {

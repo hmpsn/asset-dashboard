@@ -51,13 +51,8 @@ vi.mock('../server/chat-memory.js', () => ({
 
 // ── Mocks for other slices used by workspace-intelligence.ts ──────────────
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));

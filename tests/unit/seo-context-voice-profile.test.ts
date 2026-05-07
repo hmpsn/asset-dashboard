@@ -1,7 +1,7 @@
 /**
- * Regression test for the `hasVoiceProfile` silent-drop bug in buildSeoContext.
+ * Regression test for the `hasVoiceProfile` silent-drop bug in the SEO context slice.
  *
- * Bug (pre-fix): `buildSeoContext` at server/seo-context.ts:120 / :174 used
+ * Bug (pre-fix): the legacy SEO context builder used
  * `getVoiceProfile(workspaceId) !== null` to decide whether to replace the
  * legacy `brandVoiceBlock` (containing workspace.brandVoice + brand-docs
  * content) with `voiceProfileBlock`. When a profile existed but produced an
@@ -23,7 +23,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import db from '../../server/db/index.js';
-import { buildSeoContext, clearSeoContextCache } from '../../server/seo-context.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../../server/workspace-intelligence.js';
 import {
   createVoiceProfile,
   addVoiceSample,
@@ -48,6 +48,12 @@ const SENTINEL_GUARDRAILS: VoiceGuardrails = {
   toneBoundaries: ['Never condescending'],
   antiPatterns: [],
 };
+
+async function getEffectiveBrandVoiceBlock(workspaceId: string): Promise<string> {
+  invalidateIntelligenceCache(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  return intel.seoContext?.effectiveBrandVoiceBlock ?? '';
+}
 
 interface SeededWs {
   workspaceId: string;
@@ -78,13 +84,13 @@ function seedWorkspaceWithLegacyVoice(): SeededWs {
     db.prepare('DELETE FROM voice_samples WHERE voice_profile_id IN (SELECT id FROM voice_profiles WHERE workspace_id = ?)').run(workspaceId);
     db.prepare('DELETE FROM voice_profiles WHERE workspace_id = ?').run(workspaceId);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(workspaceId);
-    clearSeoContextCache(workspaceId);
+    invalidateIntelligenceCache(workspaceId);
   };
 
   return { workspaceId, cleanup };
 }
 
-describe('buildSeoContext — voice profile authority vs legacy brand voice', () => {
+describe('seoContext slice — voice profile authority vs legacy brand voice', () => {
   let seeded: SeededWs | null = null;
 
   afterEach(() => {
@@ -92,7 +98,7 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     seeded = null;
   });
 
-  it('preserves legacy brand voice when only a draft profile exists (explicitly created)', () => {
+  it('preserves legacy brand voice when only a draft profile exists (explicitly created)', async () => {
     // Simulates: admin has workspace.brandVoice set, creates a voice profile via
     // POST /api/voice/:id. Pre-fix, the mere existence of that draft row caused
     // the legacy brand voice to be silently dropped from every subsequent prompt.
@@ -100,15 +106,14 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     const profile = createVoiceProfile(seeded.workspaceId);
     expect(profile.status).toBe('draft');
     expect(profile.samples).toHaveLength(0);
-    clearSeoContextCache(seeded.workspaceId);
+    invalidateIntelligenceCache(seeded.workspaceId);
 
-    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
-    expect(ctx.fullContext).toContain(LEGACY_VOICE_TEXT);
-    expect(ctx.brandVoiceBlock).toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).toContain(LEGACY_VOICE_TEXT);
   });
 
-  it('uses voice profile and drops legacy when profile is calibrated with ≥1 sample', () => {
+  it('uses voice profile and drops legacy when profile is calibrated with ≥1 sample', async () => {
     seeded = seedWorkspaceWithLegacyVoice();
     createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
@@ -119,19 +124,19 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
-    clearSeoContextCache(seeded.workspaceId);
+    invalidateIntelligenceCache(seeded.workspaceId);
 
-    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy must be gone — the voice profile is now the single source of truth
-    expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
     // The calibrated voice profile block contains the sample (DNA + guardrails
     // are held out here and injected by Layer 2 in buildSystemPrompt — that's
     // the whole reason we can't also include the legacy block)
-    expect(ctx.fullContext).toContain(SAMPLE_TEXT);
+    expect(effectiveBlock).toContain(SAMPLE_TEXT);
   });
 
-  it('drops legacy brand voice when profile is calibrated with zero samples (Layer 2 covers it)', () => {
+  it('drops legacy brand voice when profile is calibrated with zero samples (Layer 2 covers it)', async () => {
     // This is the original bug: a calibrated profile with DNA + guardrails but
     // no samples causes buildVoiceProfileContext to return ''. Pre-fix, the
     // code would use that '' as the effective brand voice — dropping legacy
@@ -148,16 +153,15 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
-    clearSeoContextCache(seeded.workspaceId);
+    invalidateIntelligenceCache(seeded.workspaceId);
 
-    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy is NOT in the user-prompt context — calibrated Layer 2 owns voice.
-    expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
-    expect(ctx.brandVoiceBlock).not.toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
   });
 
-  it('preserves legacy brand voice when draft profile has only samples (no DNA, no guardrails)', () => {
+  it('preserves legacy brand voice when draft profile has only samples (no DNA, no guardrails)', async () => {
     // Regression for the post-PR-#168 review flag: an admin who opens the
     // Voice tab and uploads a single sample should NOT silently lose their
     // previously-configured legacy `workspace.brandVoice` text. Samples
@@ -172,16 +176,15 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
     // No DNA, no guardrails, no status change — pure "uploaded one sample".
-    clearSeoContextCache(seeded.workspaceId);
+    invalidateIntelligenceCache(seeded.workspaceId);
 
-    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy MUST still be present — the admin hasn't committed to the new path yet.
-    expect(ctx.fullContext).toContain(LEGACY_VOICE_TEXT);
-    expect(ctx.brandVoiceBlock).toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).toContain(LEGACY_VOICE_TEXT);
   });
 
-  it('activates override when draft profile has DNA saved (even before calibration)', () => {
+  it('activates override when draft profile has DNA saved (even before calibration)', async () => {
     // Symmetric to the samples-only test: once the admin has committed to
     // the new voice system by saving actual DNA (e.g. via the calibration
     // wizard that persists DNA mid-flow), the override DOES activate and
@@ -190,14 +193,14 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
     updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
-    clearSeoContextCache(seeded.workspaceId);
+    invalidateIntelligenceCache(seeded.workspaceId);
 
-    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy is gone — the admin's DNA save was the commitment signal.
-    expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
     // The voice profile block is now active and contains the sample text.
-    expect(ctx.fullContext).toContain(SAMPLE_TEXT);
+    expect(effectiveBlock).toContain(SAMPLE_TEXT);
   });
 });
 

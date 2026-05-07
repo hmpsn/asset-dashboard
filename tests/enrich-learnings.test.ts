@@ -37,8 +37,8 @@ vi.mock('../server/outcome-tracking.js', () => ({
 }));
 
 // Mock other assembler dependencies to prevent import errors
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({ strategy: null, brandVoiceBlock: '', businessContext: '', knowledgeBlock: '' })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));

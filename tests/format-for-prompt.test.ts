@@ -520,11 +520,8 @@ describe('formatForPrompt', () => {
 
 import { vi } from 'vitest';
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null, brandVoiceBlock: 'Voice: concise', businessContext: 'B2B SaaS',
-    knowledgeBlock: '', personasBlock: '',
-  })),
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => 'Voice: concise'),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));

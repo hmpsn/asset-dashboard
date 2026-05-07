@@ -261,7 +261,7 @@ export async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: content status optional, degrading gracefully');
   }
 
-  // contentGaps — prefer per-page AI keyword analysis (same source as old buildPageAnalysisContext),
+  // contentGaps — prefer per-page AI keyword analysis from persisted pageMap data,
   // fall back to strategy content gaps filtered by keyword if page analysis hasn't run yet.
   let contentGaps: string[] = pageKw?.contentGaps ?? [];
   if (contentGaps.length === 0) {

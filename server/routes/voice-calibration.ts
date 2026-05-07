@@ -12,7 +12,6 @@ import {
   generateCalibrationVariations, refineVariation,
   saveVariationFeedback,
 } from '../voice-calibration.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
@@ -116,7 +115,6 @@ router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), v
     const result = updateVoiceProfile(req.params.workspaceId, req.body);
     addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
-    clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
@@ -145,7 +143,6 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
     const sample = addVoiceSample(req.params.workspaceId, content, contextTag, source);
     addActivity(req.params.workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
-    clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(sample);
   } catch (err) {
@@ -162,7 +159,6 @@ router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAcces
   if (!ok) return res.status(404).json({ error: 'Not found' });
   addActivity(req.params.workspaceId, 'voice_sample_deleted', 'Deleted voice sample');
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: req.params.sampleId, deleted: true });
-  clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json({ deleted: true });
 });
@@ -185,7 +181,6 @@ router.post('/api/voice/:workspaceId/calibrate',
       const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
       addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
-      clearSeoContextCache(req.params.workspaceId);
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(session);
     } catch (err) {
@@ -220,7 +215,6 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
       }
       addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
-      clearSeoContextCache(req.params.workspaceId);
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(session);
     } catch (err) {

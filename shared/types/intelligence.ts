@@ -93,12 +93,12 @@ export interface SeoContextSlice {
   /**
    *  Pre-formatted prompt block with voice-authority applied. Inject DIRECTLY into prompts
    *  — it already carries the emphatic BRAND VOICE header when non-empty. Source of
-   *  truth: buildSeoContext(workspaceId).brandVoiceBlock.
+   *  truth: buildEffectiveBrandVoiceBlock(workspaceId) in the SEO context source.
    *
    *  Authority rule:
    *    - profile.status === 'calibrated' → voice profile block (Layer 2 system prompt covers DNA)
-   *    - profile has real content (samples/examples) → voice profile block
-   *    - otherwise → legacy workspace.brandVoice + readBrandDocs() block
+   *    - profile has saved DNA/guardrails and rendered profile content → voice profile block
+   *    - otherwise → legacy workspace.brandVoice + brand-docs block
    *
    *  Empty string means "no brand voice configured" — render nothing.
    */
@@ -388,9 +388,20 @@ export interface BusinessProfile {
   targetAudience: string;
   phone?: string;
   email?: string;
+  /** Prompt-friendly one-line address text (e.g. "street, city, state, zip, country"). */
   address?: string;
+  /** Source-of-truth structured address for schema and contact-aware consumers. */
+  addressParts?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
   socialProfiles?: string[];
   openingHours?: string;
+  foundedDate?: string;
+  numberOfEmployees?: string;
 }
 
 export interface BacklinkProfile {

@@ -146,7 +146,7 @@ const MISSING_SCHEMA_RE = /no such (table|column)/i;
 
 /**
  * Safe wrapper for voice-calibration reads — tables may not exist in test envs
- * or before brand-engine migrations have run. Mirrors the pattern in seo-context.ts.
+ * or before brand-engine migrations have run. Mirrors the SEO context source pattern.
  */
 function safeVoiceRead<T>(context: string, wsId: string, fn: () => T, fallback: T): T {
   try {

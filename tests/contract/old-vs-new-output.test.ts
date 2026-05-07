@@ -9,7 +9,7 @@ import { seoContextMock } from '../fixtures/seo-context-mock.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 
-vi.mock('../../server/seo-context.js', () => seoContextMock());
+vi.mock('../../server/intelligence/seo-context-source.js', () => seoContextMock());
 
 vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: vi.fn(() => false) }));
 
@@ -309,7 +309,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
   // NOTE: there is no formatBrandVoiceForPrompt contract test. The raw brandVoice
   // field bypasses voice-profile authority, so there is no helper that wraps it
   // with a standalone header — callers inject `seo?.effectiveBrandVoiceBlock`
-  // directly, which `buildSeoContext` already formats with the emphatic BRAND
+  // directly, which the SEO context source already formats with the emphatic BRAND
   // VOICE header when non-empty. See PR #167.
 
   it('formatKnowledgeBaseForPrompt matches old knowledgeBlock header', async () => {

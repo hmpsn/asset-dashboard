@@ -208,15 +208,15 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   const lines: string[] = ['## SEO Context'];
 
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
-  // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
-  // already computed by `buildSeoContext` with full voice authority (calibrated profile
+  // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it is
+  // computed by the SEO context source with full voice authority (calibrated profile
   // → voice samples block; else legacy brandVoice + brand-docs block; else empty). An
   // empty string means "render nothing here" and is INTENTIONAL when the workspace is
   // calibrated with no samples — `buildSystemPrompt` Layer 2 handles DNA + guardrails
   // via the system message. Injecting raw `ctx.brandVoice` as a fallback would bypass
   // the authority rule and produce two contradictory voice sources (see the bug from
   // PR #167 where the `else if` fallback re-injected legacy voice on calibrated empty
-  // profiles). `.trim()` strips the leading `\n\n` from buildSeoContext's output.
+  // profiles). `.trim()` strips the leading `\n\n` from the source output.
   const voiceBlock = (ctx.effectiveBrandVoiceBlock ?? '').trim();
   if (voiceBlock) {
     lines.push(voiceBlock);
@@ -815,17 +815,17 @@ export function formatKeywordsForPrompt(seo: SeoContextSlice | null | undefined)
 
   let keywordBlock = '';
 
-  // Site-level keywords (matches seo-context.ts line 111-112)
+  // Site-level keywords from the seoContext strategy slice.
   const siteKw = seo.strategy.siteKeywords?.slice(0, 8).join(', ');
   if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
 
-  // Business context (matches seo-context.ts line 115-118)
+  // Business context from the resolved slice, with strategy fallback.
   const businessContext = seo.businessContext || seo.strategy.businessContext || '';
   if (businessContext) {
     keywordBlock += `\nGeneral business context: ${businessContext}`;
   }
 
-  // Page-specific keywords from pageKeywords slice field (matches seo-context.ts line 121-133)
+  // Page-specific keywords from the pageKeywords slice field.
   const pageKw = seo.pageKeywords;
   if (pageKw) {
     keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
@@ -846,7 +846,7 @@ export function formatKeywordsForPrompt(seo: SeoContextSlice | null | undefined)
 export function formatPersonasForPrompt(personas: AudiencePersona[] | null | undefined): string {
   if (!personas?.length) return '';
 
-  // Matches buildPersonasContext() in seo-context.ts lines 322-331
+  // Keep this shape stable because schema, chat, and prompt callers share it.
   const personaStr = personas.map(p => {
     const parts = [`**${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
     if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
@@ -868,7 +868,7 @@ export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, 
 
   if (!pageMap.length) return '';
 
-  // Matches buildKeywordMapContext() in seo-context.ts lines 395-399
+  // Preserves the legacy keyword-map prompt shape used before retirement.
   const mapStr = pageMap.map(
     p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`
   ).join('\n');

@@ -83,7 +83,7 @@ export type VoiceSampleSource =
   | 'identity_approved'    // Phase 1: approved taglines/pitches become samples
   | 'copy_approved';       // Phase 3: approved copy sections become samples
 
-// ═══ CONTEXT EMPHASIS (for seo-context.ts builders) ═══
+// ═══ CONTEXT EMPHASIS (for SEO context source builders) ═══
 /**
  * Controls verbosity of brand context injected into AI prompts.
  * Phase 1 callers default to 'full'. Phase 3 uses 'summary'/'minimal' for smart context selection.

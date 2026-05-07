@@ -16,16 +16,14 @@ function readServerFiles(dir = 'server'): { path: string; content: string }[] {
 }
 
 describe('bridge pairing', () => {
-  it('every clearSeoContextCache call is paired with invalidateIntelligenceCache', () => {
+  it('production server files do not import the retired seo-context module', () => {
     const files = readServerFiles();
-    const unpaired: string[] = [];
+    const offenders: string[] = [];
     for (const { path, content } of files) {
-      // Skip the definition files themselves
-      if (path.includes('seo-context.ts') || path.includes('bridge-infrastructure.ts')) continue;
-      if (content.includes('clearSeoContextCache') && !content.includes('invalidateIntelligenceCache')) {
-        unpaired.push(path);
+      if (/(?:from\s+['"][^'"]*seo-context(?:\.js)?['"]|import\s*\(\s*['"][^'"]*seo-context(?:\.js)?['"])/.test(content)) {
+        offenders.push(path);
       }
     }
-    expect(unpaired).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 });

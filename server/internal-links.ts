@@ -275,7 +275,7 @@ export async function analyzeInternalLinks(
     : null;
   const seo = intel?.seoContext;
   // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
-  // already computed by `buildSeoContext` with full voice authority applied. When a
+  // computed by the seoContext slice source with full voice authority applied. When a
   // workspace has a calibrated voice profile with zero samples, this is INTENTIONALLY
   // empty: the rule in CLAUDE.md ("Prompt assembly layers must not duplicate content")
   // says Layer 2 `buildSystemPrompt` injects DNA+guardrails into the system message for

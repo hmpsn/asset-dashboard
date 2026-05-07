@@ -2,31 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Static mocks (hoisted before module resolution) ──────────────────────────
 
-vi.mock('../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: {
+vi.mock('../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional, data-driven, and authoritative. No fluff.'),
+  getRawBrandVoice: vi.fn(() => 'Professional, data-driven, and authoritative. No fluff.'),
+  getRawKnowledge: vi.fn(() => 'We specialize in enterprise SEO analytics with real-time rank tracking and AI-powered insights.'),
+}));
+
+vi.mock('../server/feature-flags.js', () => ({ isFeatureEnabled: vi.fn(() => false) }));
+
+vi.mock('../server/workspaces.js', () => ({
+  getWorkspace: vi.fn(() => ({
+    id: 'ws-equiv',
+    personas: [],
+    webflowSiteId: null,
+    keywordStrategy: {
       siteKeywords: ['enterprise seo', 'analytics platform', 'seo tools'],
       pageMap: [{ pagePath: '/features', primaryKeyword: 'enterprise seo', secondaryKeywords: ['seo analytics'] }],
       opportunities: [],
       businessContext: 'Enterprise SEO analytics platform serving Fortune 500 companies',
       generatedAt: new Date().toISOString(),
     },
-    brandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional, data-driven, and authoritative. No fluff.',
-    businessContext: 'Enterprise SEO analytics platform serving Fortune 500 companies',
-    knowledgeBlock: '\n\nBUSINESS KNOWLEDGE BASE:\nWe specialize in enterprise SEO analytics with real-time rank tracking and AI-powered insights.',
-    personasBlock: '',
-    keywordBlock: '',
-    fullContext: '',
   })),
-  getRawBrandVoice: vi.fn(() => 'Professional, data-driven, and authoritative. No fluff.'),
-  getRawKnowledge: vi.fn(() => 'We specialize in enterprise SEO analytics with real-time rank tracking and AI-powered insights.'),
-  clearSeoContextCache: vi.fn(),
-}));
-
-vi.mock('../server/feature-flags.js', () => ({ isFeatureEnabled: vi.fn(() => false) }));
-
-vi.mock('../server/workspaces.js', () => ({
-  getWorkspace: vi.fn(() => ({ id: 'ws-equiv', personas: [], webflowSiteId: null })),
   listWorkspaces: vi.fn(() => []),
 }));
 
@@ -85,7 +81,7 @@ describe('buildIntelPrompt behavioral equivalence', () => {
   });
 
   // 1. Brand voice flows through
-  it('seoContext slice includes brand voice content from buildSeoContext', async () => {
+  it('seoContext slice includes brand voice content from the SEO context source', async () => {
     const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
     const result = await buildIntelPrompt(WS_ID, ['seoContext']);
     expect(result).toContain('Professional, data-driven, and authoritative');
@@ -190,18 +186,12 @@ describe('buildIntelPrompt behavioral equivalence', () => {
 
   // 8. Cold-start detection — empty workspace returns fallback message, not crash
   it('returns cold-start message for workspace with no data', async () => {
-    const seoContext = await import('../server/seo-context.js');
-    vi.mocked(seoContext.buildSeoContext).mockReturnValueOnce({
-      strategy: null,
-      brandVoiceBlock: '',
-      businessContext: '',
-      knowledgeBlock: '',
-      personasBlock: '',
-      keywordBlock: '',
-      fullContext: '',
-    } as ReturnType<typeof seoContext.buildSeoContext>);
-    vi.mocked(seoContext.getRawBrandVoice).mockReturnValueOnce('');
-    vi.mocked(seoContext.getRawKnowledge).mockReturnValueOnce('');
+    const seoContextSource = await import('../server/intelligence/seo-context-source.js');
+    const workspaces = await import('../server/workspaces.js');
+    vi.mocked(seoContextSource.buildEffectiveBrandVoiceBlock).mockReturnValueOnce('');
+    vi.mocked(seoContextSource.getRawBrandVoice).mockReturnValueOnce('');
+    vi.mocked(seoContextSource.getRawKnowledge).mockReturnValueOnce('');
+    vi.mocked(workspaces.getWorkspace).mockReturnValueOnce({ id: WS_ID, personas: [], webflowSiteId: null } as any);
 
     await invalidateCache();
 

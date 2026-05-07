@@ -48,7 +48,6 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
@@ -259,8 +258,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
-  clearSeoContextCache(req.params.id); // Invalidate cached AI context
-  invalidateIntelligenceCache(req.params.id);
+  invalidateIntelligenceCache(req.params.id); // Invalidate cached AI context
   // Bridge #11: debounced cascade — re-invalidates intelligence cache 2s later to catch any
   // cache repopulation that occurred between the immediate clear above and this deferred pass.
   debouncedSettingsCascade(req.params.id, () => {

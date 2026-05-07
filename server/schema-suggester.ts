@@ -283,7 +283,6 @@ export interface SchemaContext {
   liveDomain?: string;
   logoUrl?: string;
   businessContext?: string;
-  brandVoice?: string;
   pageKeywords?: { primary: string; secondary: string[] };
   searchIntent?: string;
   siteKeywords?: string[];

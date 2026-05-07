@@ -10,7 +10,6 @@ import {
   setDeliverableStatus, exportDeliverables,
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getWorkspace } from '../workspaces.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
@@ -95,7 +94,6 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
-    clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
@@ -123,7 +121,6 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
     }
     addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
-    clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
@@ -144,7 +141,6 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
     addActivity(req.params.workspaceId, 'brand_deliverable_reverted', `Reverted ${typeLabel} deliverable to draft`);
   }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status });
-  clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);
 });

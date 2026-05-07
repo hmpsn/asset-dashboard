@@ -43,7 +43,6 @@ import {
   extractPatterns,
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getEntry } from '../page-strategy.js';
 import type { BatchJob } from '../../shared/types/copy-pipeline.js';
@@ -493,7 +492,6 @@ router.post(
     const { steeringNotes } = req.body as { steeringNotes: string[] };
     try {
       const patterns = await extractPatterns(workspaceId, steeringNotes);
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, {
         extracted: patterns.length,
@@ -527,7 +525,6 @@ router.patch(
       } else if (pattern !== undefined || patternType !== undefined) {
         return res.status(400).json({ error: 'Both pattern and patternType are required to update pattern text' });
       }
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId });
       return res.json({ updated: true });
@@ -546,7 +543,6 @@ router.delete(
     const { workspaceId, patternId } = req.params;
     try {
       removePattern(patternId, workspaceId);
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId, deleted: true });
       addActivity(workspaceId, 'copy_pattern_removed', `Removed copy intelligence pattern`);

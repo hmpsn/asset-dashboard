@@ -29,7 +29,6 @@ import { parseJsonSafeArray } from '../db/json-validation.js';
 import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { addTrackedKeyword } from '../rank-tracking.js';
@@ -553,7 +552,6 @@ router.post('/api/public/business-priorities/:workspaceId', requireClientStrateg
 
     updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
     // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
-    clearSeoContextCache(wsId);
     invalidateIntelligenceCache(wsId);
     debouncedStrategyInvalidate(wsId, () => {
       invalidateIntelligenceCache(wsId);
@@ -618,7 +616,6 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
 
   // businessProfile feeds into workspace-intelligence.ts (base.businessProfile → AI prompts).
   // Flush caches immediately so AI chat/strategy use the updated data.
-  clearSeoContextCache(wsId);
   invalidateIntelligenceCache(wsId);
   broadcastToWorkspace(wsId, WS_EVENTS.WORKSPACE_UPDATED, { businessProfile: ws.businessProfile });
   // client-visibility-ok: business-profile edits are internal audit history, not client timeline content.

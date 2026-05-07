@@ -4,9 +4,9 @@
  *
  * Why this file exists: historically, three separate call sites hand-wrote the
  * same `VOICE DNA:` block —
- *   - server/seo-context.ts       (buildVoiceProfileContext, non-calibrated path)
- *   - server/voice-calibration.ts (buildVoiceCalibrationContext)
- *   - server/prompt-assembly.ts   (Layer 2, calibrated path)
+ *   - server/intelligence/seo-context-source.ts (non-calibrated context path)
+ *   - server/voice-calibration.ts               (buildVoiceCalibrationContext)
+ *   - server/prompt-assembly.ts                 (Layer 2, calibrated path)
  * All three drifted. Two of them silently dropped `vocabularyLevel` for months
  * until a code review caught it. This helper prevents that class of bug by
  * forcing every field in `VoiceDNA` to be handled in one place.
@@ -75,7 +75,7 @@ export function renderVoiceDNAForPrompt(dna: VoiceDNA): string {
 /**
  * Convenience: return a single-line voice summary for `emphasis: 'minimal'`
  * contexts where the full block would be overkill. Used by
- * `buildVoiceProfileContext(workspaceId, 'minimal')` in seo-context.ts.
+ * the SEO context intelligence source.
  */
 export function renderVoiceDNASummary(dna: VoiceDNA): string {
   const traits = dna.personalityTraits.slice(0, 3).join(', ');

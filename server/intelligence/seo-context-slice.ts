@@ -4,6 +4,7 @@ import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../helpers.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import db from '../db/index.js';
+import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, getRawKnowledge } from './seo-context-source.js';
 
 const log = createLogger('workspace-intelligence/seo-context');
 
@@ -17,11 +18,7 @@ export async function assembleSeoContext(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<SeoContextSlice> {
-  const { buildSeoContext, getRawBrandVoice, getRawKnowledge } = await import('../seo-context.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
   const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-  // Pass _skipShadow to prevent circular recursion:
-  // buildWorkspaceIntelligence → assembleSeoContext → buildSeoContext → shadow mode → buildWorkspaceIntelligence → ∞
-  const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
   const workspace = getWorkspace(workspaceId);
 
   // Populate pageMap from the page_keywords table (not from the stored keyword_strategy column,
@@ -35,9 +32,9 @@ export async function assembleSeoContext(
   }
 
   const base: SeoContextSlice = {
-    strategy: ctx.strategy
-      ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
-      : ctx.strategy,
+    strategy: workspace?.keywordStrategy
+      ? { ...workspace.keywordStrategy, pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap }
+      : workspace?.keywordStrategy,
     // Store RAW brand voice value (no headers) for legacy read-only consumers that need
     // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST
     // use `effectiveBrandVoiceBlock` below (which already applies voice-profile authority).
@@ -48,13 +45,13 @@ export async function assembleSeoContext(
     // authority-layered variant (it's the same raw text everywhere).
     brandVoice: getRawBrandVoice(workspaceId),
     // Pre-formatted block with voice-profile authority applied. Source of truth:
-    // buildSeoContext().brandVoiceBlock, which honors the rule that voice profile
+    // buildEffectiveBrandVoiceBlock(), which honors the rule that voice profile
     // replaces legacy brandVoice only when (a) status === 'calibrated' (Layer 2 system
-    // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is non-empty.
+    // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is authoritative.
     // Intelligence-path callers inject this DIRECTLY — it already carries the emphatic
     // BRAND VOICE header when non-empty.
-    effectiveBrandVoiceBlock: ctx.brandVoiceBlock,
-    businessContext: ctx.businessContext,
+    effectiveBrandVoiceBlock: buildEffectiveBrandVoiceBlock(workspaceId),
+    businessContext: workspace?.keywordStrategy?.businessContext ?? '',
     personas: workspace?.personas ?? [],
     knowledgeBase: getRawKnowledge(workspaceId),
   };
@@ -111,7 +108,8 @@ export async function assembleSeoContext(
   const contactProfile = workspace?.businessProfile;
   const hasContactInfo = contactProfile && (
     contactProfile.phone || contactProfile.email || contactProfile.address ||
-    contactProfile.socialProfiles?.length || contactProfile.openingHours
+    contactProfile.socialProfiles?.length || contactProfile.openingHours ||
+    contactProfile.foundedDate || contactProfile.numberOfEmployees
   );
   if (hasContactInfo) {
     if (!base.businessProfile) {
@@ -121,6 +119,13 @@ export async function assembleSeoContext(
     if (contactProfile!.email) base.businessProfile.email = contactProfile!.email;
     if (contactProfile!.address) {
       const a = contactProfile!.address;
+      base.businessProfile.addressParts = {
+        street: a.street,
+        city: a.city,
+        state: a.state,
+        zip: a.zip,
+        country: a.country,
+      };
       base.businessProfile.address = [a.street, a.city, a.state, a.zip, a.country]
         .filter(Boolean)
         .join(', ');
@@ -130,6 +135,12 @@ export async function assembleSeoContext(
     }
     if (contactProfile!.openingHours) {
       base.businessProfile.openingHours = contactProfile!.openingHours;
+    }
+    if (contactProfile!.foundedDate) {
+      base.businessProfile.foundedDate = contactProfile!.foundedDate;
+    }
+    if (contactProfile!.numberOfEmployees) {
+      base.businessProfile.numberOfEmployees = contactProfile!.numberOfEmployees;
     }
   }
 

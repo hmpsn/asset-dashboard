@@ -4,7 +4,6 @@
 import { Router } from 'express';
 import { callAI } from '../ai.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
-import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
@@ -188,7 +187,6 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
     // Bridge #5: page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
-      clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
       invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');

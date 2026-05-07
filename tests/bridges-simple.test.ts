@@ -39,18 +39,17 @@ describe('PR 2B Bridge Wiring Verification', () => {
     });
   });
 
-  describe('Bridge #5: page analysis → clear caches', () => {
+  describe('Bridge #5: page analysis → invalidate intelligence cache', () => {
     it('webflow-keywords.ts calls debouncedPageAnalysisInvalidate', () => {
-      const src = readFileSync('server/routes/webflow-keywords.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 calls debouncedPageAnalysisInvalidate (which calls clearSeoContextCache and invalidateIntelligenceCache) in webflow-keywords.ts.
+      const src = readFileSync('server/routes/webflow-keywords.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 calls debouncedPageAnalysisInvalidate and invalidateIntelligenceCache in webflow-keywords.ts.
       expect(src).toContain('debouncedPageAnalysisInvalidate');
-      expect(src).toContain('clearSeoContextCache');
       expect(src).toContain('invalidateIntelligenceCache');
     });
 
     it('page-analysis-job.ts calls debouncedPageAnalysisInvalidate', () => {
-      const src = readFileSync('server/page-analysis-job.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 also calls debouncedPageAnalysisInvalidate and clearSeoContextCache in the background page-analysis worker.
+      const src = readFileSync('server/page-analysis-job.ts', 'utf-8'); // readFile-ok — bridge wiring guard: asserts Bridge #5 also calls debouncedPageAnalysisInvalidate in the background page-analysis worker.
       expect(src).toContain('debouncedPageAnalysisInvalidate');
-      expect(src).toContain('clearSeoContextCache');
+      expect(src).toContain('invalidateIntelligenceCache');
     });
   });
 

@@ -59,13 +59,8 @@ vi.mock('../../server/feature-flags.js', () => ({
 
 // ── SEO context dependencies ──────────────────────────────────────────────────
 
-vi.mock('../../server/seo-context.js', () => ({
-  buildSeoContext: vi.fn(() => ({
-    strategy: null,
-    brandVoiceBlock: '',
-    businessContext: '',
-    knowledgeBlock: '',
-  })),
+vi.mock('../../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => ''),
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
@@ -400,19 +395,13 @@ describe('contract: SeoContextSlice field population', () => {
 
   it('effectiveBrandVoiceBlock passthrough: non-empty brandVoiceBlock reaches slice', async () => {
     // Regression guard: the empty-path test above only verifies the contract when
-    // buildSeoContext returns an empty block. This test verifies the non-empty
+    // the SEO context source returns an empty block. This test verifies the non-empty
     // passthrough — if `assembleSeoContext` ever silently stripped, transformed, or
-    // mis-wired the field, this would catch it. The default mock at line 62 returns
+    // mis-wired the field, this would catch it. The default mock above returns
     // empty, so we re-mock for this test only.
     const SENTINEL_BLOCK = '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nSentinel contract voice';
-    const seoContextMock = await import('../../server/seo-context.js');
-    const originalBuildSeoContext = vi.mocked(seoContextMock.buildSeoContext);
-    originalBuildSeoContext.mockReturnValueOnce({
-      strategy: null,
-      brandVoiceBlock: SENTINEL_BLOCK,
-      businessContext: '',
-      knowledgeBlock: '',
-    } as any);
+    const seoContextSource = await import('../../server/intelligence/seo-context-source.js');
+    vi.mocked(seoContextSource.buildEffectiveBrandVoiceBlock).mockReturnValueOnce(SENTINEL_BLOCK);
 
     const result = await getSlice<SeoContextSlice>('seoContext');
 
