@@ -11,15 +11,15 @@ import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor, usePageJoin } from '../hooks/admin';
-import { LoadingState, EmptyState, Icon } from './ui';
+import { LoadingState, Icon } from './ui';
 import { useToast } from './Toast';
-import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 import { SeoEditorTableControls } from './editor/SeoEditorTableControls';
 import { SeoEditorTrackingSummary } from './editor/SeoEditorTrackingSummary';
 import { SeoEditorHeaderActions } from './editor/SeoEditorHeaderActions';
+import { SeoEditorPageList } from './editor/SeoEditorPageList';
 import { resolvePagePath } from '../lib/pathUtils';
 import type { SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
@@ -382,51 +382,41 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
       />
 
-      {/* Page list */}
-      <div className="space-y-2">
-        {showCmsOnly && filteredPages.length === 0 && (
-          <EmptyState
-            icon={AlertCircle}
-            title="No CMS pages found"
-            description="No CMS collection pages were discovered via sitemap. Static pages are hidden while this filter is active."
-          />
-        )}
-        {filteredPages.map(page => (
-          <div key={page.id}>
-            {page.source === 'cms' && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded t-caption-sm text-accent-warning mb-1">
-                <Icon as={AlertCircle} size="sm" />
-                Manual apply required — CMS pages must be updated directly in Webflow
-              </div>
-            )}
-            <PageEditRow
-              page={page} edit={edits[page.id]}
-              expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
-              isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
-              isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
-              isSelected={approvalSelected.has(page.id)}
-              pageRecs={recsLoaded ? recsForPage(resolvePagePath(page)) : []}
-              pageState={getState(page.id)} variations={variations[page.id]}
-              showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
-              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && ((edits[page.id].seoTitle ?? '') !== (page.seo?.title ?? '') || (edits[page.id].seoDescription ?? '') !== (page.seo?.description ?? '')))}
-              onSendToClient={sendPageToClient}
-              onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
-              onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
-              onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
-              onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
-              onClearTracking={workspaceId ? clearPageTracking : undefined}
-              errorState={errorStates[page.id] || null}
-              showPreview={previewExpanded.has(page.id)}
-              onTogglePreview={togglePreview}
-              onAnalyzePage={workspaceId ? analyzePage : undefined}
-              hasAnalysis={analyzedPages.has(page.id)}
-              isAnalyzing={analyzing.has(page.id)}
-              primaryKeyword={pageKeywordMap.get(page.id)?.primaryKeyword}
-              secondaryKeywords={pageKeywordMap.get(page.id)?.secondaryKeywords}
-            />
-          </div>
-        ))}
-      </div>
+      <SeoEditorPageList
+        workspaceId={workspaceId}
+        showCmsOnly={showCmsOnly}
+        filteredPages={filteredPages}
+        expanded={expanded}
+        saving={saving}
+        saved={saved}
+        aiLoading={aiLoading}
+        draftSaving={draftSaving}
+        draftSaved={draftSaved}
+        approvalSelected={approvalSelected}
+        getPageRecommendations={(page) => (recsLoaded ? recsForPage(resolvePagePath(page)) : [])}
+        getPageState={getState}
+        variations={variations}
+        sendingPage={sendingPage}
+        sentPage={sentPage}
+        onSendToClient={sendPageToClient}
+        onToggleExpand={toggleExpand}
+        onToggleApprovalSelect={toggleApprovalSelect}
+        onUpdateField={updateField}
+        onSavePage={savePage}
+        onSaveDraft={saveDraft}
+        onAiRewrite={aiRewrite}
+        onSelectVariation={updateField}
+        onClearVariations={(pageId) => setVariations(prev => { const next = { ...prev }; delete next[pageId]; return next; })}
+        onClearTracking={workspaceId ? clearPageTracking : undefined}
+        errorStates={errorStates}
+        previewExpanded={previewExpanded}
+        onTogglePreview={togglePreview}
+        onAnalyzePage={workspaceId ? analyzePage : undefined}
+        analyzedPages={analyzedPages}
+        analyzing={analyzing}
+        pageKeywordMap={pageKeywordMap}
+        edits={edits}
+      />
     </div>
   );
 }

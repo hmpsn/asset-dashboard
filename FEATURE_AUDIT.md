@@ -4822,3 +4822,22 @@ Bug sniffing check included: preserved existing enable/disable behavior and publ
 **Mutual:** Keeps decomposition velocity steady with a low-risk extraction while improving maintainability and regression guardrails.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorHeaderActions.tsx`; `tests/contract/seo-editor-header-actions-extraction.test.ts`; `data/roadmap.json`.
+
+### 371. Platform Consolidation — SeoEditor Page List Extraction (Phase 10)
+**What it does:** Continues SeoEditor decomposition by extracting the page-list rendering surface from `SeoEditor.tsx` into `src/components/editor/SeoEditorPageList.tsx`. The new component owns:
+- CMS-only empty-state rendering
+- per-page CMS manual-apply banner rendering
+- `PageEditRow` mapping/wiring for expand/save/draft/rewrite/analyze/preview/send actions
+- per-row `hasChanges` evaluation against current edit state
+
+`SeoEditor.tsx` now delegates page-list composition and keeps orchestration/state ownership in the parent shell.
+
+Bug sniffing check included: preserved CMS write-guard behavior by keeping static-only save wiring (`onSave` disabled for CMS rows) and retained row-level tracking clear/analyze gating by workspace context.
+
+**Agency value:** Removes another dense JSX block from the monolith shell and isolates high-churn row rendering behind one focused component boundary.
+
+**Client value:** No UI/API contract changes; row-level edit, analyze, approval-send, and CMS warnings keep the same behavior and copy.
+
+**Mutual:** Keeps the phase-per-PR decomposition cadence while strengthening guardrails against page-list markup drifting back into `SeoEditor.tsx`.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorPageList.tsx`; `tests/contract/seo-editor-page-list-extraction.test.ts`; `data/roadmap.json`.
