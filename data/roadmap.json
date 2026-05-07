@@ -621,9 +621,9 @@
           "source": "Follow-up surfaced during workspace intelligence decomposition review",
           "est": "2-4h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-07",
-          "notes": "Finish provider-neutral naming by migrating remaining imports/tests away from semrush.ts compatibility re-exports where behavior is now provider-neutral, then narrow or remove the compatibility barrel so new code cannot accidentally reintroduce provider-specific assumptions."
+          "notes": "Completed 2026-05-07. Removed the provider-neutral helper compatibility bridge from `server/semrush.ts` (`trendDirection`, `parseSerpFeatures`, `hasSerpOpportunity`) and migrated remaining test imports to `server/seo-provider-signals.ts`. Updated `tests/contract/seo-provider-boundary.test.ts` to block reintroduction of the semrush re-export bridge and require direct provider-neutral helper imports in the touched strategy/semrush suites."
         }
       ]
     },

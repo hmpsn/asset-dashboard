@@ -15,7 +15,7 @@ import {
   parseSerpFeatures,
   hasSerpOpportunity,
   trendDirection,
-} from '../../server/semrush.js';
+} from '../../server/seo-provider-signals.js';
 import {
   extractBrandTokens,
   isBrandedQuery,
