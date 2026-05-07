@@ -4899,3 +4899,20 @@ Bug sniffing fixes included: list additions now dedupe case-insensitively with t
 **Mutual:** Keeps the phase-per-PR decomposition cadence and adds static/behavioral guardrails so shared VoiceTab model logic cannot drift back into the monolith shell.
 
 **Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/voiceTabModel.ts`; `tests/contract/voice-tab-model-extraction.test.ts`; `tests/unit/voice-tab-model.test.ts`; `data/roadmap.json`.
+
+### 375. Platform Consolidation — VoiceTab Samples + DNA Section Extraction (Phase 2)
+**What it does:** Continues VoiceTab decomposition by extracting two section surfaces from `src/components/brand/VoiceTab.tsx` into focused modules:
+- `src/components/brand/voice-tab/SamplesSection.tsx` now owns sample add/delete UI, context-tag rendering, loading/disabled states, and delete confirmation flow.
+- `src/components/brand/voice-tab/DNASection.tsx` now owns Voice DNA trait/tone/style editing and save orchestration.
+
+`VoiceTab.tsx` remains the public entrypoint and now composes these extracted sections.
+
+Bug sniffing outcomes: sample add/delete loading/disabled behavior remains intact after extraction, and trait duplicate prevention continues to run through the normalized helper path from `voiceTabModel.ts`.
+
+**Agency value:** Shrinks the monolith shell and isolates two high-churn UI workflows into owned modules, making upcoming guardrails/calibration extraction lower-risk.
+
+**Client value:** No behavior or API contract changes; same VoiceTab flows with preserved toasts, mutation calls, and invalidation behavior.
+
+**Mutual:** Maintains one-phase-per-PR decomposition velocity and adds phase-2 source contract guards to prevent section logic from drifting back into the root shell.
+
+**Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/SamplesSection.tsx`; `src/components/brand/voice-tab/DNASection.tsx`; `tests/contract/voice-tab-phase2-extraction.test.ts`; `data/roadmap.json`.
