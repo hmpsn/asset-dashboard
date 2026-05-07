@@ -4860,3 +4860,23 @@ Bug sniffing check included: preserved approval refresh behavior by keeping retr
 **Mutual:** Maintains the one-phase-per-PR decomposition loop and adds a contract guard to prevent workflow panel markup from drifting back into `SeoEditor.tsx`.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorWorkflowPanels.tsx`; `tests/contract/seo-editor-workflow-panels-extraction.test.ts`; `data/roadmap.json`.
+
+### 373. Platform Consolidation — SeoEditor Session State Hook Extraction (Phase 12)
+**What it does:** Continues SeoEditor decomposition by extracting cached session/hydration and local page-state orchestration from `SeoEditor.tsx` into `src/components/editor/useSeoEditorSessionState.ts`. The new hook owns:
+- cached edits/expanded/variation hydration from session storage
+- persistence writes for edits/expanded/variation state
+- page-data rehydration via `buildSeoEditsFromPages`
+- fix-context driven auto-expand/scroll behavior
+- local expanded/preview toggle handlers and unsaved-change detection
+
+`SeoEditor.tsx` now consumes this hook and keeps workflow composition in the parent.
+
+Bug sniffing fix included: typecheck surfaced a wrong-module import during extraction (`buildSeoEditsFromPages`), corrected in-phase so the new hook resolves to the existing persistence module source-of-truth.
+
+**Agency value:** Shrinks the parent shell’s state/effect surface and isolates session-state behavior behind one hook, reducing future regression risk as remaining phases land.
+
+**Client value:** No UI/API contract changes; cached draft restore, fix-target auto-expand, and unsaved/expanded behavior remain unchanged.
+
+**Mutual:** Preserves phase-by-phase decomposition velocity while adding a guardrail that blocks cache/fix-context session logic from drifting back into `SeoEditor.tsx`.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorSessionState.ts`; `tests/contract/seo-editor-session-state-extraction.test.ts`; `data/roadmap.json`.
