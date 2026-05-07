@@ -4786,3 +4786,20 @@ Bug sniffing fix included: page tracking clear now refreshes shared edit-state s
 **Mutual:** Locks in a stable extraction seam for remaining shell cleanup while preserving workflow behavior and improving regression guardrails.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorBulkWorkflow.ts`; `tests/contract/seo-editor-bulk-workflow-extraction.test.ts`; `data/roadmap.json`.
+
+### 369. Platform Consolidation — SeoEditor Shell Controls Extraction (Phase 8)
+**What it does:** Continues SeoEditor decomposition by extracting remaining shell-level controls from `SeoEditor.tsx` into focused components:
+- `SeoEditorTrackingSummary` for tracked-status badges and reset actions
+- `SeoEditorTableControls` for bulk analyze controls, CMS-only toggle, and search input
+
+`SeoEditor.tsx` now composes these focused components and keeps orchestration wiring in the parent shell. The extraction removes large inline JSX blocks while preserving all existing behavior and control semantics.
+
+Bug sniffing fix included: reset tracking now routes through one shared helper path (`resetAllTracking`) so both summary variants use the same refresh flow after clear-state calls.
+
+**Agency value:** Further reduces SeoEditor shell complexity and makes control-surface rendering easier to reason about and test in isolation.
+
+**Client value:** No UI/API contract changes; control behavior (analyze progress/cancel, CMS filter, search, and tracking reset) remains unchanged.
+
+**Mutual:** Advances the monolith decomposition with a low-risk, composition-first slice while preserving workflow behavior and adding guardrail coverage for extracted shell controls.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorTrackingSummary.tsx`; `src/components/editor/SeoEditorTableControls.tsx`; `tests/contract/seo-editor-shell-controls-extraction.test.ts`; `data/roadmap.json`.

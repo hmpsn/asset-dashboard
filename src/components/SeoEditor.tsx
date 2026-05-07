@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
+  Loader2, Upload, Check, AlertCircle, Wand2, RefreshCw,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions } from '../api/seo';
@@ -11,13 +11,15 @@ import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor, usePageJoin } from '../hooks/admin';
-import { StatusBadge, LoadingState, EmptyState, Icon } from './ui';
+import { LoadingState, EmptyState, Icon } from './ui';
 import { useToast } from './Toast';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
+import { SeoEditorTableControls } from './editor/SeoEditorTableControls';
+import { SeoEditorTrackingSummary } from './editor/SeoEditorTrackingSummary';
 import { resolvePagePath } from '../lib/pathUtils';
 import type { SeoEditState, SeoVariationSet } from './editor/seoEditorTypes';
 import {
@@ -201,6 +203,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     });
   };
 
+  const resetAllTracking = async () => {
+    if (!workspaceId) return;
+    await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
+    refreshStates();
+  };
+
   const metadataRecommendationCountByPageId = useMemo(() => {
     if (!recsLoaded) return new Map<string, number>();
     return new Map(
@@ -372,107 +380,28 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
 
-      {/* Edit status summary bar */}
-      {summary.total > 0 && (
-        <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
-          <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
-          {summary.live > 0 && <StatusBadge status="live" />}
-          {summary.live > 0 && <span className="text-accent-brand">{summary.live}</span>}
-          {summary.inReview > 0 && <StatusBadge status="in-review" />}
-          {summary.inReview > 0 && <span className="text-accent-warning">{summary.inReview}</span>}
-          {summary.approved > 0 && <StatusBadge status="approved" />}
-          {summary.approved > 0 && <span className="text-accent-success">{summary.approved}</span>}
-          {summary.rejected > 0 && <StatusBadge status="rejected" />}
-          {summary.rejected > 0 && <span className="text-accent-danger">{summary.rejected}</span>}
-          {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
-          {summary.issueDetected > 0 && <span className="text-accent-warning">{summary.issueDetected}</span>}
-          {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
-          {summary.fixProposed > 0 && <span className="text-accent-info">{summary.fixProposed}</span>}
-          {workspaceId && (
-            <button
-              onClick={async () => {
-                await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
-                refreshStates();
-              }}
-              className="ml-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
-            >
-              reset all
-            </button>
-          )}
-        </div>
-      )}
+      <SeoEditorTrackingSummary
+        workspaceId={workspaceId}
+        summary={summary}
+        onResetAll={resetAllTracking}
+      />
 
-      {/* Always-visible reset — clears all page edit states + stale approval data */}
-      {workspaceId && summary.total === 0 && (
-        <button
-          onClick={async () => {
-            await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
-            refreshStates();
-          }}
-          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
-        >
-          Reset page tracking
-        </button>
-      )}
-
-      {/* Analyze All Pages */}
-      {workspaceId && (
-        <div className="flex items-center gap-3">
-          {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-              <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
-              <span className="t-caption-sm text-[var(--brand-text-bright)]">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={cancelAnalyze} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">Cancel</button>
-            </div>
-          ) : (
-            <button
-              onClick={analyzeAllPages}
-              disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-              className="flex items-center gap-1.5 px-3 py-1.5 t-caption-sm font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-40"
-            >
-              <Icon as={Sparkles} size="md" />
-              {analyzedPages.size === pages.length && pages.length > 0
-                ? 'All Pages Analyzed'
-                : analyzedPages.size > 0
-                  ? `Analyze Remaining (${pages.length - analyzedPages.size})`
-                  : 'Analyze All Pages'}
-            </button>
-          )}
-          {analyzedPages.size > 0 && !bulkAnalyzeProgress && (
-            <span className="t-caption-sm text-accent-success">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
-          )}
-        </div>
-      )}
-
-      {/* CMS filter toggle */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => {
-            setShowCmsOnly(prev => !prev);
-            setApprovalSelected(new Set());
-          }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors border ${
-            showCmsOnly
-              ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand'
-              : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-          }`}
-        >
-          CMS pages only
-        </button>
-        {showCmsOnly && (
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            {filteredPages.length} CMS pages
-          </span>
-        )}
-      </div>
-
-      {/* Search */}
-      <input
-        type="text"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        placeholder="Search pages..."
-        className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+      <SeoEditorTableControls
+        workspaceId={workspaceId}
+        bulkAnalyzeProgress={bulkAnalyzeProgress}
+        onCancelAnalyze={cancelAnalyze}
+        onAnalyzeAllPages={analyzeAllPages}
+        analyzeDisabled={analyzing.size > 0 || analyzedPages.size === pages.length}
+        analyzedPagesCount={analyzedPages.size}
+        totalPages={pages.length}
+        showCmsOnly={showCmsOnly}
+        onToggleCmsOnly={() => {
+          setShowCmsOnly(prev => !prev);
+          setApprovalSelected(new Set());
+        }}
+        filteredCmsCount={filteredPages.length}
+        search={search}
+        onSearchChange={setSearch}
       />
 
       {hasUnsaved && (
