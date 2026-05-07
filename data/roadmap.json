@@ -96,7 +96,7 @@
           "priority": "P1",
           "status": "done",
           "shippedAt": "2026-05-07",
-          "notes": "Shipped in .github/workflows/ci.yml and .github/workflows/e2e.yml. Added workflow-level concurrency cancel-in-progress to avoid duplicate runs per branch/PR. Split CI into change-detection + conditional quality/test/coverage jobs, moved coverage off PRs to push-only, and added required-check aggregation so branch protections stay stable. Added file-change gating via dorny/paths-filter for both CI and E2E so unchanged docs/non-runtime edits skip heavy jobs. Added Playwright browser cache keyed by Playwright version to avoid re-downloading browsers on every run."
+          "notes": "Shipped in .github/workflows/ci.yml and .github/workflows/e2e.yml. Added workflow-level concurrency cancel-in-progress to avoid duplicate runs per branch/PR. Split CI into change-detection + conditional quality/test/coverage jobs, moved coverage off PRs to push-only, and added required-check aggregation so branch protections stay stable. Added file-change gating via dorny/paths-filter for both CI and E2E so unchanged docs/non-runtime edits skip heavy jobs. Added Playwright browser cache keyed by Playwright version to avoid re-downloading browsers on every run. Follow-up optimization: E2E now runs in 2 Playwright shards (`--shard=1/2` and `--shard=2/2`) with a stable top-level `e2e` aggregator check so branch protection wiring stays unchanged."
         }
       ]
     },
