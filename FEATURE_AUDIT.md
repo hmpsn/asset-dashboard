@@ -4880,3 +4880,22 @@ Bug sniffing fix included: typecheck surfaced a wrong-module import during extra
 **Mutual:** Preserves phase-by-phase decomposition velocity while adding a guardrail that blocks cache/fix-context session logic from drifting back into `SeoEditor.tsx`.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorSessionState.ts`; `tests/contract/seo-editor-session-state-extraction.test.ts`; `data/roadmap.json`.
+
+### 374. Platform Consolidation — VoiceTab Model/Helper Extraction (Phase 1)
+**What it does:** Starts VoiceTab decomposition by extracting shared constants/defaults/mappings and normalization helpers from `src/components/brand/VoiceTab.tsx` into `src/components/brand/voice-tab/voiceTabModel.ts`. The extracted module now owns:
+- context tag options and display color mapping
+- prompt-type option/mapping helpers
+- default `VoiceDNA` and `VoiceGuardrails` values
+- normalized dedupe helpers for list items and required-terminology pairs
+
+`VoiceTab.tsx` remains the public entrypoint and now imports those shared primitives from the phase-1 module.
+
+Bug sniffing fixes included: list additions now dedupe case-insensitively with trim/whitespace normalization; required terminology entries now normalize both fields and dedupe normalized `{ use, insteadOf }` pairs.
+
+**Agency value:** Establishes a stable internal seam for upcoming section/hook extraction phases while reducing constant/helper drift risk inside the monolith.
+
+**Client value:** No UI/API contract changes; VoiceTab behavior is preserved aside from improved duplicate/whitespace handling in trait/guardrail input paths.
+
+**Mutual:** Keeps the phase-per-PR decomposition cadence and adds static/behavioral guardrails so shared VoiceTab model logic cannot drift back into the monolith shell.
+
+**Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/voiceTabModel.ts`; `tests/contract/voice-tab-model-extraction.test.ts`; `tests/unit/voice-tab-model.test.ts`; `data/roadmap.json`.
