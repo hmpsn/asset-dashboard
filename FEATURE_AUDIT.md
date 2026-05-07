@@ -4694,3 +4694,20 @@ Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E i
 **Mutual:** Shrinks the SeoEditor controller surface and creates a reusable seam for later extraction phases without changing API or UI contracts.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorDerived.ts`; `tests/unit/seo-editor-derived.test.ts`; `data/roadmap.json`.
+
+### 364. Platform Consolidation — SeoEditor Bulk Helper Extraction (Phase 3)
+**What it does:** Continues SeoEditor decomposition by extracting bulk-operation payload assembly from `SeoEditor.tsx` into `src/components/editor/seoEditorBulkHelpers.ts`. The new module owns:
+- pattern-preview item assembly/truncation (`buildPatternPreviewItems`)
+- pattern-apply request payload assembly (`buildPatternApplyPayload`)
+- bulk rewrite job payload assembly (`buildBulkRewriteRequestPages`)
+- static-page SEO/openGraph update payload assembly (`buildBulkSeoUpdate`)
+
+`SeoEditor.tsx` now delegates these transformations and keeps only workflow orchestration (state transitions, API/job calls, toasts, progress updates). The extraction preserves existing behavior around edit-first fallbacks, missing-page payload safety defaults, and title/description pairing for openGraph updates.
+
+**Agency value:** Reduces repeated payload-building logic inside an already large orchestration component and makes bulk workflow contracts testable in isolation.
+
+**Client value:** No UI/behavior contract changes; bulk pattern apply and bulk rewrite flows keep the same payload semantics with lower regression risk.
+
+**Mutual:** Creates a stable seam for future SeoEditor phase extractions without changing route contracts or page-level UX.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/seoEditorBulkHelpers.ts`; `tests/unit/seo-editor-bulk-helpers.test.ts`; `data/roadmap.json`.

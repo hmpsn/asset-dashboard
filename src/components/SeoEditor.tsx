@@ -35,6 +35,12 @@ import {
   buildSeoApprovalItemsForSelection,
   filterAndSortSeoPages,
 } from './editor/seoEditorDerived';
+import {
+  buildBulkRewriteRequestPages,
+  buildBulkSeoUpdate,
+  buildPatternApplyPayload,
+  buildPatternPreviewItems,
+} from './editor/seoEditorBulkHelpers';
 
 interface Props {
   siteId: string;
@@ -573,17 +579,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // ── Bulk Pattern Apply ──
   const previewPattern = () => {
     if (!patternText.trim()) return;
-    const maxLen = bulkField === 'description' ? 160 : 60;
     // Exclude CMS pages upfront — their synthetic IDs are rejected by the Webflow API on apply
-    const preview = filterWritableIds(Array.from(approvalSelected), pages).map(pageId => {
-      const page = pages.find(p => p.id === pageId);
-      const edit = edits[pageId];
-      if (!page || !edit) return null;
-      const oldValue = bulkField === 'title' ? (edit.seoTitle || page.seo?.title || '') : (edit.seoDescription || page.seo?.description || '');
-      let newValue = patternAction === 'append' ? `${oldValue} ${patternText}`.trim() : `${patternText} ${oldValue}`.trim();
-      if (newValue.length > maxLen) newValue = newValue.slice(0, maxLen).replace(/\s+\S*$/, '');
-      return { pageId, oldValue, newValue };
-    }).filter(Boolean) as Array<{ pageId: string; oldValue: string; newValue: string }>;
+    const preview = buildPatternPreviewItems(
+      filterWritableIds(Array.from(approvalSelected), pages),
+      pages,
+      edits,
+      { field: bulkField, action: patternAction, text: patternText },
+    );
     setBulkPreview(preview);
     setBulkSource('pattern');
     setBulkMode('rewrite-preview');
@@ -593,10 +595,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: bulkPreview.length });
     try {
-      const pagesPayload = bulkPreview.map(p => {
-        const page = pages.find(pg => pg.id === p.pageId);
-        return { pageId: p.pageId, title: page?.title || '', slug: page?.slug, currentValue: p.oldValue };
-      });
+      const pagesPayload = buildPatternApplyPayload(bulkPreview, pages);
       const data = await post<{ results: Array<{ pageId: string; newValue: string; applied: boolean }> }>(
         `/api/webflow/seo-pattern-apply/${siteId}`,
         { workspaceId, pages: pagesPayload, field: bulkField, action: patternAction, text: patternText }
@@ -620,18 +619,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     try {
       const { jobId } = await seoBulkJobs.bulkRewrite(workspaceId, {
         siteId,
-        pages: selectedIds.map(id => {
-          const page = pages.find(p => p.id === id);
-          const edit = edits[id];
-          return {
-            pageId: id,
-            title: page?.title || '',
-            slug: page?.slug,
-            publishedPath: page?.publishedPath,
-            currentSeoTitle: edit?.seoTitle || page?.seo?.title || '',
-            currentDescription: edit?.seoDescription || page?.seo?.description || '',
-          };
-        }),
+        pages: buildBulkRewriteRequestPages(selectedIds, pages, edits),
         field,
       });
       trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId });
@@ -649,16 +637,15 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     // Pre-filter to only static pages — CMS pages have synthetic IDs the Webflow API rejects.
     // Filtering here (not inside the loop) ensures total/progress counts are accurate.
     const staticItems = filterWritableItems(bulkPreview, pages);
+    const pageById = new Map(pages.map(page => [page.id, page]));
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: staticItems.length });
     try {
       for (const item of staticItems) {
-        const page = pages.find(pg => pg.id === item.pageId);
+        const page = pageById.get(item.pageId);
         if (!page) continue;
-        const seoFields = bulkField === 'title'
-          ? { seo: { title: item.newValue, description: edits[page.id]?.seoDescription || page.seo?.description || '' } }
-          : { seo: { title: edits[page.id]?.seoTitle || page.seo?.title || '', description: item.newValue } };
-        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, workspaceId, ...seoFields, openGraph: seoFields.seo });
+        const seoFields = buildBulkSeoUpdate(bulkField, item.newValue, page, edits[page.id]);
+        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, workspaceId, ...seoFields });
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
       setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
