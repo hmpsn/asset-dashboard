@@ -308,14 +308,20 @@ const deadLinkSchema = z.object({
   type: z.enum(['internal', 'external']),
 }).passthrough();
 
+// .catch([]) on the nested arrays: if a single page / issue / dead link fails
+// validation we drop just that array (down to []) instead of rejecting the
+// whole audit and falling back to EMPTY_AUDIT (which would zero out
+// siteScore + all counters). This preserves partial data for callers that
+// only need top-level scores, matching the resilience semantics of the
+// per-item parseJsonSafeArray used at the top-level columns.
 export const seoAuditResultSchema = z.object({
   siteScore: z.number(),
   totalPages: z.number(),
   errors: z.number(),
   warnings: z.number(),
   infos: z.number().optional().default(0),
-  pages: z.array(pageSeoResultSchema).default([]),
-  siteWideIssues: z.array(seoIssueSchema).default([]),
+  pages: z.array(pageSeoResultSchema).catch([]),
+  siteWideIssues: z.array(seoIssueSchema).catch([]),
   cwvSummary: cwvSummarySchema.optional(),
   deadLinkSummary: z.object({
     total: z.number(),
@@ -323,7 +329,7 @@ export const seoAuditResultSchema = z.object({
     external: z.number(),
     redirects: z.number(),
   }).passthrough().optional(),
-  deadLinkDetails: z.array(deadLinkSchema).optional(),
+  deadLinkDetails: z.array(deadLinkSchema).optional().catch(undefined),
 }).passthrough();
 
 export const actionItemSchema = z.object({
