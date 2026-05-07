@@ -2,7 +2,7 @@
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../components/client/types';
-import { readNdjsonStream, readSseStream } from './streamUtils';
+import { readNdjsonStream } from './streamUtils';
 
 const workspaceQuery = (workspaceId?: string) => workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
 const appendWorkspaceQuery = (url: string, workspaceId?: string) =>
@@ -167,9 +167,6 @@ export const keywords = {
 
   webflowStrategy: (wsId: string) =>
     get<unknown>(`/api/webflow/keyword-strategy/${wsId}`),
-
-  generateStrategy: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
 
   patchStrategy: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
@@ -532,69 +529,4 @@ export async function bulkGenerateAltText(
       onProgress(event.assetId, event.altText);
     }
   });
-}
-
-/**
- * SSE event emitted by the keyword-strategy generation stream. Mirrors the
- * shape parsed in KeywordStrategy.tsx.
- */
-interface KeywordStrategySseEvent {
-  error?: string;
-  done?: boolean;
-  strategy?: unknown;
-  step?: string;
-  detail?: string;
-  progress?: number;
-  message?: string;
-}
-
-/**
- * Stream the POST /api/webflow/keyword-strategy/:workspaceId SSE endpoint.
- * Returns a cleanup function that aborts the in-flight fetch — callers
- * should invoke it on unmount.
- *
- * Parsing mirrors KeywordStrategy.tsx:156 verbatim: split buffer on '\n',
- * keep incomplete trailing line, parse `data: ` prefixed lines as JSON, and
- * forward parsed events to onEvent (the caller decides which fields to react
- * to — progress, done+strategy, or error).
- */
-export function streamKeywordStrategy(
-  workspaceId: string,
-  body: Record<string, unknown>,
-  onEvent: (event: KeywordStrategySseEvent) => void,
-  onError: (err: Error) => void,
-  onDone: () => void,
-): () => void {
-  const controller = new AbortController();
-
-  (async () => {
-    try {
-      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        // Non-streaming error response (429, 400, 500, etc.) — parse JSON body.
-        let data: KeywordStrategySseEvent = {};
-        try { data = await res.json() as KeywordStrategySseEvent; } catch { /* non-JSON error body */ }
-        if (!res.ok || data.error) {
-          onError(new Error(data.message || data.error || 'Request failed'));
-          return;
-        }
-        onDone();
-        return;
-      }
-
-      await readSseStream<KeywordStrategySseEvent>(res.body, onEvent);
-      onDone();
-    } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError') return;
-      onError(err instanceof Error ? err : new Error(String(err)));
-    }
-  })();
-
-  return () => controller.abort();
 }

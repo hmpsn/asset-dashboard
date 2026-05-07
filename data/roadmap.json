@@ -611,9 +611,9 @@
           "source": "Follow-up surfaced during workspace intelligence decomposition review",
           "est": "3-5h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-07",
-          "notes": "Audit the remaining direct SSE/route-fetch compatibility surfaces after the generation service split, remove obsolete wrappers once callers use shared jobs/native orchestration, and preserve progress/activity parity with regression coverage."
+          "notes": "Completed 2026-05-07. Removed obsolete frontend compatibility wrappers after the background-job migration: deleted the unused `keywords.generateStrategy` route-fetch helper and `streamKeywordStrategy` SSE helper from `src/api/seo.ts`, removed the now-dead SSE parser from `src/api/streamUtils.ts`, and updated the global fetch-auth comment in `src/main.tsx` to match remaining NDJSON usage. Added a contract guard (`tests/contract/keyword-strategy-compat-retirement.test.ts`) that pins job orchestration via `startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)` and blocks reintroduction of the retired direct-generation wrappers."
         },
         {
           "id": "platform-consolidation-seo-provider-compat-retirement",
