@@ -4764,3 +4764,23 @@ Bug sniffing fix included: select-all logic now checks whether all filtered IDs 
 **Mutual:** Establishes another clean seam for future SeoEditor shell reduction while preserving current route/API contracts.
 
 **Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorPageWorkflow.ts`; `tests/contract/seo-editor-page-workflow-extraction.test.ts`; `data/roadmap.json`.
+
+### 368. Platform Consolidation — SeoEditor Bulk Workflow Hook Extraction (Phase 7)
+**What it does:** Continues SeoEditor decomposition by extracting bulk-operation orchestration from `SeoEditor.tsx` into `src/components/editor/useSeoEditorBulkWorkflow.ts`. The new hook now owns:
+- bulk operation state (`bulkFixing`, `bulkResults`, `bulkMode`, field/action/pattern inputs, previews, progress)
+- bulk background-job remount recovery and session job-id persistence
+- workspace-event handling for bulk analyze/rewrite progress, completion, and failure
+- bulk handlers (`analyzeAllPages`, `handleBulkFix`, `previewPattern`, `applyPattern`, `bulkAiRewrite`, `applyBulkRewrite`, `cancelAnalyze`, `cancelRewrite`)
+- page-state clearing helper (`clearPageTracking`) used by per-row tracking reset
+
+`SeoEditor.tsx` now delegates bulk orchestration to the hook and remains focused on composition/wiring of approvals, per-page workflows, and UI surfaces.
+
+Bug sniffing fix included: page tracking clear now refreshes shared edit-state summaries through the same hook path, preventing stale tracking counts after a row-level clear action.
+
+**Agency value:** Removes another high-churn side-effect cluster from the monolith and centralizes the bulk workflow into one testable boundary.
+
+**Client value:** No UI/API contract changes; bulk analyze/fix/rewrite flows, progress/cancel behavior, and suggestion refresh behavior remain unchanged.
+
+**Mutual:** Locks in a stable extraction seam for remaining shell cleanup while preserving workflow behavior and improving regression guardrails.
+
+**Files:** `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorBulkWorkflow.ts`; `tests/contract/seo-editor-bulk-workflow-extraction.test.ts`; `data/roadmap.json`.
