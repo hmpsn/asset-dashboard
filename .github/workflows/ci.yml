@@ -148,9 +148,14 @@ jobs:
             exit 1
           fi
 
-  test:
+  test-shard:
+    name: test-shard (${{ matrix.shard }}/3)
     needs: changes
     if: github.event_name == 'pull_request' && needs.changes.outputs.test == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -163,8 +168,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm run test -- --reporter=dot
+      - name: Run tests (shard)
+        run: npm run test -- --reporter=dot --shard=${{ matrix.shard }}/3
+
+  test:
+    if: always() && github.event_name == 'pull_request'
+    needs: [changes, test-shard]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required test shards passed
+        env:
+          TEST_NEEDED: ${{ needs.changes.outputs.test }}
+          SHARD_RESULT: ${{ needs.test-shard.result }}
+        run: |
+          echo "test needed:   $TEST_NEEDED"
+          echo "shard result:  $SHARD_RESULT"
+          if [[ "$TEST_NEEDED" == "true" && "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::test shards failed"
+            exit 1
+          fi
 
   coverage:
     needs: changes

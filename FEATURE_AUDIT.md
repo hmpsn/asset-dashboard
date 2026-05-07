@@ -4671,13 +4671,15 @@ Guardrails were updated in `tests/contract/seo-provider-boundary.test.ts` to exp
 
 Both workflows now use `concurrency` cancel-in-progress per branch/PR, and E2E includes Playwright browser caching keyed by Playwright version to avoid repeated browser downloads. Shard runs now emit blob reports that are merged into a single `playwright-report-merged` artifact for one-pane debugging.
 
+Follow-up CI tuning now shards PR Vitest execution across three jobs (`--shard=1/3`, `2/3`, `3/3`) and keeps a stable top-level `test` aggregator check. This reduces test wall-clock time while preserving existing branch-protection required-check semantics.
+
 **Agency value:** Faster feedback on PRs, fewer wasted runner minutes, and less queue contention from duplicate in-flight runs.
 
 **Client value:** N/A — delivery pipeline optimization with no direct user-facing UI/API behavior change.
 
 **Mutual:** Keeps required-check semantics predictable while making routine non-impacting edits substantially cheaper to validate.
 
-**Files:** `.github/workflows/ci.yml`; `.github/workflows/e2e.yml`; `data/roadmap.json`.
+**Files:** `.github/workflows/ci.yml`; `.github/workflows/e2e.yml`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
 ### 363. Platform Consolidation — SeoEditor Derived Logic Extraction (Phase 2)
 **What it does:** Continues the SeoEditor monolith decomposition by extracting duplicated derived logic from `SeoEditor.tsx` into `src/components/editor/seoEditorDerived.ts`. The new helper module now owns:
