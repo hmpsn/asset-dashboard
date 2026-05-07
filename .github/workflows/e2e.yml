@@ -112,9 +112,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build frontend
-        run: npm run build
-
       - name: Create data directory
         run: mkdir -p $DATA_DIR
 
