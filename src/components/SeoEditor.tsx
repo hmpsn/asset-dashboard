@@ -41,6 +41,20 @@ import {
   buildPatternApplyPayload,
   buildPatternPreviewItems,
 } from './editor/seoEditorBulkHelpers';
+import {
+  buildSeoEditsFromPages,
+  getSeoDraftKey,
+  persistCachedExpandedPages,
+  persistCachedSeoBulkAnalyzeJobId,
+  persistCachedSeoBulkRewriteJobId,
+  persistCachedSeoEdits,
+  persistCachedSeoVariations,
+  readCachedExpandedPages,
+  readCachedSeoBulkAnalyzeJobId,
+  readCachedSeoBulkRewriteJobId,
+  readCachedSeoEdits,
+  readCachedSeoVariations,
+} from './editor/seoEditorPersistence';
 
 interface Props {
   siteId: string;
@@ -81,18 +95,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
   const [edits, setEdits] = useState<Record<string, SeoEditState>>(() => {
-    try {
-      const raw = sessionStorage.getItem(`seo-editor-edits-${siteId}`);
-      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
-    } catch { /* ignore */ }
-    return {};
+    const cached = readCachedSeoEdits(siteId);
+    restoredFromCache.current = cached.restoredFromCache;
+    return cached.edits;
   });
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    try {
-      const raw = sessionStorage.getItem(`seo-editor-expanded-${siteId}`);
-      if (raw) return new Set(JSON.parse(raw));
-    } catch { /* ignore */ }
-    return new Set();
+    return readCachedExpandedPages(siteId);
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -112,37 +120,37 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
   const [variations, setVariations] = useState<Record<string, SeoVariationSet>>(() => {
-    try {
-      const raw = sessionStorage.getItem(`seo-editor-vars-${siteId}`);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
-    return {};
+    return readCachedSeoVariations(siteId);
   });
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
-    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-analyze-job-${workspaceId}`) ?? null : null; } catch { return null; }
+    return readCachedSeoBulkAnalyzeJobId(workspaceId);
   });
   const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(() => {
-    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-rewrite-job-${workspaceId}`) ?? null : null; } catch { return null; }
+    return readCachedSeoBulkRewriteJobId(workspaceId);
   });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
-  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+  useEffect(() => {
+    persistCachedSeoEdits(siteId, edits);
+  }, [edits, siteId]);
+  useEffect(() => {
+    persistCachedExpandedPages(siteId, expanded);
+  }, [expanded, siteId]);
+  useEffect(() => {
+    persistCachedSeoVariations(siteId, variations);
+  }, [variations, siteId]);
 
   // Persist active bulk job IDs so they survive remount (nav away + back)
   useEffect(() => {
-    if (!workspaceId) return;
-    try { bulkAnalyzeJobId ? sessionStorage.setItem(`seo-bulk-analyze-job-${workspaceId}`, bulkAnalyzeJobId) : sessionStorage.removeItem(`seo-bulk-analyze-job-${workspaceId}`); } catch { /* ignore */ }
+    persistCachedSeoBulkAnalyzeJobId(workspaceId, bulkAnalyzeJobId);
   }, [bulkAnalyzeJobId, workspaceId]);
   useEffect(() => {
-    if (!workspaceId) return;
-    try { bulkRewriteJobId ? sessionStorage.setItem(`seo-bulk-rewrite-job-${workspaceId}`, bulkRewriteJobId) : sessionStorage.removeItem(`seo-bulk-rewrite-job-${workspaceId}`); } catch { /* ignore */ }
+    persistCachedSeoBulkRewriteJobId(workspaceId, bulkRewriteJobId);
   }, [bulkRewriteJobId, workspaceId]);
 
   // On remount, query server to recover progress UI for any restored job IDs
@@ -254,35 +262,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       restoredFromCache.current = false;
       return;
     }
-    const editMap: Record<string, SeoEditState> = {};
-    for (const p of pages) {
-      // Check for saved draft first
-      const draftKey = `seo-draft-${workspaceId}-${p.id}`;
-      let seoTitle = p.seo?.title || '';
-      let seoDescription = p.seo?.description || '';
-      let dirty = false;
-
-      try {
-        const draftData = localStorage.getItem(draftKey);
-        if (draftData) {
-          const draft = JSON.parse(draftData);
-          // Apply persisted draft (we don't have page lastModified from Webflow yet)
-          // Sanitize: JSON.parse can return null for fields that were stored as null
-          seoTitle = draft.seoTitle ?? seoTitle;
-          seoDescription = draft.seoDescription ?? seoDescription;
-          dirty = true;
-        }
-      } catch (err) {
-        console.warn('Failed to load draft for page', p.id, err);
-      }
-
-      editMap[p.id] = {
-        seoTitle,
-        seoDescription,
-        dirty,
-      };
-    }
-    setEdits(editMap);
+    setEdits(buildSeoEditsFromPages(pages, workspaceId));
   }, [pages, workspaceId]);
 
   // Auto-expand target page from audit Fix→
@@ -322,7 +302,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     
     try {
       // Save to local storage as draft
-      const draftKey = `seo-draft-${workspaceId}-${pageId}`;
+      const draftKey = getSeoDraftKey(workspaceId, pageId);
       const draftData = {
         seoTitle: edit.seoTitle,
         seoDescription: edit.seoDescription,
