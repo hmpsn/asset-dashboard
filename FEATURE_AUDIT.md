@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **329 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **357 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -4600,3 +4600,16 @@ The migration preserves behavior: the business-profile callout still gates on mi
 **Mutual:** Finishes the schema monolith portion of the platform-consolidation sprint while preserving the generator, template, and mapping experience.
 
 **Files:** `src/components/SchemaSuggester.tsx`; `src/components/schema/SchemaGeneratorSetup.tsx`; `src/components/schema/schemaSuggesterTypes.ts`; `src/components/schema/useSchemaSuggesterGeneration.ts`; `tests/component/SchemaGeneratorSetup.test.tsx`.
+
+### 357. Platform Consolidation — Workspace Intelligence Slice Modules
+**What it does:** Decomposes the workspace intelligence backend monolith while preserving the public facade at `server/workspace-intelligence.ts`. Prompt formatting and standalone prompt helpers now live in `server/intelligence/formatters.ts`; slice assemblers now live in focused modules for SEO context, insights, learnings, content pipeline, client signals, operational state, site health, site inventory, and page profile. Existing callers continue to import `buildWorkspaceIntelligence`, `formatForPrompt`, `buildIntelPrompt`, cache helpers, and prompt helpers from the facade.
+
+The migration also fixes touched intelligence bugs: `siteInventory` cache keys now isolate by `siteId`, `siteBaseUrl`, and a non-secret Webflow token fingerprint; saved AEO review parsing uses validated parsing instead of raw `JSON.parse`; and pr-check coverage now follows the extracted formatter/SEO-context modules for assembled-but-never-rendered fields, backlink calls, direct `buildSeoContext`, dynamic imports, and JSON parsing.
+
+**Agency value:** Engineers can inspect and extend one intelligence slice without reopening a 3,000-line coordination file, reducing regression risk during future AI-context and schema-context work.
+
+**Client value:** N/A — infrastructure-only refactor with preserved intelligence behavior.
+
+**Mutual:** Keeps AI context assembly stable while making future client-facing intelligence additions safer, easier to test, and less likely to lose data silently.
+
+**Files:** `server/workspace-intelligence.ts`; `server/intelligence/formatters.ts`; `server/intelligence/seo-context-slice.ts`; `server/intelligence/insights-slice.ts`; `server/intelligence/learnings-slice.ts`; `server/intelligence/content-pipeline-slice.ts`; `server/intelligence/client-signals-slice.ts`; `server/intelligence/operational-slice.ts`; `server/intelligence/site-health-slice.ts`; `server/intelligence/site-inventory-slice.ts`; `server/intelligence/page-profile-slice.ts`; `scripts/pr-check.ts`; `tests/unit/workspace-intelligence.test.ts`; `tests/pr-check.test.ts`.

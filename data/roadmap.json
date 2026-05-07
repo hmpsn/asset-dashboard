@@ -581,9 +581,49 @@
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
           "est": "8-12h",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. workspace-intelligence.ts is still 3,027 lines. Preserve staging's newer pageElements slice behavior and tests when splitting slice assemblers."
+          "notes": "Completed 2026-05-07. server/workspace-intelligence.ts now remains the public facade while prompt formatting and slice assemblers live under server/intelligence/*. Preserved facade exports and pageElements behavior, added cache-key isolation for siteInventory by site identity/token fingerprint, replaced the touched AEO review raw JSON.parse path with validated parsing, and extended pr-check/tests so extracted formatter and SEO-context modules remain covered. See FEATURE_AUDIT entry 357."
+        },
+        {
+          "id": "platform-consolidation-seo-context-retirement",
+          "title": "Workspace intelligence follow-up - retire deprecated seo-context builder",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-07",
+          "notes": "Move RICH_BLOCKS_PROMPT and raw brand/knowledge/persona helpers to owned modules, replace clearSeoContextCache callers with invalidateIntelligenceCache, port the voice-authority behavior into the seoContext slice with parity tests, then remove the remaining seo-context.ts bridge exception from pr-check."
+        },
+        {
+          "id": "platform-consolidation-schema-context-slice-migration",
+          "title": "Schema context - finish direct-read to intelligence-slice migration",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-07",
+          "notes": "Complete the buildSchemaContext Pattern B migration by moving the remaining non-identity direct workspace reads to buildWorkspaceIntelligence slices, remove now-obsolete schema-context-direct-read-ok hatches, and keep the identity-field allow-list only."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-compat-retirement",
+          "title": "Keyword strategy - retire legacy direct/compatibility generation paths",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-07",
+          "notes": "Audit the remaining direct SSE/route-fetch compatibility surfaces after the generation service split, remove obsolete wrappers once callers use shared jobs/native orchestration, and preserve progress/activity parity with regression coverage."
+        },
+        {
+          "id": "platform-consolidation-seo-provider-compat-retirement",
+          "title": "SEO provider boundary - retire Semrush-named compatibility exports",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "pending",
+          "createdAt": "2026-05-07",
+          "notes": "Finish provider-neutral naming by migrating remaining imports/tests away from semrush.ts compatibility re-exports where behavior is now provider-neutral, then narrow or remove the compatibility barrel so new code cannot accidentally reintroduce provider-specific assumptions."
         }
       ]
     },
