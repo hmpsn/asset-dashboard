@@ -646,6 +646,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase6`. Extracted the collection/item render monolith from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorCollections.tsx`, including collection header badges, item-level editor controls, AI variation selectors, inline approval history, and preview panels. `CmsEditor.tsx` now composes the extracted renderer and remains focused on orchestration. Bug sniffing hardening included: phase-1 contract assertions were updated to stop pinning now-extracted render helper usage in root (`filterAndRankCollectionItems`) while preserving model ownership checks, and a pre-existing purple paired-description label was corrected to blue to align with color-system rules. Added source-contract guardrails (`tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`) to lock the phase-6 ownership boundary."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase7",
+          "title": "CmsEditor monolith decomposition - phase 7 shell panel + save workflow cleanup",
+          "source": "Loop follow-up after CmsEditor phase 6",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase7`. Extracted root shell chrome (header actions, bulk rewrite state UI, approval/error panels, tracking summary, search bar) from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorShellPanels.tsx`, and moved per-item save mutation orchestration into `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`. `CmsEditor.tsx` now stays composition-first (220 lines) and wires extracted modules plus existing workflow hooks. Bug sniffing hardening included: added unit coverage for the no-edit early-return guard in save workflow so API calls are blocked when no editable payload exists for an item. Added phase-7 source contract guardrails (`tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`) and dedicated save workflow unit coverage (`tests/unit/cms-editor-save-workflow.test.ts`). This closes the remaining CmsEditor decomposition surface for this sprint."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
