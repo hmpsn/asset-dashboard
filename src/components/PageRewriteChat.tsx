@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
+  Send, Loader2, ArrowLeft,
   Copy, Check, FileText, Sparkles, Maximize2,
 } from 'lucide-react';
 import { Document, Packer } from 'docx';
@@ -31,6 +31,7 @@ import {
   execFormatCommand,
   wrapSelectionHeading,
 } from './page-rewrite-chat/pageRewriteChatActions';
+import { PageRewriteDocumentPane } from './page-rewrite-chat/PageRewriteDocumentPane';
 
 interface Props {
   workspaceId: string;
@@ -140,6 +141,25 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === 'Escape') setExportOpen(false);
+    };
+    // keydown-ok: includes input/textarea/select/contenteditable guard before handling Escape.
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [exportOpen]);
 
   const loadPage = useCallback(async (url: string) => {
@@ -318,6 +338,21 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       URL.revokeObjectURL(url);
     }
     setExportOpen(false);
+  };
+
+  const handleFormatBold = () => execFormatCommand('bold', docBodyRef.current);
+  const handleFormatItalic = () => execFormatCommand('italic', docBodyRef.current);
+  const handleHeading2 = () => wrapSelectionHeading('h2', docBodyRef.current);
+  const handleHeading3 = () => wrapSelectionHeading('h3', docBodyRef.current);
+
+  const docBodyRefCallback = (el: HTMLDivElement | null) => {
+    docBodyRef.current = el;
+    if (!el || !pageData) return;
+    // Use slug, then title, then URL as fallback — never '' (empty string matches cleared state)
+    const pageKey = pageData.slug || pageData.title || pageData.url || '__loaded__';
+    if (el.dataset.pageKey === pageKey) return;
+    el.dataset.pageKey = pageKey;
+    el.innerHTML = buildDocHtml(pageData);
   };
 
   return (
@@ -582,143 +617,25 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           </div>
         </div>
 
-        {/* ═══ RIGHT PANE: Editable Document ═══ */}
-        <div ref={docPanelRef} className="flex flex-col w-1/2 overflow-hidden bg-[var(--surface-1)]/50 relative">
-
-          {/* Empty state */}
-          {!pageData && !loadingPage && !pageError && (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-3 px-8">
-              <Icon as={FileText} size="2xl" className="text-[var(--brand-text-dim)]" />
-              <div>
-                <h3 className="text-sm font-medium text-[var(--brand-text)]">No page loaded</h3>
-                <p className="text-xs text-[var(--brand-text-dim)] mt-1">Search for a page above or paste a URL to see the content here.</p>
-              </div>
-            </div>
-          )}
-
-          {loadingPage && (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
-              <span className="text-xs text-[var(--brand-text)]">Loading page content...</span>
-            </div>
-          )}
-
-          {pageError && (
-            <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
-              <AlertTriangle className="w-6 h-6 text-accent-warning" />
-              <p className="text-xs text-[var(--brand-text)] text-center">{pageError}</p>
-            </div>
-          )}
-
-          {pageData && !loadingPage && (
-            <>
-              {/* Panel header */}
-              <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/60">
-                <a
-                  href={pageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-accent-brand transition-colors flex-1 min-w-0"
-                >
-                  <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
-                  <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
-                </a>
-                {/* Export popover */}
-                <div className="relative flex-shrink-0" ref={exportPopoverRef}>
-                  <button
-                    ref={exportBtnRef}
-                    onClick={() => setExportOpen(o => !o)}
-                    className={"flex items-center gap-1 px-2 py-1 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors" // arbitrary-text-ok
-                    }
-                  >
-                    Export brief
-                  </button>
-                  {exportOpen && (
-                    <div className="absolute right-0 top-7 z-[var(--z-modal)] bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
-                      <button
-                        onClick={() => handleExport('copy')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
-                      >
-                        <Icon as={Copy} size="sm" /> Copy as Markdown
-                      </button>
-                      <button
-                        onClick={() => handleExport('download')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
-                      >
-                        <Icon as={FileText} size="sm" /> Download .md
-                      </button>
-                      <button
-                        onClick={() => handleExport('docx')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
-                      >
-                        <Icon as={FileText} size="sm" /> Download .docx
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Audit issue chips — always visible, non-collapsible */}
-              {pageData.issues.length > 0 && (
-                <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/30">
-                  {pageData.issues.slice(0, 20).map((issue, i) => (
-                    <span
-                      key={i}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ // arbitrary-text-ok
-                        issue.severity === 'error'
-                          ? 'bg-red-950/40 border-red-500/40 text-accent-danger'
-                          : issue.severity === 'warning'
-                          ? 'bg-amber-950/40 border-amber-500/40 text-accent-warning'
-                          : 'bg-blue-950/40 border-blue-500/40 text-accent-info'
-                      }`}
-                    >
-                      {issue.severity === 'error' ? '✕' : '⚠'} {issue.message}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Contenteditable document body — initialized via ref callback, not JSX children, to prevent React from overwriting user edits on re-render */}
-              <div
-                ref={(el) => {
-                  docBodyRef.current = el;
-                  if (!el) return;
-                  // Use slug, then title, then URL as fallback — never '' (empty string matches cleared state)
-                  const pageKey = pageData.slug || pageData.title || pageData.url || '__loaded__';
-                  if (el.dataset.pageKey === pageKey) return; // already initialized for this page
-                  el.dataset.pageKey = pageKey;
-                  el.innerHTML = buildDocHtml(pageData);
-                }}
-                role="textbox"
-                aria-multiline="true"
-                aria-label="Page content editor"
-                contentEditable
-                suppressContentEditableWarning
-                spellCheck
-                className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none"
-              />
-
-              {/* Floating formatting toolbar — appears above text selection */}
-              {toolbarPos && (
-                <div
-                  className="absolute z-[var(--z-modal)] flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl px-1 py-0.5 pointer-events-auto"
-                  style={{ top: toolbarPos.top, left: toolbarPos.left }}
-                  onMouseDown={e => e.preventDefault()}
-                >
-                  <button onClick={() => execFormatCommand('bold', docBodyRef.current)} className="px-2 py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
-                  <button onClick={() => execFormatCommand('italic', docBodyRef.current)} className="px-2 py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
-                  <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={() => wrapSelectionHeading('h2', docBodyRef.current)} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
-                  }>H2</button>
-                  <button onClick={() => wrapSelectionHeading('h3', docBodyRef.current)} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
-                  }>H3</button>
-                  <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={clearFormattingSelection} className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <PageRewriteDocumentPane
+          pageData={pageData}
+          pageUrl={pageUrl}
+          loadingPage={loadingPage}
+          pageError={pageError}
+          docPanelRef={docPanelRef}
+          docBodyRefCallback={docBodyRefCallback}
+          toolbarPos={toolbarPos}
+          exportOpen={exportOpen}
+          onToggleExport={() => setExportOpen(o => !o)}
+          onExport={handleExport}
+          exportPopoverRef={exportPopoverRef}
+          exportBtnRef={exportBtnRef}
+          onBold={handleFormatBold}
+          onItalic={handleFormatItalic}
+          onHeading2={handleHeading2}
+          onHeading3={handleHeading3}
+          onClearFormatting={clearFormattingSelection}
+        />
       </div>
     </div>
   );

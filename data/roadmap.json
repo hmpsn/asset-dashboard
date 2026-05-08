@@ -686,6 +686,16 @@
           "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found — content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
         },
         {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase4",
+          "title": "PageRewriteChat monolith decomposition - phase 4 document pane extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 3",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase4`. Extracted the full right-side editable document pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`, including empty/loading/error states, loaded-page header/export UI, issue-chip rendering, contenteditable surface, and formatting-toolbar rendering. Root shell now composes the pane while preserving document hydration/export/orchestration behavior. Bug sniffing hardening included: export popover now closes on `Escape` for keyboard dismissal. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`) to lock right-pane ownership."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
