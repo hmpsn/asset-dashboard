@@ -11,13 +11,13 @@ import { statusBorderClass } from './ui/statusConfig';
 import { patch, post } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
 import {
-  buildApprovalPayloadItems,
   buildInitialEdits,
   buildItemApprovalMap,
   filterAndRankCollectionItems,
   getExtraSeoFields,
   getTitleAndDescriptionFields,
 } from './cms-editor/cmsEditorModel';
+import { useCmsEditorApprovalWorkflow } from './cms-editor/useCmsEditorApprovalWorkflow';
 
 interface Props {
   siteId: string;
@@ -52,10 +52,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
-  const [sendingApproval, setSendingApproval] = useState(false);
-  const [approvalSent, setApprovalSent] = useState(false);
-  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[]; descOptions?: string[] }>>(() => {
     try { const raw = sessionStorage.getItem(`cms-editor-vars-${siteId}`); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
     return {};
@@ -63,15 +59,30 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-    const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState<'idle' | 'rewriting'>('idle');
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
+  const {
+    approvalSelected,
+    sendingApproval,
+    approvalSent,
+    approvalRefreshKey,
+    approvalError,
+    toggleApprovalItem,
+    toggleSelectAllInCollection,
+    sendForApproval,
+  } = useCmsEditorApprovalWorkflow({
+    workspaceId,
+    siteId,
+    edits,
+    collections,
+    refreshStates,
+  });
 
   // Sync state to sessionStorage for persistence across tab switches + refresh
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`cms-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
@@ -311,78 +322,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setTimeout(() => setBulkResults(null), 8000);
   };
 
-  const toggleApprovalItem = (itemId: string) => {
-    setApprovalSelected(prev => {
-      const n = new Set(prev);
-      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
-      return n;
-    });
-  };
-
-  // Toggle all items in a collection: if all selected → deselect all; otherwise → select all
-  const toggleSelectAllInCollection = (collectionItemIds: string[]) => {
-    setApprovalSelected(prev => {
-      const allSelected = collectionItemIds.every(id => prev.has(id));
-      const next = new Set(prev);
-      if (allSelected) {
-        collectionItemIds.forEach(id => next.delete(id));
-      } else {
-        collectionItemIds.forEach(id => next.add(id));
-      }
-      return next;
-    });
-  };
-
-  const sendForApproval = async () => {
-    if (!workspaceId || approvalSelected.size === 0) return;
-    setSendingApproval(true);
-    try {
-      const items = buildApprovalPayloadItems(approvalSelected, edits, collections);
-      if (items.length === 0) {
-        setErrorStates(prev => ({ 
-          ...prev, 
-          approval: { 
-            type: 'validation', 
-            message: 'No changes detected on selected items. Edit fields first.' 
-          } 
-        }));
-        setTimeout(() => {
-          setErrorStates(prev => { 
-            const next = { ...prev }; 
-            delete next.approval; 
-            return next; 
-          });
-        }, 5000);
-        setSendingApproval(false);
-        return;
-      }
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`, items });
-      setApprovalSent(true);
-      refreshStates();
-      setApprovalSelected(new Set());
-      setApprovalRefreshKey(k => k + 1);
-      setTimeout(() => setApprovalSent(false), 4000);
-    } catch (err) {
-      console.error('Failed to send for approval:', err);
-      setErrorStates(prev => ({ 
-        ...prev, 
-        approval: { 
-          type: 'network', 
-          message: 'Failed to send for approval. Please check your connection and try again.' 
-        } 
-      }));
-      setTimeout(() => {
-        setErrorStates(prev => { 
-          const next = { ...prev }; 
-          delete next.approval; 
-          return next; 
-        });
-      }, 5000);
-    } finally {
-      setSendingApproval(false);
-    }
-  };
-
   const toggleCollection = (id: string) => {
     setExpandedCollections(prev => {
       const n = new Set(prev);
@@ -486,11 +425,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       )}
 
       {/* Error States */}
-      {errorStates.approval && (
+      {approvalError && (
         <ErrorState
-          type={errorStates.approval.type as 'network' | 'data' | 'permission'}
-          title={errorStates.approval.type === 'network' ? 'Connection Error' : errorStates.approval.type === 'permission' ? 'Permission Error' : 'Error'}
-          message={errorStates.approval.message}
+          type={approvalError.type === 'network' ? 'network' : 'data'}
+          title={approvalError.type === 'network' ? 'Connection Error' : 'Validation Error'}
+          message={approvalError.message}
         />
       )}
 

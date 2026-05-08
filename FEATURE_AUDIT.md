@@ -4973,3 +4973,23 @@ Bug sniffing fix included: approval history is now sorted by `updatedAt` descend
 **Mutual:** Adds guardrails and unit coverage so contracts/helpers do not drift back into the root shell during later CmsEditor decomposition phases.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/cmsEditorModel.ts`; `tests/unit/cms-editor-model.test.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `data/roadmap.json`.
+
+### 379. Platform Consolidation — CmsEditor Approval Workflow Hook Extraction (Phase 2)
+**What it does:** Continues CmsEditor decomposition by extracting approval workflow ownership from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`. The new hook now owns:
+- approval selection state (`approvalSelected`) and per-item toggle behavior
+- select-all-per-collection toggle behavior
+- send-for-approval orchestration (payload assembly + mutation)
+- transient success state (`approvalSent`) and refresh trigger (`approvalRefreshKey`)
+- approval error state normalization for validation/network paths
+
+`CmsEditor.tsx` remains the public entrypoint and now consumes this hook while keeping section composition and render wiring.
+
+Bug sniffing hardening included: select-all now treats empty collections as not-fully-selected (prevents accidental deselect behavior), and extracted validation/network errors continue to surface through the same `ErrorState` path.
+
+**Agency value:** Reduces root-shell state churn and isolates a high-change workflow behind a focused hook with clear ownership boundaries.
+
+**Client value:** No UI/API contract changes; approval selection, submission, and feedback behavior remain unchanged.
+
+**Mutual:** Adds a phase-2 source contract guardrail so approval state and orchestration logic cannot drift back into the CmsEditor root shell.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`; `data/roadmap.json`.

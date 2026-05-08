@@ -596,6 +596,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase1`. Extracted CmsEditor contracts and pure helpers into `src/components/cms-editor/cmsEditorModel.ts` (initial edit map assembly, SEO field selection, search/rank helpers, approval payload assembly, approval-history map builder), and rewired `src/components/CmsEditor.tsx` to consume the module while preserving behavior. Bug sniffing fix included: approval history is now sorted by `updatedAt` descending before render so the inline \"Latest\" badge always reflects the most recent approval event. Added unit coverage (`tests/unit/cms-editor-model.test.ts`) and source-contract guardrails (`tests/contract/cms-editor-phase1-model-extraction.test.ts`) to prevent model/contracts drift back into the root shell."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase2",
+          "title": "CmsEditor monolith decomposition - phase 2 approval workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 1",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase2`. Extracted approval workflow state/orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`, including selection toggles, select-all behavior, payload assembly, send-for-approval mutation, transient success state, and approval refresh key wiring. `CmsEditor.tsx` now consumes the hook and keeps shell composition only for this workflow path. Bug sniffing hardening included: select-all now guards empty collections from false \"all selected\" toggles, and validation/network approval errors remain surfaced through the existing `ErrorState` UI path after extraction. Added source-contract guardrails (`tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`) and updated phase-1 contract assertions to match the new ownership boundary."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

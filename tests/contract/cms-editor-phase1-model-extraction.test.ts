@@ -11,7 +11,6 @@ describe('CmsEditor phase-1 model extraction contract', () => {
     expect(cmsEditorSource).toContain("from './cms-editor/cmsEditorModel'");
     expect(cmsEditorSource).toContain('buildInitialEdits(collections)');
     expect(cmsEditorSource).toContain('buildItemApprovalMap(approvalBatches)');
-    expect(cmsEditorSource).toContain('buildApprovalPayloadItems(approvalSelected, edits, collections)');
     expect(cmsEditorSource).toContain('filterAndRankCollectionItems(coll, search)');
   });
 
