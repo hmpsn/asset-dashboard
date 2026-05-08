@@ -616,6 +616,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase3`. Extracted AI rewrite/variation workflow state and orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorAiWorkflow.ts`, including AI loading state, rewrite request assembly, paired rewrite handling, variation application helpers, and session-storage-backed variation persistence. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for AI controls. Bug sniffing hardening included: AI failures and empty/no-suggestion responses now surface user-visible `ErrorState` feedback (`aiError`) instead of silently failing. Added source-contract guardrails (`tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`) to lock the new ownership boundary."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase4",
+          "title": "CmsEditor monolith decomposition - phase 4 publish + bulk workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 3",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase4`. Extracted publish and bulk rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`, including publish pending/success state, bulk mode/progress/result state, collection/item auto-expansion during bulk operations, and concurrency-limited bulk rewrite dispatch. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for publish/bulk controls. Bug sniffing hardening included: bulk rewrite failure accounting now correctly tracks AI generation failures (not only thrown promise rejections) by having AI rewrite actions return explicit success booleans consumed by the bulk workflow. Added source-contract guardrails (`tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`) to lock the ownership boundary."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

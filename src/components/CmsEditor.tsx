@@ -8,7 +8,7 @@ import { useCmsEditor } from '../hooks/admin';
 import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
-import { patch, post } from '../api/client';
+import { patch } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
 import {
   buildInitialEdits,
@@ -19,6 +19,7 @@ import {
 } from './cms-editor/cmsEditorModel';
 import { useCmsEditorApprovalWorkflow } from './cms-editor/useCmsEditorApprovalWorkflow';
 import { useCmsEditorAiWorkflow } from './cms-editor/useCmsEditorAiWorkflow';
+import { useCmsEditorPublishBulkWorkflow } from './cms-editor/useCmsEditorPublishBulkWorkflow';
 
 interface Props {
   siteId: string;
@@ -57,11 +58,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-  const [publishing, setPublishing] = useState<Set<string>>(new Set());
-  const [published, setPublished] = useState<Set<string>>(new Set());
-  const [bulkMode, setBulkMode] = useState<'idle' | 'rewriting'>('idle');
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
-  const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
   const {
     approvalSelected,
@@ -138,6 +134,26 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     updateField,
   });
 
+  const {
+    publishing,
+    published,
+    bulkMode,
+    bulkProgress,
+    bulkResults,
+    publishCollection,
+    bulkAiRewrite,
+  } = useCmsEditorPublishBulkWorkflow({
+    siteId,
+    workspaceId,
+    collections,
+    saved,
+    approvalSelected,
+    setExpandedCollections,
+    setExpandedItems,
+    aiRewrite,
+    aiRewriteBoth,
+  });
+
   const saveItem = async (collectionId: string, itemId: string) => {
     const fields = edits[itemId];
     if (!fields) return;
@@ -158,91 +174,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     } finally {
       setSaving(prev => { const n = new Set(prev); n.delete(itemId); return n; });
     }
-  };
-
-  const publishCollection = async (collectionId: string) => {
-    const collItems = collections.find(c => c.collectionId === collectionId)?.items || [];
-    const savedItemIds = collItems.filter(i => saved.has(i.id)).map(i => i.id);
-    if (savedItemIds.length === 0) return;
-    setPublishing(prev => new Set(prev).add(collectionId));
-    try {
-      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds, siteId, workspaceId });
-      if (result.success) {
-        setPublished(prev => new Set(prev).add(collectionId));
-        setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);
-      }
-    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
-      setPublishing(prev => { const n = new Set(prev); n.delete(collectionId); return n; });
-    }
-  };
-
-  // ── Bulk AI Rewrite — calls single-page aiRewrite for each selected item ──
-  const bulkAiRewrite = async (targetField: 'name' | 'title' | 'description' | 'all') => {
-    const selectedIds = Array.from(approvalSelected).filter(id =>
-      collections.some(c => c.items.some(it => it.id === id))
-    );
-    if (selectedIds.length === 0) return;
-    setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: selectedIds.length });
-
-    // Auto-expand parent collections + selected items
-    setExpandedCollections(prev => {
-      const next = new Set(prev);
-      for (const id of selectedIds) {
-        const coll = collections.find(c => c.items.some(it => it.id === id));
-        if (coll) next.add(coll.collectionId);
-      }
-      return next;
-    });
-    setExpandedItems(prev => {
-      const next = new Set(prev);
-      for (const id of selectedIds) next.add(id);
-      return next;
-    });
-
-    let completed = 0;
-    let failed = 0;
-    const CONCURRENCY = 3;
-
-    for (let i = 0; i < selectedIds.length; i += CONCURRENCY) {
-      const batch = selectedIds.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(async (itemId) => {
-          const coll = collections.find(c => c.items.some(it => it.id === itemId));
-          if (!coll) return;
-          const extraSeoFields = getExtraSeoFields(coll.seoFields);
-          const { titleField: titleF, descField: descF } = getTitleAndDescriptionFields(extraSeoFields);
-
-          if (targetField === 'all' && titleF && descF) {
-            await aiRewrite(coll.collectionId, itemId, 'name');
-            await aiRewriteBoth(coll.collectionId, itemId, titleF.slug, descF.slug);
-          } else {
-            const slugs: string[] = [];
-            if (targetField === 'name' || targetField === 'all') slugs.push('name');
-            if ((targetField === 'title' || targetField === 'all') && titleF) slugs.push(titleF.slug);
-            if ((targetField === 'description' || targetField === 'all') && descF) slugs.push(descF.slug);
-
-            for (const slug of slugs) {
-              await aiRewrite(coll.collectionId, itemId, slug);
-            }
-          }
-        })
-      );
-      for (const r of results) {
-        if (r.status === 'rejected') failed++;
-        completed++;
-      }
-      setBulkProgress({ done: completed, total: selectedIds.length });
-    }
-
-    const succeeded = completed - failed;
-    setBulkResults(
-      failed > 0
-        ? `Generated variations for ${succeeded}/${selectedIds.length} items (${failed} failed) — review below.`
-        : `Generated variations for ${succeeded}/${selectedIds.length} items — review in each card below.`
-    );
-    setBulkMode('idle');
-    setTimeout(() => setBulkResults(null), 8000);
   };
 
   const toggleCollection = (id: string) => {

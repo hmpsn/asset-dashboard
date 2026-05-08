@@ -85,7 +85,7 @@ export function useCmsEditorAiWorkflow({
     clearItemVariations(itemId);
   };
 
-  const aiRewrite = async (collectionId: string, itemId: string, fieldSlug: string) => {
+  const aiRewrite = async (collectionId: string, itemId: string, fieldSlug: string): Promise<boolean> => {
     const key = `${itemId}-${fieldSlug}`;
     setAiLoading(previous => ({ ...previous, [key]: true }));
     setAiError(null);
@@ -118,14 +118,18 @@ export function useCmsEditorAiWorkflow({
       if (data.variations && data.variations.length > 1) {
         const options = data.variations;
         setVariations(previous => ({ ...previous, [itemId]: { fieldSlug, options } }));
+        return true;
       } else if (data.text) {
         updateField(itemId, fieldSlug, data.text);
+        return true;
       } else {
         surfaceAiError('No AI suggestion returned. Please try again.');
+        return false;
       }
     } catch (err) {
       console.error('CmsEditor operation failed:', err);
       surfaceAiError('AI rewrite failed. Please try again.');
+      return false;
     } finally {
       setAiLoading(previous => {
         const next = { ...previous };
@@ -135,7 +139,7 @@ export function useCmsEditorAiWorkflow({
     }
   };
 
-  const aiRewriteBoth = async (collectionId: string, itemId: string, titleSlug: string, descSlug: string) => {
+  const aiRewriteBoth = async (collectionId: string, itemId: string, titleSlug: string, descSlug: string): Promise<boolean> => {
     const key = `${itemId}-both`;
     setAiLoading(previous => ({ ...previous, [key]: true }));
     setAiError(null);
@@ -174,17 +178,22 @@ export function useCmsEditorAiWorkflow({
             descOptions: pairs.map(pair => pair.description),
           },
         }));
+        return true;
       } else if (data.variations && data.variations.length > 1) {
         const options = data.variations;
         setVariations(previous => ({ ...previous, [itemId]: { fieldSlug: titleSlug, options } }));
+        return true;
       } else if (data.text) {
         updateField(itemId, titleSlug, data.text);
+        return true;
       } else {
         surfaceAiError('No AI suggestions returned. Please try again.');
+        return false;
       }
     } catch (err) {
       console.error('CmsEditor operation failed:', err);
       surfaceAiError('AI rewrite failed. Please try again.');
+      return false;
     } finally {
       setAiLoading(previous => {
         const next = { ...previous };
