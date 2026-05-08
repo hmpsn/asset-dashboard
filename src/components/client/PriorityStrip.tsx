@@ -15,6 +15,12 @@ const SECTION_CHIP_CLASS: Record<string, string> = {
   content: 'bg-blue-500/15 text-accent-info border-blue-500/30',
 };
 
+const SECTION_ICON_CLASS: Record<string, string> = {
+  'needs-action': 'text-accent-warning',
+  'seo-changes': 'text-accent-brand',
+  content: 'text-accent-info',
+};
+
 export interface PriorityItem {
   id: string;
   icon: LucideIcon;
@@ -51,7 +57,7 @@ export function PriorityStrip({ items, showAllCaughtUp = false }: PriorityStripP
       <ul className="divide-y divide-[var(--brand-border)]">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 px-4 py-3">
-            <Icon as={item.icon} size="sm" className="text-accent-warning flex-shrink-0" />
+            <Icon as={item.icon} size="sm" className={`${SECTION_ICON_CLASS[item.section] ?? 'text-accent-warning'} flex-shrink-0`} />
             <span className="t-ui text-[var(--brand-text)] flex-1 min-w-0 truncate">{item.title}</span>
             <span
               className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium border ${SECTION_CHIP_CLASS[item.section] ?? ''}`}
@@ -61,6 +67,7 @@ export function PriorityStrip({ items, showAllCaughtUp = false }: PriorityStripP
             <button
               type="button"
               onClick={item.onCta}
+              aria-label={`${item.ctaLabel} ${item.title}`}
               className="flex-shrink-0 t-caption font-medium text-accent-brand hover:text-[var(--brand-text-bright)] transition-colors min-h-[36px] px-2"
             >
               {item.ctaLabel}
