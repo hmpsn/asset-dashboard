@@ -340,444 +340,6 @@
       ]
     },
     {
-      "id": "sprint-platform-consolidation",
-      "name": "Platform Consolidation",
-      "hours": "70-108",
-      "rationale": "Verified against origin/staging eb0a5832 on 2026-05-04. Phase 0 baseline confirms rapid product expansion left uneven background-generation coverage, duplicate implementations, partially completed migrations, and large feature modules that now slow safe iteration.",
-      "items": [
-        {
-          "id": "platform-consolidation-phase0-baseline",
-          "title": "Phase 0 baseline - verify platform consolidation audit against staging",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "2-4h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed against origin/staging eb0a5832 on 2026-05-04. Confirmed no relevant stash already contained this work, inventoried admin generation surfaces, decided TaskPanel/useBackgroundTasks should be the canonical job UX foundation, classified drifted synchronous/partial generation paths, and defined Phase 1 background-generation contract, UX, and guardrail targets."
-        },
-        {
-          "id": "platform-consolidation-background-generation-contract",
-          "title": "Background generation contract - shared job metadata and start policy",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed in Phase 1 on 2026-05-04. Added docs/rules/background-generation.md, shared/types/background-jobs.ts, shared job labels/cancellation semantics/result behavior, and server default messages based on the shared metadata. This makes existing /api/jobs + TaskPanel conventions the official platform contract without migrating Phase 2 generation flows yet."
-        },
-        {
-          "id": "platform-consolidation-background-generation-ui-parity",
-          "title": "Background generation UX - TaskPanel parity foundation",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "3-4h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed in Phase 1 on 2026-05-04. TaskPanel now consumes shared job metadata, labels feature-specific SEO bulk jobs, shows stop only for abort-aware jobs, filters by current workspace, and avoids globally destructive clear-completed behavior in the filtered panel. useBackgroundTasks now exposes active/latest-terminal lookup helpers for Phase 2 surfaces. Shared WebSocket work remains coordinated with #587; notification hub merge remains scoped to #503."
-        },
-        {
-          "id": "platform-consolidation-background-generation-guardrails",
-          "title": "Background generation guardrails - prevent new synchronous admin generation drift",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed in Phase 1 on 2026-05-04. Added a warning pr-check rule, fixture coverage, verified-clean registry entry, generated automated-rules docs, and a background-generation-ok hatch for reviewed exceptions. The rule starts narrowly by catching unallowlisted post-response generation in audited high-churn routes."
-        },
-        {
-          "id": "platform-consolidation-background-generation-migrations",
-          "title": "Background generation Phase 2 - migrate drifted long-running generation flows",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "12-18h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed across staged Phase 2 slices by 2026-05-05. KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation; schema/page-analysis cancellation stays durable after abort-controller cleanup; SEO bulk workers unregister abort controllers; shared schema generation context prep is extracted; schema/page-analysis worker bodies are extracted from server/routes/jobs.ts into dedicated worker modules while the route remains the dispatcher; PageIntelligence rediscovers active page-analysis jobs after navigation/reload so inline progress derives from the same TaskPanel job state; schema snapshot generation, publish, rollback, retract, and delete paths now broadcast schema:snapshot_updated and invalidate admin/client React Query caches; BrandHub knowledge base, brand voice, and persona generation now run through shared background jobs with sessionStorage recovery for completed drafts after navigation."
-        },
-        {
-          "id": "platform-consolidation-page-analysis-worker-hardening",
-          "title": "Page analysis worker hardening - clarify empty states and fetch failure handling",
-          "source": "Follow-up surfaced during codex/extract-schema-page-analysis-workers scaled review",
-          "est": "2-3h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-05",
-          "notes": "Completed 2026-05-05 in codex/page-analysis-worker-hardening. Page-analysis jobs now finish with a clear no-pages-discovered message, set a user-facing terminal message when OPENAI_API_KEY is missing, and skip AI calls with warning/accounting when all page HTML fetch attempts fail instead of analyzing empty content."
-        },
-        {
-          "id": "platform-consolidation-billing-checkout-only",
-          "title": "Billing architecture - consolidate on Stripe Checkout",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-04 in codex/billing-checkout-only. Removed the legacy /api/stripe/create-payment-intent endpoint, deleted the Stripe Elements payment form, simplified client purchases to always create Stripe Checkout sessions, and updated Stripe tests/mocks so Checkout remains the only client purchase architecture. Webhook PaymentIntent handling remains only for Stripe Checkout reconciliation and failure events; the payment_intent.succeeded handler now also finds Checkout-reconciled records by stripePaymentIntentId to avoid false missing-payment errors after hosted Checkout completion."
-        },
-        {
-          "id": "platform-consolidation-client-data-react-query",
-          "title": "Client portal data - finish React Query migration and retire useClientData facade",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "6-8h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/client-data-react-query-slice. Retired src/hooks/useClientData.ts, moved its exported client data helper types into src/components/client/types.ts, and made ClientDashboard compose useClientSearch, useClientGA4, and the focused hooks from src/hooks/client/useClientQueries.ts directly. Preserved query-cache setters for approvals/content requests, workspace-event invalidation keys, date-range query behavior, and pricing hydration through useClientPricing."
-        },
-        {
-          "id": "platform-consolidation-tab-deeplink-contracts",
-          "title": "Deep-link contract sweep - fix senders whose ?tab= targets ignore search params",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/tab-deeplink-contracts. StrategyTab now reads useSearchParams/searchParams.get('tab') and maps client briefing ?tab=content-gaps deep links to the Create Content accordion section. Extended tests/contract/tab-deep-link-wiring.test.ts to cover clientPath senders as well as adminPath senders, including client StrategyTab and InboxTab receivers."
-        },
-        {
-          "id": "platform-consolidation-keyword-strategy-streaming",
-          "title": "Keyword strategy generation - start through shared background jobs",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "1-2h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-04 in codex/platform-keyword-strategy-background-job. Superseded the admin direct-SSE caller by starting BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through useBackgroundTasks, deriving the generating state from the active job, preserving SSE progress inside the worker, and fixing internal job route bridges to use signed admin tokens. The legacy SSE endpoint and streamKeywordStrategy helper remain for compatibility until the backend service extraction follow-up removes the internal route-fetch bridge."
-        },
-        {
-          "id": "platform-consolidation-content-post-generation-job",
-          "title": "Content post generation - migrate brief-to-post flow to background jobs",
-          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/content-post-background-jobs. Moved POST /api/content-posts/:workspaceId/generate off legacy post-response generation and onto the shared jobs store with BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION metadata so TaskPanel can surface it. Preserved the immediate skeleton-post UX, returns jobId with the skeleton, added /api/jobs support for the same job type, kept generation non-cancellable until generatePost is abort-aware, and added route coverage for skeleton response plus persisted job lookup."
-        },
-        {
-          "id": "platform-consolidation-content-post-generation-progress",
-          "title": "Content post generation - add step progress and cancellation",
-          "source": "Follow-up surfaced during codex/content-post-background-jobs review",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-05",
-          "notes": "Completed 2026-05-05 in codex/content-post-generation-progress. generatePost now reports durable job progress for context prep, introduction, each body section, conclusion, unification, SEO metadata, and finalization. Content post generation registers an AbortController, passes AbortSignal through content AI helper calls, marks cancelled drafts terminal in the content domain, and BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION is now cancellable in shared metadata."
-        },
-        {
-          "id": "platform-consolidation-keyword-strategy-job-service-extraction",
-          "title": "Keyword strategy jobs - extract native service worker with progress callbacks",
-          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/keyword-strategy-job-service. Extracted keyword strategy generation into server/keyword-strategy-generation.ts so the direct SSE route and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY worker share native orchestration instead of the job worker internally fetching the route. Preserved active generation guards, billing reservation/refund behavior, persistence, broadcasts, history writes, rank seeding, recommendations, llms.txt regeneration, SSE progress, and job progress translation."
-        },
-        {
-          "id": "platform-consolidation-background-job-stale-recovery",
-          "title": "Background jobs - recover stale pending/running jobs after process restart",
-          "source": "Follow-up surfaced during codex/keyword-strategy-job-service scaled review",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-05",
-          "notes": "Completed 2026-05-05 in codex/background-job-stale-recovery. Startup recovery now has an explicit exported recovery path with regression coverage, marks persisted pending/running jobs as error after restart, updates the visible TaskPanel message as well as the error field, and keeps graceful-shutdown interruption messages aligned."
-        },
-        {
-          "id": "platform-consolidation-generation-activity-parity",
-          "title": "Generation activity parity - log direct and background generation consistently",
-          "source": "Follow-up surfaced during codex/keyword-strategy-job-service review",
-          "est": "1-2h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-05",
-          "notes": "Completed 2026-05-05 in codex/generation-activity-parity. Keyword strategy success activity now logs from server/keyword-strategy-generation.ts after persistence, so direct SSE/API generation and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY share the same activity behavior. Removed the job-wrapper strategy_generated log to prevent duplicate entries."
-        },
-        {
-          "id": "platform-consolidation-webflow-seo-suggestions-list-test",
-          "title": "Webflow SEO suggestions - add list endpoint integration coverage",
-          "source": "Follow-up surfaced during PR #458 review",
-          "est": "1h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added route-level integration coverage for GET /api/webflow/seo-suggestions/:workspaceId, including counts and field filtering, after the low-risk Webflow SEO route split."
-        },
-        {
-          "id": "platform-consolidation-seo-copy-happy-path-test",
-          "title": "Webflow SEO copy - add happy-path integration coverage",
-          "source": "Follow-up surfaced during PR #458 review",
-          "est": "1h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added a mocked happy-path integration test for POST /api/webflow/seo-copy so the extracted page-tools route has explicit regression coverage."
-        },
-        {
-          "id": "platform-consolidation-ai-dispatch-migration",
-          "title": "AI dispatch - migrate general server generation paths to callAI",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. Completed across thirteen slices. Earlier slices migrated chat memory summaries, meeting briefs, monthly digests, content decay recommendations, internal link suggestions, SEO audit metadata recommendations, rewrite chat, Webflow keyword analysis, brandscript import, copy-intelligence pattern extraction, copy refresh suggestions, discovery extraction, copy voice feedback classification/suggestion generation, llms.txt page summaries, Webflow per-page SEO copy generation, page analysis jobs, bulk Webflow page analysis jobs, Google Search Console chat, workspace intelligence-profile autofill, anomaly digest summaries, keyword recommendation relevance ranking, and content post creative generation/SEO metadata/voice scoring. Final broad batch migrates the remaining general app generation paths: content briefs and outline regeneration, AEO page review, schema plan/template suggestions, keyword strategy synthesis, content publish field mapping, content post AI review, diagnostic synthesis, admin/client Search chat, jobs bulk SEO fixes, copy pipeline generation/regeneration, and blueprint generation. Claude review follow-up added JSON responseFormat defense to object-shaped parsers in the final batch plus meeting brief generation. Direct provider-helper usage now remains at the dispatcher/helper boundary, provider helper tests/usage exports, parseAIJson compatibility imports, and documented vision payload exceptions."
-        },
-        {
-          "id": "platform-consolidation-seo-provider-boundary",
-          "title": "SEO provider boundary - finish Semrush/DataForSEO abstraction cleanup",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-05 in codex/seo-provider-keyword-strategy-consolidation. Keyword strategy generation now imports trend/SERP helpers from provider-neutral server/seo-provider-signals.ts instead of server/semrush.ts, while semrush.ts keeps compatibility re-exports for older tests/imports. Keyword strategy route/job/component paths use seoDataMode, keep legacy semrushMode fallback for existing callers and stored strategies, and return a provider-neutral seoDataMode alias from the admin strategy read path. useKeywordStrategy now derives availability from /api/seo-providers/status so DataForSEO-only workspaces enable SEO data mode. Keyword Strategy UI state/props/guide copy now use provider-neutral naming, and generation progress uses seo-data while jobs still label old semrush progress for compatibility."
-        },
-        {
-          "id": "platform-consolidation-keyword-strategy-route-split",
-          "title": "Keyword strategy backend - split route monolith and sequence storage normalization",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "8-12h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed across six staged slices. First backend split slice completed 2026-05-05 in codex/keyword-strategy-generation-service-split: pure helper logic moved to server/keyword-strategy-helpers.ts and SEO provider collection moved to server/keyword-strategy-seo-data.ts while preserving the route wrapper, public re-exports, job/direct generation behavior, competitor cache writes, and provider data outputs. Second split slice completed 2026-05-05 in codex/keyword-strategy-generation-service-split-2: live-page discovery/content fetching moved to server/keyword-strategy-pages.ts and GSC/GA4 signal collection moved to server/keyword-strategy-search-data.ts while preserving progress labels, incremental fresh-page recovery, sitemap fallback behavior, and direct/background job compatibility. Third split slice completed 2026-05-06 in codex/keyword-strategy-ai-synthesis-split: AI prompt context assembly, page-batch mapping, keyword-pool construction, incremental preserve/merge handling, post-AI keyword validation, and master site-level synthesis moved to server/keyword-strategy-ai-synthesis.ts while preserving direct/background job compatibility, progress labels, declined/requested keyword guardrails, competitor brand filtering, invalid-master-JSON payloads, and incremental no-op refunds. Fourth split slice completed 2026-05-06 in codex/keyword-strategy-enrichment-split: post-synthesis enrichment moved into server/keyword-strategy-enrichment.ts, covering GSC/provider metric hydration, SERP targeting, content-gap scoring/sorting, cannibalization, topical authority clusters, site keyword metrics, quick-win ROI scoring, and final impact sorting while preserving direct/background job compatibility and existing progress labels. Fifth split slice completed 2026-05-06 in codex/keyword-strategy-persistence-split: page-keyword table persistence, strategy-history snapshots/pruning, workspace strategy blob writes, strategy_generated activity, STRATEGY_UPDATED broadcasts, cache/intelligence invalidation, and strategy outcome-action recording moved into server/keyword-strategy-persistence.ts while preserving full/incremental write semantics and direct/background job compatibility. Sixth split slice completed 2026-05-06 in codex/keyword-strategy-followons-split: tracked-keyword auto-seeding, keyword-strategy-triggered llms.txt regeneration, and deduped recommendation refreshes moved into server/keyword-strategy-follow-ons.ts while preserving response/follow-on ordering and shared direct-route/background-job orchestration. Storage normalization remains sequenced under existing items #365, #367, #368, #369, and #370."
-        },
-        {
-          "id": "platform-consolidation-webflow-seo-route-split",
-          "title": "Webflow SEO backend - split audit, rewrite, bulk jobs, and apply flows",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "6-10h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed in staged slices on 2026-05-04 and 2026-05-05. SEO suggestion routes moved to server/routes/webflow-seo-suggestions.ts, page HTML/SEO copy routes moved to server/routes/webflow-seo-page-tools.ts, single-page /api/webflow/seo-rewrite moved to server/routes/webflow-seo-rewrite.ts with shared limit handling, live /api/webflow/seo-bulk-fix and /api/webflow/seo-pattern-apply moved to server/routes/webflow-seo-apply.ts, legacy /api/webflow/seo-bulk-rewrite suggestion generation moved to server/routes/webflow-seo-bulk-rewrite.ts, /api/webflow/seo-audit moved to server/routes/webflow-seo-audit.ts, and /api/seo/:workspaceId background job start endpoints moved to server/routes/webflow-seo-jobs.ts. Bulk worker bodies live in server/webflow-seo-bulk-accept-fixes-job.ts, server/webflow-seo-bulk-rewrite-job.ts, and server/webflow-seo-bulk-analyze-job.ts. On-demand audit page-state marking and audit insight bridge handling live in server/webflow-seo-audit-bridges.ts. The old server/routes/webflow-seo.ts dispatcher has been retired without changing endpoint behavior."
-        },
-        {
-          "id": "platform-consolidation-monolith-safe-splits-phase1",
-          "title": "Monolith split Phase 1 - extract low-risk Webflow SEO and pageElements boundaries",
-          "source": "docs/superpowers/plans/2026-05-04-platform-consolidation-monolith-splits.md",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed on 2026-05-04. Extracted SEO suggestion CRUD/apply routes and Webflow page tools from server/routes/webflow-seo.ts, registered the focused routers in server/route-groups/webflow.ts, and moved the read-only pageElements assembler/formatter to server/intelligence/page-elements-slice.ts with unit coverage. This preserves behavior while creating safe ownership boundaries for the larger monolith split sprint."
-        },
-        {
-          "id": "platform-consolidation-client-strategy-tab-split",
-          "title": "Client StrategyTab - split workflow state into hooks and sections",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "6-10h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed across seven staged slices on 2026-05-06. First slice extracted keyword feedback, tracked strategy keyword, and business-priority workflow state/API calls from StrategyTab into focused hooks. Second slice extracted the keyword detail drawer and shared keyword display helpers into client/strategy modules with static contract guards. Third slice extracted the Create Content/content-opportunity accordion into StrategyContentOpportunitiesSection with a static contract guard. Fourth slice extracted the Improve Pages quick-win/page-review accordion into StrategyPageImprovementsSection with a static contract guard. Fifth slice extracted the Guide This Strategy business-priority accordion into StrategyBusinessPrioritiesSection with a static contract guard, corrected the business-priorities deep-link scroll target, and aligned keyboard adds with the existing 10-priority cap. Sixth slice extracted the Strategy Keywords request/feedback surface, declined-keyword restore accordion, and decline-reason modal into focused strategy components with a static contract guard. Seventh slice completed the shell reduction from origin/staging 210f8cb by extracting the Strategy Snapshot, Recommended Next Steps, and Page Keyword Map accordion into focused strategy components while preserving tier gates, deep-link expansion, scroll callbacks, and feedback wiring."
-        },
-        {
-          "id": "platform-consolidation-feature-tool-splits",
-          "title": "Feature tool monoliths - split SchemaSuggester, PageIntelligence, SeoEditor, VoiceTab",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "10-16h",
-          "priority": "P3",
-          "status": "pending",
-          "createdAt": "2026-05-04",
-          "notes": "Verified still valid on origin/staging eb0a5832. SchemaSuggester, PageIntelligence, SeoEditor, and VoiceTab remain >1,000-line feature modules. PageIntelligence slices on 2026-05-06 have extracted pure display/scoring helpers, data derivation helpers for persisted-analysis hydration/search/sort/fix-queue ranking, the pages-tab header/control strip, the pages list/expanded detail renderer, page row/detail renderers, expanded detail strategy/analysis/persisted-summary/action sections, and parent workflow hooks for page-analysis jobs, keyword editing/tracking, and SEO copy state with unit/source contract coverage; see FEATURE_AUDIT entries 344-350. SchemaSuggester generation workflow extraction now moves saved snapshot/page-type/page-picker/fix-context scan state and the shared schema-generator background job handling into useSchemaSuggesterGeneration, with source contract coverage and typed BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR startup; see FEATURE_AUDIT entry 351. SchemaSuggester CMS workflow extraction now moves CMS template page loading/generation/publish/copy state, schema CMS field-mapping query/mutation cache updates, and detected location/service mapping collection derivation into useSchemaSuggesterCmsWorkflow with source contract coverage; see FEATURE_AUDIT entry 352. SchemaSuggester publishing workflow extraction now moves page publish/retract, client approval submission, manual-delivery, schema edit/copy, template-save, bulk publish, and edit-state refresh state into useSchemaSuggesterPublishingWorkflow with source contract coverage; see FEATURE_AUDIT entry 353. SchemaSuggester results rendering extraction now moves schema impact display/fetch state plus page/validation/edit-status summary rendering into SchemaImpactPanel, SchemaResultsSummary, and SchemaEditStatusSummary with unit/source contract coverage; see FEATURE_AUDIT entry 354. SchemaPageCard details extraction now moves existing-schema badges, validation finding grouping, recommendation banners, graph summaries, generation diagnostics, and rich-result eligibility into SchemaPageCardDetails with component coverage; see FEATURE_AUDIT entry 355. SchemaSuggester setup extraction now moves business-profile callout, generator hero actions, initial page type picker/guide, and CMS field mapping rendering into SchemaGeneratorSetup with component coverage; see FEATURE_AUDIT entry 356. Schema monolith cleanup is complete; stop here before SeoEditor and VoiceTab per sprint direction. SeoEditor decomposition resumed on 2026-05-07 with Phase 1 contract/type extraction (PR #602), Phase 2 derived-helper extraction for approval payload assembly plus page filtering/ranking logic (PR #603), Phase 3 bulk-helper extraction for pattern preview/apply payloads, bulk rewrite job request payloads, and static-page SEO/openGraph update payload assembly (PR #605), Phase 4 persistence-helper extraction for session cache/draft/job-id hydration and guardrail coverage (FEATURE_AUDIT entry 365), Phase 5 approval-workflow hook extraction (FEATURE_AUDIT entry 366) with filtered select-all mismatch hardening, Phase 6 page-workflow hook extraction for save/draft/rewrite/analyze orchestration (FEATURE_AUDIT entry 367), Phase 7 bulk-workflow hook extraction for analyze-all/bulk-fix/pattern/rewrite orchestration with page-state clear tracking consolidation and source contract coverage (FEATURE_AUDIT entry 368), Phase 8 shell-controls extraction for tracking summary/analyze controls/CMS toggle/search composition hardening (FEATURE_AUDIT entry 369), Phase 9 header-action extraction for stats/refresh/fix/publish/action-banner composition hardening (FEATURE_AUDIT entry 370), Phase 10 page-list extraction for CMS empty-state/banner and PageEditRow composition hardening (FEATURE_AUDIT entry 371), Phase 11 workflow-panels extraction for pending approvals/unsaved banner/SEO suggestions/bulk-operations composition hardening (FEATURE_AUDIT entry 372), and Phase 12 session-state hook extraction for cache hydration/persistence, fix-context auto-expand, and local expanded/preview state composition hardening (FEATURE_AUDIT entry 373). VoiceTab decomposition resumed on 2026-05-07 with Phase 1 model/helper extraction that moved shared constants/defaults/mappings plus normalized dedupe helpers into `src/components/brand/voice-tab/voiceTabModel.ts`, added source-contract guardrails, and covered duplicate/whitespace edge cases in unit tests (FEATURE_AUDIT entry 374). VoiceTab Phase 2 now extracts the samples and DNA sections into `src/components/brand/voice-tab/SamplesSection.tsx` and `src/components/brand/voice-tab/DNASection.tsx`, preserving mutation/toast behavior while adding source-contract coverage to keep section ownership out of the root shell (FEATURE_AUDIT entry 375). VoiceTab Phase 3 now extracts guardrails and calibration surfaces into `src/components/brand/voice-tab/GuardrailsSection.tsx`, `src/components/brand/voice-tab/CalibrationSection.tsx`, and `src/components/brand/voice-tab/useVoiceCalibrationWorkflow.ts`, with source-contract coverage and preserved generate/refine/feedback/sample flows (FEATURE_AUDIT entry 376). VoiceTab Phase 4 now extracts profile query/mutation/tab-section orchestration into `src/components/brand/voice-tab/useVoiceTabShell.ts` with source-contract coverage that locks root-shell composition boundaries (FEATURE_AUDIT entry 377). With VoiceTab shell cleanup merged, this feature-tool monolith split item is now complete."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase1",
-          "title": "CmsEditor monolith decomposition - phase 1 contracts + shared model extraction",
-          "source": "Loop follow-up after VoiceTab decomposition completion",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase1`. Extracted CmsEditor contracts and pure helpers into `src/components/cms-editor/cmsEditorModel.ts` (initial edit map assembly, SEO field selection, search/rank helpers, approval payload assembly, approval-history map builder), and rewired `src/components/CmsEditor.tsx` to consume the module while preserving behavior. Bug sniffing fix included: approval history is now sorted by `updatedAt` descending before render so the inline \"Latest\" badge always reflects the most recent approval event. Added unit coverage (`tests/unit/cms-editor-model.test.ts`) and source-contract guardrails (`tests/contract/cms-editor-phase1-model-extraction.test.ts`) to prevent model/contracts drift back into the root shell."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase2",
-          "title": "CmsEditor monolith decomposition - phase 2 approval workflow hook extraction",
-          "source": "Loop follow-up after CmsEditor phase 1",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase2`. Extracted approval workflow state/orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`, including selection toggles, select-all behavior, payload assembly, send-for-approval mutation, transient success state, and approval refresh key wiring. `CmsEditor.tsx` now consumes the hook and keeps shell composition only for this workflow path. Bug sniffing hardening included: select-all now guards empty collections from false \"all selected\" toggles, and validation/network approval errors remain surfaced through the existing `ErrorState` UI path after extraction. Added source-contract guardrails (`tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`) and updated phase-1 contract assertions to match the new ownership boundary."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase3",
-          "title": "CmsEditor monolith decomposition - phase 3 AI rewrite workflow hook extraction",
-          "source": "Loop follow-up after CmsEditor phase 2",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase3`. Extracted AI rewrite/variation workflow state and orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorAiWorkflow.ts`, including AI loading state, rewrite request assembly, paired rewrite handling, variation application helpers, and session-storage-backed variation persistence. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for AI controls. Bug sniffing hardening included: AI failures and empty/no-suggestion responses now surface user-visible `ErrorState` feedback (`aiError`) instead of silently failing. Added source-contract guardrails (`tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`) to lock the new ownership boundary."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase4",
-          "title": "CmsEditor monolith decomposition - phase 4 publish + bulk workflow hook extraction",
-          "source": "Loop follow-up after CmsEditor phase 3",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase4`. Extracted publish and bulk rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`, including publish pending/success state, bulk mode/progress/result state, collection/item auto-expansion during bulk operations, and concurrency-limited bulk rewrite dispatch. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for publish/bulk controls. Bug sniffing hardening included: bulk rewrite failure accounting now correctly tracks AI generation failures (not only thrown promise rejections) by having AI rewrite actions return explicit success booleans consumed by the bulk workflow. Added source-contract guardrails (`tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`) to lock the ownership boundary."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase5",
-          "title": "CmsEditor monolith decomposition - phase 5 shell state + session hook extraction",
-          "source": "Loop follow-up after CmsEditor phase 4",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase5`. Extracted root shell/session state ownership from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorShellState.ts`, including cache hydration/persistence for edits and expansion state, shell-local state for saving/saved/history/search/errors/preview, and shared toggles/update helpers. `CmsEditor.tsx` now consumes the hook and keeps composition/orchestration wiring. Bug sniffing hardening included: edits cache now persists even when empty, preventing stale cached edits from being resurrected after reset paths. Added source-contract and hook-behavior guardrails (`tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`, `tests/unit/cms-editor-shell-state-hook.test.ts`) to lock the new ownership boundary."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase6",
-          "title": "CmsEditor monolith decomposition - phase 6 collections render extraction",
-          "source": "Loop follow-up after CmsEditor phase 5",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase6`. Extracted the collection/item render monolith from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorCollections.tsx`, including collection header badges, item-level editor controls, AI variation selectors, inline approval history, and preview panels. `CmsEditor.tsx` now composes the extracted renderer and remains focused on orchestration. Bug sniffing hardening included: phase-1 contract assertions were updated to stop pinning now-extracted render helper usage in root (`filterAndRankCollectionItems`) while preserving model ownership checks, and a pre-existing purple paired-description label was corrected to blue to align with color-system rules. Added source-contract guardrails (`tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`) to lock the phase-6 ownership boundary."
-        },
-        {
-          "id": "platform-consolidation-cms-editor-decomp-phase7",
-          "title": "CmsEditor monolith decomposition - phase 7 shell panel + save workflow cleanup",
-          "source": "Loop follow-up after CmsEditor phase 6",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase7`. Extracted root shell chrome (header actions, bulk rewrite state UI, approval/error panels, tracking summary, search bar) from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorShellPanels.tsx`, and moved per-item save mutation orchestration into `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`. `CmsEditor.tsx` now stays composition-first (220 lines) and wires extracted modules plus existing workflow hooks. Bug sniffing hardening included: added unit coverage for the no-edit early-return guard in save workflow so API calls are blocked when no editable payload exists for an item. Added phase-7 source contract guardrails (`tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`) and dedicated save workflow unit coverage (`tests/unit/cms-editor-save-workflow.test.ts`). This closes the remaining CmsEditor decomposition surface for this sprint."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase1",
-          "title": "PageRewriteChat monolith decomposition - phase 1 contracts + shared model extraction",
-          "source": "Loop follow-up after CmsEditor phase 7 merge",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase1`. Extracted PageRewriteChat contracts/constants/pure helpers into `src/components/page-rewrite-chat/pageRewriteChatModel.ts` (page/chat/sitemap types, heading-class map, quick prompts, section-slug/indent helpers, URL-query detection helper, session-id builder) and rewired `src/components/PageRewriteChat.tsx` to consume the module while preserving behavior. Bug sniffing hardening included: URL query detection now trims whitespace before checking protocol prefixes, and URL load call sites pass `comboQuery.trim()` to keep the URL path explicit. Added unit coverage (`tests/unit/page-rewrite-chat-model.test.ts`) and source-contract guardrails (`tests/contract/page-rewrite-chat-phase1-model-extraction.test.ts`) to prevent model/helper drift back into the root shell."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase2",
-          "title": "PageRewriteChat monolith decomposition - phase 2 document helpers extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 1",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase2`. Extracted document-focused assembly/serialization helpers from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatDocument.ts` (`buildDocHtml`, `serializeDocToMarkdown`, `serializeDocToDocx`) and rewired root export/document initialization calls to consume the module while preserving behavior. Bug sniffing hardening included: deep nested section body paragraphs now use explicit inline `margin-left` styling in generated HTML so level-4+ section indentation is applied consistently (replacing dynamic class fragments that do not materialize at runtime). Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase2-document-extraction.test.ts`) and serializer coverage updates (`tests/unit/rewrite-export-serializer.test.ts`) to lock ownership and behavior."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase3",
-          "title": "PageRewriteChat monolith decomposition - phase 3 editor actions extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 2",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found — content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase4",
-          "title": "PageRewriteChat monolith decomposition - phase 4 document pane extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 3",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase4`. Extracted the full right-side editable document pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`, including empty/loading/error states, loaded-page header/export UI, issue-chip rendering, contenteditable surface, and formatting-toolbar rendering. Root shell now composes the pane while preserving document hydration/export/orchestration behavior. Bug sniffing hardening included: export popover now closes on `Escape` for keyboard dismissal. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`) to lock right-pane ownership."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase5",
-          "title": "PageRewriteChat monolith decomposition - phase 5 chat pane extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 4",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase5`. Extracted the full left-side chat pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`, including empty-state hero/quick prompts, user+assistant message rendering with rewrite apply/copy controls, sending-state row, and input composer/send UI. Root shell now composes the pane while preserving message/page orchestration, rewrite application, and export/document workflows. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`) to lock left-pane ownership."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase6",
-          "title": "PageRewriteChat monolith decomposition - phase 6 header and picker extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 5",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase6`. Extracted the top header and sitemap/URL picker from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`, including back/focus controls, loaded-page chip, search/paste combobox rendering, URL-load CTA, and empty-state messaging. Root shell now composes the header while preserving workflow state/orchestration handlers. Bug sniffing hardening included: sitemap options now key by `slug+url` to avoid duplicate-key rendering drift when slugs collide. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`) to lock header/picker ownership."
-        },
-        {
-          "id": "platform-consolidation-page-rewrite-chat-decomp-phase7",
-          "title": "PageRewriteChat monolith decomposition - phase 7 shell workflow hook extraction",
-          "source": "Loop follow-up after PageRewriteChat phase 6",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase7`. Extracted root shell orchestration from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`, including page/chat/document state, lifecycle effects, sitemap query wiring, combo interactions, rewrite apply flow, export workflow, and formatting handlers. `PageRewriteChat.tsx` now composes the extracted hook and view modules while preserving behavior. Bug sniffing hardening included: clipboard copy failures now surface toast feedback, and DOCX export failures now use non-blocking toast feedback instead of `alert()`. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase7-shell-hook-extraction.test.ts`) to lock shell workflow ownership."
-        },
-        {
-          "id": "platform-consolidation-workspace-intelligence-slices",
-          "title": "Workspace intelligence - split slice assemblers behind stable API",
-          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
-          "est": "8-12h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-04",
-          "notes": "Completed 2026-05-07. server/workspace-intelligence.ts now remains the public facade while prompt formatting and slice assemblers live under server/intelligence/*. Preserved facade exports and pageElements behavior, added cache-key isolation for siteInventory by site identity/token fingerprint, replaced the touched AEO review raw JSON.parse path with validated parsing, and extended pr-check/tests so extracted formatter and SEO-context modules remain covered. See FEATURE_AUDIT entry 357."
-        },
-        {
-          "id": "platform-consolidation-seo-context-retirement",
-          "title": "Workspace intelligence follow-up - retire deprecated seo-context builder",
-          "source": "Follow-up surfaced during workspace intelligence decomposition review",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Completed 2026-05-07. Deleted server/seo-context.ts after moving RICH_BLOCKS_PROMPT to server/prompt-rich-blocks.ts and raw brand/knowledge plus voice-authority helpers to server/intelligence/seo-context-source.ts. assembleSeoContext now computes effectiveBrandVoiceBlock directly, schema context reads knowledge/personas from the seoContext slice, old clearSeoContextCache callers use invalidateIntelligenceCache, and pr-check now hard-blocks production imports from the retired module. See FEATURE_AUDIT entry 358."
-        },
-        {
-          "id": "platform-consolidation-schema-context-slice-migration",
-          "title": "Schema context - finish direct-read to intelligence-slice migration",
-          "source": "Follow-up surfaced during workspace intelligence decomposition review",
-          "est": "4-6h",
-          "priority": "P2",
-          "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Completed 2026-05-07. Follow-up audit confirmed the Pattern B migration was functionally completed during SEO context retirement: buildSchemaContext reads businessContext, knowledgeBase, personas, siteKeywords, and business profile from `buildWorkspaceIntelligence({ slices: ['seoContext'] })`, while direct workspace reads are identity/analytics-only. This pass removed obsolete `schema-context-direct-read-ok` hatches in server/helpers.ts so the function now relies on the allow-list rule directly."
-        },
-        {
-          "id": "platform-consolidation-keyword-strategy-compat-retirement",
-          "title": "Keyword strategy - retire legacy direct/compatibility generation paths",
-          "source": "Follow-up surfaced during workspace intelligence decomposition review",
-          "est": "3-5h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Completed 2026-05-07. Removed obsolete frontend compatibility wrappers after the background-job migration: deleted the unused `keywords.generateStrategy` route-fetch helper and `streamKeywordStrategy` SSE helper from `src/api/seo.ts`, removed the now-dead SSE parser from `src/api/streamUtils.ts`, and updated the global fetch-auth comment in `src/main.tsx` to match remaining NDJSON usage. Added a contract guard (`tests/contract/keyword-strategy-compat-retirement.test.ts`) that pins job orchestration via `startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)` and blocks reintroduction of the retired direct-generation wrappers."
-        },
-        {
-          "id": "platform-consolidation-seo-provider-compat-retirement",
-          "title": "SEO provider boundary - retire Semrush-named compatibility exports",
-          "source": "Follow-up surfaced during workspace intelligence decomposition review",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Completed 2026-05-07. Removed the provider-neutral helper compatibility bridge from `server/semrush.ts` (`trendDirection`, `parseSerpFeatures`, `hasSerpOpportunity`) and migrated remaining test imports to `server/seo-provider-signals.ts`. Updated `tests/contract/seo-provider-boundary.test.ts` to block reintroduction of the semrush re-export bridge and require direct provider-neutral helper imports in the touched strategy/semrush suites."
-        }
-      ]
-    },
-    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",
@@ -1491,6 +1053,445 @@
           "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
+    },
+    {
+      "id": "sprint-platform-consolidation",
+      "name": "✅ SHIPPED — Platform Consolidation",
+      "hours": "70-108",
+      "rationale": "Verified against origin/staging eb0a5832 on 2026-05-04. Phase 0 baseline confirms rapid product expansion left uneven background-generation coverage, duplicate implementations, partially completed migrations, and large feature modules that now slow safe iteration.",
+      "items": [
+        {
+          "id": "platform-consolidation-phase0-baseline",
+          "title": "Phase 0 baseline - verify platform consolidation audit against staging",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed against origin/staging eb0a5832 on 2026-05-04. Confirmed no relevant stash already contained this work, inventoried admin generation surfaces, decided TaskPanel/useBackgroundTasks should be the canonical job UX foundation, classified drifted synchronous/partial generation paths, and defined Phase 1 background-generation contract, UX, and guardrail targets."
+        },
+        {
+          "id": "platform-consolidation-background-generation-contract",
+          "title": "Background generation contract - shared job metadata and start policy",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed in Phase 1 on 2026-05-04. Added docs/rules/background-generation.md, shared/types/background-jobs.ts, shared job labels/cancellation semantics/result behavior, and server default messages based on the shared metadata. This makes existing /api/jobs + TaskPanel conventions the official platform contract without migrating Phase 2 generation flows yet."
+        },
+        {
+          "id": "platform-consolidation-background-generation-ui-parity",
+          "title": "Background generation UX - TaskPanel parity foundation",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed in Phase 1 on 2026-05-04. TaskPanel now consumes shared job metadata, labels feature-specific SEO bulk jobs, shows stop only for abort-aware jobs, filters by current workspace, and avoids globally destructive clear-completed behavior in the filtered panel. useBackgroundTasks now exposes active/latest-terminal lookup helpers for Phase 2 surfaces. Shared WebSocket work remains coordinated with #587; notification hub merge remains scoped to #503."
+        },
+        {
+          "id": "platform-consolidation-background-generation-guardrails",
+          "title": "Background generation guardrails - prevent new synchronous admin generation drift",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed in Phase 1 on 2026-05-04. Added a warning pr-check rule, fixture coverage, verified-clean registry entry, generated automated-rules docs, and a background-generation-ok hatch for reviewed exceptions. The rule starts narrowly by catching unallowlisted post-response generation in audited high-churn routes."
+        },
+        {
+          "id": "platform-consolidation-background-generation-migrations",
+          "title": "Background generation Phase 2 - migrate drifted long-running generation flows",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "12-18h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed across staged Phase 2 slices by 2026-05-05. KeywordStrategyPanel starts the existing keyword-strategy job through useBackgroundTasks instead of direct SSE; content post generation is job-backed with step progress and cancellation; schema/page-analysis cancellation stays durable after abort-controller cleanup; SEO bulk workers unregister abort controllers; shared schema generation context prep is extracted; schema/page-analysis worker bodies are extracted from server/routes/jobs.ts into dedicated worker modules while the route remains the dispatcher; PageIntelligence rediscovers active page-analysis jobs after navigation/reload so inline progress derives from the same TaskPanel job state; schema snapshot generation, publish, rollback, retract, and delete paths now broadcast schema:snapshot_updated and invalidate admin/client React Query caches; BrandHub knowledge base, brand voice, and persona generation now run through shared background jobs with sessionStorage recovery for completed drafts after navigation."
+        },
+        {
+          "id": "platform-consolidation-page-analysis-worker-hardening",
+          "title": "Page analysis worker hardening - clarify empty states and fetch failure handling",
+          "source": "Follow-up surfaced during codex/extract-schema-page-analysis-workers scaled review",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-05",
+          "notes": "Completed 2026-05-05 in codex/page-analysis-worker-hardening. Page-analysis jobs now finish with a clear no-pages-discovered message, set a user-facing terminal message when OPENAI_API_KEY is missing, and skip AI calls with warning/accounting when all page HTML fetch attempts fail instead of analyzing empty content."
+        },
+        {
+          "id": "platform-consolidation-billing-checkout-only",
+          "title": "Billing architecture - consolidate on Stripe Checkout",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-04 in codex/billing-checkout-only. Removed the legacy /api/stripe/create-payment-intent endpoint, deleted the Stripe Elements payment form, simplified client purchases to always create Stripe Checkout sessions, and updated Stripe tests/mocks so Checkout remains the only client purchase architecture. Webhook PaymentIntent handling remains only for Stripe Checkout reconciliation and failure events; the payment_intent.succeeded handler now also finds Checkout-reconciled records by stripePaymentIntentId to avoid false missing-payment errors after hosted Checkout completion."
+        },
+        {
+          "id": "platform-consolidation-client-data-react-query",
+          "title": "Client portal data - finish React Query migration and retire useClientData facade",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/client-data-react-query-slice. Retired src/hooks/useClientData.ts, moved its exported client data helper types into src/components/client/types.ts, and made ClientDashboard compose useClientSearch, useClientGA4, and the focused hooks from src/hooks/client/useClientQueries.ts directly. Preserved query-cache setters for approvals/content requests, workspace-event invalidation keys, date-range query behavior, and pricing hydration through useClientPricing."
+        },
+        {
+          "id": "platform-consolidation-tab-deeplink-contracts",
+          "title": "Deep-link contract sweep - fix senders whose ?tab= targets ignore search params",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/tab-deeplink-contracts. StrategyTab now reads useSearchParams/searchParams.get('tab') and maps client briefing ?tab=content-gaps deep links to the Create Content accordion section. Extended tests/contract/tab-deep-link-wiring.test.ts to cover clientPath senders as well as adminPath senders, including client StrategyTab and InboxTab receivers."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-streaming",
+          "title": "Keyword strategy generation - start through shared background jobs",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-04 in codex/platform-keyword-strategy-background-job. Superseded the admin direct-SSE caller by starting BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY through useBackgroundTasks, deriving the generating state from the active job, preserving SSE progress inside the worker, and fixing internal job route bridges to use signed admin tokens. The legacy SSE endpoint and streamKeywordStrategy helper remain for compatibility until the backend service extraction follow-up removes the internal route-fetch bridge."
+        },
+        {
+          "id": "platform-consolidation-content-post-generation-job",
+          "title": "Content post generation - migrate brief-to-post flow to background jobs",
+          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/content-post-background-jobs. Moved POST /api/content-posts/:workspaceId/generate off legacy post-response generation and onto the shared jobs store with BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION metadata so TaskPanel can surface it. Preserved the immediate skeleton-post UX, returns jobId with the skeleton, added /api/jobs support for the same job type, kept generation non-cancellable until generatePost is abort-aware, and added route coverage for skeleton response plus persisted job lookup."
+        },
+        {
+          "id": "platform-consolidation-content-post-generation-progress",
+          "title": "Content post generation - add step progress and cancellation",
+          "source": "Follow-up surfaced during codex/content-post-background-jobs review",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-05",
+          "notes": "Completed 2026-05-05 in codex/content-post-generation-progress. generatePost now reports durable job progress for context prep, introduction, each body section, conclusion, unification, SEO metadata, and finalization. Content post generation registers an AbortController, passes AbortSignal through content AI helper calls, marks cancelled drafts terminal in the content domain, and BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION is now cancellable in shared metadata."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-job-service-extraction",
+          "title": "Keyword strategy jobs - extract native service worker with progress callbacks",
+          "source": "Phase 2 background generation follow-up surfaced during codex/platform-keyword-strategy-background-job",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/keyword-strategy-job-service. Extracted keyword strategy generation into server/keyword-strategy-generation.ts so the direct SSE route and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY worker share native orchestration instead of the job worker internally fetching the route. Preserved active generation guards, billing reservation/refund behavior, persistence, broadcasts, history writes, rank seeding, recommendations, llms.txt regeneration, SSE progress, and job progress translation."
+        },
+        {
+          "id": "platform-consolidation-background-job-stale-recovery",
+          "title": "Background jobs - recover stale pending/running jobs after process restart",
+          "source": "Follow-up surfaced during codex/keyword-strategy-job-service scaled review",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-05",
+          "notes": "Completed 2026-05-05 in codex/background-job-stale-recovery. Startup recovery now has an explicit exported recovery path with regression coverage, marks persisted pending/running jobs as error after restart, updates the visible TaskPanel message as well as the error field, and keeps graceful-shutdown interruption messages aligned."
+        },
+        {
+          "id": "platform-consolidation-generation-activity-parity",
+          "title": "Generation activity parity - log direct and background generation consistently",
+          "source": "Follow-up surfaced during codex/keyword-strategy-job-service review",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-05",
+          "notes": "Completed 2026-05-05 in codex/generation-activity-parity. Keyword strategy success activity now logs from server/keyword-strategy-generation.ts after persistence, so direct SSE/API generation and BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY share the same activity behavior. Removed the job-wrapper strategy_generated log to prevent duplicate entries."
+        },
+        {
+          "id": "platform-consolidation-webflow-seo-suggestions-list-test",
+          "title": "Webflow SEO suggestions - add list endpoint integration coverage",
+          "source": "Follow-up surfaced during PR #458 review",
+          "est": "1h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added route-level integration coverage for GET /api/webflow/seo-suggestions/:workspaceId, including counts and field filtering, after the low-risk Webflow SEO route split."
+        },
+        {
+          "id": "platform-consolidation-seo-copy-happy-path-test",
+          "title": "Webflow SEO copy - add happy-path integration coverage",
+          "source": "Follow-up surfaced during PR #458 review",
+          "est": "1h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/webflow-seo-route-coverage. Added a mocked happy-path integration test for POST /api/webflow/seo-copy so the extracted page-tools route has explicit regression coverage."
+        },
+        {
+          "id": "platform-consolidation-ai-dispatch-migration",
+          "title": "AI dispatch - migrate general server generation paths to callAI",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. Completed across thirteen slices. Earlier slices migrated chat memory summaries, meeting briefs, monthly digests, content decay recommendations, internal link suggestions, SEO audit metadata recommendations, rewrite chat, Webflow keyword analysis, brandscript import, copy-intelligence pattern extraction, copy refresh suggestions, discovery extraction, copy voice feedback classification/suggestion generation, llms.txt page summaries, Webflow per-page SEO copy generation, page analysis jobs, bulk Webflow page analysis jobs, Google Search Console chat, workspace intelligence-profile autofill, anomaly digest summaries, keyword recommendation relevance ranking, and content post creative generation/SEO metadata/voice scoring. Final broad batch migrates the remaining general app generation paths: content briefs and outline regeneration, AEO page review, schema plan/template suggestions, keyword strategy synthesis, content publish field mapping, content post AI review, diagnostic synthesis, admin/client Search chat, jobs bulk SEO fixes, copy pipeline generation/regeneration, and blueprint generation. Claude review follow-up added JSON responseFormat defense to object-shaped parsers in the final batch plus meeting brief generation. Direct provider-helper usage now remains at the dispatcher/helper boundary, provider helper tests/usage exports, parseAIJson compatibility imports, and documented vision payload exceptions."
+        },
+        {
+          "id": "platform-consolidation-seo-provider-boundary",
+          "title": "SEO provider boundary - finish Semrush/DataForSEO abstraction cleanup",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-05 in codex/seo-provider-keyword-strategy-consolidation. Keyword strategy generation now imports trend/SERP helpers from provider-neutral server/seo-provider-signals.ts instead of server/semrush.ts, while semrush.ts keeps compatibility re-exports for older tests/imports. Keyword strategy route/job/component paths use seoDataMode, keep legacy semrushMode fallback for existing callers and stored strategies, and return a provider-neutral seoDataMode alias from the admin strategy read path. useKeywordStrategy now derives availability from /api/seo-providers/status so DataForSEO-only workspaces enable SEO data mode. Keyword Strategy UI state/props/guide copy now use provider-neutral naming, and generation progress uses seo-data while jobs still label old semrush progress for compatibility."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-route-split",
+          "title": "Keyword strategy backend - split route monolith and sequence storage normalization",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed across six staged slices. First backend split slice completed 2026-05-05 in codex/keyword-strategy-generation-service-split: pure helper logic moved to server/keyword-strategy-helpers.ts and SEO provider collection moved to server/keyword-strategy-seo-data.ts while preserving the route wrapper, public re-exports, job/direct generation behavior, competitor cache writes, and provider data outputs. Second split slice completed 2026-05-05 in codex/keyword-strategy-generation-service-split-2: live-page discovery/content fetching moved to server/keyword-strategy-pages.ts and GSC/GA4 signal collection moved to server/keyword-strategy-search-data.ts while preserving progress labels, incremental fresh-page recovery, sitemap fallback behavior, and direct/background job compatibility. Third split slice completed 2026-05-06 in codex/keyword-strategy-ai-synthesis-split: AI prompt context assembly, page-batch mapping, keyword-pool construction, incremental preserve/merge handling, post-AI keyword validation, and master site-level synthesis moved to server/keyword-strategy-ai-synthesis.ts while preserving direct/background job compatibility, progress labels, declined/requested keyword guardrails, competitor brand filtering, invalid-master-JSON payloads, and incremental no-op refunds. Fourth split slice completed 2026-05-06 in codex/keyword-strategy-enrichment-split: post-synthesis enrichment moved into server/keyword-strategy-enrichment.ts, covering GSC/provider metric hydration, SERP targeting, content-gap scoring/sorting, cannibalization, topical authority clusters, site keyword metrics, quick-win ROI scoring, and final impact sorting while preserving direct/background job compatibility and existing progress labels. Fifth split slice completed 2026-05-06 in codex/keyword-strategy-persistence-split: page-keyword table persistence, strategy-history snapshots/pruning, workspace strategy blob writes, strategy_generated activity, STRATEGY_UPDATED broadcasts, cache/intelligence invalidation, and strategy outcome-action recording moved into server/keyword-strategy-persistence.ts while preserving full/incremental write semantics and direct/background job compatibility. Sixth split slice completed 2026-05-06 in codex/keyword-strategy-followons-split: tracked-keyword auto-seeding, keyword-strategy-triggered llms.txt regeneration, and deduped recommendation refreshes moved into server/keyword-strategy-follow-ons.ts while preserving response/follow-on ordering and shared direct-route/background-job orchestration. Storage normalization remains sequenced under existing items #365, #367, #368, #369, and #370."
+        },
+        {
+          "id": "platform-consolidation-webflow-seo-route-split",
+          "title": "Webflow SEO backend - split audit, rewrite, bulk jobs, and apply flows",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed in staged slices on 2026-05-04 and 2026-05-05. SEO suggestion routes moved to server/routes/webflow-seo-suggestions.ts, page HTML/SEO copy routes moved to server/routes/webflow-seo-page-tools.ts, single-page /api/webflow/seo-rewrite moved to server/routes/webflow-seo-rewrite.ts with shared limit handling, live /api/webflow/seo-bulk-fix and /api/webflow/seo-pattern-apply moved to server/routes/webflow-seo-apply.ts, legacy /api/webflow/seo-bulk-rewrite suggestion generation moved to server/routes/webflow-seo-bulk-rewrite.ts, /api/webflow/seo-audit moved to server/routes/webflow-seo-audit.ts, and /api/seo/:workspaceId background job start endpoints moved to server/routes/webflow-seo-jobs.ts. Bulk worker bodies live in server/webflow-seo-bulk-accept-fixes-job.ts, server/webflow-seo-bulk-rewrite-job.ts, and server/webflow-seo-bulk-analyze-job.ts. On-demand audit page-state marking and audit insight bridge handling live in server/webflow-seo-audit-bridges.ts. The old server/routes/webflow-seo.ts dispatcher has been retired without changing endpoint behavior."
+        },
+        {
+          "id": "platform-consolidation-monolith-safe-splits-phase1",
+          "title": "Monolith split Phase 1 - extract low-risk Webflow SEO and pageElements boundaries",
+          "source": "docs/superpowers/plans/2026-05-04-platform-consolidation-monolith-splits.md",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed on 2026-05-04. Extracted SEO suggestion CRUD/apply routes and Webflow page tools from server/routes/webflow-seo.ts, registered the focused routers in server/route-groups/webflow.ts, and moved the read-only pageElements assembler/formatter to server/intelligence/page-elements-slice.ts with unit coverage. This preserves behavior while creating safe ownership boundaries for the larger monolith split sprint."
+        },
+        {
+          "id": "platform-consolidation-client-strategy-tab-split",
+          "title": "Client StrategyTab - split workflow state into hooks and sections",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "6-10h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed across seven staged slices on 2026-05-06. First slice extracted keyword feedback, tracked strategy keyword, and business-priority workflow state/API calls from StrategyTab into focused hooks. Second slice extracted the keyword detail drawer and shared keyword display helpers into client/strategy modules with static contract guards. Third slice extracted the Create Content/content-opportunity accordion into StrategyContentOpportunitiesSection with a static contract guard. Fourth slice extracted the Improve Pages quick-win/page-review accordion into StrategyPageImprovementsSection with a static contract guard. Fifth slice extracted the Guide This Strategy business-priority accordion into StrategyBusinessPrioritiesSection with a static contract guard, corrected the business-priorities deep-link scroll target, and aligned keyboard adds with the existing 10-priority cap. Sixth slice extracted the Strategy Keywords request/feedback surface, declined-keyword restore accordion, and decline-reason modal into focused strategy components with a static contract guard. Seventh slice completed the shell reduction from origin/staging 210f8cb by extracting the Strategy Snapshot, Recommended Next Steps, and Page Keyword Map accordion into focused strategy components while preserving tier gates, deep-link expansion, scroll callbacks, and feedback wiring."
+        },
+        {
+          "id": "platform-consolidation-feature-tool-splits",
+          "title": "Feature tool monoliths - split SchemaSuggester, PageIntelligence, SeoEditor, VoiceTab",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "10-16h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Verified still valid on origin/staging eb0a5832. SchemaSuggester, PageIntelligence, SeoEditor, and VoiceTab remain >1,000-line feature modules. PageIntelligence slices on 2026-05-06 have extracted pure display/scoring helpers, data derivation helpers for persisted-analysis hydration/search/sort/fix-queue ranking, the pages-tab header/control strip, the pages list/expanded detail renderer, page row/detail renderers, expanded detail strategy/analysis/persisted-summary/action sections, and parent workflow hooks for page-analysis jobs, keyword editing/tracking, and SEO copy state with unit/source contract coverage; see FEATURE_AUDIT entries 344-350. SchemaSuggester generation workflow extraction now moves saved snapshot/page-type/page-picker/fix-context scan state and the shared schema-generator background job handling into useSchemaSuggesterGeneration, with source contract coverage and typed BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR startup; see FEATURE_AUDIT entry 351. SchemaSuggester CMS workflow extraction now moves CMS template page loading/generation/publish/copy state, schema CMS field-mapping query/mutation cache updates, and detected location/service mapping collection derivation into useSchemaSuggesterCmsWorkflow with source contract coverage; see FEATURE_AUDIT entry 352. SchemaSuggester publishing workflow extraction now moves page publish/retract, client approval submission, manual-delivery, schema edit/copy, template-save, bulk publish, and edit-state refresh state into useSchemaSuggesterPublishingWorkflow with source contract coverage; see FEATURE_AUDIT entry 353. SchemaSuggester results rendering extraction now moves schema impact display/fetch state plus page/validation/edit-status summary rendering into SchemaImpactPanel, SchemaResultsSummary, and SchemaEditStatusSummary with unit/source contract coverage; see FEATURE_AUDIT entry 354. SchemaPageCard details extraction now moves existing-schema badges, validation finding grouping, recommendation banners, graph summaries, generation diagnostics, and rich-result eligibility into SchemaPageCardDetails with component coverage; see FEATURE_AUDIT entry 355. SchemaSuggester setup extraction now moves business-profile callout, generator hero actions, initial page type picker/guide, and CMS field mapping rendering into SchemaGeneratorSetup with component coverage; see FEATURE_AUDIT entry 356. Schema monolith cleanup is complete; stop here before SeoEditor and VoiceTab per sprint direction. SeoEditor decomposition resumed on 2026-05-07 with Phase 1 contract/type extraction (PR #602), Phase 2 derived-helper extraction for approval payload assembly plus page filtering/ranking logic (PR #603), Phase 3 bulk-helper extraction for pattern preview/apply payloads, bulk rewrite job request payloads, and static-page SEO/openGraph update payload assembly (PR #605), Phase 4 persistence-helper extraction for session cache/draft/job-id hydration and guardrail coverage (FEATURE_AUDIT entry 365), Phase 5 approval-workflow hook extraction (FEATURE_AUDIT entry 366) with filtered select-all mismatch hardening, Phase 6 page-workflow hook extraction for save/draft/rewrite/analyze orchestration (FEATURE_AUDIT entry 367), Phase 7 bulk-workflow hook extraction for analyze-all/bulk-fix/pattern/rewrite orchestration with page-state clear tracking consolidation and source contract coverage (FEATURE_AUDIT entry 368), Phase 8 shell-controls extraction for tracking summary/analyze controls/CMS toggle/search composition hardening (FEATURE_AUDIT entry 369), Phase 9 header-action extraction for stats/refresh/fix/publish/action-banner composition hardening (FEATURE_AUDIT entry 370), Phase 10 page-list extraction for CMS empty-state/banner and PageEditRow composition hardening (FEATURE_AUDIT entry 371), Phase 11 workflow-panels extraction for pending approvals/unsaved banner/SEO suggestions/bulk-operations composition hardening (FEATURE_AUDIT entry 372), and Phase 12 session-state hook extraction for cache hydration/persistence, fix-context auto-expand, and local expanded/preview state composition hardening (FEATURE_AUDIT entry 373). VoiceTab decomposition resumed on 2026-05-07 with Phase 1 model/helper extraction that moved shared constants/defaults/mappings plus normalized dedupe helpers into `src/components/brand/voice-tab/voiceTabModel.ts`, added source-contract guardrails, and covered duplicate/whitespace edge cases in unit tests (FEATURE_AUDIT entry 374). VoiceTab Phase 2 now extracts the samples and DNA sections into `src/components/brand/voice-tab/SamplesSection.tsx` and `src/components/brand/voice-tab/DNASection.tsx`, preserving mutation/toast behavior while adding source-contract coverage to keep section ownership out of the root shell (FEATURE_AUDIT entry 375). VoiceTab Phase 3 now extracts guardrails and calibration surfaces into `src/components/brand/voice-tab/GuardrailsSection.tsx`, `src/components/brand/voice-tab/CalibrationSection.tsx`, and `src/components/brand/voice-tab/useVoiceCalibrationWorkflow.ts`, with source-contract coverage and preserved generate/refine/feedback/sample flows (FEATURE_AUDIT entry 376). VoiceTab Phase 4 now extracts profile query/mutation/tab-section orchestration into `src/components/brand/voice-tab/useVoiceTabShell.ts` with source-contract coverage that locks root-shell composition boundaries (FEATURE_AUDIT entry 377). With VoiceTab shell cleanup merged, this feature-tool monolith split item is now complete. Final closeout on 2026-05-08 also completed CmsEditor phases 1-7 and PageRewriteChat phases 1-7 (PRs #627 through #636), so this umbrella platform-consolidation split item is now fully done."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase1",
+          "title": "CmsEditor monolith decomposition - phase 1 contracts + shared model extraction",
+          "source": "Loop follow-up after VoiceTab decomposition completion",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase1`. Extracted CmsEditor contracts and pure helpers into `src/components/cms-editor/cmsEditorModel.ts` (initial edit map assembly, SEO field selection, search/rank helpers, approval payload assembly, approval-history map builder), and rewired `src/components/CmsEditor.tsx` to consume the module while preserving behavior. Bug sniffing fix included: approval history is now sorted by `updatedAt` descending before render so the inline \"Latest\" badge always reflects the most recent approval event. Added unit coverage (`tests/unit/cms-editor-model.test.ts`) and source-contract guardrails (`tests/contract/cms-editor-phase1-model-extraction.test.ts`) to prevent model/contracts drift back into the root shell."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase2",
+          "title": "CmsEditor monolith decomposition - phase 2 approval workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 1",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase2`. Extracted approval workflow state/orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`, including selection toggles, select-all behavior, payload assembly, send-for-approval mutation, transient success state, and approval refresh key wiring. `CmsEditor.tsx` now consumes the hook and keeps shell composition only for this workflow path. Bug sniffing hardening included: select-all now guards empty collections from false \"all selected\" toggles, and validation/network approval errors remain surfaced through the existing `ErrorState` UI path after extraction. Added source-contract guardrails (`tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`) and updated phase-1 contract assertions to match the new ownership boundary."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase3",
+          "title": "CmsEditor monolith decomposition - phase 3 AI rewrite workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 2",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase3`. Extracted AI rewrite/variation workflow state and orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorAiWorkflow.ts`, including AI loading state, rewrite request assembly, paired rewrite handling, variation application helpers, and session-storage-backed variation persistence. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for AI controls. Bug sniffing hardening included: AI failures and empty/no-suggestion responses now surface user-visible `ErrorState` feedback (`aiError`) instead of silently failing. Added source-contract guardrails (`tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`) to lock the new ownership boundary."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase4",
+          "title": "CmsEditor monolith decomposition - phase 4 publish + bulk workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 3",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase4`. Extracted publish and bulk rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`, including publish pending/success state, bulk mode/progress/result state, collection/item auto-expansion during bulk operations, and concurrency-limited bulk rewrite dispatch. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for publish/bulk controls. Bug sniffing hardening included: bulk rewrite failure accounting now correctly tracks AI generation failures (not only thrown promise rejections) by having AI rewrite actions return explicit success booleans consumed by the bulk workflow. Added source-contract guardrails (`tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`) to lock the ownership boundary."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase5",
+          "title": "CmsEditor monolith decomposition - phase 5 shell state + session hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 4",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase5`. Extracted root shell/session state ownership from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorShellState.ts`, including cache hydration/persistence for edits and expansion state, shell-local state for saving/saved/history/search/errors/preview, and shared toggles/update helpers. `CmsEditor.tsx` now consumes the hook and keeps composition/orchestration wiring. Bug sniffing hardening included: edits cache now persists even when empty, preventing stale cached edits from being resurrected after reset paths. Added source-contract and hook-behavior guardrails (`tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`, `tests/unit/cms-editor-shell-state-hook.test.ts`) to lock the new ownership boundary."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase6",
+          "title": "CmsEditor monolith decomposition - phase 6 collections render extraction",
+          "source": "Loop follow-up after CmsEditor phase 5",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase6`. Extracted the collection/item render monolith from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorCollections.tsx`, including collection header badges, item-level editor controls, AI variation selectors, inline approval history, and preview panels. `CmsEditor.tsx` now composes the extracted renderer and remains focused on orchestration. Bug sniffing hardening included: phase-1 contract assertions were updated to stop pinning now-extracted render helper usage in root (`filterAndRankCollectionItems`) while preserving model ownership checks, and a pre-existing purple paired-description label was corrected to blue to align with color-system rules. Added source-contract guardrails (`tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`) to lock the phase-6 ownership boundary."
+        },
+        {
+          "id": "platform-consolidation-cms-editor-decomp-phase7",
+          "title": "CmsEditor monolith decomposition - phase 7 shell panel + save workflow cleanup",
+          "source": "Loop follow-up after CmsEditor phase 6",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase7`. Extracted root shell chrome (header actions, bulk rewrite state UI, approval/error panels, tracking summary, search bar) from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorShellPanels.tsx`, and moved per-item save mutation orchestration into `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`. `CmsEditor.tsx` now stays composition-first (220 lines) and wires extracted modules plus existing workflow hooks. Bug sniffing hardening included: added unit coverage for the no-edit early-return guard in save workflow so API calls are blocked when no editable payload exists for an item. Added phase-7 source contract guardrails (`tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`) and dedicated save workflow unit coverage (`tests/unit/cms-editor-save-workflow.test.ts`). This closes the remaining CmsEditor decomposition surface for this sprint."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase1",
+          "title": "PageRewriteChat monolith decomposition - phase 1 contracts + shared model extraction",
+          "source": "Loop follow-up after CmsEditor phase 7 merge",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase1`. Extracted PageRewriteChat contracts/constants/pure helpers into `src/components/page-rewrite-chat/pageRewriteChatModel.ts` (page/chat/sitemap types, heading-class map, quick prompts, section-slug/indent helpers, URL-query detection helper, session-id builder) and rewired `src/components/PageRewriteChat.tsx` to consume the module while preserving behavior. Bug sniffing hardening included: URL query detection now trims whitespace before checking protocol prefixes, and URL load call sites pass `comboQuery.trim()` to keep the URL path explicit. Added unit coverage (`tests/unit/page-rewrite-chat-model.test.ts`) and source-contract guardrails (`tests/contract/page-rewrite-chat-phase1-model-extraction.test.ts`) to prevent model/helper drift back into the root shell."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase2",
+          "title": "PageRewriteChat monolith decomposition - phase 2 document helpers extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 1",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase2`. Extracted document-focused assembly/serialization helpers from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatDocument.ts` (`buildDocHtml`, `serializeDocToMarkdown`, `serializeDocToDocx`) and rewired root export/document initialization calls to consume the module while preserving behavior. Bug sniffing hardening included: deep nested section body paragraphs now use explicit inline `margin-left` styling in generated HTML so level-4+ section indentation is applied consistently (replacing dynamic class fragments that do not materialize at runtime). Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase2-document-extraction.test.ts`) and serializer coverage updates (`tests/unit/rewrite-export-serializer.test.ts`) to lock ownership and behavior."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase3",
+          "title": "PageRewriteChat monolith decomposition - phase 3 editor actions extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 2",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found — content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase4",
+          "title": "PageRewriteChat monolith decomposition - phase 4 document pane extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 3",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase4`. Extracted the full right-side editable document pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`, including empty/loading/error states, loaded-page header/export UI, issue-chip rendering, contenteditable surface, and formatting-toolbar rendering. Root shell now composes the pane while preserving document hydration/export/orchestration behavior. Bug sniffing hardening included: export popover now closes on `Escape` for keyboard dismissal. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`) to lock right-pane ownership."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase5",
+          "title": "PageRewriteChat monolith decomposition - phase 5 chat pane extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 4",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase5`. Extracted the full left-side chat pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`, including empty-state hero/quick prompts, user+assistant message rendering with rewrite apply/copy controls, sending-state row, and input composer/send UI. Root shell now composes the pane while preserving message/page orchestration, rewrite application, and export/document workflows. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`) to lock left-pane ownership."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase6",
+          "title": "PageRewriteChat monolith decomposition - phase 6 header and picker extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 5",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase6`. Extracted the top header and sitemap/URL picker from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`, including back/focus controls, loaded-page chip, search/paste combobox rendering, URL-load CTA, and empty-state messaging. Root shell now composes the header while preserving workflow state/orchestration handlers. Bug sniffing hardening included: sitemap options now key by `slug+url` to avoid duplicate-key rendering drift when slugs collide. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`) to lock header/picker ownership."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase7",
+          "title": "PageRewriteChat monolith decomposition - phase 7 shell workflow hook extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 6",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase7`. Extracted root shell orchestration from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`, including page/chat/document state, lifecycle effects, sitemap query wiring, combo interactions, rewrite apply flow, export workflow, and formatting handlers. `PageRewriteChat.tsx` now composes the extracted hook and view modules while preserving behavior. Bug sniffing hardening included: clipboard copy failures now surface toast feedback, and DOCX export failures now use non-blocking toast feedback instead of `alert()`. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase7-shell-hook-extraction.test.ts`) to lock shell workflow ownership."
+        },
+        {
+          "id": "platform-consolidation-workspace-intelligence-slices",
+          "title": "Workspace intelligence - split slice assemblers behind stable API",
+          "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
+          "est": "8-12h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-04",
+          "notes": "Completed 2026-05-07. server/workspace-intelligence.ts now remains the public facade while prompt formatting and slice assemblers live under server/intelligence/*. Preserved facade exports and pageElements behavior, added cache-key isolation for siteInventory by site identity/token fingerprint, replaced the touched AEO review raw JSON.parse path with validated parsing, and extended pr-check/tests so extracted formatter and SEO-context modules remain covered. See FEATURE_AUDIT entry 357."
+        },
+        {
+          "id": "platform-consolidation-seo-context-retirement",
+          "title": "Workspace intelligence follow-up - retire deprecated seo-context builder",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. Deleted server/seo-context.ts after moving RICH_BLOCKS_PROMPT to server/prompt-rich-blocks.ts and raw brand/knowledge plus voice-authority helpers to server/intelligence/seo-context-source.ts. assembleSeoContext now computes effectiveBrandVoiceBlock directly, schema context reads knowledge/personas from the seoContext slice, old clearSeoContextCache callers use invalidateIntelligenceCache, and pr-check now hard-blocks production imports from the retired module. See FEATURE_AUDIT entry 358."
+        },
+        {
+          "id": "platform-consolidation-schema-context-slice-migration",
+          "title": "Schema context - finish direct-read to intelligence-slice migration",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. Follow-up audit confirmed the Pattern B migration was functionally completed during SEO context retirement: buildSchemaContext reads businessContext, knowledgeBase, personas, siteKeywords, and business profile from `buildWorkspaceIntelligence({ slices: ['seoContext'] })`, while direct workspace reads are identity/analytics-only. This pass removed obsolete `schema-context-direct-read-ok` hatches in server/helpers.ts so the function now relies on the allow-list rule directly."
+        },
+        {
+          "id": "platform-consolidation-keyword-strategy-compat-retirement",
+          "title": "Keyword strategy - retire legacy direct/compatibility generation paths",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. Removed obsolete frontend compatibility wrappers after the background-job migration: deleted the unused `keywords.generateStrategy` route-fetch helper and `streamKeywordStrategy` SSE helper from `src/api/seo.ts`, removed the now-dead SSE parser from `src/api/streamUtils.ts`, and updated the global fetch-auth comment in `src/main.tsx` to match remaining NDJSON usage. Added a contract guard (`tests/contract/keyword-strategy-compat-retirement.test.ts`) that pins job orchestration via `startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY)` and blocks reintroduction of the retired direct-generation wrappers."
+        },
+        {
+          "id": "platform-consolidation-seo-provider-compat-retirement",
+          "title": "SEO provider boundary - retire Semrush-named compatibility exports",
+          "source": "Follow-up surfaced during workspace intelligence decomposition review",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. Removed the provider-neutral helper compatibility bridge from `server/semrush.ts` (`trendDirection`, `parseSerpFeatures`, `hasSerpOpportunity`) and migrated remaining test imports to `server/seo-provider-signals.ts`. Updated `tests/contract/seo-provider-boundary.test.ts` to block reintroduction of the semrush re-export bridge and require direct provider-neutral helper imports in the touched strategy/semrush suites."
+        }
+      ],
+      "shippedAt": "2026-05-08"
     },
     {
       "id": "sprint-deep-bug-remediation",
