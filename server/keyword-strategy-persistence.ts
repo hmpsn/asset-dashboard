@@ -5,6 +5,7 @@ import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords }
 import { listContentGaps, replaceAllContentGaps } from './content-gaps.js';
 import { listQuickWins, replaceAllQuickWins } from './quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
+import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
@@ -95,6 +96,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   const prevContentGapsForHistory = listContentGaps(ws.id);
   const prevQuickWinsForHistory = listQuickWins(ws.id);
   const prevKeywordGapsForHistory = listKeywordGaps(ws.id);
+  const prevTopicClustersForHistory = listTopicClusters(ws.id);
 
   // Save pageMap to dedicated table.
   // Full mode: upsert + delete stale rows (clean replacement).
@@ -131,6 +133,9 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   // Save keywordGaps to dedicated table (replaces any existing rows for this workspace).
   // The blob copy below has keywordGaps stripped so the table is the single source of truth.
   replaceAllKeywordGaps(ws.id, keywordGaps);
+  // Save topicClusters to dedicated table (replaces any existing rows for this workspace).
+  // The blob copy below has topicClusters stripped so the table is the single source of truth.
+  replaceAllTopicClusters(ws.id, topicClusters);
 
   // Strategy-level data (no pageMap, no contentGaps) goes to workspace JSON blob
   const strategyMeta = { ...strategy };
@@ -141,7 +146,6 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     ...strategyMeta,
     siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
     competitorKeywordData: competitorKeywordData.length > 0 ? competitorKeywordData.slice(0, 150) : undefined,
-    topicClusters: topicClusters.length > 0 ? topicClusters : undefined,
     cannibalization: cannibalization.length > 0 ? cannibalization.slice(0, 20) : undefined,
     questionKeywords: questionKeywords.length > 0 ? questionKeywords : undefined,
     businessContext: businessContext || undefined,
@@ -176,6 +180,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       contentGaps: prevContentGapsForHistory,
       quickWins: prevQuickWinsForHistory,
       keywordGaps: prevKeywordGapsForHistory,
+      topicClusters: prevTopicClustersForHistory,
     };
     const previousStrategyJson = JSON.stringify(previousStrategySnapshot);
     const previousGeneratedAt = previousStrategy.generatedAt;

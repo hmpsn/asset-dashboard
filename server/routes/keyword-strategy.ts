@@ -16,12 +16,13 @@ import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.j
 import { listContentGaps, replaceAllContentGaps } from '../content-gaps.js';
 import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
+import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem } from '../../shared/types/workspace.js';
+import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
@@ -53,6 +54,7 @@ function serializeKeywordStrategy(
   contentGaps: ContentGap[],
   quickWins: QuickWin[],
   keywordGaps: KeywordGapItem[],
+  topicClusters: TopicCluster[],
 ) {
   // Strip any stale table-backed fields left in the blob in favor of
   // the table-backed sources —
@@ -63,6 +65,7 @@ function serializeKeywordStrategy(
     contentGaps: _staleGaps,
     quickWins: _staleQuickWins,
     keywordGaps: _staleKeywordGaps,
+    topicClusters: _staleTopicClusters,
     ...rest
   } = strategy;
   return {
@@ -72,6 +75,7 @@ function serializeKeywordStrategy(
     contentGaps,
     quickWins,
     keywordGaps,
+    topicClusters,
   };
 }
 
@@ -172,7 +176,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
   const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
   const keywordGapsFromTable = listKeywordGaps(ws.id);
   const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
-  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0) return res.json(null);
+  const topicClustersFromTable = listTopicClusters(ws.id);
+  const topicClusters = topicClustersFromTable.length > 0 ? topicClustersFromTable : (strategy?.topicClusters || []);
+  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0 && topicClusters.length === 0) return res.json(null);
   if (!strategy) {
     return res.json({
       siteKeywords: [],
@@ -181,10 +187,11 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       contentGaps,
       quickWins,
       keywordGaps,
+      topicClusters,
       generatedAt: null,
     });
   }
-  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps));
+  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters));
 });
 
 // Get strategy diff (compare current vs previous)
@@ -270,6 +277,17 @@ const patchStrategySchema = z.object({
     competitorPosition: z.number(),
     competitorDomain: z.string(),
   }).strict()).optional(),
+  topicClusters: z.array(z.object({
+    topic: z.string(),
+    keywords: z.array(z.string()),
+    ownedCount: z.number(),
+    totalCount: z.number(),
+    coveragePercent: z.number(),
+    avgPosition: z.number().optional(),
+    topCompetitor: z.string().optional(),
+    topCompetitorCoverage: z.number().optional(),
+    gap: z.array(z.string()),
+  }).strict()).optional(),
   opportunities: z.array(z.string()).optional(),
 }).strict();
 
@@ -299,13 +317,17 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   if (Array.isArray(req.body.keywordGaps)) {
     replaceAllKeywordGaps(ws.id, req.body.keywordGaps as KeywordGapItem[]);
   }
+  // If topicClusters is being updated, save to dedicated table (replace-all semantics).
+  if (Array.isArray(req.body.topicClusters)) {
+    replaceAllTopicClusters(ws.id, req.body.topicClusters as TopicCluster[]);
+  }
   // Save non-pageMap, non-contentGaps fields to workspace blob.
   // Guard: if the workspace has no existing strategy blob AND the patch only updates
-  // table-backed fields (pageMap/contentGaps/quickWins/keywordGaps), don't silently fabricate a
+  // table-backed fields (pageMap/contentGaps/quickWins/keywordGaps/topicClusters), don't silently fabricate a
   // blob with just a timestamp — that would promote a shell-state workspace to a
   // "real" strategy without any AI-generated content. This matters for callers
   // like PageIntelligence that only patch pageMap.
-  const { pageMap: _pm, contentGaps: _cg, quickWins: _qw, keywordGaps: _kg, ...rest } = req.body;
+  const { pageMap: _pm, contentGaps: _cg, quickWins: _qw, keywordGaps: _kg, topicClusters: _tc, ...rest } = req.body;
   const hasBlobFields = Object.keys(rest).length > 0;
   const blobExists = ws.keywordStrategy != null;
   let updated: KeywordStrategy | null = null;
@@ -327,6 +349,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
     delete (updated as { contentGaps?: unknown }).contentGaps;
     delete (updated as { quickWins?: unknown }).quickWins;
     delete (updated as { keywordGaps?: unknown }).keywordGaps;
+    delete (updated as { topicClusters?: unknown }).topicClusters;
     updateWorkspace(ws.id, { keywordStrategy: updated });
   }
   invalidateIntelligenceCache(ws.id);
@@ -337,6 +360,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   const responseContentGaps = listContentGaps(ws.id);
   const responseQuickWins = listQuickWins(ws.id);
   const responseKeywordGaps = listKeywordGaps(ws.id);
+  const responseTopicClusters = listTopicClusters(ws.id);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: responsePageMap.length,
     siteKeywords: updated?.siteKeywords?.length ?? 0,
@@ -357,6 +381,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       contentGaps: responseContentGaps,
       quickWins: responseQuickWins,
       keywordGaps: responseKeywordGaps,
+      topicClusters: responseTopicClusters,
     });
   } else {
     res.json({
@@ -366,6 +391,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       contentGaps: responseContentGaps,
       quickWins: responseQuickWins,
       keywordGaps: responseKeywordGaps,
+      topicClusters: responseTopicClusters,
       generatedAt: null,
     });
   }
