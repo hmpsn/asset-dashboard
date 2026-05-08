@@ -5254,3 +5254,38 @@ Bug sniffing hardening included:
 **Mutual:** Adds focused unit coverage for month bucketing gaps, trend math, zero baselines, and short-window behavior.
 
 **Files:** `server/content-posts-db.ts`; `server/routes/workspace-home.ts`; `src/api/misc.ts`; `src/components/WorkspaceHome.tsx`; `tests/unit/content-posts.test.ts`; `data/roadmap.json`.
+
+### 393. Hardening Sprint — Quick Wins Table Normalization
+**What it does:** Normalizes `keywordStrategy.quickWins[]` into a dedicated `quick_wins` SQLite table and updates strategy read/write paths to use table-backed quick wins.
+
+Key changes:
+- Added migration `server/db/migrations/087-quick-wins.sql` with an `id` primary key plus workspace/ROI indexes.
+- Added `server/quick-wins.ts` with:
+  - `listQuickWins()`
+  - `replaceAllQuickWins()`
+  - `deleteAllQuickWins()`
+  - `countQuickWins()`
+  - `migrateFromJsonBlob()` backfill + stale-blob-field cleanup
+- Startup now runs quick-wins backfill migration in `server/index.ts` after existing page-map/content-gaps backfills.
+- `server/keyword-strategy-persistence.ts` now:
+  - writes strategy quick wins to `quick_wins`
+  - strips `quickWins` from the strategy blob
+  - includes previous quick-wins table state in strategy-history snapshots for historical continuity
+- Reader wiring now reassembles quick wins from table in:
+  - `server/routes/keyword-strategy.ts`
+  - `server/routes/public-content.ts`
+  - with conservative fallback to legacy blob data when table rows are absent
+- Recommendation generation now sources quick wins from table-first data in `server/recommendations.ts`.
+
+Bug hardening included:
+- Normalized AI synthesis quick-win payloads before persistence so optional/loose `estimatedImpact`/`rationale` values cannot violate strict table/shared-type contracts.
+- Tightened `PATCH /api/webflow/keyword-strategy/:workspaceId` quick-win payload validation so malformed arrays fail with `400` instead of silently clearing table rows.
+- Preserved legacy compatibility by falling back to blob quick wins when table rows are missing.
+
+**Agency value:** Quick-win data becomes queryable and independently updatable without rewriting the entire strategy blob.
+
+**Client value:** Client strategy surfaces continue returning the same quick-win response shape while shifting to table-backed data.
+
+**Mutual:** Adds direct unit coverage for quick-wins table CRUD + blob migration and updates integration seeding to validate table-backed strategy responses.
+
+**Files:** `server/db/migrations/087-quick-wins.sql`; `server/quick-wins.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `server/recommendations.ts`; `shared/types/workspace.ts`; `tests/unit/quick-wins.test.ts`; `tests/integration/client-strategy.test.ts`; `data/roadmap.json`.

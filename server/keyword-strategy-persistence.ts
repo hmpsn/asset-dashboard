@@ -3,6 +3,7 @@ import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidat
 import { updateWorkspace } from './workspaces.js';
 import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from './page-keywords.js';
 import { listContentGaps, replaceAllContentGaps } from './content-gaps.js';
+import { listQuickWins, replaceAllQuickWins } from './quick-wins.js';
 import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
@@ -10,7 +11,7 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
-import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap } from '../shared/types/workspace.js';
+import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type {
   KeywordStrategyCannibalizationIssue,
@@ -70,6 +71,18 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
 
   const pageMap = (strategy.pageMap || []) as PageKeywordMap[];
   const newContentGaps = (strategy.contentGaps || []) as ContentGap[];
+  const newQuickWins: QuickWin[] = (strategy.quickWins || []).map((quickWin) => ({
+    pagePath: quickWin.pagePath,
+    currentKeyword: typeof (quickWin as { currentKeyword?: unknown }).currentKeyword === 'string'
+      ? (quickWin as { currentKeyword?: string }).currentKeyword
+      : undefined,
+    action: quickWin.action,
+    estimatedImpact: quickWin.estimatedImpact === 'high' || quickWin.estimatedImpact === 'medium' || quickWin.estimatedImpact === 'low'
+      ? quickWin.estimatedImpact
+      : 'medium',
+    rationale: quickWin.rationale ?? quickWin.action,
+    roiScore: quickWin.roiScore,
+  }));
   // Snapshot previous page map AND content gaps BEFORE replacing (needed for
   // strategy diff). The previous strategy blob no longer holds contentGaps
   // (#365 normalized them out), so we read from the table — those rows
@@ -79,6 +92,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   // but we re-read here to get the freshest snapshot right before writing.
   const prevPageMapForHistory = listPageKeywords(ws.id);
   const prevContentGapsForHistory = listContentGaps(ws.id);
+  const prevQuickWinsForHistory = listQuickWins(ws.id);
 
   // Save pageMap to dedicated table.
   // Full mode: upsert + delete stale rows (clean replacement).
@@ -109,11 +123,15 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   // Save contentGaps to dedicated table (replaces any existing rows for this workspace).
   // The blob copy below has contentGaps stripped so the table is the single source of truth.
   replaceAllContentGaps(ws.id, newContentGaps);
+  // Save quickWins to dedicated table (replaces any existing rows for this workspace).
+  // The blob copy below has quickWins stripped so the table is the single source of truth.
+  replaceAllQuickWins(ws.id, newQuickWins);
 
   // Strategy-level data (no pageMap, no contentGaps) goes to workspace JSON blob
   const strategyMeta = { ...strategy };
   delete strategyMeta.pageMap;
   delete strategyMeta.contentGaps;
+  delete strategyMeta.quickWins;
   const keywordStrategy = {
     ...strategyMeta,
     siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
@@ -149,7 +167,11 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     // Merge the previous-state contentGaps from the table back into the
     // history snapshot so the diff endpoint can reassemble the full prior
     // strategy without needing to query the table for historical state.
-    const previousStrategySnapshot = { ...previousStrategy, contentGaps: prevContentGapsForHistory };
+    const previousStrategySnapshot = {
+      ...previousStrategy,
+      contentGaps: prevContentGapsForHistory,
+      quickWins: prevQuickWinsForHistory,
+    };
     const previousStrategyJson = JSON.stringify(previousStrategySnapshot);
     const previousGeneratedAt = previousStrategy.generatedAt;
     const saveStrategyHistory = db.transaction(() => {

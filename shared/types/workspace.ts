@@ -124,7 +124,9 @@ export interface KeywordStrategy {
   /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
   pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  /** Stored separately in the content_gaps table; omitted in the workspace JSON blob. */
   contentGaps?: ContentGap[];    // specific content pieces that should be created
+  /** Stored separately in the quick_wins table; omitted in the workspace JSON blob. */
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
   /**

@@ -205,8 +205,9 @@
           "source": "TECH DEBT",
           "est": "1.5h",
           "priority": "P3",
-          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-reconcile-content-gaps-roadmap. Added migration `server/db/migrations/087-quick-wins.sql` and dedicated persistence module `server/quick-wins.ts` (list/replace/delete/count + JSON-blob backfill migration). `keyword-strategy-persistence.ts` now writes quick wins to `quick_wins`, strips stale blob copies, and stores prior quick-wins table state in strategy-history snapshots. Reader wiring now reassembles quick wins in `server/routes/keyword-strategy.ts` and `server/routes/public-content.ts` (with table-first fallback to legacy blob data), and recommendations now source quick wins from the table (`server/recommendations.ts`). Added unit coverage in `tests/unit/quick-wins.test.ts` and updated integration seeding in `tests/integration/client-strategy.test.ts` to assert table-backed behavior.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 368,
