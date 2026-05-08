@@ -606,6 +606,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase2`. Extracted approval workflow state/orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`, including selection toggles, select-all behavior, payload assembly, send-for-approval mutation, transient success state, and approval refresh key wiring. `CmsEditor.tsx` now consumes the hook and keeps shell composition only for this workflow path. Bug sniffing hardening included: select-all now guards empty collections from false \"all selected\" toggles, and validation/network approval errors remain surfaced through the existing `ErrorState` UI path after extraction. Added source-contract guardrails (`tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`) and updated phase-1 contract assertions to match the new ownership boundary."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase3",
+          "title": "CmsEditor monolith decomposition - phase 3 AI rewrite workflow hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 2",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase3`. Extracted AI rewrite/variation workflow state and orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorAiWorkflow.ts`, including AI loading state, rewrite request assembly, paired rewrite handling, variation application helpers, and session-storage-backed variation persistence. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for AI controls. Bug sniffing hardening included: AI failures and empty/no-suggestion responses now surface user-visible `ErrorState` feedback (`aiError`) instead of silently failing. Added source-contract guardrails (`tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`) to lock the new ownership boundary."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
