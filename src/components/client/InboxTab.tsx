@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -113,9 +113,15 @@ export function InboxTab({
   const queryClient = useQueryClient();
   // Two-halves deep-link contract — see CLAUDE.md UI/UX rule 11
   const [searchParams] = useSearchParams();
+  // betaMode must be declared before useState<InboxFilter> so the init closure can reference it
+  const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(() => {
     const param = searchParams.get('tab');
-    if (isInboxFilter(param)) return param;
+    if (isInboxFilter(param)) {
+      // When betaMode is active, Content section is unavailable — coerce to default
+      if (param === 'content' && betaMode) return initialFilter ?? 'needs-action';
+      return param;
+    }
     if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
     return initialFilter ?? 'needs-action';
   });
@@ -129,8 +135,6 @@ export function InboxTab({
   const [changeRequestNote, setChangeRequestNote] = useState('');
   // SEO Changes section collapses when nothing pending in active mode
   const [seoSectionExpanded, setSeoSectionExpanded] = useState(false);
-
-  const betaMode = useBetaMode();
 
   // Schema plan summary — drives SEO Changes card + priority strip item
   const schemaPlanQuery = useQuery({
@@ -158,6 +162,11 @@ export function InboxTab({
   const hasPendingSeoChanges = hasPendingApprovals || schemaPlanPending;
   const hasNeedsAction = pendingClientActions.length > 0 || requestReplies > 0 || planReviewCount > 0;
   const copyReviewCount = hasCopyEntries ? 1 : 0;
+
+  // Auto-expand SEO Changes when pending items appear, but allow manual collapse
+  useEffect(() => {
+    if (hasPendingSeoChanges) setSeoSectionExpanded(true);
+  }, [hasPendingSeoChanges]);
 
   // Filter chips (hidden in completed mode)
   const filterChips: { id: InboxFilter; label: string; count?: number }[] = [
@@ -276,8 +285,9 @@ export function InboxTab({
     } catch (err) {
       console.error('InboxTab operation failed:', err);
       setToast({ message: 'Failed to submit feedback. Please try again.', type: 'error' });
+    } finally {
+      setFlagSubmitting(false);
     }
-    setFlagSubmitting(false);
   };
 
   const showSection1 = mode === 'active' && (filter === 'all' || filter === 'needs-action');
@@ -351,9 +361,8 @@ export function InboxTab({
           items={priorityItems}
           showAllCaughtUp={
             !approvalsLoading && !requestsLoading &&
-            priorityItems.length === 0 &&
-            pendingClientActions.length === 0 &&
-            requestReplies === 0
+            !schemaPlanQuery.isLoading &&
+            priorityItems.length === 0
           }
         />
       )}
@@ -459,7 +468,7 @@ export function InboxTab({
                                 <Icon as={ExternalLink} size="xs" /> {cell.plannedUrl}
                               </span>
                             )}
-                            {cell.variableValues && (
+                            {cell.variableValues && Object.keys(cell.variableValues).length > 0 && (
                               <span>{Object.values(cell.variableValues).join(' × ')}</span>
                             )}
                           </div>
@@ -533,7 +542,7 @@ export function InboxTab({
           <button
             type="button"
             className="flex items-center gap-2 w-full text-left"
-            aria-expanded={hasPendingSeoChanges || seoSectionExpanded}
+            aria-expanded={seoSectionExpanded}
             aria-controls="seo-changes-content"
             onClick={() => setSeoSectionExpanded(e => !e)}
           >
@@ -546,14 +555,14 @@ export function InboxTab({
             {!hasPendingSeoChanges && (
               <span className="t-caption text-[var(--brand-text-muted)]">Nothing pending</span>
             )}
-            <span className="ml-auto text-[var(--brand-text-muted)]">
-              {(hasPendingSeoChanges || seoSectionExpanded)
-                ? <ChevronDown className="w-4 h-4" />
-                : <ChevronRight className="w-4 h-4" />}
+            <span className="ml-auto">
+              {seoSectionExpanded
+                ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
+                : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
             </span>
           </button>
 
-          {(hasPendingSeoChanges || seoSectionExpanded) && (
+          {seoSectionExpanded && (
             <div id="seo-changes-content" className="space-y-4">
               <ApprovalsTab
                 workspaceId={workspaceId}
