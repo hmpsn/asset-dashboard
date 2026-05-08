@@ -10,43 +10,17 @@ import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
 import { extractRewriteOnly, parseRewriteSectionTarget } from '../lib/rewriteResponse';
 import { Icon, IconButton } from './ui';
-
-interface SeoIssue {
-  check: string;
-  severity: 'error' | 'warning' | 'info';
-  message: string;
-}
-
-interface PageSection {
-  level: number;
-  heading: string;
-  body: string;
-}
-
-interface PageData {
-  title: string;
-  sections: PageSection[];
-  bodyText: string;
-  html: string;
-  issues: SeoIssue[];
-  slug: string;
-  url?: string;
-  preamble?: string;
-}
-
-interface SitemapPage {
-  slug: string;
-  title: string;
-  url: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  /** Heading name parsed from **Rewriting: X** prefix; present on AI rewrite messages only */
-  sectionTarget?: string;
-}
+import {
+  HEADING_CLASSES,
+  QUICK_PROMPTS,
+  createRewriteSessionId,
+  getIndentLevel,
+  isUrlQuery,
+  toSectionSlug,
+  type ChatMessage,
+  type PageData,
+  type SitemapPage,
+} from './page-rewrite-chat/pageRewriteChatModel';
 
 interface Props {
   workspaceId: string;
@@ -55,24 +29,6 @@ interface Props {
   onFocusModeToggle?: () => void;
   onBack: () => void;
 }
-
-// Document-body rendering classes — applied to contenteditable DOM nodes via
-// className assignment, not to React UI chrome. Exempt from Phase 5
-// arbitrary-px rule (kickoff §6.4 document-content exception).
-const HEADING_CLASSES: Record<string, string> = { // arbitrary-text-ok
-  h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5', // arbitrary-text-ok
-  h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5', // arbitrary-text-ok
-  h3: 'text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700', // arbitrary-text-ok
-};
-
-const QUICK_PROMPTS = [
-  'Rewrite the intro paragraph to lead with a direct answer',
-  'Suggest an FAQ section with schema-ready Q&A pairs',
-  'Optimize all headings for search intent and AEO',
-  'Add citation-ready data points and statistics',
-  'Rewrite this page in our brand voice with AEO best practices',
-  'Identify sections that need better keyword integration',
-];
 
 export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocusModeToggle, onBack }: Props) {
   // Page state
@@ -85,7 +41,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [sessionId] = useState(() => `rewrite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const [sessionId] = useState(() => createRewriteSessionId());
 
   // Content pane state
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -240,17 +196,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  const toSectionSlug = (text: string) =>
-    text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const comboQueryIsUrl = isUrlQuery(comboQuery);
 
-  const getIndentLevel = (slug: string) => {
-    const segs = slug.replace(/^\/|\/$/g, '').split('/');
-    return Math.max(0, segs.length - 1);
-  };
-
-  const isUrlQuery = comboQuery.startsWith('https://') || comboQuery.startsWith('http://');
-
-  const filteredPages = isUrlQuery
+  const filteredPages = comboQueryIsUrl
     ? []
     : sitemapPages.filter(p =>
         !comboQuery ||
@@ -263,7 +211,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     else if (e.key === 'ArrowUp') { e.preventDefault(); setComboIdx(i => Math.max(i - 1, 0)); }
     else if (e.key === 'Enter') {
       e.preventDefault();
-      if (isUrlQuery) { loadPage(comboQuery); setComboOpen(false); }
+      if (comboQueryIsUrl) { loadPage(comboQuery.trim()); setComboOpen(false); }
       else if (filteredPages[comboIdx]) { selectPage(filteredPages[comboIdx]); }
     } else if (e.key === 'Escape') { e.stopPropagation(); setComboOpen(false); }
   };
@@ -646,10 +594,10 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-accent-brand flex-shrink-0" />}
               </div>
 
-              {isUrlQuery && (
+              {comboQueryIsUrl && (
                 <div className="px-3 py-2">
                   <button
-                    onClick={() => { loadPage(comboQuery); setComboOpen(false); }}
+                    onClick={() => { loadPage(comboQuery.trim()); setComboOpen(false); }}
                     className="text-xs text-accent-brand hover:text-accent-brand"
                   >
                     Load {comboQuery.length > 60 ? `${comboQuery.slice(0, 60)}…` : comboQuery}
@@ -657,7 +605,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 </div>
               )}
 
-              {!isUrlQuery && filteredPages.length > 0 && (
+              {!comboQueryIsUrl && filteredPages.length > 0 && (
                 <div className="max-h-[240px] overflow-y-auto">
                   {filteredPages.map((page, i) => (
                     <button
@@ -681,7 +629,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 </div>
               )}
 
-              {!isUrlQuery && filteredPages.length === 0 && (
+              {!comboQueryIsUrl && filteredPages.length === 0 && (
                 <div className="px-3 py-2 t-caption-sm text-[var(--brand-text-muted)]">
                   {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap — paste a full URL above'}
                 </div>
