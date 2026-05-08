@@ -15,21 +15,28 @@ import { useBetaMode } from './BetaContext';
 import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 
-export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content' | 'completed';
+export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content';
+/**
+ * Controls the Active/Completed mode toggle in the inbox page header.
+ * The 'completed' branch is implemented in Task 3 (core InboxTab restructure).
+ */
 export type InboxMode = 'active' | 'completed';
 
 export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
-  ['all', 'needs-action', 'seo-changes', 'content', 'completed'] as const;
+  ['all', 'needs-action', 'seo-changes', 'content'] as const;
 
 /**
- * Maps legacy deep-link filter values (e.g. from ActionQueueStrip before Phase 2B)
- * to their new equivalents. Allows backward-compat during the migration window.
+ * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
+ * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip
+ * chip section values are updated. Also handles the 'completed' mode value which
+ * was previously a filter chip but is now the Active/Completed mode toggle.
  */
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   approvals: 'seo-changes',
   requests: 'needs-action',
   copy: 'content',
   'content-plan': 'needs-action',
+  completed: 'all',   // completed is now a mode toggle, not a filter chip
 };
 
 function isInboxFilter(value: string | null): value is InboxFilter {

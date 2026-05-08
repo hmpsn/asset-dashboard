@@ -1,22 +1,26 @@
-// tests/unit/inbox-filter-values.test.ts
 import { describe, it, expect } from 'vitest';
-
-// These are the exact values that InboxTab.tsx must export after Phase 0.
-// Test fails until the exports exist.
-import { INBOX_FILTER_VALUES } from '../../src/components/client/InboxTab';
+import { INBOX_FILTER_VALUES, LEGACY_FILTER_MAP } from '../../src/components/client/InboxTab';
 
 describe('INBOX_FILTER_VALUES', () => {
-  it('contains exactly the five new filter values', () => {
+  it('contains exactly the four active filter values', () => {
     expect(INBOX_FILTER_VALUES).toEqual(
-      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content', 'completed']),
+      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content']),
     );
-    expect(INBOX_FILTER_VALUES).toHaveLength(5);
+    expect(INBOX_FILTER_VALUES).toHaveLength(4);
   });
 
-  it('does not contain legacy filter values', () => {
-    const legacy = ['approvals', 'requests', 'copy', 'content-plan'];
-    for (const v of legacy) {
+  it('does not contain legacy or mode-only values', () => {
+    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    for (const v of excluded) {
       expect(INBOX_FILTER_VALUES).not.toContain(v);
+    }
+  });
+});
+
+describe('LEGACY_FILTER_MAP', () => {
+  it('maps every legacy key to a valid canonical InboxFilter value', () => {
+    for (const [, target] of Object.entries(LEGACY_FILTER_MAP)) {
+      expect(INBOX_FILTER_VALUES).toContain(target);
     }
   });
 });

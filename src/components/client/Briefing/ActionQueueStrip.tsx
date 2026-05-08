@@ -67,18 +67,17 @@ export function computeStaleness(
   };
 }
 
-/**
- * The `section` value MUST be a real `InboxFilter` value — see
- * `src/components/client/InboxTab.tsx` `type InboxFilter`. Briefs and posts
- * both land on the `content` filter (the Inbox doesn't separate the two);
- * replies land on `requests` (where team-note replies surface). Drift here
- * silently sends users to the default 'all' filter — covered by the
- * tab-deep-link-wiring contract test.
- */
 interface Chip {
   count: number;
   label: string;
-  section: 'approvals' | 'content' | 'requests' | 'content-plan';
+  /**
+   * Must be a valid InboxFilter value — see INBOX_FILTER_VALUES in InboxTab.tsx.
+   * Clicking a chip navigates to `?tab=${section}` on the inbox route.
+   * approvals → seo-changes, requests/replies → needs-action, content-plan → needs-action.
+   * Drift here silently sends users to the default 'all' filter — covered by the
+   * tab-deep-link-wiring contract test.
+   */
+  section: 'seo-changes' | 'content' | 'needs-action';
 }
 
 /**
@@ -102,7 +101,7 @@ export function ActionQueueStrip({
     chips.push({
       count: counts.approvals,
       label: counts.approvals === 1 ? 'approval' : 'approvals',
-      section: 'approvals',
+      section: 'seo-changes',
     });
   }
   if (counts.briefs > 0) {
@@ -123,14 +122,14 @@ export function ActionQueueStrip({
     chips.push({
       count: counts.replies,
       label: counts.replies === 1 ? 'reply' : 'replies',
-      section: 'requests',
+      section: 'needs-action',
     });
   }
   if (counts.contentPlan > 0) {
     chips.push({
       count: counts.contentPlan,
       label: counts.contentPlan === 1 ? 'page' : 'pages',
-      section: 'content-plan',
+      section: 'needs-action',
     });
   }
 
