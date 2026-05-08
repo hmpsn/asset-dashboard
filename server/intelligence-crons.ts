@@ -8,7 +8,7 @@ import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import {
   getLatestCompetitorSnapshot, saveCompetitorSnapshot,
-  detectCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
+  detectCompetitorAlerts, saveCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
 
@@ -121,6 +121,7 @@ async function runCompetitorCheck(): Promise<void> {
           const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
           if (!previous || previous.snapshotDate === today) continue;
           const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
+          saveCompetitorAlerts(alerts);
           for (const alert of alerts) {
             // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
             const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
