@@ -4993,3 +4993,22 @@ Bug sniffing hardening included: select-all now treats empty collections as not-
 **Mutual:** Adds a phase-2 source contract guardrail so approval state and orchestration logic cannot drift back into the CmsEditor root shell.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorApprovalWorkflow.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `tests/contract/cms-editor-phase2-approval-hook-extraction.test.ts`; `data/roadmap.json`.
+
+### 380. Platform Consolidation — CmsEditor AI Rewrite Workflow Hook Extraction (Phase 3)
+**What it does:** Continues CmsEditor decomposition by extracting AI rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorAiWorkflow.ts`. The new hook now owns:
+- AI loading state per item/field (`aiLoading`)
+- rewrite request assembly + dispatch for single-field and paired title/description paths
+- variation state persistence and application helpers (`variations`, `applySingleVariation`, `applyPairedVariation`)
+- session-storage-backed variation restore/save behavior for tab-switch/refresh continuity
+
+`CmsEditor.tsx` remains the public entrypoint and now consumes the extracted hook for AI flows while keeping shell composition.
+
+Bug sniffing hardening included: AI failure and no-suggestion cases now surface user-visible error feedback (`aiError` + `ErrorState`) instead of silent spinner clear/no-op behavior.
+
+**Agency value:** Removes another high-churn async workflow from the root shell and centralizes AI rewrite behavior behind a focused hook boundary.
+
+**Client value:** No API contract changes; existing rewrite flows remain intact with improved error feedback when generation fails or returns empty output.
+
+**Mutual:** Adds a phase-3 source contract guardrail so AI rewrite state/orchestration does not drift back into the CmsEditor monolith.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorAiWorkflow.ts`; `tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`; `data/roadmap.json`.

@@ -18,6 +18,7 @@ import {
   getTitleAndDescriptionFields,
 } from './cms-editor/cmsEditorModel';
 import { useCmsEditorApprovalWorkflow } from './cms-editor/useCmsEditorApprovalWorkflow';
+import { useCmsEditorAiWorkflow } from './cms-editor/useCmsEditorAiWorkflow';
 
 interface Props {
   siteId: string;
@@ -52,15 +53,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[]; descOptions?: string[] }>>(() => {
-    try { const raw = sessionStorage.getItem(`cms-editor-vars-${siteId}`); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
-    return {};
-  });
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
-  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState<'idle' | 'rewriting'>('idle');
@@ -83,10 +79,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     collections,
     refreshStates,
   });
-
   // Sync state to sessionStorage for persistence across tab switches + refresh
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`cms-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`cms-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-colls-${siteId}`, JSON.stringify(Array.from(expandedCollections))); } catch { /* ignore */ } }, [expandedCollections, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-items-${siteId}`, JSON.stringify(Array.from(expandedItems))); } catch { /* ignore */ } }, [expandedItems, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`cms-editor-dirty-${siteId}`, JSON.stringify(Array.from(dirty))); } catch { /* ignore */ } }, [dirty, siteId]);
@@ -128,6 +122,22 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setSaved(prev => { const n = new Set(prev); n.delete(itemId); return n; });
   };
 
+  const {
+    variations,
+    aiLoading,
+    aiError,
+    aiRewrite,
+    aiRewriteBoth,
+    applySingleVariation,
+    applyPairedVariation,
+  } = useCmsEditorAiWorkflow({
+    siteId,
+    workspaceId,
+    collections,
+    edits,
+    updateField,
+  });
+
   const saveItem = async (collectionId: string, itemId: string) => {
     const fields = edits[itemId];
     if (!fields) return;
@@ -163,93 +173,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       }
     } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
       setPublishing(prev => { const n = new Set(prev); n.delete(collectionId); return n; });
-    }
-  };
-
-  const aiRewrite = async (collectionId: string, itemId: string, fieldSlug: string) => {
-    const key = `${itemId}-${fieldSlug}`;
-    setAiLoading(prev => ({ ...prev, [key]: true }));
-    try {
-      const currentValue = edits[itemId]?.[fieldSlug] || '';
-      const itemName = edits[itemId]?.['name'] || '';
-      const isTitle = fieldSlug.includes('title') || fieldSlug === 'name';
-
-      // Build context from the item's other field values so the AI can differentiate items
-      const collection = collections.find(c => c.collectionId === collectionId);
-      const itemFields = edits[itemId] || {};
-      const { titleField, descField } = getTitleAndDescriptionFields(getExtraSeoFields(collection?.seoFields || []));
-      const fieldContext = Object.entries(itemFields)
-        .filter(([slug, val]) => val && slug !== fieldSlug && slug !== 'name')
-        .map(([slug, val]) => `${slug}: ${String(val).slice(0, 300)}`)
-        .join('\n');
-      const itemSlug = collection?.items.find(i => i.id === itemId)?.fieldData?.slug;
-      const pagePath = itemSlug ? `/${collection?.collectionSlug}/${itemSlug}` : undefined;
-
-      const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
-        pageTitle: itemName,
-        currentSeoTitle: isTitle ? currentValue : (titleField ? (edits[itemId]?.[titleField.slug] || '') : undefined),
-        currentDescription: !isTitle ? currentValue : (descField ? (edits[itemId]?.[descField.slug] || '') : undefined),
-        pageContent: fieldContext || undefined,
-        siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
-        pagePath,
-        field: isTitle ? 'title' : 'description',
-        workspaceId,
-      });
-      if (data.variations && data.variations.length > 1) {
-        // Show variation picker without overwriting current value
-        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations! } }));
-      } else if (data.text) {
-        // Single result (no picker) — apply directly
-        updateField(itemId, fieldSlug, data.text);
-      }
-    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
-      setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
-    }
-  };
-
-  const aiRewriteBoth = async (collectionId: string, itemId: string, titleSlug: string, descSlug: string) => {
-    const key = `${itemId}-both`;
-    setAiLoading(prev => ({ ...prev, [key]: true }));
-    try {
-      const itemName = edits[itemId]?.['name'] || '';
-      const currentTitle = edits[itemId]?.[titleSlug] || '';
-      const currentDesc = edits[itemId]?.[descSlug] || '';
-
-      const collection = collections.find(c => c.collectionId === collectionId);
-      const itemFields = edits[itemId] || {};
-      const fieldContext = Object.entries(itemFields)
-        .filter(([slug, val]) => val && slug !== titleSlug && slug !== descSlug && slug !== 'name')
-        .map(([slug, val]) => `${slug}: ${String(val).slice(0, 300)}`)
-        .join('\n');
-      const itemSlug = collection?.items.find(i => i.id === itemId)?.fieldData?.slug;
-      const pagePath = itemSlug ? `/${collection?.collectionSlug}/${itemSlug}` : undefined;
-
-      const data = await post<{ text?: string; variations?: string[]; pairs?: Array<{ title: string; description: string }> }>('/api/webflow/seo-rewrite', {
-        pageTitle: itemName,
-        currentSeoTitle: currentTitle,
-        currentDescription: currentDesc,
-        pageContent: fieldContext || undefined,
-        siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
-        pagePath,
-        field: 'both',
-        workspaceId,
-      });
-      if (data.pairs && data.pairs.length > 0) {
-        setVariations(prev => ({
-          ...prev,
-          [itemId]: {
-            fieldSlug: 'both',
-            options: data.pairs!.map(p => p.title),
-            descOptions: data.pairs!.map(p => p.description),
-          },
-        }));
-      } else if (data.variations && data.variations.length > 1) {
-        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug: titleSlug, options: data.variations! } }));
-      } else if (data.text) {
-        updateField(itemId, titleSlug, data.text);
-      }
-    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
-      setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
   };
 
@@ -430,6 +353,13 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           type={approvalError.type === 'network' ? 'network' : 'data'}
           title={approvalError.type === 'network' ? 'Connection Error' : 'Validation Error'}
           message={approvalError.message}
+        />
+      )}
+      {aiError && (
+        <ErrorState
+          type="data"
+          title="AI Rewrite Error"
+          message={aiError}
         />
       )}
 
@@ -631,7 +561,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                 {variations[item.id].options.map((v, vi) => (
                                   <button
                                     key={vi}
-                                    onClick={() => { updateField(item.id, 'name', v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
+                                    onClick={() => applySingleVariation(item.id, 'name', v)}
                                     className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                                       (edits[item.id]?.['name'] || '') === v
                                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
@@ -702,10 +632,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                     {variations[item.id].options.map((v, vi) => {
                                       const maxLen = isTitle ? 60 : 160;
-                                      return (
-                                        <button
-                                          key={vi}
-                                          onClick={() => { updateField(item.id, field.slug, v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
+                                    return (
+                                      <button
+                                        key={vi}
+                                        onClick={() => applySingleVariation(item.id, field.slug, v)}
                                           className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                                             val === v
                                               ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
@@ -744,11 +674,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     return (
                                       <button
                                         key={i}
-                                        onClick={() => {
-                                          updateField(item.id, titleField.slug, titleV);
-                                          updateField(item.id, descField.slug, descV);
-                                          setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; });
-                                        }}
+                                        onClick={() => applyPairedVariation(item.id, titleField.slug, descField.slug, titleV, descV)}
                                         className={`w-full text-left px-3 py-2 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                                           isSelected
                                             ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
