@@ -5210,3 +5210,23 @@ Bug sniffing hardening included: sitemap option rows now use stable `slug+url` k
 **Mutual:** Adds a phase-6 source contract guardrail so header/picker ownership cannot drift back into the root shell.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`; `tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`; `data/roadmap.json`.
+
+### 391. Platform Consolidation — PageRewriteChat Shell Workflow Hook Extraction (Phase 7)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting root shell orchestration (state, effects, query wiring, page/chat workflows, export flow, and editor interaction handlers) into `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`.
+
+`src/components/PageRewriteChat.tsx` now stays composition-first and consumes the extracted hook to wire:
+- header + page picker handlers
+- chat pane workflow handlers/state
+- document pane export/format handlers and refs
+
+Bug sniffing hardening included:
+- clipboard copy actions now surface toast feedback when browser clipboard writes fail
+- DOCX export failure now surfaces a toast instead of a blocking `alert()`
+
+**Agency value:** Keeps operational workflow logic in a focused reusable hook and reduces root-shell regression risk as page rewrite behavior evolves.
+
+**Client value:** Behavior remains consistent while copy/export failures now fail gracefully with in-product feedback instead of silent or blocking failure paths.
+
+**Mutual:** Adds a phase-7 source contract guardrail so shell workflow ownership cannot drift back into `PageRewriteChat.tsx`.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`; `tests/contract/page-rewrite-chat-phase7-shell-hook-extraction.test.ts`; `data/roadmap.json`.
