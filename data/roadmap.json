@@ -287,8 +287,9 @@
           "source": "UX — scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "CompetitorAlertCard, EmergingKeywordCard, FreshnessAlertCard in src/components/client/InsightCards.tsx return null when no data is available for growth/premium tiers, breaking the 3-column grid (leaves 8 cards as 3+3+2). The original 6 cards always render with an empty state. Fix: give the new cards a lightweight empty state rather than returning null, or switch all 9 to conditional rendering so the grid is consistent. Pick one pattern.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08. Removed growth/premium null-return short-circuits in CompetitorAlertCard, EmergingKeywordCard, and FreshnessAlertCard so all Tier 2 cards stay mounted and render lightweight empty states when data is absent. Added component coverage in tests/component/InsightCards.test.tsx to assert all three card titles and empty-state copy render for growth tier without tier-2 insights.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 430,
