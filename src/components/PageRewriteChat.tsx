@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Send, Loader2, ArrowLeft,
-  Copy, Check, FileText, Sparkles, Maximize2,
+  Loader2, ArrowLeft,
+  FileText, Sparkles, Maximize2,
 } from 'lucide-react';
 import { Document, Packer } from 'docx';
 import { post, get } from '../api/client';
-import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
-import { extractRewriteOnly, parseRewriteSectionTarget } from '../lib/rewriteResponse';
+import { parseRewriteSectionTarget } from '../lib/rewriteResponse';
 import { useToast } from './Toast';
-import { Icon, IconButton } from './ui';
+import { Icon } from './ui';
 import {
-  QUICK_PROMPTS,
   createRewriteSessionId,
   getIndentLevel,
   isUrlQuery,
@@ -31,6 +29,7 @@ import {
   execFormatCommand,
   wrapSelectionHeading,
 } from './page-rewrite-chat/pageRewriteChatActions';
+import { PageRewriteChatPane } from './page-rewrite-chat/PageRewriteChatPane';
 import { PageRewriteDocumentPane } from './page-rewrite-chat/PageRewriteDocumentPane';
 
 interface Props {
@@ -478,144 +477,22 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
       {/* Main two-pane layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ═══ LEFT PANE: Chat ═══ */}
-        <div className="flex flex-col w-1/2 border-r border-[var(--brand-border)]">
-          {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-accent-brand" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">AI Page Rewriter</h2>
-                  <p className="text-xs text-[var(--brand-text-muted)] max-w-sm">
-                    {pageData
-                      ? `"${pageData.title}" is loaded. Ask me to rewrite sections, optimize headings, add FAQ blocks, or improve AEO.`
-                      : 'Load a page above, then ask me to rewrite sections, optimize for AEO, or suggest improvements.'}
-                  </p>
-                </div>
-
-                {/* Quick prompts */}
-                {pageData && (
-                  <div className="grid grid-cols-2 gap-2 max-w-md mt-2">
-                    {QUICK_PROMPTS.map((prompt, i) => (
-                      <button
-                        key={i}
-                        onClick={() => sendMessage(prompt)}
-                        className="text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 hover:border-teal-500/30 hover:bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-[var(--radius-xl)] px-4 py-3 ${
-                  msg.role === 'user'
-                    ? 'bg-teal-600/20 border border-teal-500/20 text-[var(--brand-text-bright)]'
-                    : 'bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 text-[var(--brand-text-bright)]'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    msg.sectionTarget ? (
-                      // Rewrite message: editable contenteditable block + Apply button
-                      <>
-                        <div
-                          contentEditable
-                          suppressContentEditableWarning
-                          className="text-xs leading-relaxed focus:outline-none border border-transparent focus:border-[var(--brand-border-hover)] rounded p-1 -m-1 transition-colors"
-                          onInput={e => setMsgEdits(prev => ({ ...prev, [i]: (e.currentTarget as HTMLDivElement).innerText }))}
-                          ref={(el) => {
-                            // Initialize content once; do NOT use dangerouslySetInnerHTML (React would overwrite on re-render)
-                            if (el && !el.dataset.initialized) {
-                              el.dataset.initialized = 'true';
-                              el.innerText = extractRewriteOnly(msg.content);
-                            }
-                          }}
-                        />
-                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
-                          <button
-                            onClick={() => applyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
-                          >
-                            <Icon as={Check} size="sm" />
-                            Apply to {msg.sectionTarget}
-                          </button>
-                          <button
-                            onClick={() => copyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
-                            className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
-                            }
-                          >
-                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
-                            {copiedIdx === i ? 'Copied' : 'Copy'}
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      // Regular assistant message: rendered markdown + copy button
-                      <>
-                        <div className="text-xs leading-relaxed">
-                          <RenderMarkdown text={msg.content} />
-                        </div>
-                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
-                          <button
-                            onClick={() => copyToClipboard(msg.content, i)}
-                            className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
-                            }
-                          >
-                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
-                            {copiedIdx === i ? 'Copied' : 'Copy'}
-                          </button>
-                        </div>
-                      </>
-                    )
-                  ) : (
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {sending && (
-              <div className="flex justify-start">
-                <div className="bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] px-4 py-3 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
-                  <span className="text-xs text-[var(--brand-text)]">Analyzing and writing...</span>
-                </div>
-              </div>
-            )}
-
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Input area */}
-          <div className="flex-shrink-0 border-t border-[var(--brand-border)] px-4 py-3 bg-[var(--surface-2)]/50">
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={pageData ? 'Ask me to rewrite a section, optimize headings, add FAQs...' : 'Load a page first, or ask a general rewriting question...'}
-                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
-                rows={2}
-              />
-              <IconButton
-                icon={Send}
-                size="md"
-                variant="solid"
-                label="Send message"
-                onClick={() => sendMessage()}
-                disabled={sending || !input.trim()}
-                className="flex-shrink-0 bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-40"
-              />
-            </div>
-          </div>
-        </div>
+        <PageRewriteChatPane
+          pageData={pageData}
+          messages={messages}
+          sending={sending}
+          copiedIdx={copiedIdx}
+          msgEdits={msgEdits}
+          input={input}
+          chatEndRef={chatEndRef}
+          inputRef={inputRef}
+          onSendMessage={sendMessage}
+          onCopyToClipboard={copyToClipboard}
+          onApplyToSection={applyToSection}
+          onMessageEdit={(idx, text) => setMsgEdits(prev => ({ ...prev, [idx]: text }))}
+          onInputChange={setInput}
+          onInputKeyDown={handleKeyDown}
+        />
 
         <PageRewriteDocumentPane
           pageData={pageData}

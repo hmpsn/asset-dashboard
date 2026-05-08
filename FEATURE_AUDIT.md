@@ -5168,3 +5168,24 @@ Bug sniffing hardening included: export popover now closes on `Escape`, so keybo
 **Mutual:** Adds a phase-4 source contract guardrail so right-pane ownership cannot drift back into the root shell.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`; `tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`; `data/roadmap.json`.
+
+### 389. Platform Consolidation — PageRewriteChat Chat Pane Extraction (Phase 5)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting the full left-side chat pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`.
+
+The extracted module now owns:
+- empty-chat hero and quick-prompt rendering
+- user/assistant message rendering (including rewrite apply/copy controls)
+- sending state rendering
+- chat input composer and send action UI
+
+`PageRewriteChat.tsx` remains the public entrypoint and now composes the extracted chat pane while retaining message/page orchestration, rewrite application, cache/query, and export/document workflows.
+
+Bug sniffing hardening included: none required beyond behavior-preserving extraction in this phase.
+
+**Agency value:** Splits remaining high-churn chat UI from the root shell, making future workflow hooks and state cleanup substantially lower risk.
+
+**Client value:** No API/UI contract changes; chat behavior remains intact while implementation structure is cleaner and easier to maintain.
+
+**Mutual:** Adds a phase-5 source contract guardrail so left-pane ownership cannot drift back into the root shell.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`; `tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`; `data/roadmap.json`.
