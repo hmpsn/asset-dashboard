@@ -5230,3 +5230,27 @@ Bug sniffing hardening included:
 **Mutual:** Adds a phase-7 source contract guardrail so shell workflow ownership cannot drift back into `PageRewriteChat.tsx`.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`; `tests/contract/page-rewrite-chat-phase7-shell-hook-extraction.test.ts`; `data/roadmap.json`.
+
+### 392. Hardening Sprint — Workspace Home Content Velocity Metric
+**What it does:** Adds a new `contentVelocity` block to `/api/workspace-home/:id` and renders it on Workspace Home as a hero stat card.
+
+Server-side, `server/content-posts-db.ts` now provides:
+- `getPublishedPostCountsByMonth(workspaceId, months, now)` with zero-filled month buckets
+- `getContentVelocityTrend(workspaceId, months, now)` with trailing 3-month average, previous 3-month baseline average, current-month published count, and trend percentage (or `null` when baseline is zero/insufficient)
+
+Route wiring in `server/routes/workspace-home.ts` includes this metric in the existing aggregated payload, and `src/components/WorkspaceHome.tsx` now shows:
+- trailing average posts per month (`X.Y/mo`)
+- trend delta percent
+- current month published count
+
+Bug sniffing hardening included:
+- explicit insufficient-window handling (`months < 6`) to prevent misleading baseline comparisons
+- test-order independence in velocity tests (no inter-test shared state assumptions)
+
+**Agency value:** Adds an immediate leading indicator for publishing momentum directly on Workspace Home, improving planning and pacing visibility without opening deeper tooling.
+
+**Client value:** No contract break; existing Workspace Home data remains unchanged while velocity becomes visible in the top stats surface.
+
+**Mutual:** Adds focused unit coverage for month bucketing gaps, trend math, zero baselines, and short-window behavior.
+
+**Files:** `server/content-posts-db.ts`; `server/routes/workspace-home.ts`; `src/api/misc.ts`; `src/components/WorkspaceHome.tsx`; `tests/unit/content-posts.test.ts`; `data/roadmap.json`.

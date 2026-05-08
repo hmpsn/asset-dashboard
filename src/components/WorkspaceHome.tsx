@@ -115,6 +115,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const churnSignals = (Array.isArray(d?.churnSignals) ? (d.churnSignals as Array<{ id: string; type: string; severity: string; title: string; description: string; detectedAt: string }>).filter(s => s.severity === 'critical' || s.severity === 'warning') : []);
   const workOrders = (Array.isArray(d?.workOrders) ? d.workOrders : []) as Array<{ id: string; status: string; productType: string }>;
   const contentPipeline = d?.contentPipeline ?? null;
+  const contentVelocity = d?.contentVelocity ?? null;
   const contentDecayData = d?.contentDecay ?? null;
   const weeklySummary = d?.weeklySummary ?? null;
   const lastFetched = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
@@ -453,6 +454,21 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           );
         })()}
 
+        {contentVelocity && (
+          <StatCard
+            label="Content Velocity"
+            value={`${contentVelocity.trailingThreeMonthAvg}/mo`}
+            icon={FileText}
+            iconColor="#22d3ee"
+            delta={contentVelocity.trendPct ?? undefined}
+            deltaLabel="%"
+            sub={`${contentVelocity.currentMonthPublished} this month`}
+            onClick={() => navigate(adminPath(workspaceId, 'content'))}
+            size="hero"
+            staggerIndex={7}
+          />
+        )}
+
         {intel?.contentPipeline?.coverageGaps && intel.contentPipeline.coverageGaps.length > 0 && (
           <StatCard
             label="Coverage Gaps"
@@ -462,7 +478,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={`Strategy keywords without briefs`}
             onClick={() => navigate(adminPath(workspaceId, 'content'))}
             size="hero"
-            staggerIndex={7}
+            staggerIndex={8}
           />
         )}
       </div>

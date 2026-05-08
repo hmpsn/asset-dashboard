@@ -309,8 +309,9 @@
           "source": "TOOL_AUDIT §4c",
           "est": "2h",
           "priority": "P3",
-          "notes": "Track pages published per month as a trend. Leading indicator for ranking momentum.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-normalize-content-gaps. Added workspace-home `contentVelocity` payload from `getContentVelocityTrend()` in server/content-posts-db.ts and surfaced a new hero StatCard on Workspace Home showing trailing 3-month avg posts/month, month-over-month trend %, and current-month published count. Hardening included zero-fill month buckets, null trend for zero/insufficient baseline windows, and test-order-independent velocity unit coverage.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": "pr398-dedup-types",
