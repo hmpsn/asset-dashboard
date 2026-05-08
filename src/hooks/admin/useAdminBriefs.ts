@@ -15,3 +15,13 @@ export function useAdminRequestsList(wsId: string) {
     queryFn: () => contentRequests.list(wsId),
   });
 }
+
+export function useAdminBriefTemplateCrossref(wsId: string, keyword: string) {
+  const normalizedKeyword = keyword.trim();
+  return useQuery({
+    queryKey: queryKeys.admin.briefTemplateCrossref(wsId, normalizedKeyword.toLowerCase()),
+    queryFn: () => contentBriefs.templateCrossref(wsId, normalizedKeyword),
+    enabled: normalizedKeyword.length > 1,
+    staleTime: 30_000,
+  });
+}

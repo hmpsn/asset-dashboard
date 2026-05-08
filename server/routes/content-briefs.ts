@@ -1,7 +1,7 @@
 /**
  * content-briefs routes — extracted from server/index.ts
  *
- * @reads content_briefs, content_requests, search_console, seo_provider, workspaces, analytics_insights, workspace_learnings, feature_flags
+ * @reads content_briefs, content_requests, search_console, seo_provider, workspaces, analytics_insights, workspace_learnings, feature_flags, content_matrices, content_templates
  * @writes content_briefs, content_requests, outcome_actions, activities
  */
 import { Router } from 'express';
@@ -43,9 +43,14 @@ import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-le
 import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 import { validate, z } from '../middleware/validate.js';
+import { listMatrices } from '../content-matrices.js';
+import { getTemplate } from '../content-templates.js';
+import { BRIEF_PAGE_TYPES } from '../../shared/types/content.js';
+import type { BriefPageType, BriefTemplateCrossrefMatch } from '../../shared/types/content.js';
 
 const router = Router();
 const log = createLogger('content-briefs');
+const BRIEF_PAGE_TYPE_SET = new Set<string>(BRIEF_PAGE_TYPES);
 
 const contentBriefPatchSchema = z.object({
   targetKeyword: z.string().trim().min(1).max(200).optional(),
@@ -70,7 +75,7 @@ const contentBriefPatchSchema = z.object({
   eeatGuidance: eeatGuidanceSchema.optional(),
   contentChecklist: z.array(z.string().trim().min(1).max(300)).optional(),
   schemaRecommendations: z.array(schemaRecommendationSchema).optional(),
-  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
+  pageType: z.enum(BRIEF_PAGE_TYPES).optional(),
   referenceUrls: z.array(z.string().url()).optional(),
   realPeopleAlsoAsk: z.array(z.string().trim().min(1).max(300)).optional(),
   realTopResults: z.array(realTopResultSchema).optional(),
@@ -87,6 +92,62 @@ const contentBriefPatchSchema = z.object({
 
 function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+}
+
+function normalizeKeyword(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function toBriefPageType(value: string): BriefPageType | null {
+  return BRIEF_PAGE_TYPE_SET.has(value) ? value as BriefPageType : null;
+}
+
+function resolveBriefTemplateCrossref(workspaceId: string, keyword: string): BriefTemplateCrossrefMatch | null {
+  const normalizedKeyword = normalizeKeyword(keyword);
+  if (!normalizedKeyword) return null;
+
+  const matrices = listMatrices(workspaceId);
+  for (const matrix of matrices) {
+    for (const cell of matrix.cells) {
+      const customKeyword = typeof cell.customKeyword === 'string' ? cell.customKeyword.trim() : '';
+      const targetKeyword = cell.targetKeyword.trim();
+      const customMatch = customKeyword.length > 0 && normalizeKeyword(customKeyword) === normalizedKeyword;
+      const targetMatch = normalizeKeyword(targetKeyword) === normalizedKeyword;
+      if (!customMatch && !targetMatch) continue;
+
+      const template = getTemplate(workspaceId, matrix.templateId);
+      if (!template) continue;
+
+      const sections = [...template.sections]
+        .sort((a, b) => a.order - b.order)
+        .map(section => ({
+          id: section.id,
+          name: section.name,
+          headingTemplate: section.headingTemplate,
+          guidance: section.guidance,
+          wordCountTarget: section.wordCountTarget,
+          order: section.order,
+        }));
+
+      return {
+        keyword: keyword.trim(),
+        matrixId: matrix.id,
+        matrixName: matrix.name,
+        cellId: cell.id,
+        matchedKeyword: customMatch ? customKeyword : targetKeyword,
+        matchedSource: customMatch ? 'custom' : 'target',
+        templateId: template.id,
+        templateName: template.name,
+        pageType: toBriefPageType(template.pageType),
+        sections,
+        toneAndStyle: template.toneAndStyle,
+        titlePattern: template.titlePattern,
+        metaDescPattern: template.metaDescPattern,
+      };
+    }
+  }
+
+  return null;
 }
 
 // --- Content Briefs ---
@@ -107,6 +168,13 @@ router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess(
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');
     res.json({ signals: [] });
   }
+});
+
+router.get('/api/content-briefs/:workspaceId/template-crossref', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const keyword = typeof req.query.keyword === 'string' ? req.query.keyword : '';
+  if (!keyword.trim()) return res.status(400).json({ error: 'keyword query param required' });
+  const match = resolveBriefTemplateCrossref(req.params.workspaceId, keyword);
+  res.json(match);
 });
 
 // Get a specific brief
@@ -143,6 +211,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
 
     const ws = getWorkspace(req.params.workspaceId);
+    const templateCrossref = resolveBriefTemplateCrossref(req.params.workspaceId, targetKeyword);
 
     // No usage limit — briefs are paid add-ons purchased via Stripe
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
@@ -213,8 +282,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       topPageUrls.length > 0 ? scrapeUrls(topPageUrls, 2) : Promise.resolve([]),
     ]);
 
-    const validPageTypes = ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'];
-    const resolvedPageType = validPageTypes.includes(pageType) ? pageType : undefined;
+    const bodyPageType = toBriefPageType(pageType);
+    const matchedTemplatePageType = templateCrossref?.pageType;
+    const resolvedPageType = bodyPageType ?? matchedTemplatePageType ?? undefined;
 
     // Adaptive pipeline: inject workspace learnings into the brief prompt
     let adaptedBusinessContext = businessContext || ws?.keywordStrategy?.businessContext;
@@ -242,6 +312,18 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       relatedKeywords,
       providerLabel,
       pageType: resolvedPageType,
+      templateId: templateCrossref?.templateId,
+      templateSections: templateCrossref?.sections.map(section => ({
+        name: section.name,
+        headingTemplate: section.headingTemplate,
+        guidance: section.guidance,
+        wordCountTarget: section.wordCountTarget,
+      })),
+      templateToneOverride: templateCrossref?.toneAndStyle,
+      templateTitlePattern: templateCrossref?.titlePattern,
+      templateMetaDescPattern: templateCrossref?.metaDescPattern,
+      keywordLocked: templateCrossref ? true : undefined,
+      keywordSource: templateCrossref ? 'template' : undefined,
       referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
       scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
       serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,

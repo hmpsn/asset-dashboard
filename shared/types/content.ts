@@ -50,6 +50,31 @@ export interface ContentBrief {
   metaDescVariants?: string[];
 }
 
+export interface BriefTemplateCrossrefSection {
+  id: string;
+  name: string;
+  headingTemplate: string;
+  guidance: string;
+  wordCountTarget: number;
+  order: number;
+}
+
+export interface BriefTemplateCrossrefMatch {
+  keyword: string;
+  matrixId: string;
+  matrixName: string;
+  cellId: string;
+  matchedKeyword: string;
+  matchedSource: 'target' | 'custom';
+  templateId: string;
+  templateName: string;
+  pageType: BriefPageType | null;
+  sections: BriefTemplateCrossrefSection[];
+  toneAndStyle?: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+}
+
 export interface PostSection {
   index: number;
   heading: string;
@@ -337,14 +362,16 @@ export interface ContentMatrix {
 export type BriefJourneyStage = 'awareness' | 'consideration' | 'decision';
 
 /** Page types supported by the brief generation engine. */
-export type BriefPageType =
-  | 'blog'
-  | 'landing'
-  | 'service'
-  | 'location'
-  | 'pillar'
-  | 'product'
-  | 'resource';
+export const BRIEF_PAGE_TYPES = [
+  'blog',
+  'landing',
+  'service',
+  'location',
+  'pillar',
+  'product',
+  'resource',
+] as const;
+export type BriefPageType = typeof BRIEF_PAGE_TYPES[number];
 
 /**
  * Strategy card metadata threaded from a content request into generateBrief().

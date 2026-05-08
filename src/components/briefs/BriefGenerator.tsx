@@ -2,6 +2,7 @@ import {
   Loader2, Sparkles, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react';
 import { AIContextIndicator, Icon } from '../ui';
+import type { BriefTemplateCrossrefMatch } from '../../../shared/types/content';
 
 export interface BriefGeneratorProps {
   workspaceId: string;
@@ -12,6 +13,7 @@ export interface BriefGeneratorProps {
   showAdvanced: boolean;
   generating: boolean;
   error: string;
+  templateCrossref?: BriefTemplateCrossrefMatch | null;
   onKeywordChange: (value: string) => void;
   onBusinessCtxChange: (value: string) => void;
   onPageTypeChange: (value: string) => void;
@@ -29,6 +31,7 @@ export function BriefGenerator({
   showAdvanced,
   generating,
   error,
+  templateCrossref,
   onKeywordChange,
   onBusinessCtxChange,
   onPageTypeChange,
@@ -73,6 +76,16 @@ export function BriefGenerator({
             </select>
           </div>
         </div>
+        {templateCrossref && (
+          <div className="rounded-[var(--radius-lg)] border border-blue-500/25 bg-blue-500/10 px-3 py-2.5">
+            <p className="t-caption-sm text-blue-300 font-medium">
+              Matched Template: {templateCrossref.templateName}
+            </p>
+            <p className="t-caption-sm text-blue-200/90 mt-0.5">
+              Matrix: {templateCrossref.matrixName} · {templateCrossref.sections.length} template sections will pre-fill this brief.
+            </p>
+          </div>
+        )}
         <div>
           <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Business Context (optional)</label>
           <input

@@ -6,6 +6,8 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import { getBrief } from '../../server/content-brief.js';
+import { createTemplate } from '../../server/content-templates.js';
+import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
 import type { ContentBrief } from '../../shared/types/content.js';
 
 const ctx = createTestContext(13347); // port-ok: 13201-13346 already allocated in integration suite
@@ -13,6 +15,8 @@ const { api, patchJson } = ctx;
 
 let testWsId = '';
 const briefId = `brief_route_${Date.now()}`;
+let crossrefMatrixId = '';
+let targetOnlyMatrixId = '';
 
 function makeBrief(overrides: Partial<ContentBrief> = {}): ContentBrief {
   return {
@@ -103,10 +107,49 @@ beforeAll(async () => {
   const ws = createWorkspace('Content Brief Routes Test Workspace');
   testWsId = ws.id;
   seedBrief(makeBrief());
+
+  const template = createTemplate(testWsId, {
+    name: 'Crossref Template',
+    pageType: 'landing',
+    urlPattern: '/services/{service}',
+    keywordPattern: '{service} austin',
+    toneAndStyle: 'Direct and practical',
+    titlePattern: '{Keyword} Service Guide',
+    metaDescPattern: 'Learn about {Keyword} service options.',
+    variables: [{ name: 'service', label: 'Service' }],
+    sections: [
+      { id: 'sec-2', name: 'Proof', headingTemplate: 'Why choose us for {keyword}', guidance: 'Show trust factors.', wordCountTarget: 280, order: 2 },
+      { id: 'sec-1', name: 'Overview', headingTemplate: 'What is {keyword}', guidance: 'Define the service clearly.', wordCountTarget: 220, order: 1 },
+    ],
+  });
+
+  const matrix = createMatrix(testWsId, {
+    name: 'Crossref Matrix',
+    templateId: template.id,
+    dimensions: [{ variableName: 'service', values: ['HVAC'] }],
+    urlPattern: '/services/{service}',
+    keywordPattern: 'Best {service} Austin',
+  });
+
+  crossrefMatrixId = matrix.id;
+  updateMatrixCell(testWsId, matrix.id, matrix.cells[0].id, {
+    customKeyword: '  Best HVAC Austin  ',
+  });
+
+  const targetOnlyMatrix = createMatrix(testWsId, {
+    name: 'Target-only Matrix',
+    templateId: template.id,
+    dimensions: [{ variableName: 'service', values: ['HVAC'] }],
+    urlPattern: '/repair/{service}',
+    keywordPattern: 'Emergency {service} Repair',
+  });
+  targetOnlyMatrixId = targetOnlyMatrix.id;
 }, 25_000);
 
 afterAll(async () => {
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
+  db.prepare('DELETE FROM content_matrices WHERE workspace_id = ?').run(testWsId);
+  db.prepare('DELETE FROM content_templates WHERE workspace_id = ?').run(testWsId);
   deleteWorkspace(testWsId);
   await ctx.stopServer();
 });
@@ -158,5 +201,57 @@ describe('Content Briefs — update route validation', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Brief not found');
+  });
+});
+
+describe('Content Briefs — template cross-reference route', () => {
+  it('returns 400 when keyword query param is missing', async () => {
+    const res = await api(`/api/content-briefs/${testWsId}/template-crossref`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('keyword query param required');
+  });
+
+  it('returns null when no matrix cell keyword matches', async () => {
+    const res = await api(`/api/content-briefs/${testWsId}/template-crossref?keyword=no-match-keyword`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toBeNull();
+  });
+
+  it('returns template match details and uses custom-keyword precedence', async () => {
+    const res = await api(`/api/content-briefs/${testWsId}/template-crossref?keyword=best%20hvac%20austin`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      keyword: 'best hvac austin',
+      matrixId: crossrefMatrixId,
+      matrixName: 'Crossref Matrix',
+      matchedSource: 'custom',
+      matchedKeyword: 'Best HVAC Austin',
+      templateName: 'Crossref Template',
+      pageType: 'landing',
+      toneAndStyle: 'Direct and practical',
+      titlePattern: '{Keyword} Service Guide',
+      metaDescPattern: 'Learn about {Keyword} service options.',
+    });
+    expect(body.sections.map((section: { order: number }) => section.order)).toEqual([1, 2]);
+    expect(body.sections[0]).toMatchObject({
+      id: 'sec-1',
+      name: 'Overview',
+      wordCountTarget: 220,
+    });
+  });
+
+  it('matches target keyword when no custom keyword is present', async () => {
+    const res = await api(`/api/content-briefs/${testWsId}/template-crossref?keyword=emergency%20hvac%20repair`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      matrixId: targetOnlyMatrixId,
+      matrixName: 'Target-only Matrix',
+      matchedSource: 'target',
+      matchedKeyword: 'Emergency HVAC Repair',
+    });
   });
 });

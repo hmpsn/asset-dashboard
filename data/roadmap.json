@@ -305,8 +305,9 @@
           "source": "TOOL_AUDIT §2d",
           "est": "2h",
           "priority": "P3",
-          "notes": "When generating a brief for a keyword matching a matrix cell, show callout and pre-fill from template sections.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-content-briefs-template-crossref. Added `GET /api/content-briefs/:workspaceId/template-crossref?keyword=...` to resolve matrix-cell keyword matches (custom keyword precedence over target keyword), return matched template metadata, and provide sorted template sections. Brief generation now auto-injects matched template sections/style/title/meta patterns, locks keyword source to `template`, and falls back page type from the matched template when incoming page type is absent/invalid. Admin Brief Generator now shows a matched-template callout and auto-prefills page type from the crossref. Added integration coverage for missing keyword 400, no-match null response, and custom-keyword precedence + section ordering behavior.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 431,
