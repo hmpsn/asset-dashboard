@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { INBOX_FILTER_VALUES, LEGACY_FILTER_MAP } from '../../src/components/client/InboxTab';
+import { INBOX_FILTER_VALUES, LEGACY_FILTER_MAP, isInboxFilter } from '../../src/components/client/InboxTab';
 
 describe('INBOX_FILTER_VALUES', () => {
   it('contains exactly the four active filter values', () => {
@@ -29,5 +29,28 @@ describe('LEGACY_FILTER_MAP', () => {
     for (const k of expectedKeys) {
       expect(LEGACY_FILTER_MAP).toHaveProperty(k);
     }
+  });
+});
+
+describe('isInboxFilter', () => {
+  it('returns true for valid InboxFilter values', () => {
+    for (const v of INBOX_FILTER_VALUES) {
+      expect(isInboxFilter(v)).toBe(true);
+    }
+  });
+
+  it('returns false for null', () => {
+    expect(isInboxFilter(null)).toBe(false);
+  });
+
+  it('returns false for legacy values not in InboxFilter', () => {
+    expect(isInboxFilter('approvals')).toBe(false);
+    expect(isInboxFilter('content-plan')).toBe(false);
+    expect(isInboxFilter('completed')).toBe(false);
+  });
+
+  it('returns false for arbitrary strings', () => {
+    expect(isInboxFilter('garbage')).toBe(false);
+    expect(isInboxFilter('')).toBe(false);
   });
 });
