@@ -26,6 +26,7 @@ import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
+import { listQuickWins } from './quick-wins.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -878,8 +879,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   if (strategy) {
     // Quick wins → fix_now or fix_soon
-    if (strategy.quickWins) {
-      for (const qw of strategy.quickWins) {
+    const strategyQuickWins = listQuickWins(workspaceId);
+    const quickWins = strategyQuickWins.length > 0 ? strategyQuickWins : (strategy.quickWins || []);
+    if (quickWins.length > 0) {
+      for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined
         if (qw.currentKeyword && declinedKeywords.has(qw.currentKeyword.toLowerCase())) continue;
 

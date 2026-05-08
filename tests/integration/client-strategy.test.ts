@@ -30,6 +30,7 @@ import {
 import db from '../../server/db/index.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/content-gaps.js';
+import { replaceAllQuickWins, deleteAllQuickWins } from '../../server/quick-wins.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -161,11 +162,13 @@ beforeAll(async () => {
   // Seed strategy-level fields into the blob and contentGaps into the dedicated
   // table (post-#365 normalization — contentGaps no longer live in the blob).
   const stratStrategy = buildStrategy();
+  const { contentGaps: stratContentGaps, quickWins: stratQuickWins, ...stratBlob } = stratStrategy;
   updateWorkspace(strategyWsId, {
     seoClientView: true,
-    keywordStrategy: stratStrategy,
+    keywordStrategy: stratBlob as KeywordStrategy,
   });
-  replaceAllContentGaps(strategyWsId, stratStrategy.contentGaps ?? []);
+  replaceAllContentGaps(strategyWsId, stratContentGaps ?? []);
+  replaceAllQuickWins(strategyWsId, stratQuickWins ?? []);
 
   // Seed page_keywords for the strategy workspace (reassembled into pageMap by the endpoint)
   const pageEntries: PageKeywordMap[] = [
@@ -213,13 +216,17 @@ beforeAll(async () => {
   // Isolation workspace with its own strategy (should not bleed into strategyWsId reads)
   const isolWs = createWorkspace('Isolation Strategy Test');
   isolationWsId = isolWs.id;
+  const isolationStrategy = buildStrategy({
+    siteKeywords: ['isolation keyword only'],
+    opportunities: ['isolation opportunity only'],
+  });
+  const { contentGaps: isolationContentGaps, quickWins: isolationQuickWins, ...isolationBlob } = isolationStrategy;
   updateWorkspace(isolationWsId, {
     seoClientView: true,
-    keywordStrategy: buildStrategy({
-      siteKeywords: ['isolation keyword only'],
-      opportunities: ['isolation opportunity only'],
-    }),
+    keywordStrategy: isolationBlob as KeywordStrategy,
   });
+  replaceAllQuickWins(isolationWsId, isolationQuickWins ?? []);
+  replaceAllContentGaps(isolationWsId, isolationContentGaps ?? []);
 }, 30_000);
 
 afterAll(async () => {
@@ -229,7 +236,9 @@ afterAll(async () => {
   cleanBusinessPriorities(strategyWsId);
   db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(strategyWsId);
   deleteAllContentGaps(strategyWsId);
+  deleteAllQuickWins(strategyWsId);
   deleteAllContentGaps(isolationWsId);
+  deleteAllQuickWins(isolationWsId);
   deleteWorkspace(strategyWsId);
   deleteWorkspace(gatedWsId);
   deleteWorkspace(feedbackWsId);

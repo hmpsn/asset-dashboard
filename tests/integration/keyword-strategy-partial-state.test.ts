@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
+import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
@@ -137,6 +138,49 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
 
     const ws = getWorkspace(wsId);
     expect(ws?.keywordStrategy).toBeFalsy();
+  });
+
+  it('pure quickWins PATCH updates table-backed rows without creating a strategy blob', async () => {
+    const wsId = freshShellWorkspace('PATCH quickWins shell');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quickWins: [
+          { pagePath: '/services/seo', action: 'Improve title tag', estimatedImpact: 'high', rationale: 'Boost CTR' },
+        ],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBeNull();
+
+    const ws = getWorkspace(wsId);
+    expect(ws?.keywordStrategy).toBeFalsy();
+
+    const wins = listQuickWins(wsId);
+    expect(wins).toHaveLength(1);
+    expect(wins[0].action).toBe('Improve title tag');
+  });
+
+  it('rejects invalid quickWins payload and preserves existing table rows', async () => {
+    const wsId = freshShellWorkspace('PATCH invalid quickWins payload');
+    replaceAllQuickWins(wsId, [
+      { pagePath: '/services/seo', action: 'Keep me', estimatedImpact: 'medium', rationale: 'baseline' },
+    ]);
+
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quickWins: [42],
+      }),
+    });
+    expect(patchRes.status).toBe(400);
+
+    const wins = listQuickWins(wsId);
+    expect(wins).toHaveLength(1);
+    expect(wins[0].action).toBe('Keep me');
   });
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
