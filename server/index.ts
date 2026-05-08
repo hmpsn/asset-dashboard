@@ -62,6 +62,11 @@ migrateKeywordGapsFromJsonBlob();
 import { migrateFromJsonBlob as migrateTopicClustersFromJsonBlob } from './topic-clusters.js';
 migrateTopicClustersFromJsonBlob();
 
+// Migrate keywordStrategy.cannibalization from workspace JSON blobs into the
+// cannibalization_issues table (idempotent)
+import { migrateFromJsonBlob as migrateCannibalizationFromJsonBlob } from './cannibalization-issues.js';
+migrateCannibalizationFromJsonBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

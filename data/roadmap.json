@@ -235,8 +235,9 @@
           "source": "TECH DEBT",
           "est": "2h",
           "priority": "P3",
-          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-normalize-cannibalization. Added migration `server/db/migrations/090-cannibalization-issues.sql` and dedicated persistence module `server/cannibalization-issues.ts` (list/replace/delete/count + JSON-blob backfill migration). `keyword-strategy-persistence.ts` now writes cannibalization issues to `cannibalization_issues`, strips stale blob copies, and stores prior cannibalization table state in strategy-history snapshots. Strategy reader/writer wiring now reassembles cannibalization in `server/routes/keyword-strategy.ts` (table-first fallback to legacy blob, shell-state support, strict PATCH validation). Added unit coverage in `tests/unit/cannibalization-issues.test.ts` and integration coverage in `tests/integration/keyword-strategy-partial-state.test.ts` for table-backed patch/shell behavior.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 583,

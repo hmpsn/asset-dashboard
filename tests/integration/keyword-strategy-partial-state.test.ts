@@ -17,6 +17,7 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../../server/topic-clusters.js';
+import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
@@ -230,6 +231,41 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     expect(clusters[0].topic).toBe('seo services');
   });
 
+  it('pure cannibalization PATCH updates table-backed rows without creating a strategy blob', async () => {
+    const wsId = freshShellWorkspace('PATCH cannibalization shell');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cannibalization: [
+          {
+            keyword: 'seo services',
+            pages: [
+              { path: '/services', position: 6, source: 'keyword_map' },
+              { path: '/seo-services', position: 9, source: 'gsc' },
+            ],
+            severity: 'high',
+            recommendation: 'Consolidate overlapping pages.',
+          },
+        ],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBeNull();
+    expect(Array.isArray(body.cannibalization)).toBe(true);
+    expect(body.cannibalization).toHaveLength(1);
+    expect(body.cannibalization[0].keyword).toBe('seo services');
+
+    const ws = getWorkspace(wsId);
+    expect(ws?.keywordStrategy).toBeFalsy();
+
+    const issues = listCannibalizationIssues(wsId);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].keyword).toBe('seo services');
+    expect(issues[0].severity).toBe('high');
+  });
+
   it('rejects invalid quickWins payload and preserves existing table rows', async () => {
     const wsId = freshShellWorkspace('PATCH invalid quickWins payload');
     replaceAllQuickWins(wsId, [
@@ -301,6 +337,31 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     const clusters = listTopicClusters(wsId);
     expect(clusters).toHaveLength(1);
     expect(clusters[0].topic).toBe('keep cluster');
+  });
+
+  it('rejects invalid cannibalization payload and preserves existing table rows', async () => {
+    const wsId = freshShellWorkspace('PATCH invalid cannibalization payload');
+    replaceAllCannibalizationIssues(wsId, [
+      {
+        keyword: 'keep keyword',
+        pages: [{ path: '/services', source: 'keyword_map' }],
+        severity: 'medium',
+        recommendation: 'Keep current canonical target.',
+      },
+    ]);
+
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cannibalization: [42],
+      }),
+    });
+    expect(patchRes.status).toBe(400);
+
+    const issues = listCannibalizationIssues(wsId);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].keyword).toBe('keep keyword');
   });
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
