@@ -716,6 +716,16 @@
           "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase6`. Extracted the top header and sitemap/URL picker from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`, including back/focus controls, loaded-page chip, search/paste combobox rendering, URL-load CTA, and empty-state messaging. Root shell now composes the header while preserving workflow state/orchestration handlers. Bug sniffing hardening included: sitemap options now key by `slug+url` to avoid duplicate-key rendering drift when slugs collide. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`) to lock header/picker ownership."
         },
         {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase7",
+          "title": "PageRewriteChat monolith decomposition - phase 7 shell workflow hook extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 6",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase7`. Extracted root shell orchestration from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/usePageRewriteChatShell.ts`, including page/chat/document state, lifecycle effects, sitemap query wiring, combo interactions, rewrite apply flow, export workflow, and formatting handlers. `PageRewriteChat.tsx` now composes the extracted hook and view modules while preserving behavior. Bug sniffing hardening included: clipboard copy failures now surface toast feedback, and DOCX export failures now use non-blocking toast feedback instead of `alert()`. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase7-shell-hook-extraction.test.ts`) to lock shell workflow ownership."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

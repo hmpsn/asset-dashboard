@@ -2,16 +2,17 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 
 const PAGE_REWRITE_CHAT_PATH = 'src/components/PageRewriteChat.tsx';
+const PAGE_REWRITE_CHAT_SHELL_HOOK_PATH = 'src/components/page-rewrite-chat/usePageRewriteChatShell.ts';
 const PAGE_REWRITE_CHAT_MODEL_PATH = 'src/components/page-rewrite-chat/pageRewriteChatModel.ts';
 
 describe('PageRewriteChat phase-1 model extraction contract', () => {
-  it('wires PageRewriteChat root to extracted model/helpers', () => {
-    const rewriteChatSource = readFileSync(PAGE_REWRITE_CHAT_PATH, 'utf-8'); // readFile-ok - migration guard: root must consume extracted model/helpers in phase 1.
+  it('wires shell workflow layer to extracted model/helpers', () => {
+    const shellHookSource = readFileSync(PAGE_REWRITE_CHAT_SHELL_HOOK_PATH, 'utf-8'); // readFile-ok - migration guard: shell workflow layer must consume extracted model/helpers in phase 1.
 
-    expect(rewriteChatSource).toContain("from './page-rewrite-chat/pageRewriteChatModel'");
-    expect(rewriteChatSource).toContain('createRewriteSessionId()');
-    expect(rewriteChatSource).toContain('const comboQueryIsUrl = isUrlQuery(comboQuery)');
-    expect(rewriteChatSource).toContain('const filteredPages = comboQueryIsUrl');
+    expect(shellHookSource).toContain("from './pageRewriteChatModel'");
+    expect(shellHookSource).toContain('createRewriteSessionId()');
+    expect(shellHookSource).toContain('const comboQueryIsUrl = isUrlQuery(comboQuery)');
+    expect(shellHookSource).toContain('const filteredPages = comboQueryIsUrl');
   });
 
   it('keeps contracts + prompt/model helpers out of root shell', () => {

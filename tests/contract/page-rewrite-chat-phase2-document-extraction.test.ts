@@ -2,16 +2,17 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 
 const PAGE_REWRITE_CHAT_PATH = 'src/components/PageRewriteChat.tsx';
+const PAGE_REWRITE_CHAT_SHELL_HOOK_PATH = 'src/components/page-rewrite-chat/usePageRewriteChatShell.ts';
 const PAGE_REWRITE_CHAT_DOCUMENT_PATH = 'src/components/page-rewrite-chat/pageRewriteChatDocument.ts';
 
 describe('PageRewriteChat phase-2 document extraction contract', () => {
-  it('wires root shell to extracted document helpers', () => {
-    const rewriteChatSource = readFileSync(PAGE_REWRITE_CHAT_PATH, 'utf-8'); // readFile-ok - migration guard: root shell must consume extracted document helpers in phase 2.
+  it('wires shell workflow layer to extracted document helpers', () => {
+    const shellHookSource = readFileSync(PAGE_REWRITE_CHAT_SHELL_HOOK_PATH, 'utf-8'); // readFile-ok - migration guard: shell workflow layer must consume extracted document helpers in phase 2.
 
-    expect(rewriteChatSource).toContain("from './page-rewrite-chat/pageRewriteChatDocument'");
-    expect(rewriteChatSource).toContain('buildDocHtml(pageData)');
-    expect(rewriteChatSource).toContain('serializeDocToMarkdown(docBodyRef.current, pageData)');
-    expect(rewriteChatSource).toContain('serializeDocToDocx(docBodyRef.current, pageData)');
+    expect(shellHookSource).toContain("from './pageRewriteChatDocument'");
+    expect(shellHookSource).toContain('buildDocHtml(pageData)');
+    expect(shellHookSource).toContain('serializeDocToMarkdown(docBodyRef.current, pageData)');
+    expect(shellHookSource).toContain('serializeDocToDocx(docBodyRef.current, pageData)');
   });
 
   it('keeps document serialization/building logic out of root shell', () => {
