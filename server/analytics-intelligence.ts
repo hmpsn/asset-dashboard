@@ -22,6 +22,7 @@ import type {
   RankingMoverData,
   CtrOpportunityData,
   SerpOpportunityData,
+  FreshnessAlertData,
 } from '../shared/types/analytics.js';
 import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
@@ -163,6 +164,45 @@ const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — analytics data r
 export function isStale(computedAt: string | undefined, maxAgeMs: number = DEFAULT_MAX_AGE_MS): boolean {
   if (!computedAt) return true;
   return Date.now() - new Date(computedAt).getTime() > maxAgeMs;
+}
+
+const FRESHNESS_STALE_DAYS = 90;
+const FRESHNESS_CRITICAL_DAYS = 180;
+const FRESHNESS_MIN_IMPRESSIONS = 100;
+
+interface FreshnessInputPage {
+  pagePath: string;
+  analysisGeneratedAt?: string;
+  impressions?: number;
+  clicks?: number;
+}
+
+export function computeFreshnessAlerts(
+  pages: FreshnessInputPage[],
+  nowMs: number = Date.now(),
+): ComputedInsight<FreshnessAlertData>[] {
+  const insights: ComputedInsight<FreshnessAlertData>[] = [];
+  for (const page of pages) {
+    if (!page.analysisGeneratedAt) continue;
+    const lastAnalyzedMs = new Date(page.analysisGeneratedAt).getTime();
+    if (Number.isNaN(lastAnalyzedMs)) continue;
+    const daysSince = Math.floor((nowMs - lastAnalyzedMs) / 86_400_000);
+    if (daysSince < FRESHNESS_STALE_DAYS) continue;
+    if ((page.impressions ?? 0) < FRESHNESS_MIN_IMPRESSIONS) continue;
+    insights.push({
+      pageId: page.pagePath,
+      insightType: 'freshness_alert',
+      data: {
+        pagePath: page.pagePath,
+        lastAnalyzedAt: page.analysisGeneratedAt,
+        daysSinceLastAnalysis: daysSince,
+        impressions: page.impressions,
+        clicks: page.clicks,
+      },
+      severity: daysSince > FRESHNESS_CRITICAL_DAYS ? 'critical' : 'warning',
+    });
+  }
+  return insights;
 }
 
 // ── Page Health Scores ───────────────────────────────────────────
@@ -1437,35 +1477,18 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
 
   // Phase 6: Content freshness alerts — flag pages with stale keyword analysis + meaningful traffic
   {
-    const STALE_DAYS = 90;
-    const MIN_IMPRESSIONS = 100;
     try {
       const pageKws = listPageKeywords(workspaceId);
-      const now = Date.now();
-      const stale = pageKws.filter(p => {
-        if (!p.analysisGeneratedAt) return false;
-        const lastAnalyzedMs = new Date(p.analysisGeneratedAt).getTime();
-        if (isNaN(lastAnalyzedMs)) return false;
-        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
-        return daysSince >= STALE_DAYS && (p.impressions ?? 0) >= MIN_IMPRESSIONS;
-      });
-      for (const p of stale) {
-        const lastAnalyzedMs = new Date(p.analysisGeneratedAt!).getTime();
-        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
+      const freshnessAlerts = computeFreshnessAlerts(pageKws);
+      for (const alert of freshnessAlerts) {
         enrichAndUpsert({
           insightType: 'freshness_alert',
-          pageId: p.pagePath,
-          data: {
-            pagePath: p.pagePath,
-            lastAnalyzedAt: p.analysisGeneratedAt!,
-            daysSinceLastAnalysis: daysSince,
-            impressions: p.impressions,
-            clicks: p.clicks,
-          } satisfies import('../shared/types/analytics.js').FreshnessAlertData,
-          severity: daysSince > 180 ? 'critical' : 'warning',
+          pageId: alert.pageId,
+          data: alert.data,
+          severity: alert.severity,
         });
       }
-      log.info({ workspaceId, count: stale.length }, 'Computed content freshness alerts');
+      log.info({ workspaceId, count: freshnessAlerts.length }, 'Computed content freshness alerts');
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute content freshness alerts');
     }

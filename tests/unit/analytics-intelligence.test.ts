@@ -9,6 +9,7 @@ import {
   computePageHealthScores,
   computeRankingOpportunities,
   computeCannibalizationInsights,
+  computeFreshnessAlerts,
   isStale,
 } from '../../server/analytics-intelligence.js';
 import type { SearchPage, QueryPageRow } from '../../server/search-console.js';
@@ -233,6 +234,102 @@ describe('isStale', () => {
 
   it('returns true for undefined computedAt', () => {
     expect(isStale(undefined, 6 * 60 * 60 * 1000)).toBe(true);
+  });
+});
+
+// ── Content Freshness Alerts ─────────────────────────────────────
+
+describe('computeFreshnessAlerts', () => {
+  const NOW_MS = Date.UTC(2026, 4, 8, 12, 0, 0); // 2026-05-08T12:00:00.000Z
+
+  it('includes pages at or above 90 stale days and 100+ impressions', () => {
+    const alerts = computeFreshnessAlerts(
+      [
+        {
+          pagePath: '/stale-at-threshold',
+          analysisGeneratedAt: new Date(NOW_MS - 90 * 86_400_000).toISOString(),
+          impressions: 100,
+          clicks: 7,
+        },
+      ],
+      NOW_MS,
+    );
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].pageId).toBe('/stale-at-threshold');
+    expect(alerts[0].insightType).toBe('freshness_alert');
+    expect(alerts[0].data.daysSinceLastAnalysis).toBe(90);
+    expect(alerts[0].data).toMatchObject({
+      pagePath: '/stale-at-threshold',
+      lastAnalyzedAt: new Date(NOW_MS - 90 * 86_400_000).toISOString(),
+      impressions: 100,
+      clicks: 7,
+    });
+    expect(alerts[0].severity).toBe('warning');
+  });
+
+  it('keeps exactly-180-day stale pages at warning severity', () => {
+    const alerts = computeFreshnessAlerts(
+      [
+        {
+          pagePath: '/warning-boundary',
+          analysisGeneratedAt: new Date(NOW_MS - 180 * 86_400_000).toISOString(),
+          impressions: 450,
+        },
+      ],
+      NOW_MS,
+    );
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].data.daysSinceLastAnalysis).toBe(180);
+    expect(alerts[0].severity).toBe('warning');
+  });
+
+  it('uses critical severity when stale days exceed 180', () => {
+    const alerts = computeFreshnessAlerts(
+      [
+        {
+          pagePath: '/critical-stale',
+          analysisGeneratedAt: new Date(NOW_MS - 181 * 86_400_000).toISOString(),
+          impressions: 1000,
+          clicks: 21,
+        },
+      ],
+      NOW_MS,
+    );
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].severity).toBe('critical');
+    expect(alerts[0].data.daysSinceLastAnalysis).toBe(181);
+  });
+
+  it('excludes pages below stale/impressions thresholds and invalid dates', () => {
+    const alerts = computeFreshnessAlerts(
+      [
+        {
+          pagePath: '/fresh',
+          analysisGeneratedAt: new Date(NOW_MS - 89 * 86_400_000).toISOString(),
+          impressions: 1000,
+        },
+        {
+          pagePath: '/low-impressions',
+          analysisGeneratedAt: new Date(NOW_MS - 120 * 86_400_000).toISOString(),
+          impressions: 99,
+        },
+        {
+          pagePath: '/invalid-date',
+          analysisGeneratedAt: 'not-a-date',
+          impressions: 200,
+        },
+        {
+          pagePath: '/missing-analysis-date',
+          impressions: 300,
+        },
+      ],
+      NOW_MS,
+    );
+
+    expect(alerts).toHaveLength(0);
   });
 });
 

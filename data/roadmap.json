@@ -277,8 +277,9 @@
           "source": "TECH DEBT — scaled code review on PR #267",
           "est": "0.5h",
           "priority": "P3",
-          "notes": "tests/integration/content-freshness.test.ts only validates the GET /api/public/insights endpoint accepts freshness_alert shapes — it does NOT actually run the Phase 6 detection filter. Mirror tests/unit/emerging-keywords.test.ts: extract the 90d+100impressions filter into a helper (or test the existing pageKws.filter logic by calling into analytics-intelligence via a test harness). Goal: confirm pages exactly at the 90/100 thresholds behave correctly and stale pages below MIN_IMPRESSIONS are excluded.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08. Extracted Phase 6 freshness detection into pure helper `computeFreshnessAlerts()` in server/analytics-intelligence.ts and added direct unit coverage in tests/unit/analytics-intelligence.test.ts. Tests now pin: 90-day+100-impression inclusion threshold, exactly-180-day warning boundary, >180-day critical severity, stale low-impression exclusion, invalid/missing analysis date exclusion, insightType literal, and data payload mapping.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": "insight-cards-empty-state-parity",
