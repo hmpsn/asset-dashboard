@@ -215,7 +215,7 @@ export function OverviewTab({
       if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
       if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
       if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-accent-brand', icon: 'reply' });
-      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'content-plan', color: 'text-accent-info', icon: 'content-plan' });
+      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'inbox', color: 'text-accent-info', icon: 'content-plan' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (

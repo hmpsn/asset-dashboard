@@ -15,13 +15,32 @@ import { useBetaMode } from './BetaContext';
 import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 
-type InboxFilter = 'needs-action' | 'all' | 'completed' | 'approvals' | 'requests' | 'copy' | 'content' | 'content-plan';
+export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content';
+/**
+ * Controls the Active/Completed mode toggle in the inbox page header.
+ * The 'completed' branch is implemented in Task 3 (core InboxTab restructure).
+ */
+export type InboxMode = 'active' | 'completed';
 
-const VALID_INBOX_FILTERS: readonly InboxFilter[] =
-  ['needs-action', 'all', 'completed', 'approvals', 'requests', 'copy', 'content', 'content-plan'] as const;
+export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
+  ['all', 'needs-action', 'seo-changes', 'content'] as const;
 
-function isInboxFilter(value: string | null): value is InboxFilter {
-  return value !== null && (VALID_INBOX_FILTERS as readonly string[]).includes(value);
+/**
+ * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
+ * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip
+ * chip section values are updated. Also handles the 'completed' mode value which
+ * was previously a filter chip but is now the Active/Completed mode toggle.
+ */
+export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
+  approvals: 'seo-changes',
+  requests: 'needs-action',
+  copy: 'content',
+  'content-plan': 'needs-action',
+  completed: 'all',   // completed is now a mode toggle, not a filter chip
+};
+
+export function isInboxFilter(value: string | null): value is InboxFilter {
+  return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
 }
 
 interface InboxTabProps {
@@ -95,7 +114,8 @@ export function InboxTab({
   const [filter, setFilter] = useState<InboxFilter>(() => {
     const param = searchParams.get('tab');
     if (isInboxFilter(param)) return param;
-    return initialFilter || 'needs-action';
+    if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
+    return initialFilter ?? 'needs-action';
   });
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
@@ -111,36 +131,25 @@ export function InboxTab({
   ).length;
   const planReviewCount = contentPlanReviewCells.length;
   const pendingClientActions = clientActions.filter(a => a.status === 'pending');
-  const completedClientActions = clientActions.filter(a => a.status !== 'pending');
   const actionableCount = (pendingApprovals || 0) + contentReviews + planReviewCount + pendingClientActions.length + requestReplies;
 
   const filters: { id: InboxFilter; label: string; icon: typeof Inbox; count?: number }[] = [
     { id: 'needs-action', label: 'Needs Action', icon: Inbox, count: actionableCount || undefined },
     { id: 'all', label: 'All', icon: Inbox },
-    { id: 'completed', label: 'Completed', icon: Check, count: completedClientActions.length || undefined },
-    { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
-    { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
-    ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: PenLine }] : []),
+    { id: 'seo-changes', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
-    ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
 
-  const showActions = filter === 'needs-action' || filter === 'all' || filter === 'completed';
-  const showApprovals = filter === 'needs-action' || filter === 'all' || filter === 'completed' || filter === 'approvals';
-  const showRequests = filter === 'needs-action' || filter === 'all' || filter === 'requests';
-  const showCopy = filter === 'all' || filter === 'copy';
+  const showActions = filter === 'needs-action' || filter === 'all';
+  const showApprovals = filter === 'needs-action' || filter === 'all' || filter === 'seo-changes';
+  const showRequests = filter === 'needs-action' || filter === 'all';
+  const showCopy = filter === 'all' || filter === 'content';
   const showContent = !betaMode && (filter === 'needs-action' || filter === 'all' || filter === 'content');
-  const showContentPlan = filter === 'needs-action' || filter === 'all' || filter === 'content-plan';
+  const showContentPlan = filter === 'needs-action' || filter === 'all';
   const visibleApprovalBatches = filter === 'needs-action'
     ? approvalBatches.filter(b => b.items.some(i => i.status === 'pending' || !i.status))
-    : filter === 'completed'
-      ? approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))
-      : approvalBatches;
-  const visibleClientActions = filter === 'completed'
-    ? completedClientActions
-    : filter === 'all'
-      ? clientActions
-      : pendingClientActions;
+    : approvalBatches;
+  const visibleClientActions = filter === 'all' ? clientActions : pendingClientActions;
 
   const respondToClientAction = async (actionId: string, status: 'approved' | 'changes_requested', clientNote?: string) => {
     try {
@@ -208,15 +217,13 @@ export function InboxTab({
       {/* Client action section */}
       {showActions && visibleClientActions.length > 0 && (
         <div>
-          {filter !== 'completed' && (
-            <div className="flex items-center gap-2 mb-3">
-              <Icon as={Send} size="md" className="text-accent-brand" />
-              <span className="t-ui font-medium text-[var(--brand-text-bright)]">{filter === 'all' ? 'Client Actions' : 'Action Items'}</span>
-              {filter !== 'all' && (
-                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingClientActions.length}</span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 mb-3">
+            <Icon as={Send} size="md" className="text-accent-brand" />
+            <span className="t-ui font-medium text-[var(--brand-text-bright)]">{filter === 'all' ? 'Client Actions' : 'Action Items'}</span>
+            {filter !== 'all' && (
+              <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingClientActions.length}</span>
+            )}
+          </div>
           <div className="space-y-2">
             {visibleClientActions.map(action => (
               <div key={action.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-4 py-3">
@@ -462,26 +469,20 @@ export function InboxTab({
       )}
 
       {/* Empty state when filtered view has nothing */}
-      {filter === 'approvals' && !hasApprovals && !approvalsLoading && (
+      {filter === 'seo-changes' && !hasApprovals && !approvalsLoading && (
         <EmptyState
           icon={ClipboardCheck}
           title="No SEO changes to review yet."
           description={`${STUDIO_NAME} will send proposed changes here for your approval. You'll get notified when something needs your attention.`}
           action={
             <button
-              onClick={() => setFilter('requests')}
+              onClick={() => setFilter('needs-action')}
               className="mt-2 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand t-caption font-medium hover:bg-teal-600/30 transition-colors"
             >
-              Submit a Request Instead
+              View Action Items
             </button>
           }
         />
-      )}
-      {filter === 'content-plan' && planReviewCount === 0 && (
-        <EmptyState icon={Layers} title="No content plan items to review." description="When your team sends content for review, items will appear here." />
-      )}
-      {filter === 'copy' && !hasCopyEntries && (
-        <EmptyState icon={PenLine} title="No copy to review." description="Drafts and revisions will appear here as your team prepares them." />
       )}
       {filter === 'needs-action' && actionableCount === 0 && !approvalsLoading && !requestsLoading && (
         <EmptyState
@@ -505,10 +506,10 @@ export function InboxTab({
           description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}
           action={
             <button
-              onClick={() => setFilter('requests')}
+              onClick={() => setFilter('needs-action')}
               className="mt-2 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand t-caption font-medium hover:bg-teal-600/30 transition-colors"
             >
-              Submit a Request
+              View Action Items
             </button>
           }
         />
