@@ -5127,3 +5127,23 @@ Bug sniffing hardening included: deep nested heading body paragraphs now use exp
 **Mutual:** Adds phase-2 source contract guardrails plus serializer coverage so document helper ownership cannot drift back into the monolith.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatDocument.ts`; `tests/unit/rewrite-export-serializer.test.ts`; `tests/contract/page-rewrite-chat-phase2-document-extraction.test.ts`; `data/roadmap.json`.
+
+### 387. Platform Consolidation — PageRewriteChat Editor Actions Extraction (Phase 3)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts`.
+
+The extracted module now owns:
+- rich-text command execution (`execFormatCommand`, `clearFormattingSelection`)
+- heading-level wrapping flow for selected content (`wrapSelectionHeading`)
+- section-apply behavior with replacement + fallback insertion (`applyRewriteToSection`)
+
+`PageRewriteChat.tsx` remains the public entrypoint and now consumes the extracted action helpers while staying focused on chat/document orchestration and UI composition.
+
+Bug sniffing hardening included: when AI rewrite output targets a section that no longer exists in the editable document, the UI now shows an explicit info toast (`Section not found — content inserted at end`) instead of silently appending content.
+
+**Agency value:** Further reduces high-churn DOM/editing logic in the root monolith and creates a stable seam for subsequent pane/component extractions.
+
+**Client value:** No API contract changes; rewrite application behavior is preserved and now gives clearer feedback when section targeting falls back.
+
+**Mutual:** Adds phase-3 source contract guardrails and targeted unit tests so editor action ownership and fallback behavior cannot drift back into the root shell.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatActions.ts`; `tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`; `tests/unit/page-rewrite-chat-actions.test.ts`; `data/roadmap.json`.
