@@ -148,8 +148,9 @@
           "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08. Replaced per-hook socket construction in useWorkspaceEvents with a shared workspace-scoped event bus (`src/hooks/workspaceEventBus.ts`) so all listeners in a workspace reuse one WebSocket connection. Preserved auth sequencing (authenticate -> subscribe -> identify), including auth-failure fallback (subscribe without identify), added explicit unsubscribe-before-close semantics for final listener teardown, and kept reconnect behavior gated on active listeners. Added dedicated unit coverage in `tests/unit/workspace-event-bus.test.ts` for connection sharing, auth success/failure flows, unsubscribe teardown, send forwarding, and reconnect lifecycle. Full gates green: typecheck, vite build, vitest, pr-check.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 577,
