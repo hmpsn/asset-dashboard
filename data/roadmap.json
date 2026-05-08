@@ -696,6 +696,16 @@
           "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase4`. Extracted the full right-side editable document pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`, including empty/loading/error states, loaded-page header/export UI, issue-chip rendering, contenteditable surface, and formatting-toolbar rendering. Root shell now composes the pane while preserving document hydration/export/orchestration behavior. Bug sniffing hardening included: export popover now closes on `Escape` for keyboard dismissal. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`) to lock right-pane ownership."
         },
         {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase5",
+          "title": "PageRewriteChat monolith decomposition - phase 5 chat pane extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 4",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase5`. Extracted the full left-side chat pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`, including empty-state hero/quick prompts, user+assistant message rendering with rewrite apply/copy controls, sending-state row, and input composer/send UI. Root shell now composes the pane while preserving message/page orchestration, rewrite application, and export/document workflows. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`) to lock left-pane ownership."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
