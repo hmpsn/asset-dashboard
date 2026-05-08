@@ -175,8 +175,9 @@
           "source": "TECH DEBT",
           "est": "1.5h",
           "priority": "P2",
-          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08. Hardened work-order JSON read boundaries by replacing untyped parseJsonFallback reads with parseJsonSafeArray(z.string()) for page_ids and issue_checks in server/work-orders.ts, preventing malformed non-array JSON from leaking into runtime shapes. Added unit coverage in tests/unit/work-orders-json-validation.test.ts for malformed object payload fallback and mixed-type array filtering. Added schema-sync coverage in tests/unit/workspace-validation.test.ts for extended PageKeywordMap optional fields (including GSC/analysis/SERP fields) to guard against future drift. Recommendations and reports were already on parseJsonSafe + Zod schemas; this item is now fully closed.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 599,
