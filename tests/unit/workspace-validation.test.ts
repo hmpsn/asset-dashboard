@@ -7,6 +7,7 @@ import { parseJsonSafe, parseJsonSafeArray } from '../../server/db/json-validati
 import {
   eventDisplayConfigSchema, eventDisplayConfigArraySchema,
   eventGroupSchema, eventGroupArraySchema,
+  pageKeywordMapSchema,
   keywordStrategySchema, competitorDomainsSchema,
   audiencePersonaSchema, personasArraySchema,
   contentPricingSchema,
@@ -97,6 +98,50 @@ describe('keywordStrategySchema', () => {
     const data = { siteKeywords: [], opportunities: [], quickWins: [{ keyword: 'test' }] };
     const result = parseJsonSafe(JSON.stringify(data), keywordStrategySchema, fallback);
     expect((result as any).quickWins).toBeDefined();
+  });
+
+  it('keeps extended PageKeywordMap optional fields in schema shape', () => {
+    const map = {
+      pagePath: '/services/seo',
+      pageTitle: 'SEO Services',
+      primaryKeyword: 'seo services',
+      secondaryKeywords: ['seo agency'],
+      searchIntent: 'commercial',
+      currentPosition: 8,
+      previousPosition: 11,
+      impressions: 1200,
+      clicks: 84,
+      gscKeywords: [{ query: 'seo services', clicks: 50, impressions: 900, position: 8.4 }],
+      volume: 1900,
+      difficulty: 42,
+      cpc: 9.2,
+      secondaryMetrics: [{ keyword: 'seo agency', volume: 1000, difficulty: 39 }],
+      metricsSource: 'exact',
+      validated: true,
+      optimizationIssues: ['Missing H1'],
+      recommendations: ['Add target keyword to title'],
+      contentGaps: ['Pricing section'],
+      optimizationScore: 74,
+      analysisGeneratedAt: '2026-05-08T00:00:00.000Z',
+      primaryKeywordPresence: { inTitle: true, inMeta: true, inContent: false, inSlug: true },
+      longTailKeywords: ['seo services pricing'],
+      competitorKeywords: ['seo consultant'],
+      estimatedDifficulty: 'moderate',
+      keywordDifficulty: 47,
+      monthlyVolume: 2100,
+      topicCluster: 'seo',
+      searchIntentConfidence: 0.87,
+      serpFeatures: ['featured_snippet', 'people_also_ask'],
+    };
+
+    const parsed = parseJsonSafe(JSON.stringify({ siteKeywords: ['seo'], opportunities: [], pageMap: [map] }), keywordStrategySchema, fallback);
+    expect(parsed.pageMap?.[0]).toEqual(expect.objectContaining({
+      searchIntent: 'commercial',
+      gscKeywords: expect.any(Array),
+      primaryKeywordPresence: expect.any(Object),
+      serpFeatures: ['featured_snippet', 'people_also_ask'],
+    }));
+    expect(pageKeywordMapSchema.safeParse(map).success).toBe(true);
   });
 });
 
