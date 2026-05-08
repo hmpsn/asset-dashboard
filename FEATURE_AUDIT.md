@@ -4934,3 +4934,21 @@ Bug sniffing fixes included: added `aria-pressed` on rating controls to tighten 
 **Mutual:** Keeps phase-per-PR decomposition velocity while adding source-contract guardrails that prevent guardrails/calibration logic from drifting back into the root shell.
 
 **Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/GuardrailsSection.tsx`; `src/components/brand/voice-tab/CalibrationSection.tsx`; `src/components/brand/voice-tab/useVoiceCalibrationWorkflow.ts`; `tests/contract/voice-tab-model-extraction.test.ts`; `tests/contract/voice-tab-phase3-extraction.test.ts`; `data/roadmap.json`.
+
+### 377. Platform Consolidation — VoiceTab Root Shell Cleanup (Phase 4)
+**What it does:** Completes VoiceTab decomposition by extracting remaining root-shell orchestration from `src/components/brand/VoiceTab.tsx` into `src/components/brand/voice-tab/useVoiceTabShell.ts`. The new phase-4 shell module now owns:
+- profile query/mutation lifecycle (`getProfile`, `createProfile`, invalidation)
+- active section state and section registry (`VOICE_TAB_SECTIONS`)
+- root-level create-profile toast/error flow
+
+`VoiceTab.tsx` remains the public entrypoint and now focuses on state-aware composition of extracted section modules plus loading/empty/profile-present rendering.
+
+Bug sniffing outcome: revalidated create-profile and profile-refresh wiring through targeted brand-engine integration suites while preserving existing UX behavior and API contracts.
+
+**Agency value:** Finishes the monolith split with a clear ownership boundary between shell orchestration and section rendering, reducing future drift risk.
+
+**Client value:** No behavior/UI contract changes; existing VoiceTab flows remain intact.
+
+**Mutual:** Closes the VoiceTab decomposition sequence with a phase-4 source contract that blocks query/mutation orchestration from drifting back into the root shell.
+
+**Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/useVoiceTabShell.ts`; `tests/contract/voice-tab-phase4-shell-cleanup.test.ts`; `data/roadmap.json`.
