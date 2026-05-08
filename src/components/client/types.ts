@@ -121,7 +121,7 @@ export interface ClientBriefPreview {
 }
 
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'schema-review' | 'brand';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'brand';
 
 export interface ClientKeywordStrategy {
   siteKeywords: string[];

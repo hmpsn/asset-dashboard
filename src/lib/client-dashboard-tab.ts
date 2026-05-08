@@ -12,7 +12,7 @@ import type { ClientTab } from '../routes';
  * shouldn't 404). Kept separate from ClientTab so the runtime resolution can
  * widen its return type beyond the strict union.
  */
-export type LegacyClientTab = 'content-plan' | 'schema-review';
+export type LegacyClientTab = 'content-plan';
 
 export type ResolvedClientTab = ClientTab | LegacyClientTab;
 
@@ -37,7 +37,6 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'plans',
   'roi',
   'content-plan',
-  'schema-review',
 ];
 
 /**
@@ -57,6 +56,7 @@ export function resolveClientTab(
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
   if (t === 'brand') return brandTabEnabled ? 'brand' : 'overview';
+  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > SEO Changes
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

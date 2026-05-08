@@ -28,7 +28,6 @@ import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
 import { FeedbackWidget } from './client/FeedbackWidget';
-import { SchemaReviewTab } from './client/SchemaReviewTab';
 import { PlansTab } from './client/PlansTab';
 import { ContentPlanTab } from './client/ContentPlanTab';
 import { StrategyTab } from './client/StrategyTab';
@@ -666,8 +665,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
     ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0 ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
-    ...(isPaid ? [{ id: 'schema-review' as ClientTab, label: 'Schema', icon: Shield, locked: false }] : []),
-    ...(!betaMode && !isExternalBilling ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
+...(!betaMode && !isExternalBilling ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
     ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
   ];
@@ -814,13 +812,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {tab === 'roi' && (
           <ErrorBoundary label="ROI Dashboard">
             <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
-          </ErrorBoundary>
-        )}
-
-        {/* ════════════ SCHEMA REVIEW TAB ════════════ */}
-        {tab === 'schema-review' && (
-          <ErrorBoundary label="Schema Review">
-            <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
           </ErrorBoundary>
         )}
 
