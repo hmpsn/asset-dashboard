@@ -44,7 +44,7 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
 
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'alt_text_generations')) {
     return res.status(429).json({ error: 'Monthly AI generation limit reached' });
   }
 
@@ -119,7 +119,7 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
       const writeResult = await updateAsset(req.params.assetId, { altText }, altToken);
       if (!writeResult.success) {
         log.error({ detail: writeResult.error }, `Alt text generated but Webflow write-back failed for ${req.params.assetId}:`);
-        decrementUsage(ws.id, 'strategy_generations');
+        decrementUsage(ws.id, 'alt_text_generations');
         res.json({ altText, updated: false, writeError: writeResult.error });
       } else {
         log.info(`Alt text generated and saved for ${req.params.assetId}: "${altText}"`);
@@ -127,12 +127,12 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
       }
     } else {
       log.warn(`Alt text generation returned null for ${req.params.assetId}`);
-      decrementUsage(ws.id, 'strategy_generations');
+      decrementUsage(ws.id, 'alt_text_generations');
       res.json({ altText: null, updated: false });
     }
   } catch (e) {
     log.error({ err: e }, 'Generate alt error');
-    decrementUsage(ws.id, 'strategy_generations');
+    decrementUsage(ws.id, 'alt_text_generations');
     res.status(500).json({ error: 'Failed to generate alt text' });
   }
 });
@@ -152,7 +152,7 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
 
   const bulkWs = getWorkspace(req.params.workspaceId);
   if (!bulkWs) return res.status(404).json({ error: 'Workspace not found' });
-  const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
+  const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'alt_text_generations');
   if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
 
   let siteContext = '';
@@ -219,7 +219,7 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
   let done = 0;
   for (const asset of assets) {
     // Per-asset atomic check+increment prevents unbounded overshoot when batch size > remaining budget.
-    if (!incrementIfAllowed(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations')) {
+    if (!incrementIfAllowed(bulkWs.id, bulkWs.tier || 'free', 'alt_text_generations')) {
       send({ type: 'status', message: `Monthly AI limit reached after ${done}/${assets.length} images`, done, total: assets.length });
       break;
     }
@@ -227,7 +227,7 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
       const response = await fetch(asset.imageUrl);
       if (!response.ok) {
         done++;
-        decrementUsage(bulkWs.id, 'strategy_generations');
+        decrementUsage(bulkWs.id, 'alt_text_generations');
         send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}`, done, total: assets.length });
         continue;
       }
@@ -245,20 +245,20 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
         const writeResult = await updateAsset(asset.assetId, { altText }, token);
         if (!writeResult.success) {
           log.error({ detail: writeResult.error }, `Bulk alt: generated but write-back failed for ${asset.assetId}:`);
-          decrementUsage(bulkWs.id, 'strategy_generations');
+          decrementUsage(bulkWs.id, 'alt_text_generations');
           send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
           send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
         }
       } else {
-        decrementUsage(bulkWs.id, 'strategy_generations');
+        decrementUsage(bulkWs.id, 'alt_text_generations');
         send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: 'Generation returned null', done, total: assets.length });
       }
     } catch (err) {
       done++;
       const msg = err instanceof Error ? err.message : String(err);
       log.error({ detail: msg }, `Bulk alt error for ${asset.assetId}:`);
-      decrementUsage(bulkWs.id, 'strategy_generations');
+      decrementUsage(bulkWs.id, 'alt_text_generations');
       send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: msg, done, total: assets.length });
     }
   }

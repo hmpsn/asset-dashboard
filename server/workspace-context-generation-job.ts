@@ -272,7 +272,7 @@ export function startWorkspaceContextGenerationJob(type: BackgroundJobType, work
     );
   }
 
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'workspace_context_generations')) {
     throw new WorkspaceContextJobStartError('Monthly AI generation limit reached', 429);
   }
 
@@ -327,7 +327,7 @@ async function runWorkspaceContextGenerationJob(opts: {
       message: `${label[0].toUpperCase()}${label.slice(1)} draft ready for review`,
     });
   } catch (err) {
-    decrementUsage(opts.workspaceId, 'strategy_generations');
+    decrementUsage(opts.workspaceId, 'workspace_context_generations');
     if (isProgrammingError(err)) log.warn({ err }, 'workspace context generation failed with programming error');
     else log.debug({ err }, 'workspace context generation failed — degrading gracefully');
     updateJob(opts.jobId, {

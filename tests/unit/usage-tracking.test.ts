@@ -19,21 +19,29 @@ describe('getLimit', () => {
   it('returns correct limits for free tier', () => {
     expect(getLimit('free', 'ai_chats')).toBe(3);
     expect(getLimit('free', 'strategy_generations')).toBe(0);
+    expect(getLimit('free', 'alt_text_generations')).toBe(0);
+    expect(getLimit('free', 'workspace_context_generations')).toBe(0);
   });
 
   it('returns correct limits for growth tier', () => {
     expect(getLimit('growth', 'ai_chats')).toBe(50);
     expect(getLimit('growth', 'strategy_generations')).toBe(3);
+    expect(getLimit('growth', 'alt_text_generations')).toBe(3);
+    expect(getLimit('growth', 'workspace_context_generations')).toBe(3);
   });
 
   it('returns correct limits for premium tier', () => {
     expect(getLimit('premium', 'ai_chats')).toBe(Infinity);
     expect(getLimit('premium', 'strategy_generations')).toBe(Infinity);
+    expect(getLimit('premium', 'alt_text_generations')).toBe(Infinity);
+    expect(getLimit('premium', 'workspace_context_generations')).toBe(Infinity);
   });
 
   it('falls back to free tier limits for unknown tier', () => {
     expect(getLimit('unknown_tier', 'ai_chats')).toBe(3);
     expect(getLimit('unknown_tier', 'strategy_generations')).toBe(0);
+    expect(getLimit('unknown_tier', 'alt_text_generations')).toBe(0);
+    expect(getLimit('unknown_tier', 'workspace_context_generations')).toBe(0);
   });
 });
 
@@ -61,9 +69,11 @@ describe('getUsageCount / incrementUsage', () => {
     incrementUsage(testWsId, 'ai_chats');
     incrementUsage(testWsId, 'ai_chats');
     incrementUsage(testWsId, 'strategy_generations');
+    incrementUsage(testWsId, 'alt_text_generations');
 
     expect(getUsageCount(testWsId, 'ai_chats')).toBe(2);
     expect(getUsageCount(testWsId, 'strategy_generations')).toBe(1);
+    expect(getUsageCount(testWsId, 'alt_text_generations')).toBe(1);
   });
 });
 
@@ -103,6 +113,13 @@ describe('checkUsageLimit', () => {
 
   it('blocks strategy_generations for free tier (limit=0)', () => {
     const result = checkUsageLimit(testWsId, 'free', 'strategy_generations');
+    expect(result.allowed).toBe(false);
+    expect(result.limit).toBe(0);
+    expect(result.remaining).toBe(0);
+  });
+
+  it('blocks alt_text_generations for free tier (limit=0)', () => {
+    const result = checkUsageLimit(testWsId, 'free', 'alt_text_generations');
     expect(result.allowed).toBe(false);
     expect(result.limit).toBe(0);
     expect(result.remaining).toBe(0);
@@ -193,8 +210,12 @@ describe('getUsageSummary', () => {
 
     expect(summary.ai_chats).toBeDefined();
     expect(summary.strategy_generations).toBeDefined();
+    expect(summary.alt_text_generations).toBeDefined();
+    expect(summary.workspace_context_generations).toBeDefined();
     expect(summary.ai_chats.limit).toBe(50);
     expect(summary.strategy_generations.limit).toBe(3);
+    expect(summary.alt_text_generations.limit).toBe(3);
+    expect(summary.workspace_context_generations.limit).toBe(3);
     expect(summary.ai_chats.used).toBe(0);
     expect(summary.ai_chats.remaining).toBe(50);
   });
