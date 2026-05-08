@@ -1,6 +1,6 @@
 export { useAdminGA4 } from './useAdminGA4';
 export { useAdminSearch } from './useAdminSearch';
-export { useAdminBriefsList, useAdminRequestsList } from './useAdminBriefs';
+export { useAdminBriefsList, useAdminRequestsList, useAdminBriefTemplateCrossref } from './useAdminBriefs';
 export { useAdminPostsList, useAdminPost, useAdminPostVersions, usePublishTarget } from './useAdminPosts';
 export { useWorkspaceHomeData } from './useWorkspaceHome';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';

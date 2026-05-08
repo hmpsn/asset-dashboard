@@ -40,6 +40,8 @@ export const queryKeys = {
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postsDetailAll: (wsId: string) => ['admin-post', wsId] as const,
     postVersions: (wsId: string, postId: string) => ['admin-post-versions', wsId, postId] as const,
+    briefTemplateCrossref: (wsId: string, normalizedKeyword: string) =>
+      ['admin-brief-template-crossref', wsId, normalizedKeyword] as const,
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,
     contentPipeline: (wsId: string) => ['content-pipeline', wsId] as const,
