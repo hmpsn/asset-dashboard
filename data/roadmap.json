@@ -225,8 +225,9 @@
           "source": "TECH DEBT",
           "est": "2h",
           "priority": "P3",
-          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-normalize-topic-clusters. Added migration `server/db/migrations/089-topic-clusters.sql` and dedicated persistence module `server/topic-clusters.ts` (list/replace/delete/count + JSON-blob backfill migration). `keyword-strategy-persistence.ts` now writes topic clusters to `topic_clusters`, strips stale blob copies, and stores prior topic-cluster table state in strategy-history snapshots. Strategy reader/writer wiring now reassembles topic clusters in `server/routes/keyword-strategy.ts` (table-first fallback to legacy blob, shell-state support, strict PATCH validation). Added unit coverage in `tests/unit/topic-clusters.test.ts` and integration coverage in `tests/integration/keyword-strategy-partial-state.test.ts` for table-backed patch/shell behavior.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 370,

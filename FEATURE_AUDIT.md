@@ -5323,3 +5323,33 @@ Bug hardening included:
 **Mutual:** Adds direct unit coverage for keyword-gaps table CRUD + blob migration, plus integration coverage for shell-state patch behavior and public strategy reads.
 
 **Files:** `server/db/migrations/088-keyword-gaps.sql`; `server/keyword-gaps.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/keyword-strategy-seo-data.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `shared/types/workspace.ts`; `tests/unit/keyword-gaps.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `tests/integration/client-strategy.test.ts`; `data/roadmap.json`.
+
+### 395. Hardening Sprint — Topic Clusters Table Normalization
+**What it does:** Normalizes `keywordStrategy.topicClusters[]` into a dedicated `topic_clusters` SQLite table and updates strategy read/write paths to use table-backed topic clusters.
+
+Key changes:
+- Added migration `server/db/migrations/089-topic-clusters.sql` with `(workspace_id, topic)` primary key plus workspace/coverage indexes.
+- Added `server/topic-clusters.ts` with:
+  - `listTopicClusters()`
+  - `replaceAllTopicClusters()`
+  - `deleteAllTopicClusters()`
+  - `countTopicClusters()`
+  - `migrateFromJsonBlob()` backfill + stale-blob-field cleanup
+- Startup now runs topic-cluster backfill migration in `server/index.ts` after existing page-map/content-gaps/quick-wins/keyword-gaps backfills.
+- `server/keyword-strategy-persistence.ts` now:
+  - writes strategy topic clusters to `topic_clusters`
+  - strips `topicClusters` from the strategy blob
+  - includes previous topic-cluster table state in strategy-history snapshots for historical continuity
+- Reader/writer wiring now reassembles topic clusters from table in `server/routes/keyword-strategy.ts` (table-first fallback retained for legacy blobs), including shell-state patch behavior.
+
+Bug hardening included:
+- Verified and hardened case-insensitive duplicate-topic writes by deduping topic-cluster batches before insert (last topic wins), preventing PK collisions during replace-all writes.
+- Added strict `PATCH /api/webflow/keyword-strategy/:workspaceId` topic-cluster payload validation plus integration coverage to prevent malformed payloads from mutating table state.
+
+**Agency value:** Topic-cluster coverage data is now queryable/indexed independently and no longer requires full strategy-blob rewrites.
+
+**Client value:** Strategy API responses keep the same `topicClusters` shape while shifting to durable table-backed storage.
+
+**Mutual:** Adds direct unit coverage for topic-clusters table CRUD + blob migration, plus integration coverage for shell-state patch/validation behavior.
+
+**Files:** `server/db/migrations/089-topic-clusters.sql`; `server/topic-clusters.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/topic-clusters.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.

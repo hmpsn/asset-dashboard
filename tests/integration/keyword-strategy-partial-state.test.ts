@@ -16,6 +16,7 @@ import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/wor
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
+import { listTopicClusters, replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
@@ -193,6 +194,42 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     expect(gaps[0].keyword).toBe('seo audit tool');
   });
 
+  it('pure topicClusters PATCH updates table-backed rows without creating a strategy blob', async () => {
+    const wsId = freshShellWorkspace('PATCH topicClusters shell');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topicClusters: [
+          {
+            topic: 'seo services',
+            keywords: ['seo services', 'enterprise seo'],
+            ownedCount: 1,
+            totalCount: 4,
+            coveragePercent: 25,
+            avgPosition: 10,
+            topCompetitor: 'competitor.com',
+            topCompetitorCoverage: 75,
+            gap: ['technical seo', 'local seo'],
+          },
+        ],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBeNull();
+    expect(Array.isArray(body.topicClusters)).toBe(true);
+    expect(body.topicClusters).toHaveLength(1);
+    expect(body.topicClusters[0].topic).toBe('seo services');
+
+    const ws = getWorkspace(wsId);
+    expect(ws?.keywordStrategy).toBeFalsy();
+
+    const clusters = listTopicClusters(wsId);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].topic).toBe('seo services');
+  });
+
   it('rejects invalid quickWins payload and preserves existing table rows', async () => {
     const wsId = freshShellWorkspace('PATCH invalid quickWins payload');
     replaceAllQuickWins(wsId, [
@@ -237,6 +274,33 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     const gaps = listKeywordGaps(wsId);
     expect(gaps).toHaveLength(1);
     expect(gaps[0].keyword).toBe('keep keyword');
+  });
+
+  it('rejects invalid topicClusters payload and preserves existing table rows', async () => {
+    const wsId = freshShellWorkspace('PATCH invalid topicClusters payload');
+    replaceAllTopicClusters(wsId, [
+      {
+        topic: 'keep cluster',
+        keywords: ['keep keyword'],
+        ownedCount: 1,
+        totalCount: 3,
+        coveragePercent: 33,
+        gap: ['missing keyword'],
+      },
+    ]);
+
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topicClusters: [42],
+      }),
+    });
+    expect(patchRes.status).toBe(400);
+
+    const clusters = listTopicClusters(wsId);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].topic).toBe('keep cluster');
   });
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {

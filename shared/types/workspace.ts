@@ -145,6 +145,7 @@ export interface KeywordStrategy {
     position: number;
     serpFeatures?: string;
   }[];
+  /** Stored separately in the topic_clusters table; omitted in the workspace JSON blob. */
   topicClusters?: TopicCluster[];         // topical authority clusters
   cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
