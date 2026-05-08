@@ -5289,3 +5289,37 @@ Bug hardening included:
 **Mutual:** Adds direct unit coverage for quick-wins table CRUD + blob migration and updates integration seeding to validate table-backed strategy responses.
 
 **Files:** `server/db/migrations/087-quick-wins.sql`; `server/quick-wins.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `server/recommendations.ts`; `shared/types/workspace.ts`; `tests/unit/quick-wins.test.ts`; `tests/integration/client-strategy.test.ts`; `data/roadmap.json`.
+
+### 394. Hardening Sprint — Keyword Gaps Table Normalization
+**What it does:** Normalizes `keywordStrategy.keywordGaps[]` into a dedicated `keyword_gaps` SQLite table and updates strategy read/write paths to use table-backed keyword gaps.
+
+Key changes:
+- Added migration `server/db/migrations/088-keyword-gaps.sql` with `(workspace_id, keyword)` primary key plus workspace/volume indexes.
+- Added `server/keyword-gaps.ts` with:
+  - `listKeywordGaps()`
+  - `replaceAllKeywordGaps()`
+  - `deleteAllKeywordGaps()`
+  - `countKeywordGaps()`
+  - `migrateFromJsonBlob()` backfill + stale-blob-field cleanup
+- Startup now runs keyword-gap backfill migration in `server/index.ts` after existing page-map/content-gaps/quick-wins backfills.
+- `server/keyword-strategy-persistence.ts` now:
+  - writes strategy keyword gaps to `keyword_gaps`
+  - strips `keywordGaps` from the strategy blob
+  - includes previous keyword-gap table state in strategy-history snapshots for historical continuity
+- Reader wiring now reassembles keyword gaps from table in:
+  - `server/routes/keyword-strategy.ts`
+  - `server/routes/public-content.ts`
+  - with conservative fallback to legacy blob data when table rows are absent
+- Incremental SEO-data restore in `server/keyword-strategy-seo-data.ts` now reads cached keyword gaps from `keyword_gaps` table first (legacy blob fallback retained).
+
+Bug hardening included:
+- Fixed a verified duplicate-key failure mode in table replace-all writes by deduping same-keyword entries within a batch (last entry wins) before insert.
+- Added strict `PATCH /api/webflow/keyword-strategy/:workspaceId` keyword-gap payload validation plus integration coverage to prevent malformed payloads from mutating table state.
+
+**Agency value:** Competitor keyword-gap data is now queryable/indexed independently and no longer requires whole-blob rewrites.
+
+**Client value:** Client strategy responses keep the same keyword-gap shape while shifting to durable table-backed storage.
+
+**Mutual:** Adds direct unit coverage for keyword-gaps table CRUD + blob migration, plus integration coverage for shell-state patch behavior and public strategy reads.
+
+**Files:** `server/db/migrations/088-keyword-gaps.sql`; `server/keyword-gaps.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/keyword-strategy-seo-data.ts`; `server/routes/keyword-strategy.ts`; `server/routes/public-content.ts`; `shared/types/workspace.ts`; `tests/unit/keyword-gaps.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `tests/integration/client-strategy.test.ts`; `data/roadmap.json`.

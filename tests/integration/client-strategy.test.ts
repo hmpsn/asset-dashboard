@@ -31,6 +31,7 @@ import db from '../../server/db/index.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins, deleteAllQuickWins } from '../../server/quick-wins.js';
+import { replaceAllKeywordGaps, deleteAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -162,13 +163,19 @@ beforeAll(async () => {
   // Seed strategy-level fields into the blob and contentGaps into the dedicated
   // table (post-#365 normalization — contentGaps no longer live in the blob).
   const stratStrategy = buildStrategy();
-  const { contentGaps: stratContentGaps, quickWins: stratQuickWins, ...stratBlob } = stratStrategy;
+  const {
+    contentGaps: stratContentGaps,
+    quickWins: stratQuickWins,
+    keywordGaps: stratKeywordGaps,
+    ...stratBlob
+  } = stratStrategy;
   updateWorkspace(strategyWsId, {
     seoClientView: true,
     keywordStrategy: stratBlob as KeywordStrategy,
   });
   replaceAllContentGaps(strategyWsId, stratContentGaps ?? []);
   replaceAllQuickWins(strategyWsId, stratQuickWins ?? []);
+  replaceAllKeywordGaps(strategyWsId, stratKeywordGaps ?? []);
 
   // Seed page_keywords for the strategy workspace (reassembled into pageMap by the endpoint)
   const pageEntries: PageKeywordMap[] = [
@@ -220,13 +227,19 @@ beforeAll(async () => {
     siteKeywords: ['isolation keyword only'],
     opportunities: ['isolation opportunity only'],
   });
-  const { contentGaps: isolationContentGaps, quickWins: isolationQuickWins, ...isolationBlob } = isolationStrategy;
+  const {
+    contentGaps: isolationContentGaps,
+    quickWins: isolationQuickWins,
+    keywordGaps: isolationKeywordGaps,
+    ...isolationBlob
+  } = isolationStrategy;
   updateWorkspace(isolationWsId, {
     seoClientView: true,
     keywordStrategy: isolationBlob as KeywordStrategy,
   });
   replaceAllQuickWins(isolationWsId, isolationQuickWins ?? []);
   replaceAllContentGaps(isolationWsId, isolationContentGaps ?? []);
+  replaceAllKeywordGaps(isolationWsId, isolationKeywordGaps ?? []);
 }, 30_000);
 
 afterAll(async () => {
@@ -237,8 +250,10 @@ afterAll(async () => {
   db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(strategyWsId);
   deleteAllContentGaps(strategyWsId);
   deleteAllQuickWins(strategyWsId);
+  deleteAllKeywordGaps(strategyWsId);
   deleteAllContentGaps(isolationWsId);
   deleteAllQuickWins(isolationWsId);
+  deleteAllKeywordGaps(isolationWsId);
   deleteWorkspace(strategyWsId);
   deleteWorkspace(gatedWsId);
   deleteWorkspace(feedbackWsId);
@@ -405,6 +420,7 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(Array.isArray(body.keywordGaps)).toBe(true);
     expect(body.keywordGaps.length).toBeGreaterThan(0);
     expect(body.keywordGaps.length).toBeLessThanOrEqual(20);
+    expect(body.keywordGaps.some((gap: { keyword: string }) => gap.keyword === 'seo audit tool')).toBe(true);
 
     for (const gap of body.keywordGaps) {
       expect(typeof gap.keyword).toBe('string');

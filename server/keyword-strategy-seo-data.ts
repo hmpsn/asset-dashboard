@@ -2,6 +2,7 @@ import { updateWorkspace } from './workspaces.js';
 import { shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 import { filterDiscoveredCompetitors } from './competitor-domain-filter.js';
 import { MAX_COMPETITORS } from './constants.js';
+import { listKeywordGaps } from './keyword-gaps.js';
 import { createLogger } from './logger.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
 import type { Workspace } from '../shared/types/workspace.js';
@@ -72,8 +73,11 @@ export async function fetchAndCacheKeywordStrategySeoData({
   const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws, competitorDomains);
 
   if (!fetchCompetitors) {
-    if (ws.keywordStrategy?.keywordGaps) {
-      keywordGaps = ws.keywordStrategy.keywordGaps;
+    const keywordGapsFromTable = listKeywordGaps(ws.id);
+    if (keywordGapsFromTable.length > 0 || ws.keywordStrategy?.keywordGaps?.length) {
+      keywordGaps = keywordGapsFromTable.length > 0
+        ? keywordGapsFromTable
+        : (ws.keywordStrategy?.keywordGaps || []);
       if (keywordGaps.length > 0) {
         seoContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
         seoContext += keywordGaps.slice(0, 30).map(g =>

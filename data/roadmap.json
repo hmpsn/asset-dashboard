@@ -215,8 +215,9 @@
           "source": "TECH DEBT",
           "est": "1.5h",
           "priority": "P3",
-          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08 on codex/hardening-normalize-keyword-gaps. Added migration `server/db/migrations/088-keyword-gaps.sql` and dedicated persistence module `server/keyword-gaps.ts` (list/replace/delete/count + JSON-blob backfill migration). `keyword-strategy-persistence.ts` now writes keyword gaps to `keyword_gaps`, strips stale blob copies, and stores prior keyword-gap table state in strategy-history snapshots. Reader wiring now reassembles keyword gaps in `server/routes/keyword-strategy.ts` and `server/routes/public-content.ts` (with table-first fallback to legacy blob data), and incremental cached SEO-data restore now reads table-backed keyword gaps in `server/keyword-strategy-seo-data.ts`. Added unit coverage in `tests/unit/keyword-gaps.test.ts` and integration coverage in `tests/integration/client-strategy.test.ts` and `tests/integration/keyword-strategy-partial-state.test.ts`.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 369,

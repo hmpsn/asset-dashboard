@@ -128,6 +128,7 @@ export interface KeywordStrategy {
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   /** Stored separately in the quick_wins table; omitted in the workspace JSON blob. */
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
+  /** Stored separately in the keyword_gaps table; omitted in the workspace JSON blob. */
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
   /**
    * Competitor domain keywords used to enrich keyword pool.

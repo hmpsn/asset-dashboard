@@ -21,6 +21,7 @@ import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { listContentGaps } from '../content-gaps.js';
 import { listQuickWins } from '../quick-wins.js';
+import { listKeywordGaps } from '../keyword-gaps.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -111,6 +112,10 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   // Fallback to blob data for legacy workspaces that have not been migrated yet.
   const quickWinsList = listQuickWins(ws.id);
   const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy.quickWins || []);
+  // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
+  // Fallback to blob data for legacy workspaces that have not been migrated yet.
+  const keywordGapsList = listKeywordGaps(ws.id);
+  const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy.keywordGaps || []);
   // Return client-safe subset (no SEO data mode/provider internals)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
@@ -154,7 +159,7 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       estimatedImpact: q.estimatedImpact,
       rationale: q.rationale,
     })),
-    keywordGaps: (strategy.keywordGaps || []).slice(0, 20).map(g => ({
+    keywordGaps: keywordGaps.slice(0, 20).map(g => ({
       keyword: g.keyword,
       volume: g.volume,
       difficulty: g.difficulty,

@@ -15,6 +15,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
+import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
@@ -163,6 +164,35 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     expect(wins[0].action).toBe('Improve title tag');
   });
 
+  it('pure keywordGaps PATCH updates table-backed rows without creating a strategy blob', async () => {
+    const wsId = freshShellWorkspace('PATCH keywordGaps shell');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keywordGaps: [
+          {
+            keyword: 'seo audit tool',
+            volume: 2400,
+            difficulty: 48,
+            competitorPosition: 3,
+            competitorDomain: 'competitor.com',
+          },
+        ],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBeNull();
+
+    const ws = getWorkspace(wsId);
+    expect(ws?.keywordStrategy).toBeFalsy();
+
+    const gaps = listKeywordGaps(wsId);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].keyword).toBe('seo audit tool');
+  });
+
   it('rejects invalid quickWins payload and preserves existing table rows', async () => {
     const wsId = freshShellWorkspace('PATCH invalid quickWins payload');
     replaceAllQuickWins(wsId, [
@@ -181,6 +211,32 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     const wins = listQuickWins(wsId);
     expect(wins).toHaveLength(1);
     expect(wins[0].action).toBe('Keep me');
+  });
+
+  it('rejects invalid keywordGaps payload and preserves existing table rows', async () => {
+    const wsId = freshShellWorkspace('PATCH invalid keywordGaps payload');
+    replaceAllKeywordGaps(wsId, [
+      {
+        keyword: 'keep keyword',
+        volume: 999,
+        difficulty: 22,
+        competitorPosition: 4,
+        competitorDomain: 'example.com',
+      },
+    ]);
+
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keywordGaps: [42],
+      }),
+    });
+    expect(patchRes.status).toBe(400);
+
+    const gaps = listKeywordGaps(wsId);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].keyword).toBe('keep keyword');
   });
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
