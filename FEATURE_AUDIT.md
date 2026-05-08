@@ -5012,3 +5012,22 @@ Bug sniffing hardening included: AI failure and no-suggestion cases now surface 
 **Mutual:** Adds a phase-3 source contract guardrail so AI rewrite state/orchestration does not drift back into the CmsEditor monolith.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorAiWorkflow.ts`; `tests/contract/cms-editor-phase3-ai-workflow-hook-extraction.test.ts`; `data/roadmap.json`.
+
+### 381. Platform Consolidation — CmsEditor Publish + Bulk Workflow Hook Extraction (Phase 4)
+**What it does:** Continues CmsEditor decomposition by extracting publish and bulk rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`. The new hook now owns:
+- publish state and flow (`publishing`, `published`, `publishCollection`)
+- bulk rewrite workflow state (`bulkMode`, `bulkProgress`, `bulkResults`)
+- collection/item auto-expansion during bulk rewrite operations
+- concurrency-limited bulk rewrite dispatch over selected CMS items
+
+`CmsEditor.tsx` remains the public entrypoint and now consumes the extracted hook for publish/bulk behavior while keeping composition and render wiring.
+
+Bug sniffing hardening included: bulk failure accounting now captures AI generation failures that return unsuccessful outcomes (not only thrown rejections), by having AI rewrite operations return explicit success booleans consumed by the bulk workflow.
+
+**Agency value:** Shrinks root-shell orchestration further and isolates another high-churn async workflow behind a focused hook seam.
+
+**Client value:** No UI/API contract changes; publish and bulk rewrite flows remain intact with more accurate failure reporting.
+
+**Mutual:** Adds a phase-4 source contract guardrail so publish/bulk state and orchestration cannot drift back into the CmsEditor monolith.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorAiWorkflow.ts`; `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`; `tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`; `data/roadmap.json`.
