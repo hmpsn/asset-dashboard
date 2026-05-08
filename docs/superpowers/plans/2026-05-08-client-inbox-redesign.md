@@ -347,6 +347,63 @@ EOF
 
 ---
 
+## 🔴 STOP — Phase 0 Review & PR
+
+> **Do not start Task 2 until this PR is merged to staging.**
+
+Phase 0 covers Tasks 0 and 1 — type contracts and alias remapping. These are the shared contracts that every subsequent task depends on.
+
+- [ ] **Review: run code review**
+
+  Single-agent mechanical work — `superpowers:requesting-code-review` is sufficient:
+  ```
+  /requesting-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  From the project root in your terminal:
+  ```bash
+  codex review
+  ```
+  Read the output. Any flagged issues that are actionable: fix them, re-run typecheck, commit the fix on this branch.
+
+- [ ] **Resolve all actionable feedback** before opening the PR.
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 0 — shared type contracts and alias remapping" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - Updates `InboxFilter` type (8 → 5 values) with `LEGACY_FILTER_MAP` for backward-compat deep-links
+  - Adds `InboxMode` type and exported `INBOX_FILTER_VALUES` const
+  - Adds typed `ClientActionPayload` interfaces per source type in `shared/types/client-actions.ts`
+  - Remaps `ClientInboxAlias` targets: `approvals→seo-changes`, `requests→needs-action`, `content→content`
+  - Updates redirect test expectations to match new filter values
+
+  ## Test plan
+  - [ ] `npx vitest run tests/unit/client-routes-redirect.test.tsx` — all green
+  - [ ] `npx vitest run tests/unit/inbox-filter-values.test.ts` — all green
+  - [ ] `npm run typecheck && npx vite build` — zero errors
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors
+  - [ ] Existing inbox deep-links (e.g. `?tab=approvals`) still resolve correctly via LEGACY_FILTER_MAP
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Verify on staging** — navigate to client inbox, confirm it still loads and existing deep-links still work.
+
+- [ ] **Start Task 2.**
+
+---
+
 ## Task 2 — PriorityStrip Component
 
 > **Owns:** `src/components/client/PriorityStrip.tsx` (new file)
@@ -1207,6 +1264,74 @@ EOF
 
 ---
 
+## 🔴 STOP — Phase 1 Review & PR
+
+> **Do not start Tasks 4 or 5 until this PR is merged to staging.**
+
+Phase 1 covers Tasks 2 and 3 — the PriorityStrip component and full InboxTab restructure. This is the largest diff of the entire project.
+
+- [ ] **Review: run scaled code review**
+
+  This phase has significant complexity — use the full scaled review:
+  ```
+  /scaled-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  ```bash
+  codex review
+  ```
+  Pay particular attention to Codex findings on:
+  - Priority strip item assembly logic (check for missing signal types)
+  - SEO Changes section collapse logic (should be collapsed when nothing pending)
+  - `betaMode` gating — must only gate Section 3 (Content), not Sections 1 or 2
+  - `LEGACY_FILTER_MAP` being used in the `useState` init (backward compat)
+
+- [ ] **Resolve all actionable feedback.**
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 1 — PriorityStrip + InboxTab three-section restructure" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - New `PriorityStrip` component surfaces urgent items across all three sections
+  - InboxTab fully restructured: Active/Completed mode toggle, 4 filter chips, 3 collapsible sections
+  - Section 1: Needs Action (client action cards + content plan sign-offs + requests)
+  - Section 2: SEO Changes (approval batches + schema plan card, auto-collapses when nothing pending)
+  - Section 3: Content (copy review + content pipeline, betaMode gated)
+  - Internal `useQuery` for schema plan summary (priority strip + SEO Changes card)
+  - LEGACY_FILTER_MAP handles backward-compat deep-links from ActionQueueStrip (updated in Phase 2)
+
+  ## Test plan
+  - [ ] `npx vitest run tests/unit/PriorityStrip.test.tsx` — 4 tests green
+  - [ ] `npm run typecheck && npx vite build` — zero errors
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors
+  - [ ] Navigate to client inbox on staging — Active mode shows priority strip + 3 sections
+  - [ ] Filter chips hide/show correct sections
+  - [ ] Active/Completed toggle switches modes
+  - [ ] Schema plan card visible in SEO Changes (if workspace has one)
+  - [ ] Tier-1 action card (content_decay) approves/rejects inline
+  - [ ] Tier-3 action card shows "View details →" (modal wired in Phase 4)
+  - [ ] Deep-link `?tab=seo-changes` initializes correctly
+  - [ ] Deep-link `?tab=approvals` (legacy) maps to seo-changes via LEGACY_FILTER_MAP
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Verify on staging** — walk through every section, mode toggle, filter chip, and priority strip item.
+
+- [ ] **Start Tasks 4 and 5 in parallel.**
+
+---
+
 ## Task 4 — Remove schema-review Standalone Tab
 
 > **Phase 2A — can run in parallel with Task 5.**
@@ -1402,6 +1527,80 @@ EOF
 
 ---
 
+## 🔴 STOP — Phase 2 Review & PR
+
+> **Tasks 4 and 5 ran in parallel — wait for BOTH to be complete before reviewing.**
+> **Do not start Task 6 until this PR is merged to staging.**
+
+Phase 2 covers Tasks 4 and 5 — schema-review tab retirement and ActionQueueStrip/test updates. Parallel agent work always requires scaled review.
+
+- [ ] **Review: run scaled code review** (required — parallel agents touched separate files)
+
+  ```
+  /scaled-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  ```bash
+  codex review
+  ```
+  Pay particular attention to Codex findings on:
+  - Route removal checklist completeness — all 7 sites updated for `'schema-review'`
+  - ActionQueueStrip chip section values — confirm `approvals→seo-changes`, `replies→needs-action`, `content-plan→needs-action`
+  - No stray `schema-review` references in `src/`
+
+- [ ] **Verify no `schema-review` references remain**
+
+  ```bash
+  grep -rn "schema-review" src/ tests/
+  ```
+  Expected: zero results.
+
+- [ ] **Verify no old chip section values remain**
+
+  ```bash
+  grep -n "'approvals'\|'requests'\|'content-plan'" src/components/client/Briefing/ActionQueueStrip.tsx
+  ```
+  Expected: zero results.
+
+- [ ] **Resolve all actionable feedback.**
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 2 — retire schema-review tab + update ActionQueueStrip chip values" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - Removes `'schema-review'` from `ClientTab` union (route-removal-checklist applied: all 7 sites)
+  - Removes SchemaReviewTab import, nav entry, and render case from ClientDashboard
+  - Updates ActionQueueStrip Chip section values: approvals→seo-changes, requests/replies→needs-action, content-plan→needs-action
+  - Updates client-routes-redirect test expectations for new alias target values
+
+  ## Test plan
+  - [ ] `npx vitest run tests/unit/client-routes-redirect.test.tsx` — all green
+  - [ ] `npx vitest run tests/contract/tab-deep-link-wiring.test.ts` — all green
+  - [ ] `npm run typecheck && npx vite build` — zero errors
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors
+  - [ ] `grep -rn "schema-review" src/ tests/` — zero results
+  - [ ] Navigate to client dashboard on staging — no "Schema" tab in nav
+  - [ ] ActionQueueStrip chips navigate to correct new filter sections
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Verify on staging** — confirm "Schema" tab is gone from client nav, ActionQueueStrip chips deep-link correctly.
+
+- [ ] **Start Task 6.**
+
+---
+
 ## Task 6 — SchemaReviewModal
 
 > **Phase 3. Depends on Task 3 (InboxTab has schema plan card) and Task 4 (standalone tab removed).**
@@ -1507,6 +1706,66 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
+
+---
+
+## 🔴 STOP — Phase 3 Review & PR
+
+> **Do not start Task 7 until this PR is merged to staging.**
+
+Phase 3 covers Task 6 — the SchemaReviewModal that replaces the retired standalone tab.
+
+- [ ] **Review: run code review**
+
+  Single new component + wiring — `superpowers:requesting-code-review` is sufficient:
+  ```
+  /requesting-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  ```bash
+  codex review
+  ```
+  Pay particular attention to:
+  - Modal accessibility (`role="dialog"`, `aria-modal`, `aria-label`, focus trapping)
+  - Close button keyboard accessibility
+  - Scrollable body doesn't break on small viewports
+
+- [ ] **Resolve all actionable feedback.**
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 3 — SchemaReviewModal wrapping existing SchemaReviewTab" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - New `SchemaReviewModal` component: full-screen modal triggered from schema plan card in Inbox > SEO Changes
+  - Wraps the existing `SchemaReviewTab` component with a header bar and X close button
+  - Wired into InboxTab via `schemaModalOpen` state and "Review schema plan →" CTA
+
+  ## Test plan
+  - [ ] `npm run typecheck && npx vite build` — zero errors
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors
+  - [ ] On staging: navigate to Inbox on a workspace with a schema plan
+  - [ ] Schema plan card visible in SEO Changes section
+  - [ ] "Review schema plan →" opens full-screen modal
+  - [ ] X button closes modal, inbox visible behind
+  - [ ] Schema plan review/approve flow works inside modal (same as old standalone tab)
+  - [ ] Priority strip "Review →" on schema plan item also opens modal
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Verify on staging** — full schema plan review flow inside the modal.
+
+- [ ] **Start Task 7.**
 
 ---
 
@@ -1896,6 +2155,79 @@ EOF
 
 ---
 
+## 🔴 STOP — Phase 4 Review & PR
+
+> **Do not start Task 8 until this PR is merged to staging.**
+
+Phase 4 covers Task 7 — the `ClientActionDetailModal` with four per-sourceType payload renderers. This is the most net-new UI in the redesign and warrants a thorough review.
+
+- [ ] **Review: run scaled code review**
+
+  Complex new component with multiple renderer branches — use scaled review:
+  ```
+  /scaled-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  ```bash
+  codex review
+  ```
+  Pay particular attention to:
+  - Each payload renderer handles its empty/null state gracefully
+  - `as InternalLinkPayload` casts are safe (payload shape matches the typed interface)
+  - Footer approve/request-changes flow — modal closes after `respondToClientAction` resolves
+  - Modal accessibility — same checks as Phase 3
+  - The `default` switch case renders something useful (raw JSON) rather than crashing
+
+- [ ] **Manual smoke test against each source type** (if test data is available on staging):
+  - `content_decay` — still inline approve/reject in the card (NOT opening modal)
+  - `internal_link` — "View details →" opens modal with link table
+  - `redirect_proposal` — "View details →" opens modal with source→target pairs
+  - `keyword_strategy` — "View details →" opens modal with mapped pages + quick wins
+  - `aeo_change` — "View details →" opens modal with current vs proposed diffs
+
+- [ ] **Resolve all actionable feedback.**
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 4 — ClientActionDetailModal with per-sourceType payload renderers" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - New `ClientActionDetailModal` component for Tier-3 action cards requiring full-width review
+  - Per-sourceType renderers: InternalLink (table), RedirectProposal (source→target pairs), KeywordStrategy (pages/quick-wins/gaps), AeoChange (current vs proposed diffs)
+  - Approve and request-changes footer — closes modal on success
+  - content_decay remains Tier-1 (inline approve/reject in the action card, unaffected)
+
+  ## Test plan
+  - [ ] `npm run typecheck && npx vite build` — zero errors
+  - [ ] `npx vitest run` — full suite green
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors
+  - [ ] content_decay card: approve/reject inline (no modal)
+  - [ ] internal_link card: "View details →" opens table renderer modal
+  - [ ] redirect_proposal card: "View details →" opens source→target renderer
+  - [ ] keyword_strategy card: "View details →" opens strategy renderer
+  - [ ] aeo_change card: "View details →" opens diff renderer
+  - [ ] Approve from modal → toast success + modal closes
+  - [ ] Request changes from modal → feedback note sent + modal closes
+  - [ ] Empty payload state renders gracefully (no crash)
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Verify on staging** — test each source type modal if data is available.
+
+- [ ] **Start Task 8.**
+
+---
+
 ## Task 8 — pr-check Rule for Old Filter Literals
 
 > **Phase 5. Run after all other tasks are merged to staging.**
@@ -1978,24 +2310,76 @@ EOF
 
 ---
 
+## 🔴 STOP — Phase 5 Review & PR
+
+> **This is the final phase. After this PR merges to staging and is verified, the redesign is shippable.**
+
+Phase 5 covers Task 8 — InsightsDigest verification and the pr-check rule preventing old filter literal re-introduction.
+
+- [ ] **Review: run code review**
+
+  Small targeted change — `superpowers:requesting-code-review` is sufficient:
+  ```
+  /requesting-code-review
+  ```
+
+- [ ] **Review: Codex independent review**
+
+  ```bash
+  codex review
+  ```
+
+- [ ] **Resolve all actionable feedback.**
+
+- [ ] **Open PR → staging**
+
+  ```bash
+  gh pr create \
+    --base staging \
+    --title "feat(inbox): Phase 5 — pr-check rule for legacy inbox filter literals" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  - Verifies InsightsDigest emits no old inbox filter values (confirmed: zero instances)
+  - Adds pr-check rule `inbox-legacy-filter-literal` flagging ?tab=approvals, ?tab=requests, ?tab=content-plan, ?tab=copy in src/
+
+  ## Test plan
+  - [ ] `npx tsx scripts/pr-check.ts` — zero errors from new rule
+  - [ ] `npm run typecheck` — zero errors
+  - [ ] `grep -n "tab.*'approvals'\|tab.*'requests'\|tab.*'content-plan'\|tab.*'copy'" src/components/client/InsightsDigest.tsx` — zero results
+
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  EOF
+  )"
+  ```
+
+- [ ] **Merge PR to staging** once CI is green.
+
+- [ ] **Run full final verification on staging** (see Final Quality Gates below).
+
+- [ ] **Merge staging → main** to ship to production.
+
+---
+
 ## Final Quality Gates
 
-After all tasks are merged to the worktree branch:
+After Phase 5 is merged to staging, run this full-feature end-to-end verification before merging staging → main:
 
 - [ ] `npm run typecheck` — zero errors
-- [ ] `npx vite build` — builds successfully  
+- [ ] `npx vite build` — builds successfully
 - [ ] `npx vitest run` — full test suite passes
 - [ ] `npx tsx scripts/pr-check.ts` — zero violations
-- [ ] Navigate to client inbox in the browser:
+- [ ] Navigate to client inbox on staging:
   - Active mode shows priority strip, 3 sections, 4 filter chips
   - Filter chips hide/show correct sections
   - Active/Completed toggle switches modes
+  - SEO Changes section collapses when no approvals pending
   - Schema plan card (if present) opens SchemaReviewModal full-screen
   - Tier-3 action cards open ClientActionDetailModal
-  - Tier-1 (content_decay) cards approve/reject inline
+  - Tier-1 (content_decay) cards approve/reject inline — no modal
   - Deep-link `?tab=seo-changes` initializes SEO Changes chip as active
   - Deep-link `?tab=approvals` (legacy) resolves to `seo-changes` via LEGACY_FILTER_MAP
-- [ ] Invoke `superpowers:scaled-code-review` before merging (multi-agent feature)
+  - Priority strip disappears when all items resolved; green "all caught up" appears
+- [ ] **Merge staging → main** to ship to production
 
 ---
 
