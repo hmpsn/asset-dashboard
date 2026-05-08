@@ -9,14 +9,13 @@ import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
 import { extractRewriteOnly, parseRewriteSectionTarget } from '../lib/rewriteResponse';
+import { useToast } from './Toast';
 import { Icon, IconButton } from './ui';
 import {
-  HEADING_CLASSES,
   QUICK_PROMPTS,
   createRewriteSessionId,
   getIndentLevel,
   isUrlQuery,
-  toSectionSlug,
   type ChatMessage,
   type PageData,
   type SitemapPage,
@@ -26,6 +25,12 @@ import {
   serializeDocToDocx,
   serializeDocToMarkdown,
 } from './page-rewrite-chat/pageRewriteChatDocument';
+import {
+  applyRewriteToSection,
+  clearFormattingSelection,
+  execFormatCommand,
+  wrapSelectionHeading,
+} from './page-rewrite-chat/pageRewriteChatActions';
 
 interface Props {
   workspaceId: string;
@@ -36,6 +41,8 @@ interface Props {
 }
 
 export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocusModeToggle, onBack }: Props) {
+  const { toast } = useToast();
+
   // Page state
   const [pageUrl, setPageUrl] = useState(initialPageUrl || '');
   const [pageData, setPageData] = useState<PageData | null>(null);
@@ -235,85 +242,11 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     setTimeout(() => comboInputRef.current?.focus(), 0);
   };
 
-  // execCommand-ok: no replacement for contenteditable bold/italic in 2026
-  const execFormat = (command: string) => {
-    docBodyRef.current?.focus();
-    document.execCommand(command, false);
-  };
-
-  const wrapHeading = (tag: 'h2' | 'h3') => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    docBodyRef.current?.focus();
-    const range = sel.getRangeAt(0);
-    const block = (range.startContainer.nodeType === Node.TEXT_NODE
-      ? range.startContainer.parentElement
-      : range.startContainer as Element);
-    const existingHeading = block?.closest('h1,h2,h3,h4,h5,h6');
-    if (existingHeading) {
-      const newEl = document.createElement(tag);
-      newEl.innerHTML = existingHeading.innerHTML;
-      // Preserve data-section so applyToSection can still find this heading after a level change
-      const sectionAttr = existingHeading.getAttribute('data-section');
-      if (sectionAttr) newEl.setAttribute('data-section', sectionAttr);
-      newEl.className = HEADING_CLASSES[tag] ?? '';
-      existingHeading.replaceWith(newEl);
-    } else {
-      // execCommand-ok: no replacement for contenteditable formatBlock in 2026
-      document.execCommand('formatBlock', false, tag);
-      // formatBlock creates a bare heading — apply classes and data-section so Apply can target it
-      const afterSel = window.getSelection();
-      if (afterSel && afterSel.rangeCount > 0) {
-        const anchor = afterSel.anchorNode;
-        const newHeading = (anchor?.nodeType === Node.TEXT_NODE
-          ? anchor.parentElement
-          : anchor as Element)?.closest('h1,h2,h3,h4,h5,h6');
-        if (newHeading) {
-          newHeading.className = HEADING_CLASSES[tag] ?? '';
-          const slug = toSectionSlug(newHeading.textContent || '');
-          if (slug) newHeading.setAttribute('data-section', slug);
-        }
-      }
-    }
-  };
-
-  // execCommand-ok: no replacement for contenteditable removeFormat in 2026
-  const clearFormatting = () => { document.execCommand('removeFormat'); document.execCommand('formatBlock', false, 'p'); };
-
   const applyToSection = (content: string, sectionTarget: string) => {
-    const docBody = docBodyRef.current;
-    if (!docBody) return;
-
-    const targetSlug = toSectionSlug(sectionTarget);
-    const heading = docBody.querySelector(`[data-section="${targetSlug}"]`);
-    // Remove paragraphs between the target heading and the next heading sibling
-    if (heading) {
-      let sibling = heading.nextElementSibling;
-      while (sibling && !/^H[1-6]$/i.test(sibling.tagName)) {
-        const next = sibling.nextElementSibling;
-        sibling.remove();
-        sibling = next;
-      }
+    const { foundSection } = applyRewriteToSection(docBodyRef.current, content, sectionTarget);
+    if (!foundSection) {
+      toast('Section not found — content inserted at end', 'info');
     }
-
-    // Insert the new content as a paragraph
-    const p = document.createElement('p');
-    p.textContent = content;
-    p.className = 'text-[13px] text-slate-500 leading-[1.7] mb-3'; // arbitrary-text-ok
-    p.style.cssText = 'background-color:rgba(13,148,136,0.2);border-left:2px solid #0d9488;padding-left:10px;transition:background-color 2s ease,border-left 2s ease,padding-left 2s ease';
-
-    if (heading ?? docBody.lastElementChild) {
-      (heading ?? docBody.lastElementChild!).insertAdjacentElement('afterend', p);
-    } else {
-      docBody.appendChild(p);
-    }
-
-    // Fade out the highlight
-    setTimeout(() => {
-      p.style.backgroundColor = '';
-      p.style.borderLeft = '';
-      p.style.paddingLeft = '';
-    }, 2000);
   };
 
   const handleExport = (mode: 'copy' | 'download' | 'docx') => {
@@ -772,15 +705,15 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   style={{ top: toolbarPos.top, left: toolbarPos.left }}
                   onMouseDown={e => e.preventDefault()}
                 >
-                  <button onClick={() => execFormat('bold')} className="px-2 py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
-                  <button onClick={() => execFormat('italic')} className="px-2 py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
+                  <button onClick={() => execFormatCommand('bold', docBodyRef.current)} className="px-2 py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
+                  <button onClick={() => execFormatCommand('italic', docBodyRef.current)} className="px-2 py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
                   <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={() => wrapHeading('h2')} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
+                  <button onClick={() => wrapSelectionHeading('h2', docBodyRef.current)} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
                   }>H2</button>
-                  <button onClick={() => wrapHeading('h3')} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
+                  <button onClick={() => wrapSelectionHeading('h3', docBodyRef.current)} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
                   }>H3</button>
                   <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={clearFormatting} className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
+                  <button onClick={clearFormattingSelection} className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
                 </div>
               )}
             </>

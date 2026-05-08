@@ -158,7 +158,7 @@
           "est": "0.5h",
           "priority": "P2",
           "status": "done",
-          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
+          "notes": "Completed 2026-05-08 in `codex/page-rewrite-chat-decomp-phase3`. `PageRewriteChat` now surfaces a toast (`Section not found — content inserted at end`) when AI section targets do not match any `data-section` heading, replacing the prior silent append behavior. Original flag was deferred from PR #159."
         },
         {
           "id": 578,
@@ -674,6 +674,16 @@
           "status": "done",
           "createdAt": "2026-05-08",
           "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase2`. Extracted document-focused assembly/serialization helpers from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatDocument.ts` (`buildDocHtml`, `serializeDocToMarkdown`, `serializeDocToDocx`) and rewired root export/document initialization calls to consume the module while preserving behavior. Bug sniffing hardening included: deep nested section body paragraphs now use explicit inline `margin-left` styling in generated HTML so level-4+ section indentation is applied consistently (replacing dynamic class fragments that do not materialize at runtime). Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase2-document-extraction.test.ts`) and serializer coverage updates (`tests/unit/rewrite-export-serializer.test.ts`) to lock ownership and behavior."
+        },
+        {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase3",
+          "title": "PageRewriteChat monolith decomposition - phase 3 editor actions extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 2",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase3`. Extracted editor action workflow from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatActions.ts` (`execFormatCommand`, `clearFormattingSelection`, `wrapSelectionHeading`, `applyRewriteToSection`) and rewired root toolbar/apply handlers to consume the module while preserving behavior. Bug sniffing hardening included: missing section targets now surface an explicit toast (`Section not found — content inserted at end`) instead of silently appending. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`) and behavior coverage (`tests/unit/page-rewrite-chat-actions.test.ts`) to lock ownership and section-apply fallback behavior."
         },
         {
           "id": "platform-consolidation-workspace-intelligence-slices",
