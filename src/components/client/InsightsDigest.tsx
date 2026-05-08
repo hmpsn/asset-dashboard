@@ -321,7 +321,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         color: 'blue',
         headline: `${cp.reviewCells} content plan page${cp.reviewCells > 1 ? 's' : ''} need your review`,
         body: `Your content plan has ${cp.totalCells} planned pages. ${cp.publishedCells} published, ${cp.approvedCells} approved, ${cp.inProgressCells} in progress. Review flagged items to keep the pipeline moving.`,
-        action: { label: 'Review content plan', tab: 'content-plan' },
+        action: { label: 'Review content plan', tab: 'inbox' },
         priority: 1,
         sentiment: 'opportunity',
       });
@@ -332,7 +332,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         color: completionPct >= 80 ? 'emerald' : completionPct >= 40 ? 'teal' : 'blue',
         headline: `Content plan is ${completionPct}% complete`,
         body: `${cp.publishedCells} of ${cp.totalCells} pages published across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}.${cp.inProgressCells > 0 ? ` ${cp.inProgressCells} currently in progress.` : ''}${cp.approvedCells > 0 ? ` ${cp.approvedCells} approved and queued.` : ''}`,
-        action: { label: 'View content plan', tab: 'content-plan' },
+        action: { label: 'View content plan', tab: 'inbox' },
         priority: 3,
         sentiment: completionPct >= 80 ? 'positive' : 'neutral',
       });
@@ -343,7 +343,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         color: 'emerald',
         headline: 'Content plan fully published',
         body: `All ${cp.totalCells} planned pages are live across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}. Great work!`,
-        action: { label: 'View content plan', tab: 'content-plan' },
+        action: { label: 'View content plan', tab: 'inbox' },
         priority: 5,
         sentiment: 'positive',
       });

@@ -23,4 +23,11 @@ describe('LEGACY_FILTER_MAP', () => {
       expect(INBOX_FILTER_VALUES).toContain(target);
     }
   });
+
+  it('contains all 5 legacy keys including completed', () => {
+    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    for (const k of expectedKeys) {
+      expect(LEGACY_FILTER_MAP).toHaveProperty(k);
+    }
+  });
 });

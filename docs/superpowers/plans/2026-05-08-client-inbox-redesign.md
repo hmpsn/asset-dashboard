@@ -80,16 +80,16 @@ import { describe, it, expect } from 'vitest';
 import { INBOX_FILTER_VALUES } from '../../src/components/client/InboxTab';
 
 describe('INBOX_FILTER_VALUES', () => {
-  it('contains exactly the five new filter values', () => {
+  it('contains exactly the four active filter values', () => {
     expect(INBOX_FILTER_VALUES).toEqual(
-      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content', 'completed']),
+      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content']),
     );
-    expect(INBOX_FILTER_VALUES).toHaveLength(5);
+    expect(INBOX_FILTER_VALUES).toHaveLength(4);
   });
 
-  it('does not contain legacy filter values', () => {
-    const legacy = ['approvals', 'requests', 'copy', 'content-plan'];
-    for (const v of legacy) {
+  it('does not contain legacy or mode-only values', () => {
+    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    for (const v of excluded) {
       expect(INBOX_FILTER_VALUES).not.toContain(v);
     }
   });
@@ -109,24 +109,24 @@ Expected: FAIL — `INBOX_FILTER_VALUES` not exported.
 Replace lines 18–25 of `src/components/client/InboxTab.tsx`:
 
 ```ts
-export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content' | 'completed';
+export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content';
 export type InboxMode = 'active' | 'completed';
+// NOTE: 'completed' lives in InboxMode only. It is NOT an InboxFilter chip.
+// Navigating to ?tab=completed must not produce a blank screen — handled via
+// LEGACY_FILTER_MAP: { completed: 'all' }.
 
 export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
-  ['all', 'needs-action', 'seo-changes', 'content', 'completed'] as const;
+  ['all', 'needs-action', 'seo-changes', 'content'] as const;
 
-/**
- * Maps legacy deep-link filter values (e.g. from ActionQueueStrip before Phase 2B)
- * to their new equivalents. Allows backward-compat during the migration window.
- */
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   approvals: 'seo-changes',
   requests: 'needs-action',
   copy: 'content',
   'content-plan': 'needs-action',
+  completed: 'all', // mode toggle, not a filter chip
 };
 
-function isInboxFilter(value: string | null): value is InboxFilter {
+export function isInboxFilter(value: string | null): value is InboxFilter {
   return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
 }
 ```

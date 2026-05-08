@@ -39,7 +39,7 @@ export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   completed: 'all',   // completed is now a mode toggle, not a filter chip
 };
 
-function isInboxFilter(value: string | null): value is InboxFilter {
+export function isInboxFilter(value: string | null): value is InboxFilter {
   return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
 }
 
