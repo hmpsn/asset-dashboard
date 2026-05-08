@@ -5147,3 +5147,24 @@ Bug sniffing hardening included: when AI rewrite output targets a section that n
 **Mutual:** Adds phase-3 source contract guardrails and targeted unit tests so editor action ownership and fallback behavior cannot drift back into the root shell.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatActions.ts`; `tests/contract/page-rewrite-chat-phase3-actions-extraction.test.ts`; `tests/unit/page-rewrite-chat-actions.test.ts`; `data/roadmap.json`.
+
+### 388. Platform Consolidation — PageRewriteChat Document Pane Extraction (Phase 4)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting the full right-side editable document pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`.
+
+The extracted module now owns:
+- right-pane empty/loading/error view states
+- loaded-page header + export popover rendering
+- issue-chip rendering for audit findings
+- contenteditable document surface + floating formatting toolbar rendering
+
+`PageRewriteChat.tsx` remains the public entrypoint and now composes the extracted pane while retaining orchestration for document hydration, export behavior, and editor action callbacks.
+
+Bug sniffing hardening included: export popover now closes on `Escape`, so keyboard users can dismiss it without a pointer interaction.
+
+**Agency value:** Removes another large UI surface from the root monolith and isolates document-pane rendering for faster iteration and lower regression risk.
+
+**Client value:** No API/UI contract change; editing and export behavior remain unchanged with a small accessibility/UX improvement for popover dismissal.
+
+**Mutual:** Adds a phase-4 source contract guardrail so right-pane ownership cannot drift back into the root shell.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx`; `tests/contract/page-rewrite-chat-phase4-document-pane-extraction.test.ts`; `data/roadmap.json`.
