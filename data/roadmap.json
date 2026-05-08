@@ -195,8 +195,9 @@
           "source": "TECH DEBT",
           "est": "2h",
           "priority": "P2",
-          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
-          "status": "pending"
+          "notes": "Reconciled as already shipped during hardening audit on 2026-05-08. `content_gaps` table exists in migration 086 (`server/db/migrations/086-content-gaps.sql`), with dedicated persistence in `server/content-gaps.ts` and live readers wired through `server/routes/keyword-strategy.ts`, `server/routes/public-portal.ts`, `server/routes/public-content.ts`, `server/briefing-candidates.ts`, `server/briefing-cron.ts`, `server/recommendations.ts`, and intelligence slices (`server/intelligence/seo-context-slice.ts`, `server/intelligence/page-profile-slice.ts`). Existing tests already assert post-#365 behavior (e.g. `tests/assemble-page-profile.test.ts` content-gaps table source-of-truth comments + mocks).",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": 367,
