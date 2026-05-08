@@ -9,7 +9,8 @@ describe('CmsEditor phase-1 model extraction contract', () => {
     const cmsEditorSource = readFileSync(CMS_EDITOR_PATH, 'utf-8'); // readFile-ok - migration guard: CmsEditor root should consume extracted model/helpers in phase 1.
 
     expect(cmsEditorSource).toContain("from './cms-editor/cmsEditorModel'");
-    expect(cmsEditorSource).toContain('buildInitialEdits(collections)');
+    expect(cmsEditorSource).toContain("from './cms-editor/useCmsEditorShellState'");
+    expect(cmsEditorSource).toContain('useCmsEditorShellState({ siteId, collections })');
     expect(cmsEditorSource).toContain('buildItemApprovalMap(approvalBatches)');
     expect(cmsEditorSource).toContain('filterAndRankCollectionItems(coll, search)');
   });

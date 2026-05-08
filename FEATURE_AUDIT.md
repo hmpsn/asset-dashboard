@@ -5031,3 +5031,21 @@ Bug sniffing hardening included: bulk failure accounting now captures AI generat
 **Mutual:** Adds a phase-4 source contract guardrail so publish/bulk state and orchestration cannot drift back into the CmsEditor monolith.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorAiWorkflow.ts`; `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`; `tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`; `data/roadmap.json`.
+
+### 382. Platform Consolidation — CmsEditor Shell State + Session Hook Extraction (Phase 5)
+**What it does:** Continues CmsEditor decomposition by extracting root shell/session state ownership into `src/components/cms-editor/useCmsEditorShellState.ts`. The new hook now owns:
+- session hydration + persistence for edits, expanded collections/items, and dirty set
+- local shell state (`saving`, `saved`, `historyExpanded`, `search`, `errors`, `previewExpanded`)
+- shared interaction helpers (`toggleCollection`, `toggleItem`, `toggleHistory`, `togglePreview`, `updateField`)
+
+`CmsEditor.tsx` now consumes this hook and keeps composition/orchestration wiring around extracted workflows.
+
+Bug sniffing hardening included: edits cache is now persisted even when empty, preventing stale cached edit payloads from being resurrected after a reset path.
+
+**Agency value:** Reduces root-shell volatility and isolates session persistence logic behind a focused hook boundary.
+
+**Client value:** No UI/API contract changes; editor behavior remains intact with more robust cache reset behavior.
+
+**Mutual:** Adds phase-5 source contract + hook behavior guardrails so shell/session logic cannot drift back into the monolith.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorShellState.ts`; `tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`; `tests/unit/cms-editor-shell-state-hook.test.ts`; `data/roadmap.json`.
