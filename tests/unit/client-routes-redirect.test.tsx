@@ -109,23 +109,37 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it.each(['content', 'requests', 'approvals'] as const)(
-    'redirects legacy /client/:id/%s to the unified inbox filter',
-    (legacyTab) => {
-      const { getByTestId } = renderRoutes(`/client/ws_test/${legacyTab}`);
-      expect(getByTestId('initialTab').textContent).toBe('inbox');
-      expect(getByTestId('tabParam').textContent).toBe(legacyTab);
-    },
-  );
+  it('redirects legacy /client/:id/content to the inbox content filter', () => {
+    const { getByTestId } = renderRoutes('/client/ws_test/content');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('content');
+  });
+
+  it('redirects legacy /client/:id/requests to the inbox needs-action filter', () => {
+    const { getByTestId } = renderRoutes('/client/ws_test/requests');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('needs-action');
+  });
+
+  it('redirects legacy /client/:id/approvals to the inbox seo-changes filter', () => {
+    const { getByTestId } = renderRoutes('/client/ws_test/approvals');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('seo-changes');
+  });
 });
 
 describe('clientPath legacy client inbox aliases', () => {
-  it.each(['content', 'requests', 'approvals'] as const)(
-    'points %s navigation at the unified inbox filter',
-    (legacyTab) => {
-      expect(clientPath('ws_test', legacyTab)).toBe(`/client/ws_test/inbox?tab=${legacyTab}`);
-    },
-  );
+  it('points content navigation at the inbox content filter', () => {
+    expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/inbox?tab=content');
+  });
+
+  it('points requests navigation at the inbox needs-action filter', () => {
+    expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/inbox?tab=needs-action');
+  });
+
+  it('points approvals navigation at the inbox seo-changes filter', () => {
+    expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/inbox?tab=seo-changes');
+  });
 
   it('preserves normal client tab paths', () => {
     expect(clientPath('ws_test', 'performance')).toBe('/client/ws_test/performance');

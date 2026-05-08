@@ -25,9 +25,9 @@ export type Page =
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
 export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
 
-export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, ClientInboxAlias> = {
-  approvals: 'approvals',
-  requests: 'requests',
+export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, string> = {
+  approvals: 'seo-changes',
+  requests: 'needs-action',
   content: 'content',
 };
 
