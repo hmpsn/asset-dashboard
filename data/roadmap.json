@@ -706,6 +706,16 @@
           "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase5`. Extracted the full left-side chat pane from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`, including empty-state hero/quick prompts, user+assistant message rendering with rewrite apply/copy controls, sending-state row, and input composer/send UI. Root shell now composes the pane while preserving message/page orchestration, rewrite application, and export/document workflows. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`) to lock left-pane ownership."
         },
         {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase6",
+          "title": "PageRewriteChat monolith decomposition - phase 6 header and picker extraction",
+          "source": "Loop follow-up after PageRewriteChat phase 5",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase6`. Extracted the top header and sitemap/URL picker from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`, including back/focus controls, loaded-page chip, search/paste combobox rendering, URL-load CTA, and empty-state messaging. Root shell now composes the header while preserving workflow state/orchestration handlers. Bug sniffing hardening included: sitemap options now key by `slug+url` to avoid duplicate-key rendering drift when slugs collide. Added source-contract guardrails (`tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`) to lock header/picker ownership."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

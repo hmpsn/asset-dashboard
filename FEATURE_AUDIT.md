@@ -5189,3 +5189,24 @@ Bug sniffing hardening included: none required beyond behavior-preserving extrac
 **Mutual:** Adds a phase-5 source contract guardrail so left-pane ownership cannot drift back into the root shell.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteChatPane.tsx`; `tests/contract/page-rewrite-chat-phase5-chat-pane-extraction.test.ts`; `data/roadmap.json`.
+
+### 390. Platform Consolidation — PageRewriteChat Header + Picker Extraction (Phase 6)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting the header and sitemap/URL picker surface from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`.
+
+The extracted module now owns:
+- header chrome (back action, feature title, focus-mode toggle)
+- loaded-page chip and change action
+- search/paste URL combobox UI and keyboard wiring surface
+- page-match empty-state messaging and URL-load CTA rendering
+
+`PageRewriteChat.tsx` remains the public entrypoint and now composes the extracted header while retaining workflow orchestration state and handlers.
+
+Bug sniffing hardening included: sitemap option rows now use stable `slug+url` keys, preventing duplicate-key rendering drift when pages share slugs across contexts.
+
+**Agency value:** Further shrinks root rendering complexity and isolates high-churn picker UX into a focused module, reducing regression risk in future workflow changes.
+
+**Client value:** No API/UI contract changes; page lookup and focus controls behave the same while underlying ownership is cleaner.
+
+**Mutual:** Adds a phase-6 source contract guardrail so header/picker ownership cannot drift back into the root shell.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/PageRewriteHeaderBar.tsx`; `tests/contract/page-rewrite-chat-phase6-header-extraction.test.ts`; `data/roadmap.json`.
