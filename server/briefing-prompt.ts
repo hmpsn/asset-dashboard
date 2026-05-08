@@ -64,7 +64,7 @@ export function buildBriefingInstructions(input: BriefingInstructionsInput): str
     `      "headline": "string",`,
     `      "narrative": "string",`,
     `      "metrics": [{ "value": "+12%", "label": "traffic" }],`,
-    `      "drillIn": { "page": "performance|health|strategy|content-plan|schema-review|roi|brand", "tab": "...", "queryParams": { ... } },`,
+    `      "drillIn": { "page": "performance|health|strategy|content-plan|roi|brand", "tab": "...", "queryParams": { ... } },`,
     `      "sourceRefs": [{ "type": "analytics_insight|recommendation|audit_delta", "id": "..." }]`,
     `    }`,
     `  ]`,

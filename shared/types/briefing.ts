@@ -10,7 +10,6 @@ export type ExplorePage =
   | 'health'
   | 'strategy'
   | 'content-plan'
-  | 'schema-review'
   | 'roi'
   | 'brand';
 

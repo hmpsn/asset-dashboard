@@ -32,7 +32,7 @@ export const briefingStorySchema: z.ZodType<BriefingStory> = z.object({
   narrative: z.string().min(1).max(800),
   metrics: z.array(briefingMetricSchema).max(2),
   drillIn: z.object({
-    page: z.enum(['performance', 'health', 'strategy', 'content-plan', 'schema-review', 'roi', 'brand']),
+    page: z.enum(['performance', 'health', 'strategy', 'content-plan', 'roi', 'brand']),
     tab: z.string().optional(),
     queryParams: z.record(z.string()).optional(),
   }),
