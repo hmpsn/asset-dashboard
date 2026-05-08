@@ -5353,3 +5353,33 @@ Bug hardening included:
 **Mutual:** Adds direct unit coverage for topic-clusters table CRUD + blob migration, plus integration coverage for shell-state patch/validation behavior.
 
 **Files:** `server/db/migrations/089-topic-clusters.sql`; `server/topic-clusters.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/topic-clusters.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
+
+### 396. Hardening Sprint — Cannibalization Table Normalization
+**What it does:** Normalizes `keywordStrategy.cannibalization[]` into a dedicated `cannibalization_issues` SQLite table and updates strategy read/write paths to use table-backed cannibalization issues.
+
+Key changes:
+- Added migration `server/db/migrations/090-cannibalization-issues.sql` with `(workspace_id, keyword)` primary key plus workspace/severity indexes.
+- Added `server/cannibalization-issues.ts` with:
+  - `listCannibalizationIssues()`
+  - `replaceAllCannibalizationIssues()`
+  - `deleteAllCannibalizationIssues()`
+  - `countCannibalizationIssues()`
+  - `migrateFromJsonBlob()` backfill + stale-blob-field cleanup
+- Startup now runs cannibalization backfill migration in `server/index.ts` after existing page-map/content-gaps/quick-wins/keyword-gaps/topic-clusters backfills.
+- `server/keyword-strategy-persistence.ts` now:
+  - writes strategy cannibalization issues to `cannibalization_issues`
+  - strips `cannibalization` from the strategy blob
+  - includes previous cannibalization table state in strategy-history snapshots for historical continuity
+- Reader/writer wiring now reassembles cannibalization issues from table in `server/routes/keyword-strategy.ts` (table-first fallback retained for legacy blobs), including shell-state patch behavior.
+
+Bug hardening included:
+- Verified and hardened duplicate-keyword writes by deduping cannibalization batches before insert (case-insensitive, last keyword wins), preventing PK collisions during replace-all writes.
+- Added strict `PATCH /api/webflow/keyword-strategy/:workspaceId` cannibalization payload validation plus integration coverage to prevent malformed payloads from mutating table state.
+
+**Agency value:** Cannibalization findings are now queryable/indexed independently and no longer require full strategy-blob rewrites.
+
+**Client value:** Strategy API responses keep the same `cannibalization` shape while shifting to durable table-backed storage.
+
+**Mutual:** Adds direct unit coverage for cannibalization table CRUD + blob migration, plus integration coverage for shell-state patch/validation behavior.
+
+**Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.

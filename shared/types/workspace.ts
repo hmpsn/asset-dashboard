@@ -147,6 +147,7 @@ export interface KeywordStrategy {
   }[];
   /** Stored separately in the topic_clusters table; omitted in the workspace JSON blob. */
   topicClusters?: TopicCluster[];         // topical authority clusters
+  /** Stored separately in the cannibalization_issues table; omitted in the workspace JSON blob. */
   cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
