@@ -4,7 +4,7 @@ import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
   Copy, Check, FileText, Sparkles, Maximize2,
 } from 'lucide-react';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
@@ -21,6 +21,11 @@ import {
   type PageData,
   type SitemapPage,
 } from './page-rewrite-chat/pageRewriteChatModel';
+import {
+  buildDocHtml,
+  serializeDocToDocx,
+  serializeDocToMarkdown,
+} from './page-rewrite-chat/pageRewriteChatDocument';
 
 interface Props {
   workspaceId: string;
@@ -230,38 +235,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     setTimeout(() => comboInputRef.current?.focus(), 0);
   };
 
-  const buildDocHtml = (data: PageData): string => {
-    // Server text may contain raw HTML entities (&#x27;, &amp;) — decode first, then re-escape for safe innerHTML
-    const decodeEntities = (s: string) => { const el = document.createElement('span'); el.innerHTML = s; return el.textContent || s; };
-    const escHtml = (s: string) => decodeEntities(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    const bodyP = (body: string, extraClass = '') =>
-      body ? `<p class="text-[13px] text-slate-500 leading-[1.7] mb-3${extraClass ? ' ' + extraClass : ''}">${escHtml(body)}</p>` : ''; // arbitrary-text-ok
-
-    const parts: string[] = [
-      `<h1 data-section="${escHtml(toSectionSlug(data.title))}" class="text-[20px] font-bold text-slate-100 mb-3">${escHtml(data.title)}</h1>`, // arbitrary-text-ok
-    ];
-
-    // Render preamble paragraphs (text before the first heading on the page)
-    if (data.preamble) parts.push(bodyP(data.preamble));
-
-    for (const section of data.sections) {
-      const slug = toSectionSlug(section.heading);
-      if (section.level === 1) {
-        parts.push(`<h1 data-section="${escHtml(slug)}" class="text-[20px] font-bold text-slate-100 mb-2 mt-5">${escHtml(section.heading)}</h1>${bodyP(section.body)}`); // arbitrary-text-ok
-      } else if (section.level === 2) {
-        parts.push(`<h2 data-section="${escHtml(slug)}" class="text-[15px] font-semibold text-slate-300 mb-2 mt-5">${escHtml(section.heading)}</h2>${bodyP(section.body)}`); // arbitrary-text-ok
-      } else if (section.level === 3) {
-        parts.push(`<h3 data-section="${escHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">${escHtml(section.heading)}</h3>${bodyP(section.body, 'ml-3')}`); // arbitrary-text-ok
-      } else {
-        const extraIndent = (section.level - 3) * 12;
-        parts.push(`<h4 data-section="${escHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style="margin-left:${12 + extraIndent}px">${escHtml(section.heading)}</h4>${bodyP(section.body, `ml-[${12 + extraIndent}px]`)}`); // arbitrary-text-ok
-      }
-    }
-
-    return parts.join('');
-  };
-
   // execCommand-ok: no replacement for contenteditable bold/italic in 2026
   const execFormat = (command: string) => {
     docBodyRef.current?.focus();
@@ -343,125 +316,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     }, 2000);
   };
 
-  const serializeDocToMarkdown = (): string => {
-    const docBody = docBodyRef.current;
-    if (!docBody) return '';
-    const lines: string[] = [];
-
-    if (pageData && pageData.issues.length > 0) {
-      lines.push('## Issues\n');
-      pageData.issues.forEach(issue => lines.push(`- [${issue.severity}] ${issue.message}`));
-      lines.push('');
-    }
-
-    const walk = (node: Node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = (node.textContent || '').trim();
-        if (text) lines.push(`${text}\n`);
-        return;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return;
-      const el = node as Element;
-      const tag = el.tagName.toLowerCase();
-      if (tag === 'h1') { lines.push(`# ${el.textContent?.trim()}\n`); return; }
-      if (tag === 'h2') { lines.push(`\n## ${el.textContent?.trim()}\n`); return; }
-      if (tag === 'h3') { lines.push(`\n### ${el.textContent?.trim()}\n`); return; }
-      if (tag === 'h4') { lines.push(`\n#### ${el.textContent?.trim()}\n`); return; }
-      if (tag === 'p') {
-        const parts: string[] = [];
-        el.childNodes.forEach(child => {
-          if (child.nodeType === Node.TEXT_NODE) { parts.push(child.textContent || ''); }
-          else if (child.nodeType === Node.ELEMENT_NODE) {
-            const c = child as Element;
-            if (c.tagName === 'STRONG' || c.tagName === 'B') parts.push(`**${c.textContent}**`);
-            else if (c.tagName === 'EM' || c.tagName === 'I') parts.push(`*${c.textContent}*`);
-            else parts.push(c.textContent || '');
-          }
-        });
-        const text = parts.join('').trim();
-        if (text) lines.push(`${text}\n`);
-        return;
-      }
-      el.childNodes.forEach(walk);
-    };
-
-    docBody.childNodes.forEach(walk);
-    return lines.join('\n');
-  };
-
-  const serializeDocToDocx = (): Paragraph[] => {
-    const docBody = docBodyRef.current;
-    const paragraphs: Paragraph[] = [];
-
-    // Severity label colors for the Issues section
-    const severityColor: Record<string, string> = { error: 'DC2626', warning: 'D97706', info: '2563EB' };
-
-    if (pageData && pageData.issues.length > 0) {
-      paragraphs.push(new Paragraph({ text: 'SEO Issues', heading: HeadingLevel.HEADING_2 }));
-      pageData.issues.forEach(issue => {
-        const color = severityColor[issue.severity] ?? '6B7280';
-        paragraphs.push(new Paragraph({
-          bullet: { level: 0 },
-          children: [
-            new TextRun({ text: issue.severity.toUpperCase(), bold: true, color, size: 20 }),
-            new TextRun({ text: `  ${issue.message}`, size: 22 }),
-          ],
-        }));
-      });
-      // Spacer after issues section
-      paragraphs.push(new Paragraph({ text: '' }));
-    }
-
-    if (!docBody) return paragraphs;
-
-    const headingLevel = (tag: string): typeof HeadingLevel[keyof typeof HeadingLevel] | null => {
-      if (tag === 'h1') return HeadingLevel.HEADING_1;
-      if (tag === 'h2') return HeadingLevel.HEADING_2;
-      if (tag === 'h3') return HeadingLevel.HEADING_3;
-      if (tag === 'h4') return HeadingLevel.HEADING_4;
-      return null;
-    };
-
-    const walk = (node: Node) => {
-      if (node.nodeType !== Node.ELEMENT_NODE) return;
-      const el = node as Element;
-      const tag = el.tagName.toLowerCase();
-      const level = headingLevel(tag);
-      if (level) {
-        paragraphs.push(new Paragraph({ text: el.textContent?.trim() || '', heading: level }));
-        return;
-      }
-      if (tag === 'p') {
-        const runs: TextRun[] = [];
-        el.childNodes.forEach(child => {
-          if (child.nodeType === Node.TEXT_NODE) {
-            runs.push(new TextRun({ text: child.textContent || '', size: 24 }));
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            const c = child as Element;
-            const ctag = c.tagName;
-            runs.push(new TextRun({
-              text: c.textContent || '',
-              size: 24,
-              bold: ctag === 'STRONG' || ctag === 'B',
-              italics: ctag === 'EM' || ctag === 'I',
-            }));
-          }
-        });
-        if (runs.length) {
-          paragraphs.push(new Paragraph({
-            children: runs,
-            spacing: { after: 160 },
-          }));
-        }
-        return;
-      }
-      el.childNodes.forEach(walk);
-    };
-
-    docBody.childNodes.forEach(walk);
-    return paragraphs;
-  };
-
   const handleExport = (mode: 'copy' | 'download' | 'docx') => {
     const slug = (pageData?.slug || 'page').replace(/\//g, '-').replace(/^-/, '');
     if (mode === 'docx') {
@@ -500,7 +354,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
             },
           },
-          children: serializeDocToDocx(),
+          children: serializeDocToDocx(docBodyRef.current, pageData),
         }],
       });
       Packer.toBlob(doc).then(blob => {
@@ -518,7 +372,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       });
       return;
     }
-    const md = serializeDocToMarkdown();
+    const md = serializeDocToMarkdown(docBodyRef.current, pageData);
     if (mode === 'copy') {
       navigator.clipboard.writeText(md);
     } else {

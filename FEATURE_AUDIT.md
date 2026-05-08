@@ -5107,3 +5107,23 @@ Bug sniffing hardening included: URL mode detection now trims whitespace before 
 **Mutual:** Adds phase-1 source contract guardrails plus unit coverage so model/helper ownership cannot drift back into the monolith.
 
 **Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatModel.ts`; `tests/unit/page-rewrite-chat-model.test.ts`; `tests/contract/page-rewrite-chat-phase1-model-extraction.test.ts`; `data/roadmap.json`.
+
+### 386. Platform Consolidation — PageRewriteChat Document Helpers Extraction (Phase 2)
+**What it does:** Continues `PageRewriteChat` decomposition by extracting document-focused helper logic from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatDocument.ts`.
+
+The extracted module now owns:
+- editable document HTML assembly (`buildDocHtml`)
+- markdown export serialization (`serializeDocToMarkdown`)
+- DOCX paragraph serialization (`serializeDocToDocx`)
+
+`PageRewriteChat.tsx` remains the public entrypoint and now imports these document helpers while staying focused on orchestration and UI composition.
+
+Bug sniffing hardening included: deep nested heading body paragraphs now use explicit inline `margin-left` styles in generated document HTML (instead of dynamic Tailwind class fragments that do not materialize at runtime), preserving visual indentation for level-4+ sections.
+
+**Agency value:** Removes a large block of high-churn document transformation logic from the root shell and creates a clean seam for subsequent pane/component extraction.
+
+**Client value:** No API/UX contract changes; export and editing behavior remain intact with improved nested-section indentation consistency.
+
+**Mutual:** Adds phase-2 source contract guardrails plus serializer coverage so document helper ownership cannot drift back into the monolith.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatDocument.ts`; `tests/unit/rewrite-export-serializer.test.ts`; `tests/contract/page-rewrite-chat-phase2-document-extraction.test.ts`; `data/roadmap.json`.
