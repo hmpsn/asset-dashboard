@@ -1,48 +1,22 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mic, Loader2 } from 'lucide-react';
-import { queryKeys } from '../../lib/queryKeys';
-import { voice } from '../../api/brand-engine';
 import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button } from '../ui';
-import { useToast } from '../Toast';
 import { DNASection } from './voice-tab/DNASection';
 import { SamplesSection } from './voice-tab/SamplesSection';
 import { GuardrailsSection } from './voice-tab/GuardrailsSection';
 import { CalibrationSection } from './voice-tab/CalibrationSection';
-
-type VoiceSection = 'samples' | 'dna' | 'guardrails' | 'calibration';
+import { VOICE_TAB_SECTIONS, useVoiceTabShell } from './voice-tab/useVoiceTabShell';
+import type { VoiceSection } from './voice-tab/useVoiceTabShell';
 
 export function VoiceTab({ workspaceId }: { workspaceId: string }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<VoiceSection>('samples');
-
-  const { data: profile, isLoading } = useQuery({
-    queryKey: queryKeys.admin.voiceProfile(workspaceId),
-    queryFn: () => voice.getProfile(workspaceId),
-  });
-
-  const createProfileMutation = useMutation({
-    mutationFn: () => voice.createProfile(workspaceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
-      toast('Voice profile created');
-    },
-    onError: () => {
-      toast('Failed to create voice profile', 'error');
-    },
-  });
-
-  const invalidateProfile = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
-  };
-
-  const sections: { id: string; label: string }[] = [
-    { id: 'samples', label: 'Samples' },
-    { id: 'dna', label: 'Voice DNA' },
-    { id: 'guardrails', label: 'Guardrails' },
-    { id: 'calibration', label: 'Calibration' },
-  ];
+  const {
+    profile,
+    isLoading,
+    activeSection,
+    setActiveSection,
+    createProfile,
+    isCreatingProfile,
+    invalidateProfile,
+  } = useVoiceTabShell(workspaceId);
 
   if (isLoading) {
     return (
@@ -72,14 +46,14 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
           action={
             <Button
               type="button"
-              onClick={() => createProfileMutation.mutate()}
-              disabled={createProfileMutation.isPending}
+              onClick={createProfile}
+              disabled={isCreatingProfile}
               variant="primary"
               size="sm"
-              icon={createProfileMutation.isPending ? Loader2 : undefined}
-              loading={createProfileMutation.isPending}
+              icon={isCreatingProfile ? Loader2 : undefined}
+              loading={isCreatingProfile}
             >
-              {createProfileMutation.isPending ? 'Creating…' : 'Create voice profile'}
+              {isCreatingProfile ? 'Creating…' : 'Create voice profile'}
             </Button>
           }
         />
@@ -94,7 +68,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     >
       {/* tab-deeplink-ok: VoiceTab section tabs are local panel state, not route deep-link tabs */}
       <TabBar
-        tabs={sections}
+        tabs={VOICE_TAB_SECTIONS}
         active={activeSection}
         onChange={id => setActiveSection(id as VoiceSection)}
         className="mb-5"
