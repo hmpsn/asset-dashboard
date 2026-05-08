@@ -42,6 +42,24 @@ interface PostRow {
   updated_at: string;
 }
 
+interface PublishedMonthCountRow {
+  month: string;
+  cnt: number;
+}
+
+export interface PublishedMonthCount {
+  month: string; // YYYY-MM
+  published: number;
+}
+
+export interface ContentVelocityTrend {
+  monthly: PublishedMonthCount[];
+  currentMonthPublished: number;
+  trailingThreeMonthAvg: number;
+  previousThreeMonthAvg: number;
+  trendPct: number | null;
+}
+
 // ── Version history types ──
 
 export interface PostVersion {
@@ -170,6 +188,15 @@ const stmts = createStmtCache(() => ({
   deleteById: db.prepare(
     `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
   ),
+  selectPublishedByMonth: db.prepare<[workspaceId: string, startMonth: string]>(
+    `SELECT substr(published_at, 1, 7) AS month, COUNT(*) AS cnt
+       FROM content_posts
+      WHERE workspace_id = ?
+        AND published_at IS NOT NULL
+        AND substr(published_at, 1, 7) >= ?
+      GROUP BY substr(published_at, 1, 7)
+      ORDER BY month ASC`,
+  ),
 }));
 
 function rowToPost(row: PostRow): GeneratedPost {
@@ -240,6 +267,54 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
 export function listPosts(workspaceId: string): GeneratedPost[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
   return rows.map(rowToPost);
+}
+
+function monthKeys(now: Date, months: number): string[] {
+  const keys: string[] = [];
+  const current = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - i, 1));
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    keys.push(`${y}-${m}`);
+  }
+  return keys;
+}
+
+export function getPublishedPostCountsByMonth(
+  workspaceId: string,
+  months = 6,
+  now = new Date(),
+): PublishedMonthCount[] {
+  const span = Math.max(1, months);
+  const keys = monthKeys(now, span);
+  const startMonth = keys[0];
+  const rows = stmts().selectPublishedByMonth.all(workspaceId, startMonth) as PublishedMonthCountRow[];
+  const byMonth = new Map(rows.map(r => [r.month, r.cnt]));
+  return keys.map(month => ({ month, published: byMonth.get(month) ?? 0 }));
+}
+
+export function getContentVelocityTrend(
+  workspaceId: string,
+  months = 6,
+  now = new Date(),
+): ContentVelocityTrend {
+  const monthly = getPublishedPostCountsByMonth(workspaceId, months, now);
+  const trailing = monthly.slice(-3);
+  const previous = monthly.length >= 6 ? monthly.slice(-6, -3) : [];
+  const trailingThreeMonthAvg = trailing.reduce((sum, m) => sum + m.published, 0) / Math.max(1, trailing.length);
+  const previousThreeMonthAvg = previous.reduce((sum, m) => sum + m.published, 0) / Math.max(1, previous.length);
+  const trendPct = previousThreeMonthAvg > 0
+    ? Math.round(((trailingThreeMonthAvg - previousThreeMonthAvg) / previousThreeMonthAvg) * 100)
+    : null;
+
+  return {
+    monthly,
+    currentMonthPublished: monthly.length > 0 ? monthly[monthly.length - 1].published : 0,
+    trailingThreeMonthAvg: Number(trailingThreeMonthAvg.toFixed(1)),
+    previousThreeMonthAvg: Number(previousThreeMonthAvg.toFixed(1)),
+    trendPct,
+  };
 }
 
 export function getPost(workspaceId: string, postId: string): GeneratedPost | undefined {

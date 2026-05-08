@@ -8,6 +8,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
 import {
+  getContentVelocityTrend,
+  getPublishedPostCountsByMonth,
   listPosts,
   getPost,
   savePost,
@@ -111,6 +113,82 @@ describe('listPosts', () => {
     expect(posts).toHaveLength(2);
     expect(posts[0].id).toBe('post_new');
     expect(posts[1].id).toBe('post_old');
+  });
+});
+
+// ── content velocity ──
+
+describe('content velocity metrics', () => {
+  const wsId = 'ws_post_velocity_' + Date.now();
+
+  afterAll(() => cleanupWorkspace(wsId));
+
+  function savePublishedPost(id: string, workspaceId: string, publishedAt: string) {
+    const post = makePost(id, workspaceId);
+    savePost(workspaceId, post);
+    post.publishedAt = publishedAt;
+    savePost(workspaceId, post);
+  }
+
+  it('returns month-by-month published counts with zero-filled gaps', () => {
+    savePublishedPost('post_pub_1', wsId, '2026-01-12T10:00:00Z');
+    savePublishedPost('post_pub_2', wsId, '2026-03-05T10:00:00Z');
+    savePublishedPost('post_pub_3', wsId, '2026-03-21T10:00:00Z');
+    savePublishedPost('post_pub_4', wsId, '2026-05-02T10:00:00Z');
+
+    const counts = getPublishedPostCountsByMonth(wsId, 6, new Date('2026-05-20T00:00:00Z'));
+    expect(counts).toEqual([
+      { month: '2025-12', published: 0 },
+      { month: '2026-01', published: 1 },
+      { month: '2026-02', published: 0 },
+      { month: '2026-03', published: 2 },
+      { month: '2026-04', published: 0 },
+      { month: '2026-05', published: 1 },
+    ]);
+  });
+
+  it('computes trailing trend percent from previous three-month baseline', () => {
+    const wsIdTrend = `ws_post_velocity_trend_${Date.now()}`;
+    savePublishedPost('post_pub_trend_1', wsIdTrend, '2026-01-12T10:00:00Z');
+    savePublishedPost('post_pub_trend_2', wsIdTrend, '2026-03-05T10:00:00Z');
+    savePublishedPost('post_pub_trend_3', wsIdTrend, '2026-03-21T10:00:00Z');
+    savePublishedPost('post_pub_trend_4', wsIdTrend, '2026-05-02T10:00:00Z');
+
+    const trend = getContentVelocityTrend(wsIdTrend, 6, new Date('2026-05-20T00:00:00Z'));
+    expect(trend.currentMonthPublished).toBe(1);
+    expect(trend.trailingThreeMonthAvg).toBe(1.0);
+    expect(trend.previousThreeMonthAvg).toBeCloseTo(0.3, 1);
+    expect(trend.trendPct).toBe(200);
+
+    cleanupWorkspace(wsIdTrend);
+  });
+
+  it('returns null trend when previous baseline is zero', () => {
+    const wsIdZero = `ws_post_velocity_zero_${Date.now()}`;
+    savePublishedPost('post_pub_recent', wsIdZero, '2026-05-10T10:00:00Z');
+
+    const trend = getContentVelocityTrend(wsIdZero, 6, new Date('2026-05-20T00:00:00Z'));
+    expect(trend.previousThreeMonthAvg).toBe(0);
+    expect(trend.trendPct).toBeNull();
+
+    cleanupWorkspace(wsIdZero);
+  });
+
+  it('returns null trend when fewer than six months are requested', () => {
+    const wsIdShortWindow = `ws_post_velocity_short_${Date.now()}`;
+    savePublishedPost('post_pub_short_1', wsIdShortWindow, '2026-03-10T10:00:00Z');
+    savePublishedPost('post_pub_short_2', wsIdShortWindow, '2026-05-10T10:00:00Z');
+
+    const trend = getContentVelocityTrend(wsIdShortWindow, 3, new Date('2026-05-20T00:00:00Z'));
+    expect(trend.monthly).toEqual([
+      { month: '2026-03', published: 1 },
+      { month: '2026-04', published: 0 },
+      { month: '2026-05', published: 1 },
+    ]);
+    expect(trend.previousThreeMonthAvg).toBe(0);
+    expect(trend.trendPct).toBeNull();
+
+    cleanupWorkspace(wsIdShortWindow);
   });
 });
 

@@ -15,6 +15,7 @@ import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
 import { loadDecayAnalysis } from '../content-decay.js';
+import { getContentVelocityTrend } from '../content-posts.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('workspace-home');
@@ -50,6 +51,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     comparison,
     matrices,
     templates,
+    contentVelocity,
   ] = await Promise.all([
     safe(Promise.resolve(getLatestRanks(req.params.id)), []),
     safe(Promise.resolve(listRequests(req.params.id)), []),
@@ -69,6 +71,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
       : Promise.resolve(null),
     safe(Promise.resolve(listMatrices(req.params.id)), []),
     safe(Promise.resolve(listTemplates(req.params.id)), []),
+    safe(Promise.resolve(getContentVelocityTrend(req.params.id)), null),
   ]);
 
   // Content decay — synchronous SQLite read, wrapped for safety
@@ -112,6 +115,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     ga4Data,
     comparison,
     contentPipeline,
+    contentVelocity,
     contentDecay,
     weeklySummary: weeklyTotal > 0 ? weeklySummary : null,
   });
