@@ -5070,3 +5070,20 @@ Bug sniffing hardening included: phase-1 source contract expectations were updat
 **Mutual:** Adds phase-6 source contract guardrails so the collections/item render monolith cannot silently drift back into `CmsEditor.tsx`.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorCollections.tsx`; `tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `data/roadmap.json`.
+
+### 384. Platform Consolidation — CmsEditor Shell Panel + Save Workflow Cleanup (Phase 7)
+**What it does:** Completes the remaining CmsEditor root-shell decomposition by extracting:
+- shell chrome composition (`header`, bulk rewrite status/results, approval and AI errors, pending approvals panel, edit-status summary, and search input) into `src/components/cms-editor/CmsEditorShellPanels.tsx`
+- per-item save mutation orchestration into `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`
+
+`CmsEditor.tsx` now stays composition-first and wires extracted modules/hooks while preserving behavior and public entrypoint stability.
+
+Bug sniffing hardening included: added explicit guard coverage for the no-edit save path so `saveItem` does not call the Webflow patch endpoint when no edit payload exists for a selected item.
+
+**Agency value:** Finishes the CmsEditor monolith split with clearer ownership boundaries between orchestration, shell presentation, and mutation workflows.
+
+**Client value:** No API/UX contract changes; editor behavior remains stable with stronger save-path safety checks.
+
+**Mutual:** Adds phase-7 source contract guardrails and save-hook unit coverage so shell/save logic cannot drift back into the root monolith.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorShellPanels.tsx`; `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`; `tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`; `tests/unit/cms-editor-save-workflow.test.ts`; `data/roadmap.json`.
