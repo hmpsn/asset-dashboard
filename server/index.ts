@@ -54,6 +54,10 @@ migrateContentGapsFromJsonBlob();
 import { migrateFromJsonBlob as migrateQuickWinsFromJsonBlob } from './quick-wins.js';
 migrateQuickWinsFromJsonBlob();
 
+// Migrate keywordStrategy.keywordGaps from workspace JSON blobs into the keyword_gaps table (idempotent)
+import { migrateFromJsonBlob as migrateKeywordGapsFromJsonBlob } from './keyword-gaps.js';
+migrateKeywordGapsFromJsonBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

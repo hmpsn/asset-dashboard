@@ -15,12 +15,13 @@ import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { listContentGaps, replaceAllContentGaps } from '../content-gaps.js';
 import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
+import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordStrategy, ContentGap, QuickWin } from '../../shared/types/workspace.js';
+import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
@@ -51,18 +52,26 @@ function serializeKeywordStrategy(
   pageMap: ReturnType<typeof listPageKeywords>,
   contentGaps: ContentGap[],
   quickWins: QuickWin[],
+  keywordGaps: KeywordGapItem[],
 ) {
-  // Strip any stale `contentGaps` / `quickWins` left in the blob in favor of
+  // Strip any stale table-backed fields left in the blob in favor of
   // the table-backed sources —
   // the migration on startup removes it from the blob, but be defensive
   // against callers that still mutate the blob in-memory.
-  const { semrushMode, contentGaps: _staleGaps, quickWins: _staleQuickWins, ...rest } = strategy;
+  const {
+    semrushMode,
+    contentGaps: _staleGaps,
+    quickWins: _staleQuickWins,
+    keywordGaps: _staleKeywordGaps,
+    ...rest
+  } = strategy;
   return {
     ...rest,
     seoDataMode: strategy.seoDataMode ?? semrushMode ?? 'none',
     pageMap,
     contentGaps,
     quickWins,
+    keywordGaps,
   };
 }
 
@@ -161,7 +170,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
   const contentGaps = listContentGaps(ws.id);
   const quickWinsFromTable = listQuickWins(ws.id);
   const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
-  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0) return res.json(null);
+  const keywordGapsFromTable = listKeywordGaps(ws.id);
+  const keywordGaps = keywordGapsFromTable.length > 0 ? keywordGapsFromTable : (strategy?.keywordGaps || []);
+  if (!strategy && pageMap.length === 0 && contentGaps.length === 0 && quickWins.length === 0 && keywordGaps.length === 0) return res.json(null);
   if (!strategy) {
     return res.json({
       siteKeywords: [],
@@ -169,10 +180,11 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       pageMap,
       contentGaps,
       quickWins,
+      keywordGaps,
       generatedAt: null,
     });
   }
-  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins));
+  res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps));
 });
 
 // Get strategy diff (compare current vs previous)
@@ -251,6 +263,13 @@ const patchStrategySchema = z.object({
     rationale: z.string().optional(),
     roiScore: z.number().optional(),
   }).strict()).optional(),
+  keywordGaps: z.array(z.object({
+    keyword: z.string(),
+    volume: z.number(),
+    difficulty: z.number(),
+    competitorPosition: z.number(),
+    competitorDomain: z.string(),
+  }).strict()).optional(),
   opportunities: z.array(z.string()).optional(),
 }).strict();
 
@@ -276,13 +295,17 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   if (Array.isArray(req.body.quickWins)) {
     replaceAllQuickWins(ws.id, req.body.quickWins as QuickWin[]);
   }
+  // If keywordGaps is being updated, save to dedicated table (replace-all semantics).
+  if (Array.isArray(req.body.keywordGaps)) {
+    replaceAllKeywordGaps(ws.id, req.body.keywordGaps as KeywordGapItem[]);
+  }
   // Save non-pageMap, non-contentGaps fields to workspace blob.
   // Guard: if the workspace has no existing strategy blob AND the patch only updates
-  // table-backed fields (pageMap/contentGaps/quickWins), don't silently fabricate a
+  // table-backed fields (pageMap/contentGaps/quickWins/keywordGaps), don't silently fabricate a
   // blob with just a timestamp — that would promote a shell-state workspace to a
   // "real" strategy without any AI-generated content. This matters for callers
   // like PageIntelligence that only patch pageMap.
-  const { pageMap: _pm, contentGaps: _cg, quickWins: _qw, ...rest } = req.body;
+  const { pageMap: _pm, contentGaps: _cg, quickWins: _qw, keywordGaps: _kg, ...rest } = req.body;
   const hasBlobFields = Object.keys(rest).length > 0;
   const blobExists = ws.keywordStrategy != null;
   let updated: KeywordStrategy | null = null;
@@ -299,10 +322,11 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       ...rest,
       generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
     } as KeywordStrategy;
-    // Strip any stray `contentGaps` / `quickWins` from the merged blob — the table is the
-    // source of truth post-#365 normalization.
+    // Strip any stray table-backed fields from the merged blob — the tables are
+    // the source of truth post-normalization.
     delete (updated as { contentGaps?: unknown }).contentGaps;
     delete (updated as { quickWins?: unknown }).quickWins;
+    delete (updated as { keywordGaps?: unknown }).keywordGaps;
     updateWorkspace(ws.id, { keywordStrategy: updated });
   }
   invalidateIntelligenceCache(ws.id);
@@ -312,6 +336,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   const responsePageMap = listPageKeywords(ws.id);
   const responseContentGaps = listContentGaps(ws.id);
   const responseQuickWins = listQuickWins(ws.id);
+  const responseKeywordGaps = listKeywordGaps(ws.id);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: responsePageMap.length,
     siteKeywords: updated?.siteKeywords?.length ?? 0,
@@ -326,7 +351,13 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   // surface a synthesized shell (same shape as GET) so the client can render pageMap
   // without assuming a real strategy.
   if (updated) {
-    res.json({ ...updated, pageMap: responsePageMap, contentGaps: responseContentGaps, quickWins: responseQuickWins });
+    res.json({
+      ...updated,
+      pageMap: responsePageMap,
+      contentGaps: responseContentGaps,
+      quickWins: responseQuickWins,
+      keywordGaps: responseKeywordGaps,
+    });
   } else {
     res.json({
       siteKeywords: [],
@@ -334,6 +365,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
       pageMap: responsePageMap,
       contentGaps: responseContentGaps,
       quickWins: responseQuickWins,
+      keywordGaps: responseKeywordGaps,
       generatedAt: null,
     });
   }
