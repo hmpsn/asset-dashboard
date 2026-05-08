@@ -5087,3 +5087,23 @@ Bug sniffing hardening included: added explicit guard coverage for the no-edit s
 **Mutual:** Adds phase-7 source contract guardrails and save-hook unit coverage so shell/save logic cannot drift back into the root monolith.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorShellPanels.tsx`; `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`; `tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`; `tests/unit/cms-editor-save-workflow.test.ts`; `data/roadmap.json`.
+
+### 385. Platform Consolidation — PageRewriteChat Contracts + Shared Model Extraction (Phase 1)
+**What it does:** Starts `PageRewriteChat` decomposition by extracting shared contracts/constants/pure helpers from `src/components/PageRewriteChat.tsx` into `src/components/page-rewrite-chat/pageRewriteChatModel.ts`.
+
+The extracted module now owns:
+- rewrite-chat data contracts (`PageData`, `PageSection`, `SeoIssue`, `SitemapPage`, `ChatMessage`)
+- shared constants (`HEADING_CLASSES`, `QUICK_PROMPTS`)
+- pure helpers (`createRewriteSessionId`, `toSectionSlug`, `getIndentLevel`, `isUrlQuery`)
+
+`PageRewriteChat.tsx` remains the public entrypoint and now imports these contracts/helpers to keep the root shell focused on composition and workflow orchestration.
+
+Bug sniffing hardening included: URL mode detection now trims whitespace before protocol checks, so pasted URLs with leading spaces still take the URL load path.
+
+**Agency value:** Establishes a stable extraction seam for later `PageRewriteChat` phases and reduces root-shell drift risk.
+
+**Client value:** No UI/API contract changes; behavior remains stable with improved URL-input robustness.
+
+**Mutual:** Adds phase-1 source contract guardrails plus unit coverage so model/helper ownership cannot drift back into the monolith.
+
+**Files:** `src/components/PageRewriteChat.tsx`; `src/components/page-rewrite-chat/pageRewriteChatModel.ts`; `tests/unit/page-rewrite-chat-model.test.ts`; `tests/contract/page-rewrite-chat-phase1-model-extraction.test.ts`; `data/roadmap.json`.

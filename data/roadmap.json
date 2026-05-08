@@ -656,6 +656,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase7`. Extracted root shell chrome (header actions, bulk rewrite state UI, approval/error panels, tracking summary, search bar) from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorShellPanels.tsx`, and moved per-item save mutation orchestration into `src/components/cms-editor/useCmsEditorSaveWorkflow.ts`. `CmsEditor.tsx` now stays composition-first (220 lines) and wires extracted modules plus existing workflow hooks. Bug sniffing hardening included: added unit coverage for the no-edit early-return guard in save workflow so API calls are blocked when no editable payload exists for an item. Added phase-7 source contract guardrails (`tests/contract/cms-editor-phase7-shell-save-cleanup.test.ts`) and dedicated save workflow unit coverage (`tests/unit/cms-editor-save-workflow.test.ts`). This closes the remaining CmsEditor decomposition surface for this sprint."
         },
         {
+          "id": "platform-consolidation-page-rewrite-chat-decomp-phase1",
+          "title": "PageRewriteChat monolith decomposition - phase 1 contracts + shared model extraction",
+          "source": "Loop follow-up after CmsEditor phase 7 merge",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/page-rewrite-chat-decomp-phase1`. Extracted PageRewriteChat contracts/constants/pure helpers into `src/components/page-rewrite-chat/pageRewriteChatModel.ts` (page/chat/sitemap types, heading-class map, quick prompts, section-slug/indent helpers, URL-query detection helper, session-id builder) and rewired `src/components/PageRewriteChat.tsx` to consume the module while preserving behavior. Bug sniffing hardening included: URL query detection now trims whitespace before checking protocol prefixes, and URL load call sites pass `comboQuery.trim()` to keep the URL path explicit. Added unit coverage (`tests/unit/page-rewrite-chat-model.test.ts`) and source-contract guardrails (`tests/contract/page-rewrite-chat-phase1-model-extraction.test.ts`) to prevent model/helper drift back into the root shell."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",
