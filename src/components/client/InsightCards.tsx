@@ -410,7 +410,6 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
   const alerts = insights.filter(i => i.insightType === 'competitor_alert') as AnalyticsInsight<'competitor_alert'>[];
   const topAlert = alerts[0];
   const data = topAlert?.data as CompetitorAlertData | undefined;
-  if (!loading && !topAlert && tier !== 'free') return null;
   return (
     <SectionCard
       title="Competitor Alerts"
@@ -458,7 +457,6 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
   const emerging = insights.filter(i => i.insightType === 'emerging_keyword') as AnalyticsInsight<'emerging_keyword'>[];
   const top = emerging[0];
   const data = top?.data as EmergingKeywordData | undefined;
-  if (!loading && !top && tier !== 'free') return null;
   return (
     <SectionCard
       title="Rising Search Trends"
@@ -512,7 +510,6 @@ function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsIn
   const stale = insights.filter(i => i.insightType === 'freshness_alert') as AnalyticsInsight<'freshness_alert'>[];
   const worst = [...stale].sort((a, b) => b.data.daysSinceLastAnalysis - a.data.daysSinceLastAnalysis)[0];
   const data = worst?.data as FreshnessAlertData | undefined;
-  if (!loading && !worst && tier !== 'free') return null;
   return (
     <SectionCard
       title="Content Freshness"
