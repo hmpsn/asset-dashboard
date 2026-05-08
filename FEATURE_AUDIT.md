@@ -5383,3 +5383,29 @@ Bug hardening included:
 **Mutual:** Adds direct unit coverage for cannibalization table CRUD + blob migration, plus integration coverage for shell-state patch/validation behavior.
 
 **Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
+
+### 397. Hardening Sprint — Per-Feature Usage Budget Split
+**What it does:** Splits the previously shared `strategy_generations` monthly budget into dedicated feature pools so different AI workflows no longer cannibalize each other.
+
+Key changes:
+- Added two usage-tracking feature keys in `server/usage-tracking.ts`:
+  - `alt_text_generations`
+  - `workspace_context_generations`
+- Kept `strategy_generations` as the keyword-strategy-only budget.
+- Rewired AI usage checks to the new pools:
+  - `server/routes/webflow-alt-text.ts` now uses `alt_text_generations` for single and bulk alt-text generation.
+  - `server/workspace-context-generation-job.ts` now uses `workspace_context_generations` for brand voice / knowledge base / personas generation jobs.
+- Expanded usage contract coverage:
+  - `tests/unit/usage-tracking.test.ts` now asserts limits and summaries for the new keys.
+  - `tests/integration/tier-gate-enforcement.test.ts` now asserts per-tier usage endpoint payload includes the new pools.
+
+Bug hardening included:
+- Verified all paired refund paths (`decrementUsage`) moved with their corresponding reservation checks to avoid budget leaks or incorrect refunds after the split.
+
+**Agency value:** Prevents support churn from “wrong feature exhausted my quota” reports and makes usage controls easier to reason about by feature.
+
+**Client value:** Running brand-context generation no longer unexpectedly blocks alt-text work (and vice versa) under growth-tier monthly limits.
+
+**Mutual:** Preserves existing keyword-strategy limits while reducing cross-feature coupling in billing/usage behavior.
+
+**Files:** `server/usage-tracking.ts`; `server/routes/webflow-alt-text.ts`; `server/workspace-context-generation-job.ts`; `tests/unit/usage-tracking.test.ts`; `tests/integration/tier-gate-enforcement.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
