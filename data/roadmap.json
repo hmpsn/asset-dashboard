@@ -626,6 +626,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase4`. Extracted publish and bulk rewrite orchestration from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorPublishBulkWorkflow.ts`, including publish pending/success state, bulk mode/progress/result state, collection/item auto-expansion during bulk operations, and concurrency-limited bulk rewrite dispatch. `CmsEditor.tsx` now consumes the hook and keeps composition-only wiring for publish/bulk controls. Bug sniffing hardening included: bulk rewrite failure accounting now correctly tracks AI generation failures (not only thrown promise rejections) by having AI rewrite actions return explicit success booleans consumed by the bulk workflow. Added source-contract guardrails (`tests/contract/cms-editor-phase4-publish-bulk-hook-extraction.test.ts`) to lock the ownership boundary."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase5",
+          "title": "CmsEditor monolith decomposition - phase 5 shell state + session hook extraction",
+          "source": "Loop follow-up after CmsEditor phase 4",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase5`. Extracted root shell/session state ownership from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorShellState.ts`, including cache hydration/persistence for edits and expansion state, shell-local state for saving/saved/history/search/errors/preview, and shared toggles/update helpers. `CmsEditor.tsx` now consumes the hook and keeps composition/orchestration wiring. Bug sniffing hardening included: edits cache now persists even when empty, preventing stale cached edits from being resurrected after reset paths. Added source-contract and hook-behavior guardrails (`tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`, `tests/unit/cms-editor-shell-state-hook.test.ts`) to lock the new ownership boundary."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

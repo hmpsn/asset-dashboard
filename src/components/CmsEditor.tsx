@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
@@ -11,12 +11,12 @@ import { statusBorderClass } from './ui/statusConfig';
 import { patch } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
 import {
-  buildInitialEdits,
   buildItemApprovalMap,
   filterAndRankCollectionItems,
   getExtraSeoFields,
   getTitleAndDescriptionFields,
 } from './cms-editor/cmsEditorModel';
+import { useCmsEditorShellState } from './cms-editor/useCmsEditorShellState';
 import { useCmsEditorApprovalWorkflow } from './cms-editor/useCmsEditorApprovalWorkflow';
 import { useCmsEditorAiWorkflow } from './cms-editor/useCmsEditorAiWorkflow';
 import { useCmsEditorPublishBulkWorkflow } from './cms-editor/useCmsEditorPublishBulkWorkflow';
@@ -31,33 +31,31 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const collections = cmsData?.collections || [];
   const approvalBatches = cmsData?.approvalBatches || [];
 
-  // Session persistence: restore from sessionStorage (survives tab switches + refresh)
-  const restoredFromCache = useRef(false);
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
-    try { const raw = sessionStorage.getItem(`cms-editor-expanded-colls-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
-    return new Set();
-  });
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
-    try { const raw = sessionStorage.getItem(`cms-editor-expanded-items-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
-    return new Set();
-  });
-  const [edits, setEdits] = useState<Record<string, Record<string, string>>>(() => {
-    try {
-      const raw = sessionStorage.getItem(`cms-editor-edits-${siteId}`);
-      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
-    } catch { /* ignore */ }
-    return {};
-  });
-  const [dirty, setDirty] = useState<Set<string>>(() => {
-    try { const raw = sessionStorage.getItem(`cms-editor-dirty-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
-    return new Set();
-  });
-  const [saving, setSaving] = useState<Set<string>>(new Set());
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
+  const {
+    expandedCollections,
+    setExpandedCollections,
+    expandedItems,
+    setExpandedItems,
+    edits,
+    dirty,
+    setDirty,
+    saving,
+    setSaving,
+    saved,
+    setSaved,
+    historyExpanded,
+    search,
+    setSearch,
+    errors,
+    setErrors,
+    previewExpanded,
+    toggleCollection,
+    toggleItem,
+    toggleHistory,
+    togglePreview,
+    updateField,
+  } = useCmsEditorShellState({ siteId, collections });
+
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
   const {
     approvalSelected,
@@ -75,48 +73,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     collections,
     refreshStates,
   });
-  // Sync state to sessionStorage for persistence across tab switches + refresh
-  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`cms-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-colls-${siteId}`, JSON.stringify(Array.from(expandedCollections))); } catch { /* ignore */ } }, [expandedCollections, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-items-${siteId}`, JSON.stringify(Array.from(expandedItems))); } catch { /* ignore */ } }, [expandedItems, siteId]);
-  useEffect(() => { try { sessionStorage.setItem(`cms-editor-dirty-${siteId}`, JSON.stringify(Array.from(dirty))); } catch { /* ignore */ } }, [dirty, siteId]);
-
-  // Initialize edit state when collections data loads
-  useEffect(() => {
-    if (!collections.length) return;
-    // Skip re-initialization if restored from RQ cache (admin tab switch)
-    if (restoredFromCache.current) {
-      restoredFromCache.current = false;
-      return;
-    }
-    setEdits(buildInitialEdits(collections));
-    setDirty(new Set());
-    setSaved(new Set());
-  }, [collections]);
 
   // Build per-item approval lookup: itemId → approval items across all batches
   const itemApprovalMap = useMemo(() => {
     return buildItemApprovalMap(approvalBatches);
   }, [approvalBatches]);
-
-  const toggleHistory = (itemId: string) => {
-    setHistoryExpanded(prev => {
-      const n = new Set(prev);
-      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
-      return n;
-    });
-  };
-
-
-
-  const updateField = (itemId: string, fieldSlug: string, value: string) => {
-    setEdits(prev => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], [fieldSlug]: value },
-    }));
-    setDirty(prev => new Set(prev).add(itemId));
-    setSaved(prev => { const n = new Set(prev); n.delete(itemId); return n; });
-  };
 
   const {
     variations,
@@ -174,30 +135,6 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     } finally {
       setSaving(prev => { const n = new Set(prev); n.delete(itemId); return n; });
     }
-  };
-
-  const toggleCollection = (id: string) => {
-    setExpandedCollections(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  };
-
-  const toggleItem = (id: string) => {
-    setExpandedItems(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  };
-
-  const togglePreview = (itemId: string) => {
-    setPreviewExpanded(prev => {
-      const n = new Set(prev);
-      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
-      return n;
-    });
   };
 
   if (isLoading) {
