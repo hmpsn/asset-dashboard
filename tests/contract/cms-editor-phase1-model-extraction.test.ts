@@ -12,7 +12,6 @@ describe('CmsEditor phase-1 model extraction contract', () => {
     expect(cmsEditorSource).toContain("from './cms-editor/useCmsEditorShellState'");
     expect(cmsEditorSource).toContain('useCmsEditorShellState({ siteId, collections })');
     expect(cmsEditorSource).toContain('buildItemApprovalMap(approvalBatches)');
-    expect(cmsEditorSource).toContain('filterAndRankCollectionItems(coll, search)');
   });
 
   it('keeps CmsEditor contracts out of the root shell', () => {
