@@ -303,6 +303,7 @@ export function InboxTab({
             <button
               key={m}
               type="button"
+              aria-pressed={mode === m}
               onClick={() => setMode(m)}
               className={`px-3.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium capitalize transition-colors ${
                 mode === m
@@ -323,6 +324,7 @@ export function InboxTab({
             <button
               key={f.id}
               type="button"
+              aria-pressed={filter === f.id}
               onClick={() => setFilter(f.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
                 filter === f.id
@@ -332,7 +334,7 @@ export function InboxTab({
             >
               {f.label}
               {f.count !== undefined && (
-                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-semibold ${
+                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
                   filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
                 }`}>
                   {f.count}
@@ -350,8 +352,8 @@ export function InboxTab({
           showAllCaughtUp={
             !approvalsLoading && !requestsLoading &&
             priorityItems.length === 0 &&
-            clientActions.length === 0 &&
-            requests.length === 0
+            pendingClientActions.length === 0 &&
+            requestReplies === 0
           }
         />
       )}
@@ -407,7 +409,7 @@ export function InboxTab({
                               placeholder="Add a note for your team…"
                               className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
                             />
-                            <Button size="sm" variant="primary" onClick={() => changeRequestNote.trim() && respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim())}>
+                            <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim())}>
                               Send
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => { setChangeRequestAction(null); setChangeRequestNote(''); }}>
@@ -464,6 +466,7 @@ export function InboxTab({
                         </div>
                         {!isFlagged && !isFlagging && (
                           <button
+                            type="button"
                             onClick={() => setFlaggingCell(cell.cellId)}
                             className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                           >
@@ -478,17 +481,19 @@ export function InboxTab({
                             onChange={e => setFlagComment(e.target.value)}
                             placeholder="Describe what you'd like changed..."
                             rows={2}
-                            className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
+                            className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
                           />
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleFlagCell(cell)}
+                            <Button
+                              size="sm"
+                              variant="primary"
                               disabled={flagSubmitting || !flagComment.trim()}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
+                              onClick={() => handleFlagCell(cell)}
                             >
-                              {flagSubmitting ? 'Submitting...' : 'Submit Feedback'}
-                            </button>
+                              {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
+                            </Button>
                             <button
+                              type="button"
                               onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
                               className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                             >Cancel</button>
@@ -528,6 +533,8 @@ export function InboxTab({
           <button
             type="button"
             className="flex items-center gap-2 w-full text-left"
+            aria-expanded={hasPendingSeoChanges || seoSectionExpanded}
+            aria-controls="seo-changes-content"
             onClick={() => setSeoSectionExpanded(e => !e)}
           >
             <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
@@ -547,7 +554,7 @@ export function InboxTab({
           </button>
 
           {(hasPendingSeoChanges || seoSectionExpanded) && (
-            <div className="space-y-4">
+            <div id="seo-changes-content" className="space-y-4">
               <ApprovalsTab
                 workspaceId={workspaceId}
                 approvalBatches={approvalBatches}
@@ -670,7 +677,7 @@ export function InboxTab({
               ))}
             </div>
           )}
-          {completedClientActions.length === 0 && approvalBatches.filter(b => b.items.every(i => i.status === 'applied')).length === 0 && (
+          {completedClientActions.length === 0 && approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied')).length === 0 && (
             <EmptyState
               icon={Check}
               title="No completed items yet"
