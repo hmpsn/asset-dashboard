@@ -4952,3 +4952,24 @@ Bug sniffing outcome: revalidated create-profile and profile-refresh wiring thro
 **Mutual:** Closes the VoiceTab decomposition sequence with a phase-4 source contract that blocks query/mutation orchestration from drifting back into the root shell.
 
 **Files:** `src/components/brand/VoiceTab.tsx`; `src/components/brand/voice-tab/useVoiceTabShell.ts`; `tests/contract/voice-tab-phase4-shell-cleanup.test.ts`; `data/roadmap.json`.
+
+### 378. Platform Consolidation — CmsEditor Contracts + Shared Model Extraction (Phase 1)
+**What it does:** Starts CmsEditor decomposition by moving shared contracts and pure data helpers out of `src/components/CmsEditor.tsx` into `src/components/cms-editor/cmsEditorModel.ts`. The extracted module now owns:
+- CmsEditor contracts (`SeoField`, `ApprovalItem`, `CmsItem`, `CmsCollection`, approval payload/map types)
+- edit-map initialization (`buildInitialEdits`)
+- SEO field helpers (`getExtraSeoFields`, `getTitleAndDescriptionFields`)
+- collection search/ranking helper (`filterAndRankCollectionItems`)
+- approval payload assembly (`buildApprovalPayloadItems`)
+- per-item approval history map builder (`buildItemApprovalMap`)
+
+`CmsEditor.tsx` remains the public entry and now consumes those helpers/contracts.
+
+Bug sniffing fix included: approval history is now sorted by `updatedAt` descending before rendering, so the "Latest" approval context consistently reflects the newest event instead of insertion order.
+
+**Agency value:** Establishes a clean shared model seam before section/workflow extraction phases and reduces duplicate in-component mapping logic.
+
+**Client value:** No UI/API contract changes; CMS edit/save/publish/approval behavior is preserved.
+
+**Mutual:** Adds guardrails and unit coverage so contracts/helpers do not drift back into the root shell during later CmsEditor decomposition phases.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/cmsEditorModel.ts`; `tests/unit/cms-editor-model.test.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `data/roadmap.json`.

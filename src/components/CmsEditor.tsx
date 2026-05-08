@@ -10,43 +10,14 @@ import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { patch, post } from '../api/client';
 import { PendingApprovals } from './PendingApprovals';
-
-interface SeoField {
-  id: string;
-  slug: string;
-  displayName: string;
-  type: string;
-}
-
-interface ApprovalItem {
-  id: string;
-  pageId: string;
-  pageTitle: string;
-  pageSlug: string;
-  field: string;
-  collectionId?: string;
-  currentValue: string;
-  proposedValue: string;
-  clientValue?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'applied';
-  reason?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface CmsItem {
-  id: string;
-  fieldData: Record<string, unknown>;
-}
-
-interface CmsCollection {
-  collectionId: string;
-  collectionName: string;
-  collectionSlug: string;
-  seoFields: SeoField[];
-  items: CmsItem[];
-  total: number;
-}
+import {
+  buildApprovalPayloadItems,
+  buildInitialEdits,
+  buildItemApprovalMap,
+  filterAndRankCollectionItems,
+  getExtraSeoFields,
+  getTitleAndDescriptionFields,
+} from './cms-editor/cmsEditorModel';
 
 interface Props {
   siteId: string;
@@ -117,33 +88,14 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       restoredFromCache.current = false;
       return;
     }
-    const editMap: Record<string, Record<string, string>> = {};
-    for (const coll of collections) {
-      for (const item of coll.items) {
-        const fields: Record<string, string> = {};
-        for (const sf of coll.seoFields) {
-          fields[sf.slug] = String(item.fieldData[sf.slug] || '');
-        }
-        editMap[item.id] = fields;
-      }
-    }
-    setEdits(editMap);
+    setEdits(buildInitialEdits(collections));
     setDirty(new Set());
     setSaved(new Set());
   }, [collections]);
 
   // Build per-item approval lookup: itemId → approval items across all batches
   const itemApprovalMap = useMemo(() => {
-    const map = new Map<string, Array<ApprovalItem & { batchName: string; batchId: string }>>();
-    for (const batch of approvalBatches) {
-      for (const item of batch.items) {
-        if (!item.collectionId) continue; // only CMS items
-        const list = map.get(item.pageId) || [];
-        list.push({ ...item, batchName: batch.name, batchId: batch.id });
-        map.set(item.pageId, list);
-      }
-    }
-    return map;
+    return buildItemApprovalMap(approvalBatches);
   }, [approvalBatches]);
 
   const toggleHistory = (itemId: string) => {
@@ -214,6 +166,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       // Build context from the item's other field values so the AI can differentiate items
       const collection = collections.find(c => c.collectionId === collectionId);
       const itemFields = edits[itemId] || {};
+      const { titleField, descField } = getTitleAndDescriptionFields(getExtraSeoFields(collection?.seoFields || []));
       const fieldContext = Object.entries(itemFields)
         .filter(([slug, val]) => val && slug !== fieldSlug && slug !== 'name')
         .map(([slug, val]) => `${slug}: ${String(val).slice(0, 300)}`)
@@ -223,8 +176,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
         pageTitle: itemName,
-        currentSeoTitle: isTitle ? currentValue : (() => { const tf = collection?.seoFields?.find(f => f.slug.includes('title') && f.slug !== 'name' && f.slug !== 'slug'); return tf ? (edits[itemId]?.[tf.slug] || '') : undefined; })(),
-        currentDescription: !isTitle ? currentValue : (() => { const df = collection?.seoFields?.find(f => f.slug.includes('description') || f.slug.includes('desc')); return df ? (edits[itemId]?.[df.slug] || '') : undefined; })(),
+        currentSeoTitle: isTitle ? currentValue : (titleField ? (edits[itemId]?.[titleField.slug] || '') : undefined),
+        currentDescription: !isTitle ? currentValue : (descField ? (edits[itemId]?.[descField.slug] || '') : undefined),
         pageContent: fieldContext || undefined,
         siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
         pagePath,
@@ -323,9 +276,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         batch.map(async (itemId) => {
           const coll = collections.find(c => c.items.some(it => it.id === itemId));
           if (!coll) return;
-          const extra = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
-          const titleF = extra.find(f => f.slug.includes('title'));
-          const descF = extra.find(f => f.slug.includes('description') || f.slug.includes('desc'));
+          const extraSeoFields = getExtraSeoFields(coll.seoFields);
+          const { titleField: titleF, descField: descF } = getTitleAndDescriptionFields(extraSeoFields);
 
           if (targetField === 'all' && titleF && descF) {
             await aiRewrite(coll.collectionId, itemId, 'name');
@@ -385,33 +337,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     try {
-      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: string; collectionId: string; currentValue: string; proposedValue: string }> = [];
-      for (const itemId of approvalSelected) {
-        const edit = edits[itemId];
-        if (!edit) continue;
-        // Find the collection and original item
-        let coll: CmsCollection | undefined;
-        let origItem: CmsItem | undefined;
-        for (const c of collections) {
-          const found = c.items.find(i => i.id === itemId);
-          if (found) { coll = c; origItem = found; break; }
-        }
-        if (!coll || !origItem) continue;
-        const itemName = String(origItem.fieldData['name'] || '');
-        const itemSlug = String(origItem.fieldData['slug'] || '');
-        // Check each editable field for changes
-        for (const sf of coll.seoFields) {
-          const original = String(origItem.fieldData[sf.slug] || '');
-          const proposed = edit[sf.slug] || '';
-          if (proposed !== original) {
-            items.push({
-              pageId: itemId, pageTitle: itemName, pageSlug: itemSlug,
-              field: sf.slug, collectionId: coll.collectionId,
-              currentValue: original, proposedValue: proposed,
-            });
-          }
-        }
-      }
+      const items = buildApprovalPayloadItems(approvalSelected, edits, collections);
       if (items.length === 0) {
         setErrorStates(prev => ({ 
           ...prev, 
@@ -604,33 +530,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       {/* Collections */}
       {collections.map(coll => {
-        const filteredItems = coll.items.filter(item => {
-          if (!search) return true;
-          const q = search.toLowerCase();
-          const name = String(item.fieldData['name'] || '').toLowerCase();
-          const slug = String(item.fieldData['slug'] || '').toLowerCase();
-          return name.includes(q) || slug.includes(q);
-        }).sort((a, b) => {
-          const seoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
-          const tf = seoFields.find(f => f.slug.includes('title'));
-          const df = seoFields.find(f => f.slug.includes('description') || f.slug.includes('desc'));
-          const scoreA = (!String(a.fieldData['name'] || '').trim() ? 3 : 0)
-            + (tf && !String(a.fieldData[tf.slug] || '').trim() ? 2 : 0)
-            + (df && !String(a.fieldData[df.slug] || '').trim() ? 2 : 0);
-          const scoreB = (!String(b.fieldData['name'] || '').trim() ? 3 : 0)
-            + (tf && !String(b.fieldData[tf.slug] || '').trim() ? 2 : 0)
-            + (df && !String(b.fieldData[df.slug] || '').trim() ? 2 : 0);
-          return scoreB - scoreA;
-        });
+        const filteredItems = filterAndRankCollectionItems(coll, search);
         if (filteredItems.length === 0 && search) return null;
         const isExpanded = expandedCollections.has(coll.collectionId);
         const collSavedIds = coll.items.filter(i => saved.has(i.id)).map(i => i.id);
         const filteredItemIds = filteredItems.map(i => i.id);
         const selectedInColl = filteredItemIds.filter(id => approvalSelected.has(id)).length;
         const allInCollSelected = filteredItemIds.length > 0 && selectedInColl === filteredItemIds.length;
-        const extraSeoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
-        const titleField = extraSeoFields.find(f => f.slug.includes('title'));
-        const descField = extraSeoFields.find(f => f.slug.includes('description') || f.slug.includes('desc'));
+        const extraSeoFields = getExtraSeoFields(coll.seoFields);
+        const { titleField, descField } = getTitleAndDescriptionFields(extraSeoFields);
         const missingTitles = titleField ? coll.items.filter(i => !String(i.fieldData[titleField.slug] || '').trim()).length : 0;
         const missingDescs = descField ? coll.items.filter(i => !String(i.fieldData[descField.slug] || '').trim()).length : 0;
         const missingNames = coll.items.filter(i => !String(i.fieldData['name'] || '').trim()).length;
