@@ -636,6 +636,16 @@
           "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase5`. Extracted root shell/session state ownership from `src/components/CmsEditor.tsx` into `src/components/cms-editor/useCmsEditorShellState.ts`, including cache hydration/persistence for edits and expansion state, shell-local state for saving/saved/history/search/errors/preview, and shared toggles/update helpers. `CmsEditor.tsx` now consumes the hook and keeps composition/orchestration wiring. Bug sniffing hardening included: edits cache now persists even when empty, preventing stale cached edits from being resurrected after reset paths. Added source-contract and hook-behavior guardrails (`tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`, `tests/unit/cms-editor-shell-state-hook.test.ts`) to lock the new ownership boundary."
         },
         {
+          "id": "platform-consolidation-cms-editor-decomp-phase6",
+          "title": "CmsEditor monolith decomposition - phase 6 collections render extraction",
+          "source": "Loop follow-up after CmsEditor phase 5",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Completed 2026-05-08 on `codex/cms-editor-decomp-phase6`. Extracted the collection/item render monolith from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorCollections.tsx`, including collection header badges, item-level editor controls, AI variation selectors, inline approval history, and preview panels. `CmsEditor.tsx` now composes the extracted renderer and remains focused on orchestration. Bug sniffing hardening included: phase-1 contract assertions were updated to stop pinning now-extracted render helper usage in root (`filterAndRankCollectionItems`) while preserving model ownership checks, and a pre-existing purple paired-description label was corrected to blue to align with color-system rules. Added source-contract guardrails (`tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`) to lock the phase-6 ownership boundary."
+        },
+        {
           "id": "platform-consolidation-workspace-intelligence-slices",
           "title": "Workspace intelligence - split slice assemblers behind stable API",
           "source": "docs/superpowers/audits/2026-05-04-platform-consolidation-audit.md",

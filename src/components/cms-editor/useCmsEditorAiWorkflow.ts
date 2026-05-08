@@ -14,7 +14,7 @@ interface UseCmsEditorAiWorkflowArgs {
   updateField: (itemId: string, fieldSlug: string, value: string) => void;
 }
 
-interface ItemVariations {
+export interface ItemVariations {
   fieldSlug: string;
   options: string[];
   descOptions?: string[];

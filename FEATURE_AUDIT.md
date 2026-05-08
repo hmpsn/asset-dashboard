@@ -5049,3 +5049,24 @@ Bug sniffing hardening included: edits cache is now persisted even when empty, p
 **Mutual:** Adds phase-5 source contract + hook behavior guardrails so shell/session logic cannot drift back into the monolith.
 
 **Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/useCmsEditorShellState.ts`; `tests/contract/cms-editor-phase5-shell-state-hook-extraction.test.ts`; `tests/unit/cms-editor-shell-state-hook.test.ts`; `data/roadmap.json`.
+
+### 383. Platform Consolidation — CmsEditor Collections Render Extraction (Phase 6)
+**What it does:** Continues CmsEditor decomposition by extracting the full collections/items render surface from `src/components/CmsEditor.tsx` into `src/components/cms-editor/CmsEditorCollections.tsx`.
+
+The extracted component now owns:
+- collection header rendering (selection summary, publish status, missing-field badges)
+- item list rendering (state badges, approval selectors, preview toggles)
+- item editor rendering (name/slug/SEO fields, AI variation pickers, paired title+description flow)
+- inline approval history and preview panels
+
+`CmsEditor.tsx` now stays focused on data/workflow orchestration and composes the extracted renderer.
+
+Bug sniffing hardening included: phase-1 source contract expectations were updated to stop pinning now-extracted render helper usage (`filterAndRankCollectionItems`) in the root shell, preventing false failures while preserving model ownership checks. Also corrected a pre-existing purple color usage in the paired-description label to blue so the extracted UI path complies with the Four Laws color contract.
+
+**Agency value:** Shrinks the root orchestration surface and isolates high-churn render logic behind a dedicated module boundary.
+
+**Client value:** No UX/API contract changes; behavior remains stable with clearer internal ownership for faster iteration.
+
+**Mutual:** Adds phase-6 source contract guardrails so the collections/item render monolith cannot silently drift back into `CmsEditor.tsx`.
+
+**Files:** `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorCollections.tsx`; `tests/contract/cms-editor-phase6-collections-render-extraction.test.ts`; `tests/contract/cms-editor-phase1-model-extraction.test.ts`; `data/roadmap.json`.
