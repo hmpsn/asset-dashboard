@@ -225,7 +225,8 @@ export function InboxTab({
       title: a.title,
       section: 'needs-action',
       ctaLabel: 'View →',
-      onCta: () => setDetailAction(a),
+      // Modal wired in Task 7 — scroll to section until then
+      onCta: () => setFilter('needs-action'),
     });
   }
   // 5. Content at review status
@@ -428,6 +429,7 @@ export function InboxTab({
                         )}
                       </>
                     ) : (
+                      // Modal wired in Task 7 — button present, modal not yet mounted
                       <Button size="sm" variant="ghost" onClick={() => setDetailAction(action)}>
                         View details →
                       </Button>
