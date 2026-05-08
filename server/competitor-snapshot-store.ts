@@ -169,17 +169,12 @@ export function detectCompetitorAlerts(
       if (kw.volume >= minVolume && kw.position <= 10) {
         const severity = kw.position <= 3 ? 'critical' as const : 'warning' as const;
         const alertId = randomUUID();
-        stmts().insertAlert.run({
-          id: alertId, workspace_id: workspaceId, competitor_domain: domain,
-          alert_type: 'new_keyword', keyword: kw.keyword,
-          previous_position: null, current_position: kw.position, position_change: null,
-          volume: kw.volume, severity, snapshot_date: current.snapshotDate,
-        });
+        const createdAt = new Date().toISOString();
         alerts.push({
           id: alertId, workspaceId, competitorDomain: domain,
           alertType: 'new_keyword', keyword: kw.keyword,
           currentPosition: kw.position, volume: kw.volume, severity,
-          snapshotDate: current.snapshotDate, createdAt: new Date().toISOString(),
+          snapshotDate: current.snapshotDate, createdAt,
         });
       }
       continue;
@@ -188,18 +183,12 @@ export function detectCompetitorAlerts(
     if (change >= positionChangeThreshold && kw.volume >= minVolume) {
       const severity = change >= 10 ? 'critical' as const : 'warning' as const;
       const alertId = randomUUID();
-      stmts().insertAlert.run({
-        id: alertId, workspace_id: workspaceId, competitor_domain: domain,
-        alert_type: 'keyword_gained', keyword: kw.keyword,
-        previous_position: prev.position, current_position: kw.position, position_change: change,
-        volume: kw.volume, severity, snapshot_date: current.snapshotDate,
-      });
+      const createdAt = new Date().toISOString();
       alerts.push({
         id: alertId, workspaceId, competitorDomain: domain,
         alertType: 'keyword_gained', keyword: kw.keyword,
         previousPosition: prev.position, currentPosition: kw.position, positionChange: change,
-        volume: kw.volume, severity, snapshotDate: current.snapshotDate,
-        createdAt: new Date().toISOString(),
+        volume: kw.volume, severity, snapshotDate: current.snapshotDate, createdAt,
       });
     }
   }
@@ -211,26 +200,42 @@ export function detectCompetitorAlerts(
     if (dropped && prev.volume >= minVolume && prev.position <= 20) {
       const severity = !curr ? 'warning' as const : (curr.position - prev.position >= 10 ? 'critical' as const : 'warning' as const);
       const alertId = randomUUID();
-      stmts().insertAlert.run({
-        id: alertId, workspace_id: workspaceId, competitor_domain: domain,
-        alert_type: 'keyword_lost', keyword: prev.keyword,
-        previous_position: prev.position, current_position: curr?.position ?? null,
-        position_change: curr ? prev.position - curr.position : null,
-        volume: prev.volume, severity, snapshot_date: current.snapshotDate,
-      });
+      const createdAt = new Date().toISOString();
       alerts.push({
         id: alertId, workspaceId, competitorDomain: domain,
         alertType: 'keyword_lost', keyword: prev.keyword,
         previousPosition: prev.position, currentPosition: curr?.position,
         positionChange: curr ? prev.position - curr.position : undefined,
-        volume: prev.volume, severity, snapshotDate: current.snapshotDate,
-        createdAt: new Date().toISOString(),
+        volume: prev.volume, severity, snapshotDate: current.snapshotDate, createdAt,
       });
     }
   }
 
   log.info({ workspaceId, domain, alertCount: alerts.length }, 'Competitor alerts detected');
   return alerts;
+}
+
+export function saveCompetitorAlerts(alerts: CompetitorAlert[]): void {
+  if (alerts.length === 0) return;
+  const run = db.transaction(() => {
+    const insertAlert = stmts().insertAlert;
+    for (const alert of alerts) {
+      insertAlert.run({
+        id: alert.id,
+        workspace_id: alert.workspaceId,
+        competitor_domain: alert.competitorDomain,
+        alert_type: alert.alertType,
+        keyword: alert.keyword ?? null,
+        previous_position: alert.previousPosition ?? null,
+        current_position: alert.currentPosition ?? null,
+        position_change: alert.positionChange ?? null,
+        volume: alert.volume ?? null,
+        severity: alert.severity,
+        snapshot_date: alert.snapshotDate,
+      });
+    }
+  });
+  run();
 }
 
 export function listUnlinkedCompetitorAlerts(workspaceId: string): CompetitorAlert[] {

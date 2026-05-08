@@ -258,8 +258,9 @@
           "source": "TECH DEBT — scaled code review on PR #267 (feat/seo-tier2-capabilities)",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "detectCompetitorAlerts() in server/competitor-snapshot-store.ts both computes alerts AND inserts them into the competitor_alerts table as a side effect. This tight coupling makes the function hard to unit-test in isolation and violates the separation seen elsewhere (e.g. computePageHealthScores returns data without DB writes). Fix: split into computeCompetitorAlerts(current, previous, opts) returning CompetitorAlert[] (pure, no DB writes) and saveCompetitorAlerts(workspaceId, alerts) for the insert pass. Callers in intelligence-crons.ts call both in sequence.",
-          "status": "pending"
+          "notes": "Shipped / verified 2026-05-08. detectCompetitorAlerts() in server/competitor-snapshot-store.ts is now pure (no DB writes), with inserts moved into saveCompetitorAlerts(alerts). Intelligence cron wiring now calls detect + save in sequence. Added/updated tests pinning the two-step contract: no persisted alerts until saveCompetitorAlerts is called, then expected unlinked-alert/list/link behavior.",
+          "status": "done",
+          "shippedAt": "2026-05-08"
         },
         {
           "id": "analytics-intelligence-phase-reorder",
