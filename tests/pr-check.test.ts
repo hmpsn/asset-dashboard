@@ -4629,6 +4629,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
     'schema-context-direct-read-not-on-allowlist',
+    // 2026-05-08 inbox redesign — retired InboxFilter literals
+    'inbox-legacy-filter-literal',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -6646,5 +6648,128 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     const hits = runRule(RULE, [file]);
     expect(hits.length).toBeGreaterThanOrEqual(1);
     expect(hits[0].text).toContain('ws.businessProfile');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: inbox-legacy-filter-literal
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: inbox-legacy-filter-literal', () => {
+  const RULE = 'inbox-legacy-filter-literal';
+
+  it('flags ?tab=approvals in a string literal', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadLink.tsx'),
+      lines(
+        'export function BadLink() {',
+        '  return <a href={`/client/${id}/inbox?tab=approvals`}>Go</a>;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags ?tab=requests in a navigate call', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadNav.tsx'),
+      lines(
+        'export function BadNav() {',
+        "  navigate(`/inbox?tab=requests`);",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags &tab=copy in a query string concatenation', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/badHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/client/${id}/inbox?section=all&tab=copy`;",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags ?tab=content-plan in a navigate call', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContentPlan.tsx'),
+      lines(
+        'export function BadContentPlan() {',
+        '  navigate(`/inbox?tab=content-plan`);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag ?tab=seo-changes (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
+      lines(
+        'export function GoodLink() {',
+        '  return <a href={`/inbox?tab=seo-changes`}>Go</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=needs-action (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/goodHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/inbox?tab=needs-action`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag comment-only lines with the old URL format', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/App.tsx'),
+      lines(
+        '// Backward-compat: old URLs like `/client/:id/inbox?tab=approvals` are rewritten.',
+        '// chips that deep-link to `/inbox?tab=requests` get redirected.',
+        'export function App() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline inbox-legacy-filter-literal-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/HatchedInline.tsx'),
+      lines(
+        'export function HatchedInline() {',
+        '  return <a href={`/inbox?tab=approvals`}> {/* inbox-legacy-filter-literal-ok: legacy external link */}',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line inbox-legacy-filter-literal-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/HatchedAbove.tsx'),
+      lines(
+        'export function HatchedAbove() {',
+        '  // inbox-legacy-filter-literal-ok: external legacy link',
+        '  return <a href={`/inbox?tab=approvals`}>x</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
