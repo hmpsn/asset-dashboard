@@ -260,7 +260,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         priority: lowHangingFruit.length > 0 || (strategy.contentGaps?.length ?? 0) > 0 ? 'high' : 'medium',
         payload: {
           generatedAt: strategy.generatedAt,
-          pageMap: filteredPageMap,
+          mappedPages: filteredPageMap.map(p => ({
+            page: p.pagePath,
+            keyword: p.primaryKeyword,
+            currentPosition: p.currentPosition,
+          })),
           quickWins: strategy.quickWins ?? [],
           contentGaps: strategy.contentGaps ?? [],
           opportunities: strategy.opportunities ?? [],
