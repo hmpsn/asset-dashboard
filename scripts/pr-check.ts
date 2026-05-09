@@ -5135,7 +5135,8 @@ export const CHECKS: Check[] = [
           if (!legacyRe.test(line)) continue;
           // Skip pure comment lines — backward-compat documentation in App.tsx
           // and similar files legitimately references old URL formats in comments.
-          if (/^\s*\/\//.test(line)) continue;
+          // Also skip JSX block comments ({/* */}) and C-style block comments (/* */).
+          if (/^\s*(\/\/|\/\*|\{\/\*)/.test(line)) continue;
           if (hasHatch(lines, i, 'inbox-legacy-filter-literal-ok')) continue;
           hits.push({ file, line: i + 1, text: line.trim() });
         }

@@ -6698,6 +6698,20 @@ describe('Rule: inbox-legacy-filter-literal', () => {
     expect(hits).toHaveLength(1);
   });
 
+  it('flags ?tab=content-plan in a navigate call', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContentPlan.tsx'),
+      lines(
+        'export function BadContentPlan() {',
+        '  navigate(`/inbox?tab=content-plan`);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
   it('does NOT flag ?tab=seo-changes (new value)', () => {
     const file = write(
       uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
