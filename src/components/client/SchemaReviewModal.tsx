@@ -27,7 +27,7 @@ export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaRevi
   return (
     <div
       className={
-        'fixed inset-0 z-[var(--z-modal)] flex flex-col bg-[var(--surface-1)]' // fixed-inset-ok -- Full-screen schema review takeover; not a centered reusable dialog, so <Modal> compound doesn't apply.
+        'fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col bg-[var(--surface-1)]' // fixed-inset-ok -- Full-screen schema review takeover; not a centered reusable dialog, so <Modal> compound doesn't apply.
       }
       role="dialog"
       aria-modal="true"
