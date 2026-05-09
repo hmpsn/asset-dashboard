@@ -12,7 +12,6 @@ import { X, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '../ui';
 import type {
   ClientAction,
-  ClientActionSourceType,
   InternalLinkPayload,
   InternalLinkItem,
   RedirectProposalPayload,
@@ -255,15 +254,19 @@ export function ClientActionDetailModal({
   // Escape to close — WAI-ARIA dialog requirement
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+      if (e.key === 'Escape') {
+        if (submitting) return;
+        e.stopPropagation();
+        onClose();
+      }
     };
     document.addEventListener('keydown', handleKey); // keydown-ok — full-screen modal intentionally handles Escape globally while open
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [onClose, submitting]);
 
   const renderPayload = () => {
     const p = action.payload;
-    switch (action.sourceType as ClientActionSourceType) {
+    switch (action.sourceType) {
       case 'internal_link':
         return <InternalLinkRenderer payload={p as unknown as InternalLinkPayload} />;
       case 'redirect_proposal':
@@ -304,9 +307,9 @@ export function ClientActionDetailModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label="Close action review"
           autoFocus
-          className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
+          className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -338,6 +341,7 @@ export function ClientActionDetailModal({
               value={changeNote}
               onChange={e => setChangeNote(e.target.value)}
               placeholder="Describe what needs to change…"
+              aria-label="Describe what needs to change"
               className="flex-1 min-w-[200px] px-3 py-2 rounded-[var(--radius-md)] t-body bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
             />
             <Button variant="primary" disabled={submitting || !changeNote.trim()} onClick={() => onRequestChanges(changeNote.trim())}>
