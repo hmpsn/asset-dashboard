@@ -3745,6 +3745,64 @@
       ]
     },
     {
+      "id": "sprint-client-inbox-redesign",
+      "name": "✅ SHIPPED — Client Inbox Redesign",
+      "hours": "16-24",
+      "rationale": "Five-phase redesign of the client Inbox tab: PriorityStrip urgency surfacing, 3-section layout (SEO Changes / Actions / Needs Your Attention), full-screen modals for schema and action detail review, and a pr-check guard to lock in the filter rename.",
+      "items": [
+        {
+          "id": "client-inbox-phase1-priority-strip",
+          "title": "InboxTab Phase 1 — PriorityStrip urgency component",
+          "source": "feat/client-inbox-redesign",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-06",
+          "notes": "Shipped. PriorityStrip component surfaces highest-priority item across all inbox sections. Teal action CTA. Renders null when nothing is pending."
+        },
+        {
+          "id": "client-inbox-phase2-restructure",
+          "title": "InboxTab Phase 2 — 3-section restructure + schema-review tab retirement",
+          "source": "feat/client-inbox-redesign",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-06",
+          "notes": "Shipped. InboxTab restructured into SEO Changes / Actions / Needs Your Attention with Active/Completed mode toggle and 4 filter chips. schema-review standalone ClientTab retired — content moves to Inbox SEO Changes section. ClientTab type consolidated to routes.ts as single source of truth. content-plan added to canonical ClientTab union."
+        },
+        {
+          "id": "client-inbox-phase3-schema-review-modal",
+          "title": "InboxTab Phase 3 — SchemaReviewModal full-screen dialog",
+          "source": "feat/client-inbox-redesign",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Shipped. SchemaReviewModal: fixed inset-0 full-screen WAI-ARIA dialog wrapping SchemaReviewTab. New --z-modal-fullscreen: 55 token in tokens.css (between --z-modal: 50 and --z-toast: 60). autoFocus on close button, Escape key handler, aria-labelledby."
+        },
+        {
+          "id": "client-inbox-phase4-action-detail-modal",
+          "title": "InboxTab Phase 4 — ClientActionDetailModal with typed payload renderers",
+          "source": "feat/client-inbox-redesign",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-07",
+          "notes": "Shipped. ClientActionDetailModal: full-screen WAI-ARIA dialog for Tier-3 client action cards. Four typed payload renderers: internal_link (HTML table + safeHref()), redirect_proposal (source→target pairs), keyword_strategy (mapped pages + quick wins + content gaps), aeo_change (current vs proposed diff). Default JSON fallback. respondToClientAction re-throws on error for retry-safe UX."
+        },
+        {
+          "id": "client-inbox-phase5-pr-check-rule",
+          "title": "InboxTab Phase 5 — inbox-legacy-filter-literal pr-check rule",
+          "source": "feat/client-inbox-redesign",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-05-08",
+          "notes": "Shipped. New pr-check rule prevents re-introduction of legacy filter literals (approvals, requests, content-plan, copy) after the Phase 1-2 rename. Escape hatch: // inbox-legacy-filter-literal-ok."
+        }
+      ]
+    },
+    {
       "id": "shipped-apr-2026",
       "name": "✅ SHIPPED — April 2026",
       "items": [

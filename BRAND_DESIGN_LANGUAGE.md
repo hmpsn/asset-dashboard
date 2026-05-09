@@ -160,6 +160,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Grid** | `ui/layout/Grid.tsx` | No color — structural only | Responsive CSS grid. Props: `cols` (`{ sm?, md?, lg?, xl? }` with values 1–12), `gap`. Uses static `Record<number, string>` maps per breakpoint so Tailwind's scanner can detect all class strings. `forwardRef`. |
 | **Divider** | `ui/layout/Divider.tsx` | `border-[var(--brand-border)]` | Thin rule. `orientation="horizontal"` (default, `border-b w-full`) or `"vertical"` (`border-r h-full`). Role=separator + aria-orientation. `forwardRef`. |
 | **Modal** | `ui/overlay/Modal.tsx` | Panel: `bg-zinc-900 border-zinc-800`; close ×: `text-zinc-400 hover:text-zinc-200`; focus ring: `focus-visible:ring-teal-500` | Compound: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`. Portals to `document.body`. Focus trap + Escape + backdrop-click to close. Restores focus to trigger on close. Backdrop at `--z-modal-backdrop` (40), panel at `--z-modal` (50). |
+| **SchemaReviewModal** | `client/SchemaReviewModal.tsx` | Shell: `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm`; inner panel fills viewport | Full-screen WAI-ARIA dialog wrapping `SchemaReviewTab`. Opened from InboxTab SEO Changes schema plan card. `autoFocus` on close button, Escape key dismiss. See full-screen modal pattern below. |
+| **ClientActionDetailModal** | `client/ClientActionDetailModal.tsx` | Same full-screen shell as SchemaReviewModal | Full-screen WAI-ARIA dialog for Tier-3 client action cards. Four typed payload renderers: `internal_link`, `redirect_proposal`, `keyword_strategy`, `aeo_change`. Default raw JSON fallback. `respondToClientAction` re-throws on error (retry-safe). |
 | **Popover** | `ui/overlay/Popover.tsx` | Panel: `bg-zinc-900 border-zinc-800`; normal item: `text-zinc-200 hover:bg-zinc-800`; danger item: `text-red-400 hover:bg-red-500/10` | Compound: `<Popover.Item>`, `<Popover.Separator>`. Portals to `document.body`. Arrow key + Home/End navigation. Tab closes (focus moves naturally). Outside-click + Escape to close. |
 | **Tooltip** | `ui/overlay/Tooltip.tsx` | `bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg` | Hover (500 ms delay) + focus (instant). `role="tooltip"`, `aria-describedby` on trigger. Portals to `document.body` — safe under `transform`/`filter` ancestors. |
 
@@ -515,6 +517,15 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | Modal enter | `animate-[scaleIn_0.2s_ease-out]` |
 | Modal overlay | `bg-black/70 backdrop-blur-md` |
 | Modal container | `bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl max-w-md` |
+| Full-screen modal | `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm` | Used for takeover dialogs (SchemaReviewModal, ClientActionDetailModal). `--z-modal-fullscreen: 55` sits between `--z-modal` (50) and `--z-toast` (60). |
+
+**Full-screen modal shell contract** (`SchemaReviewModal`, `ClientActionDetailModal`):
+- `fixed inset-0 z-[var(--z-modal-fullscreen)]` — fills the entire viewport, above standard modals, below toasts
+- `role="dialog"` + `aria-modal="true"` + `aria-labelledby` pointing to the `<h2>` title
+- `autoFocus` on the close button (first focusable element)
+- Escape key handler calls `onClose()`
+- Background: `bg-black/80 backdrop-blur-sm`
+- Token: `--z-modal-fullscreen: 55` (defined in `src/tokens.css`)
 | Page transition | `ScannerReveal` — muted teal beam sweeps top-to-bottom on navigation (850ms, ease-out) |
 | Card entrance | Stagger-fade: `staggerFadeIn` 0.4s + 60ms delay per sibling. Use `staggerIndex` prop on `SectionCard`/`StatCard` |
 | MetricRing entrance | Charge-up: ring sweep → number fade at 0.8s → glow bloom at 2s. Disabled with `noAnimation` prop |
@@ -672,5 +683,6 @@ When shipping UI changes that affect color or design patterns:
 ---
 
 | 2026-05-03 | **Strategy Keywords rebuild** (PRs #430–#434 + task commits): Two-zone flat list (confirmed rows = standard surface, suggestion rows = `bg-blue-950/60 border border-blue-900/50`). Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD difficulty coloring: ≤29=emerald-400, 30–49=amber-400, ≥50=red-400. Trend coloring: rising=emerald-400, declining=red-400, stable/unknown=muted. Drawer: right slide-in on desktop, bottom sheet on mobile. No sort controls. Per-component map section added. |
+| 2026-05-09 | **Client Inbox Redesign** (feat/client-inbox-redesign, 5 phases): `PriorityStrip` urgency component (teal CTA, renders null when nothing pending). `InboxTab` restructured into 3 collapsible sections (SEO Changes / Actions / Needs Your Attention) with Active/Completed mode toggle and 4 filter chips. `schema-review` standalone tab retired — schema plan card moves to InboxTab SEO Changes. New `--z-modal-fullscreen: 55` token in `src/tokens.css` (between `--z-modal: 50` and `--z-toast: 60`). `SchemaReviewModal` + `ClientActionDetailModal`: full-screen WAI-ARIA dialogs following canonical shell contract (`fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-modal`, `aria-labelledby` → `<h2>`, `autoFocus` on close, Escape key dismiss). `ClientActionDetailModal` has four typed payload renderers (internal_link, redirect_proposal, keyword_strategy, aeo_change) + default JSON fallback. `safeHref()` helper for XSS-safe URL rendering. pr-check rule `inbox-legacy-filter-literal` prevents re-introduction of retired filter literals. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.

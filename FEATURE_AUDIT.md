@@ -5409,3 +5409,72 @@ Bug hardening included:
 **Mutual:** Preserves existing keyword-strategy limits while reducing cross-feature coupling in billing/usage behavior.
 
 **Files:** `server/usage-tracking.ts`; `server/routes/webflow-alt-text.ts`; `server/workspace-context-generation-job.ts`; `tests/unit/usage-tracking.test.ts`; `tests/integration/tier-gate-enforcement.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 398. Client Inbox Redesign — PriorityStrip & InboxTab Restructure (Phase 1–2)
+**What it does:** Complete redesign of the client Inbox tab across five phases on `feat/client-inbox-redesign`. Phase 1–2 delivered:
+
+- **`PriorityStrip`** (`src/components/client/PriorityStrip.tsx`) — urgency strip rendered at the top of `InboxTab`. Surfaces the single highest-priority item across all three inbox sections (SEO Changes, Actions, Needs Your Attention). Teal action CTA triggers the relevant modal or scroll target. Renders `null` when no items are pending.
+- **`InboxTab` restructure** — replaced the flat filter-chip list with three collapsible sections: SEO Changes, Actions, Needs Your Attention. Mode toggle (Active / Completed) at tab level. Four filter chips (All / SEO Changes / Needs Action / Content).
+- **`schema-review` standalone `ClientTab` retired** — schema plan card moved into InboxTab SEO Changes section. Stale `?tab=schema-review` URLs now redirect to `?tab=inbox`. `SchemaReviewTab.tsx` remains on disk but is route-orphaned. Public API endpoints unchanged.
+- **`ClientTab` type consolidated** — `src/routes.ts` is now the single source of truth for the `ClientTab` union (previously split between `routes.ts` and `src/components/client/types.ts`). `content-plan` added to the canonical union.
+
+**Agency value:** Single inbox surface for all outstanding client work. Priority strip ensures the most urgent item is impossible to miss.
+
+**Client value:** Clear three-section structure (what changed / what you need to do / what needs attention) replaces an undifferentiated list. Active/Completed toggle gives progress visibility.
+
+**Mutual:** Schema plan reviews surface in context alongside other SEO changes — clients no longer miss the schema review tab.
+
+**Files:** `src/components/client/PriorityStrip.tsx` (new), `src/components/client/InboxTab.tsx` (restructured), `src/routes.ts` (`ClientTab` consolidated, `schema-review` removed, `content-plan` added), `src/components/client/types.ts` (ClientTab removed — now only in routes.ts), `src/components/ClientDashboard.tsx` (schema-review redirect + inbox wiring).
+
+---
+
+### 399. Client Inbox Redesign — SchemaReviewModal (Phase 3)
+**What it does:** Full-screen WAI-ARIA dialog (`SchemaReviewModal`) wrapping the existing `SchemaReviewTab` component, opened when the client clicks the schema plan card in InboxTab's SEO Changes section.
+
+- Shell: `fixed inset-0 z-[var(--z-modal-fullscreen)]` (new token, value `55` — between `--z-modal: 50` and `--z-toast: 60`). Backdrop `bg-black/80 backdrop-blur-sm`. Panel slides up from bottom or fills viewport.
+- WAI-ARIA: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing to `<h2>` title. Close button receives `autoFocus`. Escape key handler dismisses.
+- **`--z-modal-fullscreen: 55` token** added to `src/tokens.css` for all full-screen takeover modals.
+
+**Agency value:** Schema review no longer requires navigating away from the Inbox — clients approve or request changes without losing their place.
+
+**Client value:** Full-screen immersive review experience with no context switching.
+
+**Files:** `src/components/client/SchemaReviewModal.tsx` (new), `src/components/client/InboxTab.tsx` (open modal on schema card click), `src/tokens.css` (`--z-modal-fullscreen: 55` added).
+
+---
+
+### 400. Client Inbox Redesign — ClientActionDetailModal (Phase 4)
+**What it does:** Full-screen WAI-ARIA dialog (`ClientActionDetailModal`) for Tier-3 client action cards. Opened from InboxTab's Actions section when a client clicks a rich action card. Four typed payload renderers:
+
+- **`internal_link`** — HTML table with anchor text / target URL / source page / context columns. `safeHref()` helper validates URLs before rendering `<a>` tags (XSS-safe).
+- **`redirect_proposal`** — source→target pairs with redirect type (301/302) and rationale.
+- **`keyword_strategy`** — mapped pages table, quick wins list, content gaps list, opportunities list.
+- **`aeo_change`** — current vs. proposed side-by-side diff per page.
+- **`default`** — raw JSON fallback for unknown payload types.
+
+Shell follows the same pattern as `SchemaReviewModal`: `fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-labelledby`, `autoFocus` on close, Escape key dismiss. `respondToClientAction` re-throws on error (retry-safe modal pattern — modal stays open on failure so the client can try again).
+
+**Agency value:** Clients can review full action details — link tables, redirect mappings, keyword strategy — without leaving the Inbox.
+
+**Client value:** Rich structured detail view replaces truncated card previews. Approve or request changes on any action type from within the modal.
+
+**Files:** `src/components/client/ClientActionDetailModal.tsx` (new, four typed renderers + `safeHref()`), `src/components/client/InboxTab.tsx` (open modal on action card click), `src/api/content.ts` (`respondToClientAction` re-throw added).
+
+---
+
+### 401. Client Inbox Redesign — `inbox-legacy-filter-literal` pr-check Rule (Phase 5)
+**What it does:** New pr-check rule (`inbox-legacy-filter-literal`) in `scripts/pr-check.ts` that prevents re-introduction of legacy inbox filter string literals after the Phase 1–2 filter rename. Catches `?tab=approvals`, `?tab=requests`, `?tab=content-plan`, and `?tab=copy` anywhere in `src/` and `server/`. Escape hatch: `// inbox-legacy-filter-literal-ok`.
+
+Filter rename mapping:
+- `approvals` → `seo-changes`
+- `requests` → `needs-action`
+- `content-plan` → `needs-action`
+- `copy` → `content`
+
+**Agency value:** Prevents the silent regression where a future component navigates to a retired filter value — client lands on the default tab instead of the intended section.
+
+**Mutual:** Mechanizes the rename contract so it survives future contributors who weren't part of the redesign.
+
+**Files:** `scripts/pr-check.ts` (new `inbox-legacy-filter-literal` check with customCheck logic).
