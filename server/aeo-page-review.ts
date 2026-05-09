@@ -13,8 +13,7 @@ import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
-import { decodeEntities } from './helpers.js';
-import { stripHtmlToText, stripCodeFences } from './helpers.js';
+import { decodeEntities, stripHtmlToText, stripCodeFences } from './helpers.js';
 import { z } from './middleware/validate.js';
 import type { AeoEffort, AeoPageReview, AeoSiteReview } from '../shared/types/aeo.js';
 import {

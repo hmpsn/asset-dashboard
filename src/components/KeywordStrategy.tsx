@@ -268,7 +268,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           quickWins: strategy.quickWins ?? [],
           contentGaps: strategy.contentGaps ?? [],
           opportunities: strategy.opportunities ?? [],
-          lowHangingFruit,
         },
       });
       setSentToClient(true);

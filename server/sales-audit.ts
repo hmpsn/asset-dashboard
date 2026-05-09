@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { decodeEntities } from './helpers.js';
 const log = createLogger('sales-audit');
 
 /**
@@ -75,7 +76,7 @@ function extractMetaContent(html: string, nameOrProp: string): string | null {
 
 function extractTitle(html: string): string {
   const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return m ? m[1].trim() : '';
+  return m ? decodeEntities(m[1].trim()) : '';
 }
 
 function extractMetaDescription(html: string): string {
