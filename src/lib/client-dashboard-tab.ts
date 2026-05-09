@@ -11,10 +11,14 @@ import type { ClientTab } from '../routes';
  * they are not part of the canonical `ClientTab` union (older saved URLs
  * shouldn't 404). Kept separate from ClientTab so the runtime resolution can
  * widen its return type beyond the strict union.
+ *
+ * Currently `never` — `'content-plan'` was the last member, promoted to
+ * canonical `ClientTab` in feat/client-inbox-redesign. This type is retained
+ * as the pattern for future legacy surfaces.
  */
-export type LegacyClientTab = 'content-plan';
+export type LegacyClientTab = never;
 
-export type ResolvedClientTab = ClientTab | LegacyClientTab;
+export type ResolvedClientTab = ClientTab;
 
 /**
  * Set of tab ids the client dashboard accepts as-is. Includes the canonical

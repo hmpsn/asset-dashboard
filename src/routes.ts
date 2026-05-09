@@ -22,7 +22,7 @@ export type Page =
   | 'outcomes-overview'
   | 'diagnostics';
 
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'brand';
 export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
 
 export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, string> = {

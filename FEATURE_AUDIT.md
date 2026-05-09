@@ -1970,7 +1970,7 @@ When the user asks to update this document with recent features, follow this pro
 
 ### 154. Client Content Plan Tab
 **What it does:** New "Content Plan" tab in the client portal (paid tiers only) showing matrix progress via MatrixProgressView. Fetches plans from public API (`/api/public/content-plan/:wsId`). Auto-selects if only one plan; shows a list picker for multiple. Clients can preview cells, flag cells with comments (feedback submitted to admin), and download exports. Wrapped in ErrorBoundary.
-**Files:** `src/components/client/ContentPlanTab.tsx` (new), `src/components/ClientDashboard.tsx` (tab wired), `src/components/client/types.ts` (`content-plan` added to ClientTab)
+**Files:** `src/components/client/ContentPlanTab.tsx` (new), `src/components/ClientDashboard.tsx` (tab wired), `src/components/client/types.ts` (`content-plan` added to ClientTab), `src/routes.ts` (`content-plan` added to canonical ClientTab union in feat/client-inbox-redesign — previously only in `client/types.ts`)
 
 **Agency value:** Clients can self-serve content plan status — fewer "where are we?" emails.
 
