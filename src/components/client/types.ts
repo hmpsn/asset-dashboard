@@ -121,7 +121,9 @@ export interface ClientBriefPreview {
 }
 
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'brand';
+// Single source of truth lives in src/routes.ts — re-exported here so existing
+// importers of this file don't need to change their import paths.
+export type { ClientTab } from '../../routes';
 
 export interface ClientKeywordStrategy {
   siteKeywords: string[];

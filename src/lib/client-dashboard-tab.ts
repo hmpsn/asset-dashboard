@@ -21,13 +21,12 @@ export type LegacyClientTab = never;
 export type ResolvedClientTab = ClientTab;
 
 /**
- * Set of tab ids the client dashboard accepts as-is. Includes the canonical
- * `ClientTab` values plus the legacy surfaces above.
- *
- * Intentionally EXCLUDES `'brand'` — that surface is feature-flagged and is
+ * Set of tab ids the client dashboard accepts as-is. A strict subset of the
+ * canonical `ClientTab` values — intentionally EXCLUDES `'brand'` (feature-flagged;
  * resolved by an explicit branch in `resolveClientTab()` *before* this list
- * is consulted. Adding `'brand'` here would bypass the feature flag because
- * the pass-through check would match the tab id directly.
+ * is consulted — adding `'brand'` here would bypass the feature flag because
+ * the pass-through check would match the tab id directly) and EXCLUDES
+ * `'search'` / `'analytics'` (redirected to `'performance'` by alias guards).
  */
 export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'overview',
