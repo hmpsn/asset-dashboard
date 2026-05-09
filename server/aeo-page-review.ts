@@ -13,6 +13,7 @@ import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
+import { decodeEntities } from './helpers.js';
 import { stripHtmlToText, stripCodeFences } from './helpers.js';
 import { z } from './middleware/validate.js';
 import type { AeoEffort, AeoPageReview, AeoSiteReview } from '../shared/types/aeo.js';
@@ -33,7 +34,7 @@ function extractPageStructure(html: string): string {
 
   // Title
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim();
-  if (title) parts.push(`PAGE TITLE: ${title}`);
+  if (title) parts.push(`PAGE TITLE: ${decodeEntities(title)}`);
 
   // H1
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1]?.replace(/<[^>]+>/g, '').trim();

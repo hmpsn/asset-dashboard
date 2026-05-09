@@ -21,6 +21,26 @@ import { buildWorkspaceIntelligence, formatPersonasForPrompt } from './workspace
 
 
 const log = createLogger('helpers');
+
+// ── HTML Utilities ──
+
+/**
+ * Decode common HTML entities to their plain-text equivalents.
+ * Webflow HTML encodes apostrophes (&#x27;), ampersands (&amp;), etc.
+ * Use this on any string extracted from raw HTML before storing or displaying.
+ */
+export function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&nbsp;/g, ' ');
+}
+
 // ── Page Path Utilities ──
 
 /** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */
