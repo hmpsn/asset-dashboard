@@ -12,6 +12,7 @@ import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import { ClientCopyReview } from './ClientCopyReview';
 import { SchemaReviewModal } from './SchemaReviewModal';
+import { ClientActionDetailModal } from './ClientActionDetailModal';
 import { PriorityStrip } from './PriorityStrip';
 import type { PriorityItem } from './PriorityStrip';
 import type { Tier } from '../ui';
@@ -708,7 +709,20 @@ export function InboxTab({
           onClose={() => setSchemaModalOpen(false)}
         />
       )}
-      {detailAction && null /* ClientActionDetailModal mounted in Task 7 */}
+      {/* Tier-3 Client Action Detail Modal */}
+      {detailAction && (
+        <ClientActionDetailModal
+          action={detailAction}
+          submitting={false}
+          onApprove={() => {
+            respondToClientAction(detailAction.id, 'approved').then(() => setDetailAction(null));
+          }}
+          onRequestChanges={(note) => {
+            respondToClientAction(detailAction.id, 'changes_requested', note).then(() => setDetailAction(null));
+          }}
+          onClose={() => setDetailAction(null)}
+        />
+      )}
     </div>
   );
 }
