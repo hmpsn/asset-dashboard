@@ -80,7 +80,6 @@ describe('briefing deep-link URL renderer', () => {
       'health',
       'strategy',
       'content-plan',
-      'schema-review',
       'roi',
       'brand',
     ] as const;

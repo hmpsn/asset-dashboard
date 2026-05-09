@@ -39,6 +39,10 @@ describe('schema snapshot invalidation contract', () => {
   });
 
   it('keeps the client schema review tab on React Query keys instead of local effect-fetch state', () => {
+    // NOTE: SchemaReviewTab is route-orphaned as of feat/client-inbox-redesign — the
+    // 'schema-review' ClientTab now redirects to 'inbox' and the component is never
+    // rendered via real navigation. This test only verifies the component renders in
+    // isolation (source-level contract), NOT via a real user navigation path.
     const source = readProjectFile('src/components/client/SchemaReviewTab.tsx');
 
     expect(source).toContain('useQuery');

@@ -951,8 +951,8 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 ---
 
-### 73. Client Schema Review Tab
-**What it does:** Adds a "Schema" tab to the client portal that shows the site-wide structured data strategy in a clean, client-friendly format. Replaces the need to send 250+ individual approval notifications. Shows page roles grouped by type with plain-English descriptions of what each schema type does for Google visibility. Clients can approve the strategy or request changes with notes — feedback flows to the activity log and broadcasts to the admin in real-time. Includes an educational blurb explaining structured data for non-technical clients. Public API endpoints: `GET /api/public/schema-plan/:workspaceId`, `GET /api/public/schema-snapshot/:workspaceId`, `POST /api/public/schema-plan/:workspaceId/feedback`.
+### 73. Client Schema Review Tab *(retired — now in Inbox → SEO Changes)*
+**What it does:** ~~Adds a "Schema" tab to the client portal~~ **Retired in feat/client-inbox-redesign Phase 2.** Schema plan content now surfaces inside the Inbox tab under the "SEO Changes" section. The standalone `schema-review` client tab is removed; any stale `?tab=schema-review` URLs redirect to `inbox`. `SchemaReviewTab.tsx` remains on disk but is route-orphaned. Public API endpoints unchanged: `GET /api/public/schema-plan/:workspaceId`, `GET /api/public/schema-snapshot/:workspaceId`, `POST /api/public/schema-plan/:workspaceId/feedback`.
 
 **Agency value:** Schema plans get reviewed faster — clients see the full strategy in one clean view instead of wading through hundreds of approval notifications. Approval/rejection flows back to the admin dashboard via WebSocket.
 
@@ -1970,7 +1970,7 @@ When the user asks to update this document with recent features, follow this pro
 
 ### 154. Client Content Plan Tab
 **What it does:** New "Content Plan" tab in the client portal (paid tiers only) showing matrix progress via MatrixProgressView. Fetches plans from public API (`/api/public/content-plan/:wsId`). Auto-selects if only one plan; shows a list picker for multiple. Clients can preview cells, flag cells with comments (feedback submitted to admin), and download exports. Wrapped in ErrorBoundary.
-**Files:** `src/components/client/ContentPlanTab.tsx` (new), `src/components/ClientDashboard.tsx` (tab wired), `src/components/client/types.ts` (`content-plan` added to ClientTab)
+**Files:** `src/components/client/ContentPlanTab.tsx` (new), `src/components/ClientDashboard.tsx` (tab wired), `src/components/client/types.ts` (`content-plan` added to ClientTab), `src/routes.ts` (`content-plan` added to canonical ClientTab union in feat/client-inbox-redesign — previously only in `client/types.ts`)
 
 **Agency value:** Clients can self-serve content plan status — fewer "where are we?" emails.
 

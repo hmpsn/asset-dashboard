@@ -55,9 +55,13 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('content', false)).toBe('content');
   });
 
-  it('passes through legacy surfaces "content-plan" and "schema-review"', () => {
+  it('passes through legacy surface "content-plan"', () => {
     expect(resolveClientTab('content-plan', false)).toBe('content-plan');
-    expect(resolveClientTab('schema-review', false)).toBe('schema-review');
+  });
+
+  it('redirects retired "schema-review" tab to inbox', () => {
+    expect(resolveClientTab('schema-review', false)).toBe('inbox');
+    expect(resolveClientTab('schema-review', true)).toBe('inbox');
   });
 
   // ── Unknown / falsy → "overview" ──

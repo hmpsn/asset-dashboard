@@ -11,19 +11,22 @@ import type { ClientTab } from '../routes';
  * they are not part of the canonical `ClientTab` union (older saved URLs
  * shouldn't 404). Kept separate from ClientTab so the runtime resolution can
  * widen its return type beyond the strict union.
+ *
+ * Currently `never` — `'content-plan'` was the last member, promoted to
+ * canonical `ClientTab` in feat/client-inbox-redesign. This type is retained
+ * as the pattern for future legacy surfaces.
  */
-export type LegacyClientTab = 'content-plan' | 'schema-review';
+export type LegacyClientTab = never;
 
-export type ResolvedClientTab = ClientTab | LegacyClientTab;
+export type ResolvedClientTab = ClientTab;
 
 /**
- * Set of tab ids the client dashboard accepts as-is. Includes the canonical
- * `ClientTab` values plus the legacy surfaces above.
- *
- * Intentionally EXCLUDES `'brand'` — that surface is feature-flagged and is
+ * Set of tab ids the client dashboard accepts as-is. A strict subset of the
+ * canonical `ClientTab` values — intentionally EXCLUDES `'brand'` (feature-flagged;
  * resolved by an explicit branch in `resolveClientTab()` *before* this list
- * is consulted. Adding `'brand'` here would bypass the feature flag because
- * the pass-through check would match the tab id directly.
+ * is consulted — adding `'brand'` here would bypass the feature flag because
+ * the pass-through check would match the tab id directly) and EXCLUDES
+ * `'search'` / `'analytics'` (redirected to `'performance'` by alias guards).
  */
 export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'overview',
@@ -37,7 +40,6 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'plans',
   'roi',
   'content-plan',
-  'schema-review',
 ];
 
 /**
@@ -57,6 +59,7 @@ export function resolveClientTab(
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
   if (t === 'brand') return brandTabEnabled ? 'brand' : 'overview';
+  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > SEO Changes
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }
