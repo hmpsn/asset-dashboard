@@ -12,6 +12,7 @@ import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import { ClientCopyReview } from './ClientCopyReview';
 import { SchemaReviewModal } from './SchemaReviewModal';
+import { ClientActionDetailModal } from './ClientActionDetailModal';
 import { PriorityStrip } from './PriorityStrip';
 import type { PriorityItem } from './PriorityStrip';
 import type { Tier } from '../ui';
@@ -129,6 +130,7 @@ export function InboxTab({
   const [mode, setMode] = useState<InboxMode>('active');
   const [schemaModalOpen, setSchemaModalOpen] = useState(false);
   const [detailAction, setDetailAction] = useState<ClientAction | null>(null);
+  const [detailActionSubmitting, setDetailActionSubmitting] = useState(false);
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);
@@ -271,8 +273,9 @@ export function InboxTab({
       setToast({ message: status === 'approved' ? 'Approved. Your team will handle implementation.' : 'Feedback sent to your team.', type: 'success' });
       setChangeRequestAction(null);
       setChangeRequestNote('');
-    } catch {
+    } catch (err) {
       setToast({ message: 'Failed to update action. Please try again.', type: 'error' });
+      throw err;
     }
   };
 
@@ -404,7 +407,7 @@ export function InboxTab({
                   <div className="flex items-center gap-2 mt-3">
                     {action.sourceType === 'content_decay' ? (
                       <>
-                        <Button size="sm" variant="primary" onClick={() => respondToClientAction(action.id, 'approved')}>
+                        <Button size="sm" variant="primary" onClick={() => respondToClientAction(action.id, 'approved').catch(() => {})}>
                           Approve
                         </Button>
                         {changeRequestAction !== action.id ? (
@@ -420,7 +423,7 @@ export function InboxTab({
                               placeholder="Add a note for your team…"
                               className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
                             />
-                            <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim())}>
+                            <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim()).catch(() => {})}>
                               Send
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => { setChangeRequestAction(null); setChangeRequestNote(''); }}>
@@ -708,7 +711,36 @@ export function InboxTab({
           onClose={() => setSchemaModalOpen(false)}
         />
       )}
-      {detailAction && null /* ClientActionDetailModal mounted in Task 7 */}
+      {/* Tier-3 Client Action Detail Modal */}
+      {detailAction && (
+        <ClientActionDetailModal
+          action={detailAction}
+          submitting={detailActionSubmitting}
+          onApprove={async () => {
+            setDetailActionSubmitting(true);
+            try {
+              await respondToClientAction(detailAction.id, 'approved');
+              setDetailAction(null);
+            } catch {
+              // error already toasted in respondToClientAction; keep modal open for retry
+            } finally {
+              setDetailActionSubmitting(false);
+            }
+          }}
+          onRequestChanges={async (note) => {
+            setDetailActionSubmitting(true);
+            try {
+              await respondToClientAction(detailAction.id, 'changes_requested', note);
+              setDetailAction(null);
+            } catch {
+              // error already toasted; keep modal open for retry
+            } finally {
+              setDetailActionSubmitting(false);
+            }
+          }}
+          onClose={() => setDetailAction(null)}
+        />
+      )}
     </div>
   );
 }
