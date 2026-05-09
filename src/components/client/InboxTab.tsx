@@ -11,6 +11,7 @@ import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import { ClientCopyReview } from './ClientCopyReview';
+import { SchemaReviewModal } from './SchemaReviewModal';
 import { PriorityStrip } from './PriorityStrip';
 import type { PriorityItem } from './PriorityStrip';
 import type { Tier } from '../ui';
@@ -699,7 +700,14 @@ export function InboxTab({
       )}
 
       {/* Modals wired in Tasks 6 & 7 — state holders keep compile green */}
-      {schemaModalOpen && null /* SchemaReviewModal mounted in Task 6 */}
+      {/* Schema Review Modal */}
+      {schemaModalOpen && (
+        <SchemaReviewModal
+          workspaceId={workspaceId}
+          setToast={setToast}
+          onClose={() => setSchemaModalOpen(false)}
+        />
+      )}
       {detailAction && null /* ClientActionDetailModal mounted in Task 7 */}
     </div>
   );

@@ -135,6 +135,7 @@
   --z-tooltip: 30;
   --z-modal-backdrop: 40;
   --z-modal: 50;
+  --z-modal-fullscreen: 55; /* Full-screen takeover modals (above chat widgets / standard modals) */
   --z-toast: 60;
 }
 
