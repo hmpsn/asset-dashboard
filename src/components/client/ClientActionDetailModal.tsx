@@ -177,7 +177,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
           <ul className="space-y-1.5">
             {contentGaps.map((gap, i) => (
               <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-[50%] bg-amber-400 flex-shrink-0" />
                 {gap}
               </li>
             ))}
@@ -190,7 +190,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
           <ul className="space-y-1.5">
             {opportunities.map((opp, i) => (
               <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-[50%] bg-teal-400 flex-shrink-0" />
                 {opp}
               </li>
             ))}
