@@ -141,11 +141,16 @@ function rowToDraft(row: BriefingRow): BriefingDraft {
     workspaceId: row.workspace_id,
     weekOf: row.week_of,
     status: row.status,
-    stories: parseJsonSafeArray(row.stories, briefingStorySchema, {
-      workspaceId: row.workspace_id,
-      field: 'stories',
-      table: 'briefing_drafts',
-    }),
+    stories: parseJsonSafeArray(
+      // Migrate legacy 'schema-review' drillIn.page values before Zod validates.
+      // 'schema-review' was a valid ExplorePage until feat/client-inbox-redesign Phase 2 retired
+      // the standalone tab. Replace in the raw JSON string so historical briefings are not
+      // silently dropped by parseJsonSafeArray. JSON.stringify never adds spaces after colons,
+      // so the pattern "page":"schema-review" is safe and precise.
+      row.stories ? row.stories.replace(/"page":"schema-review"/g, '"page":"health"') : row.stories,
+      briefingStorySchema,
+      { workspaceId: row.workspace_id, field: 'stories', table: 'briefing_drafts' },
+    ),
     sourceMetadata: row.source_metadata
       ? parseJsonSafe(row.source_metadata, sourceMetadataSchema, null, {
           workspaceId: row.workspace_id,
