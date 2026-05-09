@@ -130,6 +130,7 @@ export function InboxTab({
   const [mode, setMode] = useState<InboxMode>('active');
   const [schemaModalOpen, setSchemaModalOpen] = useState(false);
   const [detailAction, setDetailAction] = useState<ClientAction | null>(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);
@@ -713,12 +714,18 @@ export function InboxTab({
       {detailAction && (
         <ClientActionDetailModal
           action={detailAction}
-          submitting={false}
+          submitting={actionSubmitting}
           onApprove={() => {
-            respondToClientAction(detailAction.id, 'approved').then(() => setDetailAction(null));
+            setActionSubmitting(true);
+            respondToClientAction(detailAction.id, 'approved')
+              .then(() => setDetailAction(null))
+              .finally(() => setActionSubmitting(false));
           }}
           onRequestChanges={(note) => {
-            respondToClientAction(detailAction.id, 'changes_requested', note).then(() => setDetailAction(null));
+            setActionSubmitting(true);
+            respondToClientAction(detailAction.id, 'changes_requested', note)
+              .then(() => setDetailAction(null))
+              .finally(() => setActionSubmitting(false));
           }}
           onClose={() => setDetailAction(null)}
         />

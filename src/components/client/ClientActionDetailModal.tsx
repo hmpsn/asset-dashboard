@@ -33,53 +33,42 @@ interface ClientActionDetailModalProps {
 // ── Payload renderers ──────────────────────────────────────────────────────
 
 function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
-  const { suggestions } = payload;
-  if (!suggestions?.length) {
-    return (
-      <div className="flex items-center gap-2 text-[var(--brand-text-muted)]">
-        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span className="t-body">No link suggestions found in this action.</span>
-      </div>
-    );
+  const suggestions: InternalLinkItem[] = payload.suggestions ?? [];
+  if (suggestions.length === 0) {
+    return <p className="t-body text-[var(--brand-text-muted)]">No link suggestions in this batch.</p>;
   }
   return (
-    <div className="space-y-4">
-      <p className="t-body text-[var(--brand-text-muted)]">
-        {suggestions.length} internal link suggestion{suggestions.length !== 1 ? 's' : ''} to review.
-      </p>
-      <div className="space-y-3">
-        {suggestions.map((item: InternalLinkItem, i: number) => (
-          <div
-            key={i}
-            className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-2"
-          >
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <span className="t-body font-medium text-[var(--brand-text-bright)]">
-                &ldquo;{item.anchorText}&rdquo;
-              </span>
-              <a
-                href={item.targetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 t-caption text-teal-400 hover:text-teal-300 transition-colors"
-              >
-                {item.targetTitle ?? item.targetUrl}
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-            {item.sourcePage && (
-              <p className="t-caption text-[var(--brand-text-muted)]">
-                Source: <span className="text-[var(--brand-text)]">{item.sourcePage}</span>
-              </p>
-            )}
-            {item.contextSnippet && (
-              <blockquote className="border-l-2 border-[var(--brand-border)] pl-3 t-caption text-[var(--brand-text-muted)] italic">
-                {item.contextSnippet}
-              </blockquote>
-            )}
-          </div>
-        ))}
-      </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="border-b border-[var(--brand-border)]">
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Anchor text</th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Target URL</th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Source page</th>
+            <th className="py-2 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">Context</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--brand-border)]">
+          {suggestions.map((s, i) => (
+            <tr key={i}>
+              <td className="py-3 pr-4 t-ui font-medium text-[var(--brand-text-bright)] align-top">{s.anchorText}</td>
+              <td className="py-3 pr-4 align-top">
+                <a
+                  href={s.targetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="t-caption text-accent-brand hover:underline flex items-center gap-1"
+                >
+                  {s.targetTitle || s.targetUrl}
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+              </td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-muted)] align-top">{s.sourcePage || '—'}</td>
+              <td className="py-3 t-caption text-[var(--brand-text-muted)] align-top max-w-xs">{s.contextSnippet || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -126,6 +115,9 @@ function RedirectProposalRenderer({ payload }: { payload: RedirectProposalPayloa
 }
 
 function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload }) {
+  if (!payload) {
+    return <p className="t-body text-[var(--brand-text-muted)]">No strategy data available.</p>;
+  }
   const { mappedPages = [], quickWins = [], contentGaps = [], opportunities = [] } = payload;
   return (
     <div className="space-y-6">
