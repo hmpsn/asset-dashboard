@@ -21,6 +21,16 @@ import type {
   AeoChangeDiff,
 } from '../../../shared/types/client-actions';
 
+/** Allow only http/https URLs in rendered <a> tags — blocks javascript: and data: schemes. */
+function safeHref(url: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : undefined;
+  } catch {
+    return undefined; // relative or malformed URL — don't render as href
+  }
+}
+
 interface ClientActionDetailModalProps {
   action: ClientAction;
   onApprove: () => void;
@@ -53,7 +63,7 @@ function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
               <td className="py-3 pr-4 t-ui font-medium text-[var(--brand-text-bright)] align-top">{s.anchorText}</td>
               <td className="py-3 pr-4 align-top">
                 <a
-                  href={s.targetUrl}
+                  href={safeHref(s.targetUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="t-caption text-accent-brand hover:underline flex items-center gap-1"
@@ -122,7 +132,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
     <div className="space-y-6">
       {mappedPages.length > 0 && (
         <section>
-          <h3 className="t-label text-[var(--brand-text)] mb-3">Mapped Pages</h3>
+          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Mapped Pages</h3>
           <div className="rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
             <table className="w-full t-caption text-[var(--brand-text)]">
               <thead className="bg-[var(--surface-3)] border-b border-[var(--brand-border)]">
@@ -149,7 +159,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
       )}
       {quickWins.length > 0 && (
         <section>
-          <h3 className="t-label text-[var(--brand-text)] mb-3">Quick Wins</h3>
+          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Quick Wins</h3>
           <div className="space-y-2">
             {quickWins.map((qw, i) => (
               <div key={i} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-3">
@@ -164,7 +174,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
       )}
       {contentGaps.length > 0 && (
         <section>
-          <h3 className="t-label text-[var(--brand-text)] mb-3">Content Gaps</h3>
+          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Content Gaps</h3>
           <ul className="space-y-1.5">
             {contentGaps.map((gap, i) => (
               <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
@@ -177,7 +187,7 @@ function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload 
       )}
       {opportunities.length > 0 && (
         <section>
-          <h3 className="t-label text-[var(--brand-text)] mb-3">Opportunities</h3>
+          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Opportunities</h3>
           <ul className="space-y-1.5">
             {opportunities.map((opp, i) => (
               <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
@@ -228,7 +238,7 @@ function AeoChangeRenderer({ payload }: { payload: AeoChangePayload }) {
                 <p className="t-body text-[var(--brand-text)]">{diff.current}</p>
               </div>
               <div className="p-4 bg-teal-500/5">
-                <p className="t-caption text-teal-400 mb-2 font-medium uppercase tracking-wide">Proposed</p>
+                <p className="t-caption text-accent-brand mb-2 font-medium uppercase tracking-wide">Proposed</p>
                 <p className="t-body text-[var(--brand-text-bright)]">{diff.proposed}</p>
               </div>
             </div>

@@ -721,6 +721,8 @@ export function InboxTab({
             try {
               await respondToClientAction(detailAction.id, 'approved');
               setDetailAction(null);
+            } catch {
+              // error already toasted in respondToClientAction; keep modal open for retry
             } finally {
               setDetailActionSubmitting(false);
             }
@@ -730,6 +732,8 @@ export function InboxTab({
             try {
               await respondToClientAction(detailAction.id, 'changes_requested', note);
               setDetailAction(null);
+            } catch {
+              // error already toasted; keep modal open for retry
             } finally {
               setDetailActionSubmitting(false);
             }
