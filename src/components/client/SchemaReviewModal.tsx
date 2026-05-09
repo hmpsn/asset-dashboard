@@ -31,11 +31,11 @@ export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaRevi
       }
       role="dialog"
       aria-modal="true"
-      aria-label="Schema plan review"
+      aria-labelledby="schema-review-modal-title"
     >
       {/* Modal header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
-        <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
+        <h2 id="schema-review-modal-title" className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
         {/* autoFocus moves keyboard focus into the modal on open (WAI-ARIA focus management) */}
         <button
           type="button"
