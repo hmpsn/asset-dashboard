@@ -4,6 +4,7 @@
  * Replaces the standalone 'schema-review' ClientTab (removed in Phase 2A).
  * Triggered from the schema plan card in InboxTab's SEO Changes section.
  */
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { SchemaReviewTab } from './SchemaReviewTab';
 
@@ -14,6 +15,15 @@ interface SchemaReviewModalProps {
 }
 
 export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaReviewModalProps) {
+  // Close on Escape — required for dialog role (WAI-ARIA Authoring Practices)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', handleKey); // keydown-ok — full-screen modal intentionally handles Escape globally while open
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
   return (
     <div
       className={
@@ -26,10 +36,12 @@ export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaRevi
       {/* Modal header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
         <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
+        {/* autoFocus moves keyboard focus into the modal on open (WAI-ARIA focus management) */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close schema review"
+          autoFocus
           className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
         >
           <X className="w-5 h-5" />
