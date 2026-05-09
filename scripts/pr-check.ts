@@ -5102,6 +5102,47 @@ export const CHECKS: Check[] = [
     severity: 'error',
     rationale: "semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct.",
   },
+  {
+    // Flags old InboxFilter string literals that were renamed in the inbox redesign.
+    // After 2026-05-08 inbox redesign: 'approvals'→'seo-changes', 'requests'→'needs-action',
+    // 'content-plan'→'needs-action', 'copy'→'content' as filter values.
+    // These must not reappear as ?tab= values in src/ after migration.
+    // Implemented as customCheck so comment-only lines (e.g. backward-compat doc
+    // in App.tsx) are skipped without needing per-file escape hatches.
+    name: 'inbox-legacy-filter-literal',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['inbox-legacy-filter-literal-ok'],
+    message:
+      "Old inbox filter value — update to new InboxFilter value. See 2026-05-08 inbox redesign: 'approvals'→'seo-changes', 'requests'→'needs-action', 'content-plan'→'needs-action', 'copy'→'content'. Add // inbox-legacy-filter-literal-ok if intentional.",
+    severity: 'error',
+    rationale:
+      "Prevents re-introduction of retired InboxFilter literals (?tab=approvals, ?tab=requests, ?tab=content-plan, ?tab=copy) after the 2026-05-08 inbox redesign renamed them.",
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const legacyRe = /[?&]tab=(approvals|requests|content-plan|copy)(?=['"`& ]|$)/;
+      for (const file of files) {
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        if (!file.includes('/src/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!legacyRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!legacyRe.test(line)) continue;
+          // Skip pure comment lines — backward-compat documentation in App.tsx
+          // and similar files legitimately references old URL formats in comments.
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, 'inbox-legacy-filter-literal-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
