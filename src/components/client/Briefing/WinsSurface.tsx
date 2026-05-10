@@ -1,6 +1,6 @@
 // src/components/client/Briefing/WinsSurface.tsx
 import { Sparkles } from 'lucide-react';
-import { SectionCard, Skeleton, Icon } from '../../ui';
+import { SectionCard, Skeleton, Icon, EmptyState } from '../../ui';
 import { TierGate } from '../../ui/TierGate';
 import { useClientOutcomeWins } from '../../../hooks/client/useClientOutcomes';
 import type { Tier } from '../../ui/TierGate';
@@ -28,12 +28,12 @@ function actionLabel(type: ActionType): string {
 // ── Relative time ──────────────────────────────────────────────────────────
 
 function relativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
+  const diff = Math.max(0, Date.now() - new Date(isoDate).getTime());
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   if (days === 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30);
+  const months = Math.floor(days / 30.44); // 30.44 ≈ avg days/month
   return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
@@ -47,8 +47,9 @@ function ScoreBadge({ score }: { score: OutcomeScore }) {
       </span>
     );
   }
+  // "Win" is a success-status badge — not a CTA — so emerald/neutral, not teal (Four Laws: teal = actions only)
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-[var(--surface-3)] text-accent-brand border border-[var(--brand-border)]">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-emerald-500/8 text-[var(--brand-text-bright)] border border-emerald-500/20">
       Win
     </span>
   );
@@ -94,7 +95,7 @@ interface WinsSurfaceProps {
 }
 
 export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
-  const { data: wins = [], isLoading } = useClientOutcomeWins(workspaceId);
+  const { data: wins = [], isLoading, isError } = useClientOutcomeWins(workspaceId);
 
   const body = (
     <>
@@ -105,12 +106,19 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
           <Skeleton className="h-12 w-full" />
         </div>
       )}
-      {!isLoading && wins.length === 0 && (
+      {!isLoading && isError && (
         <p className="t-caption text-[var(--brand-text-muted)] py-4">
-          We're working — wins appear here once your changes start showing measurable impact.
+          Couldn't load wins — try refreshing the page.
         </p>
       )}
-      {!isLoading && wins.length > 0 && (
+      {!isLoading && !isError && wins.length === 0 && (
+        <EmptyState
+          icon={Sparkles}
+          title="Wins are building"
+          description="We're working — wins appear here once your changes start showing measurable impact."
+        />
+      )}
+      {!isLoading && !isError && wins.length > 0 && (
         <>
           <div>
             {wins.map(w => <WinRow key={w.actionId} entry={w} />)}
@@ -133,7 +141,7 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
   return (
     <SectionCard
       title="What we shipped"
-      titleIcon={<Icon as={Sparkles} size="md" className="text-accent-success" />}
+      titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
     >
       {effectiveTier === 'free' ? (
         <TierGate

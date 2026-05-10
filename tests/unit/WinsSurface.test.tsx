@@ -35,37 +35,39 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe('WinsSurface', () => {
   it('renders "What we shipped" heading', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('What we shipped')).toBeInTheDocument();
   });
 
   it('renders human label for meta_updated action type', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('Updated meta description')).toBeInTheDocument();
   });
 
   it('renders "Win" badge for score=win', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin({ score: 'win' })], isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin({ score: 'win' })], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('Win')).toBeInTheDocument();
   });
 
   it('renders "Strong win" badge for score=strong_win', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin({ score: 'strong_win' })], isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin({ score: 'strong_win' })], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('Strong win')).toBeInTheDocument();
   });
 
   it('shows empty state when wins is []', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [], isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    // EmptyState renders title + description
+    expect(screen.getByText('Wins are building')).toBeInTheDocument();
     expect(screen.getByText(/We're working/)).toBeInTheDocument();
   });
 
   it('shows skeleton rows when loading', () => {
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: undefined, isLoading: true });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: undefined, isLoading: true, isError: false });
     const { container } = renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     const skeletons = container.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
@@ -73,7 +75,7 @@ describe('WinsSurface', () => {
 
   it('shows "See full history" link when exactly 10 wins returned', () => {
     const wins = Array.from({ length: 10 }, (_, i) => mockWin({ actionId: `act-${i}` }));
-    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: wins, isLoading: false });
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: wins, isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('See full history →')).toBeInTheDocument();
   });
