@@ -159,11 +159,10 @@ export function ActionQueueStrip({
           {chip.count} {chip.label}
         </button>
       ))}
-      {/* TODO PR 1.2: update escalation pill to ?tab=decisions once InboxTab adds 'decisions' filter value */}
       {showEscalation && escalationLabel && (
         <button
           type="button"
-          onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=seo-changes`)}
+          onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=decisions`)}
           className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
           aria-label={`${staleCount} urgent items pending`}
         >
