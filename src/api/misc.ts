@@ -43,7 +43,7 @@ export const publicRequests = {
 
 // ── Approvals ───────────────────────────────────────────────────
 export const approvals = {
-  create: (wsId: string, body: Record<string, unknown>) =>
+  create: (wsId: string, body: Record<string, unknown> & { note?: string }) =>
     post<unknown>(`/api/approvals/${wsId}`, body),
 
   list: (wsId: string) =>
