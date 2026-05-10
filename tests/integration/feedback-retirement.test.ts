@@ -1,13 +1,15 @@
 /**
  * Retirement verification test for the feedback system.
  *
- * This test suite MUST FAIL until all feedback routes and table are removed.
- * It asserts that every feedback endpoint returns 404 (route does not exist),
- * proving the legacy `feedback` table and its surrounding code are gone.
+ * Uses vitest's `it.fails()` so the suite is GREEN in CI before removal
+ * (tests are expected to fail) and turns RED after removal (the expected
+ * failure unexpectedly passes), giving a clear "go remove it.fails()" signal.
  *
  * TDD workflow:
- *  - Before removal: tests fail (routes return 200/400, not 404) — EXPECTED
- *  - After removal:  tests pass (routes return 404)
+ *  - Before removal: routes return 200/400 → expect(404) fails → it.fails() sees
+ *    expected failure → suite GREEN.
+ *  - After removal:  routes return 404 → expect(404) passes → it.fails() sees
+ *    unexpected pass → suite RED → signal to convert it.fails() → it() and ship.
  *
  * Design notes:
  * - A real workspace is created so public routes advance past the workspace-not-found
@@ -60,8 +62,8 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(async () => {
-  if (testWsId) deleteWorkspace(testWsId);
   await ctx.stopServer();
+  if (testWsId) deleteWorkspace(testWsId);
 });
 
 // ---------------------------------------------------------------------------
@@ -69,17 +71,20 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('Feedback retirement — admin endpoints must return 404', () => {
-  it('GET /api/feedback returns 404', async () => {
+  // it.fails(): route still exists → expect(404) fails → suite stays GREEN.
+  // After retirement: route gone → expect(404) passes → it.fails() turns RED →
+  // signal to remove it.fails() wrapper and ship the final green suite.
+  it.fails('GET /api/feedback returns 404', async () => {
     const res = await api('/api/feedback');
     expect(res.status).toBe(404);
   });
 
-  it('GET /api/feedback/:wsId returns 404', async () => {
+  it.fails('GET /api/feedback/:wsId returns 404', async () => {
     const res = await api(`/api/feedback/${testWsId}`);
     expect(res.status).toBe(404);
   });
 
-  it('PATCH /api/feedback/:wsId/:id returns 404', async () => {
+  it.fails('PATCH /api/feedback/:wsId/:id returns 404', async () => {
     // Real item ID — currently returns 200 (item updated). 404 after retirement.
     const res = await patchJson(`/api/feedback/${testWsId}/${sentinelItemId}`, {
       status: 'acknowledged',
@@ -87,7 +92,7 @@ describe('Feedback retirement — admin endpoints must return 404', () => {
     expect(res.status).toBe(404);
   });
 
-  it('POST /api/feedback/:wsId/:id/reply returns 404', async () => {
+  it.fails('POST /api/feedback/:wsId/:id/reply returns 404', async () => {
     // Real item ID — currently returns 200 (reply added). 404 after retirement.
     const res = await postJson(`/api/feedback/${testWsId}/${sentinelItemId}/reply`, {
       content: 'Retirement test reply',
@@ -95,7 +100,7 @@ describe('Feedback retirement — admin endpoints must return 404', () => {
     expect(res.status).toBe(404);
   });
 
-  it('DELETE /api/feedback/:wsId/:id returns 404', async () => {
+  it.fails('DELETE /api/feedback/:wsId/:id returns 404', async () => {
     // Separate item so it does not affect public reply test. 404 after retirement.
     const res = await del(`/api/feedback/${testWsId}/${deleteTargetItemId}`);
     expect(res.status).toBe(404);
@@ -108,8 +113,8 @@ describe('Feedback retirement — admin endpoints must return 404', () => {
 // ---------------------------------------------------------------------------
 
 describe('Feedback retirement — public endpoints must return 404', () => {
-  it('POST /api/public/feedback/:wsId returns 404', async () => {
-    // Real workspace, no clientPassword → requireClientPortalAuth() passes.
+  it.fails('POST /api/public/feedback/:wsId returns 404', async () => {
+    // Real workspace needed: the route middleware has an explicit !ws guard that returns 404 before reaching the route handler. Without a real workspace this would produce a wrong-reason 404.
     // Currently returns 200 (feedback created). 404 after retirement.
     const res = await postJson(`/api/public/feedback/${testWsId}`, {
       type: 'general',
@@ -119,13 +124,13 @@ describe('Feedback retirement — public endpoints must return 404', () => {
     expect(res.status).toBe(404);
   });
 
-  it('GET /api/public/feedback/:wsId returns 404', async () => {
+  it.fails('GET /api/public/feedback/:wsId returns 404', async () => {
     // Currently returns 200 (array of items). 404 after retirement.
     const res = await api(`/api/public/feedback/${testWsId}`);
     expect(res.status).toBe(404);
   });
 
-  it('POST /api/public/feedback/:wsId/:id/reply returns 404', async () => {
+  it.fails('POST /api/public/feedback/:wsId/:id/reply returns 404', async () => {
     // Real item ID (sentinel, not the delete target) — currently returns 200.
     // 404 after retirement.
     const res = await postJson(
