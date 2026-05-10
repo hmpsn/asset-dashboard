@@ -80,6 +80,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
+  const [note, setNote] = useState('');
 
   // Load saved redirect snapshot on mount
   useEffect(() => {
@@ -179,6 +180,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         title: `Redirect recommendations (${acceptedRules.length})`,
         summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are manual or agency-executed for v1 and are not written directly to Webflow by the client.`,
         priority: acceptedRules.length > 3 ? 'high' : 'medium',
+        clientNote: note.trim() || undefined,
         payload: {
           scannedAt: snapshotDate || data?.scannedAt,
           rules: acceptedRules,
@@ -375,6 +377,17 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
               </div>
             )}
           </div>
+          {acceptedRules.length > 0 && workspaceId && !sentToClient && (
+            <div className="px-4 py-3 border-b border-[var(--brand-border)]">
+              <textarea
+                rows={2}
+                placeholder="Add a note for your client (optional)"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)]"
+              />
+            </div>
+          )}
           <div className="divide-y divide-[var(--brand-border)]/50 max-h-[300px] overflow-y-auto">
             {rules.map(rule => (
               <div key={rule.from} className="px-4 py-3">
