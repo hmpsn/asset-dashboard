@@ -24,6 +24,8 @@ export interface ApprovalBatch {
   name: string;
   items: ApprovalItem[];
   status: 'pending' | 'partial' | 'approved' | 'rejected' | 'applied';
+  /** Admin note attached at send-time. When present, signals client Conversations routing (PR 1.2). */
+  note?: string;
   createdAt: string;
   updatedAt: string;
 }

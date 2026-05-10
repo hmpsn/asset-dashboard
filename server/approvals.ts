@@ -20,14 +20,15 @@ interface BatchRow {
   name: string;
   items: string;
   status: string;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
-    `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
-         VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)`,
+    `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, note, created_at, updated_at)
+         VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @note, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM approval_batches WHERE workspace_id = ?`,
@@ -70,6 +71,7 @@ function rowToBatch(row: BatchRow): ApprovalBatch {
     name: row.name,
     items,
     status: row.status as ApprovalBatch['status'],
+    note: row.note ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -79,7 +81,8 @@ export function createBatch(
   workspaceId: string,
   siteId: string,
   name: string,
-  items: Omit<ApprovalItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>[]
+  items: Omit<ApprovalItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>[],
+  note?: string
 ): ApprovalBatch {
   const now = new Date().toISOString();
   const batch: ApprovalBatch = {
@@ -95,6 +98,7 @@ export function createBatch(
       updatedAt: now,
     })),
     status: 'pending',
+    note,
     createdAt: now,
     updatedAt: now,
   };
@@ -105,6 +109,7 @@ export function createBatch(
     name,
     items: JSON.stringify(batch.items),
     status: batch.status,
+    note: note ?? null,
     created_at: now,
     updated_at: now,
   });

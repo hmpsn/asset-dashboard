@@ -68,6 +68,7 @@ function approvalActivityLabel(field: string): string {
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
   name: z.string().optional().default('SEO Changes'),
+  note: z.string().max(2000).optional(),
   items: z.array(z.object({
     id: z.string().optional(),
     pageId: z.string(),
@@ -88,8 +89,8 @@ const updateItemSchema = z.object({
 
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
-  const { siteId, name, items } = req.body;
-  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
+  const { siteId, name, note, items } = req.body;
+  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items, note);
   // Track all pages in this batch as in-review
   for (const item of items) {
     if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });
