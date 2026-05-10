@@ -40,15 +40,17 @@ Each PR follows this exact sequence. Do not skip steps.
    - Fresh implementer subagent per task
    - Two-stage review per task (spec compliance → code quality)
    - Re-review until clean before next task
-6. **Final scaled code review** — use `scaled-code-review` skill across the full PR diff
-7. **Codex independent review** — open the PR as draft, request Codex review, address findings
-8. **Verification gate** before marking PR ready: `npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts` — ALL green, no warnings
-9. **Open PR** to `staging` branch
-10. **Wait for staging CI** — green required
-11. **Wait for staging deploy + smoke test** — curl any endpoints touched by this PR, verify response shape
-12. **Merge to main** if all green
-13. **Wait for main CI** to confirm production deploy succeeds
-14. **Move to next PR**
+6. **Local verification gate** — `npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts` — ALL green, no warnings. Fix and re-run until clean.
+7. **Open PR as DRAFT** to `staging` branch (the PR is the artifact for all subsequent review)
+8. **Scaled code review** — run `scaled-code-review` skill against the open PR diff (uses git SHAs from the PR). Capture all findings.
+9. **Codex independent review** — request Codex review on the same draft PR. Capture all findings.
+10. **Address findings** — fix every Critical and Important finding from BOTH reviews. Push fix commits to the PR. Re-run local verification gate. If significant changes (>20 lines), re-request scaled-review and Codex review on the updated diff.
+11. **Mark PR ready for review** (un-draft) once all Critical/Important findings resolved
+12. **Wait for staging CI** — green required
+13. **Wait for staging deploy + smoke test** — curl any endpoints touched by this PR, verify response shape
+14. **Merge to main** if all green (use squash or merge commit per project convention)
+15. **Wait for main CI** to confirm production deploy succeeds
+16. **Move to next PR** — only after this one is fully merged to main with green CI
 
 ---
 
