@@ -77,10 +77,10 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it('redirects legacy ?tab=content to the unified inbox content filter', () => {
+  it('redirects legacy ?tab=content to the unified inbox reviews filter', () => {
     const { getByTestId } = renderRoutes('/client/ws_test?tab=content');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('content');
+    expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 
   it('preserves /client/:id/inbox?tab=X without redirecting', () => {
@@ -109,36 +109,36 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it('redirects legacy /client/:id/content to the inbox content filter', () => {
+  it('redirects legacy /client/:id/content to the inbox reviews filter', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/content');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('content');
+    expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 
-  it('redirects legacy /client/:id/requests to the inbox needs-action filter', () => {
+  it('redirects legacy /client/:id/requests to the inbox conversations filter', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/requests');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('needs-action');
+    expect(getByTestId('tabParam').textContent).toBe('conversations');
   });
 
-  it('redirects legacy /client/:id/approvals to the inbox seo-changes filter', () => {
+  it('redirects legacy /client/:id/approvals to the inbox decisions filter', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/approvals');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('seo-changes');
+    expect(getByTestId('tabParam').textContent).toBe('decisions');
   });
 });
 
 describe('clientPath legacy client inbox aliases', () => {
-  it('points content navigation at the inbox content filter', () => {
-    expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/inbox?tab=content');
+  it('points content navigation at the inbox reviews filter', () => {
+    expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 
-  it('points requests navigation at the inbox needs-action filter', () => {
-    expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/inbox?tab=needs-action');
+  it('points requests navigation at the inbox conversations filter', () => {
+    expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/inbox?tab=conversations');
   });
 
-  it('points approvals navigation at the inbox seo-changes filter', () => {
-    expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/inbox?tab=seo-changes');
+  it('points approvals navigation at the inbox decisions filter', () => {
+    expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/inbox?tab=decisions');
   });
 
   it('preserves normal client tab paths', () => {
