@@ -789,7 +789,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         workspaceId={workspaceId}
         ws={ws}
         onApiChange={api => setChatApi(api)}
-        onExpandedChange={undefined}
       />
 
 

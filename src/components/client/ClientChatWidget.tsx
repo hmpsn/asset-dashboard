@@ -25,8 +25,6 @@ export interface ClientChatWidgetProps {
   ws: WorkspaceInfo | null;
   /** Called whenever the API surface (openChat, askAi) changes. */
   onApiChange?: (api: ClientChatWidgetApi) => void;
-  /** Called when the expanded state changes. */
-  onExpandedChange?: (expanded: boolean) => void;
   /**
    * Override the default quick-question buttons shown in the empty chat state.
    * When omitted, the widget falls back to `QUICK_QUESTIONS` from `./types`.
@@ -43,7 +41,6 @@ export function ClientChatWidget({
   workspaceId,
   ws,
   onApiChange,
-  onExpandedChange,
   quickQuestions,
 }: ClientChatWidgetProps) {
   const clientNavigate = useNavigate();
@@ -87,14 +84,6 @@ export function ClientChatWidget({
   useEffect(() => {
     onApiChangeRef.current?.(api);
   }, [api]);
-
-  // Bubble up expanded state
-  const onExpandedChangeRef = useRef(onExpandedChange);
-  onExpandedChangeRef.current = onExpandedChange;
-
-  useEffect(() => {
-    onExpandedChangeRef.current?.(chatExpanded);
-  }, [chatExpanded]);
 
   const { overview, audit, ga4Overview } = chatDeps;
   if (!overview && !audit && !ga4Overview) return null;
