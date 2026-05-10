@@ -4,7 +4,6 @@ import type { ApprovalBatch } from '../../shared/types/approvals.js';
 import type { ChurnSignal } from '../churn-signals.js';
 import type { ROIData } from '../roi.js';
 import type { SafeClientUser } from '../../shared/types/users.js';
-import type { FeedbackItem } from '../feedback.js';
 import type { ClientRequest } from '../../shared/types/requests.js';
 import type { SessionSummary } from '../chat-memory.js';
 import { createLogger } from '../logger.js';
@@ -239,21 +238,6 @@ export async function assembleClientSignals(
     log.debug({ err, workspaceId }, 'assembleClientSignals: ROI data optional, degrading gracefully');
   }
 
-  // Feedback items
-  let feedbackItems: ClientSignalsSlice['feedbackItems'] = [];
-  try {
-    const { listFeedback } = await import('../feedback.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-    const items = listFeedback(workspaceId);
-    feedbackItems = items.slice(0, 10).map((f: FeedbackItem) => ({
-      id: f.id,
-      type: f.type ?? 'general',
-      status: f.status ?? 'new',
-      createdAt: f.createdAt ?? '',
-    }));
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'assembleClientSignals: feedback items optional, degrading gracefully');
-  }
-
   // Service requests
   let serviceRequests = { pending: 0, total: 0 };
   try {
@@ -372,7 +356,6 @@ export async function assembleClientSignals(
     roi,
     engagement,
     compositeHealthScore,
-    feedbackItems,
     serviceRequests,
     intentSignals,
     latestBriefing,

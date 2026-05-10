@@ -54,7 +54,6 @@ import churnSignalsRoutes from './routes/churn-signals.js';
 import anomaliesRoutes from './routes/anomalies.js';
 import insightsRoutes from './routes/insights.js';
 import miscRoutes from './routes/misc.js';
-import feedbackRoutes from './routes/feedback.js';
 import aeoReviewRoutes from './routes/aeo-review.js';
 import seoChangeTrackerRoutes from './routes/seo-change-tracker.js';
 import dataExportRoutes from './routes/data-export.js';
@@ -291,7 +290,6 @@ export function createApp(): express.Express {
   app.use(anomaliesRoutes);
   app.use(insightsRoutes);
   app.use(miscRoutes);
-  app.use(feedbackRoutes);
   app.use(aeoReviewRoutes);
   app.use(seoChangeTrackerRoutes);
   registerContentRoutes(app);
