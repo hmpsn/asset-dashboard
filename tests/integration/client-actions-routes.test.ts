@@ -138,7 +138,7 @@ describe('client action routes', () => {
 
   it('keeps action IDs scoped to their workspace for admin reads and updates', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
+      sourceType: 'aeo_change',
       title: 'Workspace-scoped action',
       summary: 'This action belongs to the primary workspace only.',
     });
@@ -326,7 +326,7 @@ describe('client action routes', () => {
 
   it('rejects invalid admin status transitions', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
+      sourceType: 'aeo_change',
       title: 'Keyword strategy',
       summary: 'Review the strategy.',
     });

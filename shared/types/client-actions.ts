@@ -1,7 +1,6 @@
 export type ClientActionSourceType =
   | 'aeo_change'
   | 'internal_link'
-  | 'keyword_strategy'
   | 'redirect_proposal'
   | 'content_decay';
 
@@ -55,22 +54,6 @@ export interface RedirectItem {
 }
 export interface RedirectProposalPayload {
   redirects: RedirectItem[];
-}
-
-export interface KeywordStrategyPage {
-  page: string;
-  keyword: string;
-  currentPosition?: number;
-}
-export interface KeywordStrategyQuickWin {
-  keyword: string;
-  opportunity: string;
-}
-export interface KeywordStrategyPayload {
-  mappedPages?: KeywordStrategyPage[];
-  quickWins?: KeywordStrategyQuickWin[];
-  contentGaps?: string[];
-  opportunities?: string[];
 }
 
 export interface AeoChangeDiff {

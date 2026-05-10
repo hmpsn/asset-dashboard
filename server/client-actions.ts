@@ -21,7 +21,7 @@ interface ClientActionRow {
 }
 
 const validStatuses: ClientActionStatus[] = ['pending', 'approved', 'changes_requested', 'completed', 'archived'];
-const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'keyword_strategy', 'redirect_proposal', 'content_decay'];
+const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay'];
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
@@ -94,7 +94,7 @@ const stmts = createStmtCache(() => ({
 function rowToAction(row: ClientActionRow): ClientAction {
   const sourceType = validSources.includes(row.source_type as ClientActionSourceType)
     ? row.source_type as ClientActionSourceType
-    : 'keyword_strategy';
+    : 'aeo_change';  // fallback for any legacy rows with retired source types
   const status = validStatuses.includes(row.status as ClientActionStatus)
     ? row.status as ClientActionStatus
     : 'pending';

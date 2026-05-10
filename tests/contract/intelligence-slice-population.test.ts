@@ -229,9 +229,9 @@ vi.mock('../../server/client-actions.js', () => ({
     completed: 1,
     recentDecisions: [
       {
-        title: 'Keyword strategy',
+        title: 'AEO change review',
         status: 'approved',
-        sourceType: 'keyword_strategy',
+        sourceType: 'aeo_change',
         updatedAt: '2026-05-01T12:00:00Z',
       },
       {

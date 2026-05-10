@@ -124,7 +124,7 @@ describe('client action broadcasts and workflow side effects', () => {
   it('returns an existing active source action without duplicate broadcast or activity', async () => {
     const sourceId = 'broadcast:dedupe';
     const firstRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
+      sourceType: 'aeo_change',
       sourceId,
       title: 'Review keyword strategy',
       summary: 'Approve this keyword strategy.',
@@ -134,7 +134,7 @@ describe('client action broadcasts and workflow side effects', () => {
     expect(clientActionBroadcasts()).toHaveLength(1);
 
     const duplicateRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
+      sourceType: 'aeo_change',
       sourceId,
       title: 'Review keyword strategy again',
       summary: 'This should reuse the active action.',
