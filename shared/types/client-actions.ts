@@ -72,11 +72,15 @@ export interface AeoChangeDiff {
   priority?: 'high' | 'medium' | 'low';
 }
 
-/** Maps AeoEffort (admin internal) to client-facing effort tier. */
+const AEO_EFFORT_CLIENT_MAP: Record<AeoEffort, 'low' | 'medium' | 'high'> = {
+  quick: 'low',
+  moderate: 'medium',
+  significant: 'high',
+};
+
+/** Maps AeoEffort (admin internal) to client-facing effort tier. Exhaustiveness-checked via Record. */
 export function mapAeoEffortToClientEffort(e: AeoEffort): 'low' | 'medium' | 'high' {
-  if (e === 'quick') return 'low';
-  if (e === 'significant') return 'high';
-  return 'medium'; // 'moderate'
+  return AEO_EFFORT_CLIENT_MAP[e];
 }
 
 export interface AeoChangePayload {
