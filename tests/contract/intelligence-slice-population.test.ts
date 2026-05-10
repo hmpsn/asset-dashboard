@@ -826,11 +826,6 @@ describe('contract: ClientSignalsSlice field population', () => {
       expect(result.compositeHealthScore === null || typeof result.compositeHealthScore === 'number').toBe(true);
     }
 
-    // feedbackItems — retired; field is optional and no longer populated
-    if (result.feedbackItems !== undefined) {
-      expect(Array.isArray(result.feedbackItems)).toBe(true);
-    }
-
     // serviceRequests — assembler always sets this
     if (result.serviceRequests !== undefined) {
       expect(typeof result.serviceRequests.pending).toBe('number');
