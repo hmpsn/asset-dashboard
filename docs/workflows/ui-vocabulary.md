@@ -43,6 +43,10 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 | The place tasks live | **"Tasks"** (nav label) | Request Manager (internal name only) |
 | Client-facing dashboard | **"Client Dashboard"** | portal, client view |
 | Admin-facing dashboard | **"Command Center"** | admin panel, control panel |
+| Client inbox section — approvals/actions without note | **"Decisions"** | Approvals, Needs Action, SEO Changes |
+| Client inbox section — briefs/posts/copy | **"Reviews"** | Content, Briefs, Posts |
+| Client inbox section — approvals/actions with note + requests | **"Conversations"** | Requests, Messages |
+| Win quality indicator | **"Win"** / **"Strong win"** | "success", "confirmed win" |
 
 ## Overflow Menu Labels
 
@@ -50,6 +54,22 @@ When actions are behind a `⋮` (MoreVertical) overflow menu:
 
 - **"Send to Client"** — always first, purple text
 - **"Add to Tasks"** — always second, zinc text
+
+## Admin Send Convention (PR 1.4)
+
+All admin surfaces that send items to the client use a single button + optional inline note field:
+
+| Retired pattern | Current pattern |
+|-----------------|-----------------|
+| "Send for Review" + "Flag for Client" (two buttons) | "Send to client" (one button) |
+| Dual state variables `sendingReview` + `flagging` | Single `sending` state |
+
+**Button label:** `"Send to client"` (lowercase "to")  
+**Loading state:** `"Sending..."`  
+**Past-tense badge:** `"Sent"`  
+**Note routing:** note present → item lands in Conversations; no note → Decisions.
+
+Enforced by pr-check rule `send-for-review-anti-pattern`.
 
 ## Toast / Confirmation Messages
 
