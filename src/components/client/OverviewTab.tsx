@@ -328,7 +328,7 @@ export function OverviewTab({
     </ErrorBoundary>
     )}
 
-    {/* Predictions that came true — only render when server has populated the field (gated to growth+) */}
+    {/* Predictions that came true — only render when wins surface is off AND server has populated the field (growth+) */}
     {!winsEnabled && clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
 
     {/* Main content: insights + sidebar */}
