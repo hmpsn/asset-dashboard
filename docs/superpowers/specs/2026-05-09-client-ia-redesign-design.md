@@ -140,7 +140,11 @@ These rules govern how items get categorized at send-time and apply across all s
 
 **Rule 1 — Note presence routes to Conversations.** Any admin "Send to client" action with an attached note routes to **Conversations** (the team's note becomes the first message). Without a note, it routes to **Decisions** (or **Reviews** if long-form). This is a single mechanism that replaces the current SEO Audit double-button ("Send for Review" + "Flag for Client") and applies platform-wide.
 
-**Rule 2 — Length and inspection cost routes Decisions vs Reviews.** If the client's job is to scan a list and confirm, it's a Decision. If the client's job is to read prose / inspect strategy / edit content, it's a Review. The Schema Plan and content-bearing Content Plan cells move from Decisions to Reviews under this rule.
+**Rule 2 — Length and inspection cost routes Decisions vs Reviews.** If the client's job is to scan a list and confirm, it's a Decision. If the client's job is to read prose / inspect strategy / edit content, it's a Review. The Schema Plan moves from Decisions to Reviews under this rule.
+
+For content plan items, the discriminator is the entity type, not a field on a single type:
+- **`ContentPlanReviewCell` rows → Decisions** (cells are always topic-level placeholders in a calendar; never contain long-form content directly)
+- **`ClientContentRequest` at `client_review` status → Reviews** (the brief generated *from* a previously-approved topic — this is where long-form review happens)
 
 **Rule 3 — `keyword_strategy` is removed as a client_action.** Keyword strategy already has a dedicated SEO Strategy page with its own approval/feedback workflow. Surfacing it as an Inbox client_action duplicated the mental model. The `keyword_strategy` source type is deprecated; existing rows transition to `archived` status during Phase 1 migration.
 
@@ -299,10 +303,10 @@ These changes are pre-conditions for the section primitives to work cleanly. The
 
 ### 5.1 Retire the `feedback` table and FeedbackWidget
 
-- Remove `FeedbackWidget` from any page that mounts it
-- Migrate existing `feedback` rows to `requests` with `category: 'general'`
+- Remove `FeedbackWidget` from any page that mounts it (confirmed mounted in `src/components/ClientDashboard.tsx:916`)
+- Migrate existing `feedback` rows to `requests` with `category: 'general'` in the same migration that drops the table
 - Remove `/api/public/feedback/*` and `/api/feedback/*` routes
-- Drop the `feedback` table after a one-release grace period
+- **Drop the `feedback` table immediately** in the same migration (no grace period — `feedback` is platform-internal app feedback, not client-facing in any flow we support going forward)
 
 ### 5.2 Collapse SEO Audit double-button to one "Send to client"
 
@@ -331,62 +335,60 @@ The three schema entry points (per-page, bulk, strategic plan) all produce clien
 
 The action queue strip in the current InboxTab was compensating for the admin-shaped IA's fragmented urgency. The new Inbox carries urgency through chip counts and inline amber borders. Remove the in-Inbox priority strip. The Insights page ActionQueueStrip is **retained** (it serves a different purpose — compass for clients in the briefing context).
 
-### 5.7 Remove "we called it" tab from Insights page
+### 5.7 Hide "we called it" via feature flag
 
-Deprecated in this redesign. Can be reinstated if a use case re-emerges.
+`PredictionShowcaseCard` is rendered on `OverviewTab.tsx:331` from `clientIntel.weCalledIt` data. Phase 1 hides it behind a feature flag (default `false`) rather than deleting the component. Files involved (`WeCalledIt.tsx`, `PredictionShowcaseCard.tsx`, the `useClientOutcomes` "we called it" feed, the `WeCalledItEntry` type) are retained for potential future reinstatement under a redesigned use case.
 
 ---
 
 ## 6. Phase Plan
 
-This spec drives three implementation specs, each shipped independently as its own PR (staging → main per project convention).
+This spec drives **multiple small implementation specs**, each shipped as its own PR (staging → main per project convention). Phase 1 is sliced into 6 PRs to avoid monolith risk; Phase 2 stays as a focused refactor; Phase 3 expands into independent sub-projects.
 
-### Phase 1 — Restructure existing data into the new IA
+### Phase 1 — Restructure existing data into the new IA (6 PRs)
 
-**Goal:** Re-organize what exists today into the three-section Inbox + Wins surface, with minimal underlying-system changes.
+**Goal:** Re-organize what exists today into the three-section Inbox + Wins surface, with minimal underlying-system changes. Sliced into shippable units to keep individual PRs reviewable and to enable parallel development after the shared-contracts PR lands.
 
-**In scope:**
-- New three-section InboxTab (Decisions / Reviews / Conversations) with chip filters, source badges, and primitive shells
-- All existing source types re-routed per §3 (AEO, internal links, redirects, content decay, SEO Editor batches, schema batches/plan, briefs, posts, copy review, content plan cells, requests)
-- Trust-first Decisions primitive at standard scale (defer at-scale grouping/search to Phase 1.5 or Phase 2 if migration too large)
-- Reviews and Conversations primitives wrapping existing renderers
-- Wins surface on Insights page (basic chronological ledger)
-- ActionQueueStrip removal from Inbox; "we called it" tab removal from Insights
-- AeoChangeDiff payload enrichment (Rule 5)
-- Status simplification for client view (Rule 6)
-- `feedback` table and FeedbackWidget retirement (Rule 4 / §5.1)
-- `keyword_strategy` client_action deprecation (Rule 3 / §5.4)
-- SEO Audit double-button collapse (§5.2)
+| # | PR scope | Files (~) | Depends on | Parallel-safe with |
+|---|----------|----------:|------------|--------------------|
+| **1.0a** | Retire `feedback` table (delete files, routes, table) | 7 | — | 1.0b, 1.3, 1.4 |
+| **1.0b** | Deprecate `keyword_strategy` client_action (remove button, archive existing rows, drop type) | 8 | — | 1.0a, 1.3, 1.4 |
+| **1.1** | Shared contracts: types, migrations, route alias updates, `AeoChangeDiff` payload enrichment, `ClientRequestStatus` derived type + mapping function | 10 | — | (sequential — must merge before 1.2) |
+| **1.2** | Inbox restructure: new 3-section `InboxTab` + chip bar + section adapters + trust-first `<DecisionPrimitive>` modal + `ClientActionDetailModal` renderer updates. **Behind feature flag `new_inbox_ia`** | 15 | After 1.1 | 1.3, 1.4 |
+| **1.3** | Insights / Wins: `<WinsSurface>` component + `GET /api/public/wins/:wsId` + `useClientWins` hook + "we called it" feature-flag hide. **Behind feature flag `client_wins_surface`** | 7 | After 1.1 | 1.2, 1.4 |
+| **1.4** | Platform "Send to client" convention: optional-note pattern across 13 admin components | 13 | After 1.1 | 1.2, 1.3 |
+| **1.5** | Prevention + docs: 5 new pr-check rules + CLAUDE.md/ui-vocabulary updates + new `docs/rules/inbox-section-routing.md` | 8 | Last (after 1.0–1.4) | — |
 
-**Out of scope (deferred to Phase 2 or 3):**
+**Parallelization opportunities** (after 1.1 lands): 1.2 + 1.3 + 1.4 can run in 3 separate worktrees with strict file ownership per audit §5.3.
+
+**Feature-flag protection:** 1.2 (high UX blast radius) and 1.3 (new component) ship behind feature flags defaulting to `false` in production. Flags are flipped manually after staging verification. 1.5 removes the flags once stable.
+
+**Out of scope for Phase 1:**
 - Unifying presenters across `client_actions` and `approval_batches` (Phase 2)
 - At-scale grouping/search for 200+ item batches (Phase 2)
 - Per-item exclusion semantics (Phase 3)
 - Schema admin entry-point consolidation (Phase 3)
-- Rich Wins surface (aggregates, ROI value, win patterns) (Phase 3)
+- Rich Wins surface — aggregates, ROI value, win patterns (Phase 3)
 - `client_signals` and `action_playbooks` orphan resolution (Phase 3)
 
 ### Phase 2 — Unify presenters across `client_actions` and `approval_batches`
 
 **Goal:** From the client view, every Decisions card uses one component family regardless of whether the underlying record is a `client_action` or an `approval_batch`. Tables stay separate; rendering converges.
 
-**In scope:**
-- New presenter component (e.g. `DecisionCard`, `DecisionDetailModal`) that consumes a normalized shape
-- Adapters that map `client_actions` rows and `approval_batches` rows into the shared shape
-- At-scale grouping/search/virtualization for the Decisions primitive (per §4.1.2)
-- Shared "approve with optional flagged-item notes" submission path
+Estimated as **2 PRs**:
+
+- **2.1** Presenter unification — new `<DecisionCard>` + `<DecisionDetailModal>` that consume a normalized shape; adapters mapping `client_actions` and `approval_batches` rows into the shared shape; shared "approve with optional flagged-item notes" submission path
+- **2.2** At-scale Decisions — grouping by type, search bar, virtualized list rendering for 50+ item batches (per §4.1.2)
 
 ### Phase 3 — Consolidation, wins enrichment, retire orphans
 
-**Goal:** Clean up the platform's long-tail debt now that the IA is stable.
+**Goal:** Clean up the platform's long-tail debt now that the IA is stable. Each item is a separate sub-project with its own spec:
 
-**In scope:**
-- Per-item exclusion in the Decisions primitive (if Phase 1's note-only workaround proves insufficient)
-- Schema admin-side consolidation (per-page + bulk into one admin surface)
-- Rich Wins surface — aggregates ("N wins this month, est. $X organic value"), win patterns ("your meta updates win 80% of the time"), competitive context
-- `client_signals` resolution (decide: surface to client, repurpose for admin chat context, or retire)
-- `action_playbooks` resolution (decide: surface as recommendations, keep internal, or retire)
-- Full ROI dashboard / wins history page
+- **3.1 schema-admin-consolidation** — merge per-page and bulk schema entry points into one admin surface
+- **3.2 wins-enrichment** — aggregates ("N wins this month, est. $X organic value"), win patterns ("your meta updates win 80% of the time"), competitive context, full ROI dashboard / wins history page
+- **3.3 per-item-exclusion** — backend support for per-item exclusion in the Decisions primitive (only if Phase 1's note-only workaround proves insufficient)
+- **3.4 client-signals-resolution** — decide: surface to client, repurpose for admin chat context, or retire
+- **3.5 action-playbooks-resolution** — decide: surface as recommendations, keep internal, or retire
 
 ---
 
