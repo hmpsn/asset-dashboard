@@ -49,7 +49,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     return original;
   }, [editedSchemaJson]);
 
-  const sendSchemasToClient = useCallback(async () => {
+  const sendSchemasToClient = useCallback(async (note?: string) => {
     if (!data || !workspaceId) return;
     setSendingToClient(true);
     try {
@@ -61,7 +61,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }));
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items, ...(note ? { note } : {}) });
       setSentToClient(true);
       refreshStates();
       setApprovalRefreshKey(k => k + 1);
@@ -147,7 +147,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     setTimeout(() => setCopiedId(null), 2000);
   }, [getEffectiveSchema, manualDelivery]);
 
-  const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion) => {
+  const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion, note?: string) => {
     if (!workspaceId) return;
     setSendingPage(prev => new Set(prev).add(page.pageId));
     try {
@@ -159,7 +159,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }];
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items, ...(note ? { note } : {}) });
       setSentPages(prev => new Set(prev).add(page.pageId));
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
