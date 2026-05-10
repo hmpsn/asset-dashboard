@@ -189,7 +189,7 @@ export function InboxTab({
   const decisionsCount =
     batchesWithoutNote.filter(b => b.items.some(i => i.status === 'pending' || !i.status)).length +
     pendingClientActions.filter(a => !a.clientNote).length;
-  const reviewsCount = contentReviews + copyReviewCount;
+  const reviewsCount = contentReviews + copyReviewCount + planReviewCount;
   const conversationsCount =
     requests.filter(r => r.status !== 'completed' && r.status !== 'closed').length +
     batchesWithNote.length;
@@ -403,6 +403,88 @@ export function InboxTab({
                   </div>
                 </div>
               )}
+              {/* Content Plan sign-offs */}
+              {planReviewCount > 0 && (
+                <div className="space-y-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Plan</p>
+                  {contentPlanReviewCells.map(cell => {
+                    const isFlagging = flaggingCell === cell.cellId;
+                    const isFlagged = cell.status === 'flagged';
+                    return (
+                      // pr-check-disable-next-line -- Brand signature radius intentional
+                      <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+                        <div className="px-5 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
+                                <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
+                                  isFlagged
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
+                                    : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
+                                }`}>
+                                  {isFlagged ? 'Flagged' : 'Needs Review'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                                <span>{cell.matrixName}</span>
+                                {cell.plannedUrl && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Icon as={ExternalLink} size="xs" /> {cell.plannedUrl}
+                                  </span>
+                                )}
+                                {cell.variableValues && Object.keys(cell.variableValues).length > 0 && (
+                                  <span>{Object.values(cell.variableValues).join(' × ')}</span>
+                                )}
+                              </div>
+                            </div>
+                            {!isFlagged && !isFlagging && (
+                              <button
+                                type="button"
+                                onClick={() => setFlaggingCell(cell.cellId)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                              >
+                                <Icon as={Flag} size="sm" /> Request Changes
+                              </button>
+                            )}
+                          </div>
+                          {isFlagging && (
+                            <div className="mt-3 space-y-2">
+                              <textarea
+                                value={flagComment}
+                                onChange={e => setFlagComment(e.target.value)}
+                                placeholder="Describe what you'd like changed..."
+                                rows={2}
+                                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={flagSubmitting || !flagComment.trim()}
+                                  onClick={() => handleFlagCell(cell)}
+                                >
+                                  {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
+                                </Button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
+                                  className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                                >Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                          {isFlagged && (
+                            <div className="mt-2 t-caption-sm text-accent-warning flex items-center gap-1">
+                              <Icon as={Flag} size="sm" /> You've flagged this — your team is reviewing your feedback.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {/* Copy review */}
               {hasCopyEntries && (
                 <div className="space-y-2">
@@ -441,22 +523,19 @@ export function InboxTab({
                   </span>
                 )}
               </div>
-              {/* Approval batches WITH note — simple card */}
+              {/* Approval batches WITH note — full approval controls so clients can still act on pending items */}
               {batchesWithNote.length > 0 && (
-                <div className="space-y-3">
-                  {batchesWithNote.map(batch => (
-                    <div key={batch.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="t-ui font-medium text-[var(--brand-text-bright)] mb-1">{batch.name}</p>
-                          {batch.note && (
-                            <p className="t-caption text-[var(--brand-text-muted)] line-clamp-2">{batch.note}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ApprovalsTab
+                  workspaceId={workspaceId}
+                  approvalBatches={batchesWithNote}
+                  approvalsLoading={approvalsLoading}
+                  pendingApprovals={batchesWithNote.filter(b => b.items.some(i => i.status === 'pending' || !i.status)).length}
+                  effectiveTier={effectiveTier}
+                  setApprovalBatches={setApprovalBatches}
+                  loadApprovals={loadApprovals}
+                  setToast={setToast}
+                  pageMap={pageMap}
+                />
               )}
               {/* Requests */}
               <RequestsTab
