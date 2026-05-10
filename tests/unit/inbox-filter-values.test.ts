@@ -4,7 +4,7 @@ import { INBOX_FILTER_VALUES, LEGACY_FILTER_MAP, isInboxFilter } from '../../src
 describe('INBOX_FILTER_VALUES', () => {
   it('contains exactly the four active filter values', () => {
     expect(INBOX_FILTER_VALUES).toEqual(
-      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content']),
+      expect.arrayContaining(['all', 'decisions', 'reviews', 'conversations']),
     );
     expect(INBOX_FILTER_VALUES).toHaveLength(4);
   });
