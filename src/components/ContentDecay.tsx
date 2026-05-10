@@ -52,6 +52,7 @@ export default function ContentDecay({ workspaceId }: Props) {
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'watch'>('all');
   const [sendingPage, setSendingPage] = useState<string | null>(null);
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
+  const [pageNotes, setPageNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setLoading(true);
@@ -96,6 +97,7 @@ export default function ContentDecay({ workspaceId }: Props) {
         title: `Refresh recommendation for ${page.page}`,
         summary: page.refreshRecommendation || `${page.page} has lost ${page.clickDeclinePct}% of clicks and should be reviewed for a content refresh.`,
         priority: page.severity === 'critical' ? 'high' : page.severity === 'warning' ? 'medium' : 'low',
+        clientNote: (pageNotes[page.page] ?? '').trim() || undefined,
         payload: { page, analyzedAt: analysis?.analyzedAt },
       });
       setSentPages(prev => new Set(prev).add(page.page));
@@ -259,6 +261,15 @@ export default function ContentDecay({ workspaceId }: Props) {
                                 </button>
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
+                              {!sentPages.has(page.page) && (
+                                <textarea
+                                  rows={2}
+                                  placeholder="Add a note for your client (optional)"
+                                  value={pageNotes[page.page] ?? ''}
+                                  onChange={e => setPageNotes(prev => ({ ...prev, [page.page]: e.target.value }))}
+                                  className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)]"
+                                />
+                              )}
                             </div>
                           )}
                         </div>
