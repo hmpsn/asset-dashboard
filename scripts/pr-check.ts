@@ -5159,10 +5159,13 @@ export const CHECKS: Check[] = [
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     severity: 'error',
+    excludeLines: ['feedback-module-reintroduction-ok'],
     message:
-      "FeedbackWidget import or /api/feedback route — feedback module was retired in PR 1.1 (2026-05-08). Add // feedback-module-reintroduction-ok if intentional.",
+      "FeedbackWidget import or /api/feedback route — feedback module was retired in PR 1.0a (migration 091 dropped the table). " +
+      "Use the requests subsystem (/api/public/requests) for client submissions instead. " +
+      "Add // feedback-module-reintroduction-ok if intentional.",
     rationale:
-      "Prevents reintroduction of the retired FeedbackWidget component and its /api/feedback endpoint after PR 1.1 cleanup.",
+      "Prevents reintroduction of the retired FeedbackWidget component and its /api/feedback endpoint after PR 1.0a cleanup.",
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -5233,6 +5236,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/',
     severity: 'error',
+    excludeLines: ['prediction-showcase-ungated-ok'],
     message:
       "PredictionShowcaseCard rendered without winsEnabled gate — add !winsEnabled guard on the same or preceding line. Add // prediction-showcase-ungated-ok if intentional.",
     rationale:

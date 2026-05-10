@@ -6890,6 +6890,36 @@ describe('Rule: feedback-module-reintroduction', () => {
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
+
+  it('flags a router route registration on /api/feedback', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'server/routes/feedback.ts'),
+      lines(
+        "import express from 'express';",
+        'const router = express.Router();',
+        "router.post('/api/feedback', (req, res) => { res.json({}); });",
+        'export default router;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags a router route registration on /api/public/feedback', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'server/routes/public-feedback.ts'),
+      lines(
+        "import express from 'express';",
+        'const router = express.Router();',
+        "router.get('/api/public/feedback', (req, res) => { res.json([]); });",
+        'export default router;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
