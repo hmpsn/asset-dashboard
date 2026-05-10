@@ -13,6 +13,7 @@ import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
 import { countAeoQuickWins, estimateAeoChangesMinutes } from '../../shared/types/aeo';
+import { mapAeoEffortToClientEffort } from '../../shared/types/client-actions';
 
 interface Props {
   workspaceId: string;
@@ -160,6 +161,9 @@ export function AeoReview({ workspaceId }: Props) {
             section: c.location,
             current: c.currentContent ?? '',
             proposed: c.suggestedChange,
+            rationale: c.rationale,
+            effort: mapAeoEffortToClientEffort(c.effort),
+            priority: c.priority,
           })),
         },
       });

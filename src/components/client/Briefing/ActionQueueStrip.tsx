@@ -159,6 +159,7 @@ export function ActionQueueStrip({
           {chip.count} {chip.label}
         </button>
       ))}
+      {/* TODO PR 1.2: update escalation pill to ?tab=decisions once InboxTab adds 'decisions' filter value */}
       {showEscalation && escalationLabel && (
         <button
           type="button"

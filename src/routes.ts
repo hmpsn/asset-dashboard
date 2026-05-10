@@ -26,9 +26,9 @@ export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'stra
 export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
 
 export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, string> = {
-  approvals: 'seo-changes',
-  requests: 'needs-action',
-  content: 'content',
+  approvals: 'decisions',     // legacy /approvals → Decisions section (PR 1.2)
+  requests: 'conversations',  // legacy /requests → Conversations section (PR 1.2)
+  content: 'reviews',         // legacy /content → Reviews section (PR 1.2)
 };
 
 export function isClientInboxAlias(tab: string | undefined): tab is ClientInboxAlias {
