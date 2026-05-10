@@ -156,7 +156,7 @@ async function main(): Promise<void> {
     ]);
     const actionA = actions.createClientAction({
       workspaceId: wsA.workspaceId,
-      sourceType: 'keyword_strategy',
+      sourceType: 'aeo_change',
       sourceId: `probe-source-${suffix}`,
       title: sentinels.wsAAction,
       summary: `Probe action summary ${suffix}`,
