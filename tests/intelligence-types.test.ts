@@ -98,7 +98,6 @@ describe('Intelligence types', () => {
       roi: { organicValue: 5000, growth: 12.5, period: 'monthly' },
       engagement: { loginFrequency: 'weekly', chatSessionCount: 10, lastLoginAt: null, portalUsage: null },
       compositeHealthScore: 72,
-      feedbackItems: [],
       serviceRequests: { pending: 0, total: 2 },
     };
     expect(signals.engagement?.loginFrequency).toBe('weekly');

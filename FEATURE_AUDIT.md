@@ -1233,7 +1233,6 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Skeleton/shimmer loading states~~: ✅ Shipped (March 2026) — `Skeleton.tsx` UI primitive with shimmer animation. Applied to client dashboard data loading across tabs. See Feature #83.
 - ~~Centralized number formatting~~: ✅ Shipped (March 2026) — Duplicate number formatting utilities consolidated into shared helpers. Eliminates inconsistent formatting across components.
 - ~~Mobile date picker~~: ✅ Shipped (March 2026) — Date picker popover made mobile-friendly with responsive positioning.
-- ~~Chat/FeedbackWidget mobile overlap fix~~: ✅ Shipped (March 2026) — Fixed z-index and positioning conflict between floating chat button and feedback widget on small screens.
 - ~~Frontend component decomposition~~: ✅ Shipped (March 2026) — 7 monolithic components decomposed into focused sub-modules (SeoAudit, ContentBriefs, SchemaSuggester, KeywordStrategy, AssetBrowser, WorkspaceSettings, WorkspaceHome). See Feature #83.
 - ~~Server route decomposition (webflow.ts)~~: ✅ Shipped (March 2026) — `webflow.ts` route split into 6 focused sub-routes. `seo-audit.ts` decomposed into `audit-page.ts` + `seo-audit-html.ts`. See Feature #63.
 - **WCAG AA compliance**: Full contrast ratio audit, focus indicators, keyboard navigation for all interactive elements.

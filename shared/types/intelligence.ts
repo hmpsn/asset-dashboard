@@ -244,7 +244,6 @@ export interface ClientSignalsSlice {
   roi?: { organicValue: number; growth: number; period: string } | null;
   engagement?: EngagementMetrics;
   compositeHealthScore?: number | null;
-  feedbackItems?: Array<{ id: string; type: string; status: string; createdAt: string }>;
   serviceRequests?: { pending: number; total: number };
   /** Intent signals detected in client chat (service_interest / content_interest) */
   intentSignals?: {

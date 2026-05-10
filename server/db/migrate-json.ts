@@ -991,52 +991,6 @@ function migrateRoiHistory(): number {
   return total;
 }
 
-// ── Feedback ──
-
-function migrateFeedback(): number {
-  const dir = getDataDir('feedback');
-  if (!fs.existsSync(dir)) { console.log('[migrate] No feedback directory — skipping.'); return 0; }
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  if (files.length === 0) return 0;
-
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO feedback
-      (id, workspace_id, type, title, description, status,
-       context, submitted_by, replies, created_at, updated_at)
-    VALUES
-      (@id, @workspace_id, @type, @title, @description, @status,
-       @context, @submitted_by, @replies, @created_at, @updated_at)
-  `);
-
-  let total = 0;
-  const run = db.transaction(() => {
-    for (const file of files) {
-      const wsId = path.basename(file, '.json');
-      let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
-      if (!Array.isArray(records)) continue;
-      for (const r of records) {
-        const info = insert.run({
-          id: r.id, workspace_id: r.workspaceId || wsId,
-          type: r.type || 'general',
-          title: r.title || '',
-          description: r.description || r.content || '',
-          status: r.status || 'new',
-          context: r.context ? JSON.stringify(r.context) : null,
-          submitted_by: r.submittedBy ?? r.authorName ?? null,
-          replies: JSON.stringify(r.replies || []),
-          created_at: r.createdAt || new Date().toISOString(),
-          updated_at: r.updatedAt || r.createdAt || new Date().toISOString(),
-        });
-        total += info.changes;
-      }
-      console.log(`[migrate] feedback/${file}: ${records.length} item(s)`);
-    }
-  });
-  run();
-  return total;
-}
-
 // ── Rank Tracking Config ──
 
 function migrateRankTracking(): number {
@@ -1569,7 +1523,6 @@ const results = {
   seoChanges: migrateSeoChanges(),
   contentDecay: migrateContentDecay(),
   roiHistory: migrateRoiHistory(),
-  feedback: migrateFeedback(),
   rankTracking: migrateRankTracking(),
   // Tier 3 — Per-site snapshots + config/admin
   auditSnapshots: migrateAuditSnapshots(),

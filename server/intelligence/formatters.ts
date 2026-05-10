@@ -665,10 +665,6 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
         lines.push(`  - [${s.severity}] ${s.title}: ${s.description}`);
       }
     }
-    if (signals.feedbackItems && signals.feedbackItems.length > 0) {
-      const openCount = signals.feedbackItems.filter(f => f.status === 'new').length;
-      lines.push(`Feedback: ${signals.feedbackItems.length} items (${openCount} open)`);
-    }
     if (signals.recentChatTopics.length > 0) {
       lines.push(`Recent topics: ${signals.recentChatTopics.join(', ')}`);
     }

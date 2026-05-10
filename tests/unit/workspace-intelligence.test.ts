@@ -357,7 +357,6 @@ describe('formatForPrompt — formatter rendering', () => {
         roi: null,
         engagement: { lastLoginAt: null, loginFrequency: 'inactive' as const, chatSessionCount: 0, portalUsage: null },
         compositeHealthScore: null,
-        feedbackItems: [],
         serviceRequests: { pending: 0, total: 0 },
         intentSignals: {
           newCount: 3,

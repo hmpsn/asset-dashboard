@@ -64,11 +64,6 @@ import {
   type WorkspaceLearningsRow,
 } from '../../server/db/outcome-mappers.js';
 
-import {
-  listFeedback,
-  createFeedback,
-} from '../../server/feedback.js';
-
 // ── Helpers ──
 
 /**
@@ -125,9 +120,6 @@ const INTENTIONAL_OMISSIONS: Record<string, Set<string>> = {
     // The record is identified by workspaceId (workspace_id), which IS mapped.
     // rowToWorkspaceLearnings returns { workspaceId, computedAt, ...spread } — no 'id'.
     'id',
-  ]),
-  feedback: new Set([
-    // All columns are mapped; no intentional omissions.
   ]),
 };
 
@@ -813,86 +805,7 @@ describe('rowToWorkspaceLearnings mapper completeness', () => {
   });
 });
 
-// ── 8. feedback → rowToFeedback ──
-
-describe('rowToFeedback mapper completeness', () => {
-  const TABLE = 'feedback';
-
-  it('maps every feedback column to a camelCase field', () => {
-    const columns = getTableColumns(TABLE);
-    expect(columns.length).toBeGreaterThan(0);
-
-    const wsId = `mapper-fb-${Date.now()}`;
-    createFeedback(wsId, {
-      type: 'bug',
-      title: 'Mapper test bug',
-      description: 'Testing mapper completeness via feedback',
-      context: {
-        currentTab: 'analytics',
-        browser: 'Chrome 124',
-        screenSize: '1440x900',
-        url: 'https://example.com/admin',
-        userAgent: 'Mozilla/5.0',
-      },
-      submittedBy: 'client_user_001',
-    });
-
-    const items = listFeedback(wsId);
-    expect(items.length).toBeGreaterThan(0);
-    const out = items[0];
-
-    const omitted = INTENTIONAL_OMISSIONS[TABLE] ?? new Set();
-    const missing: string[] = [];
-
-    for (const col of columns) {
-      if (omitted.has(col)) continue;
-      const camel = snakeToCamel(col);
-      const keyFound = camel in out;
-      if (!keyFound) {
-        missing.push(`${col} → expected "${camel}" on FeedbackItem output`);
-      }
-    }
-
-    expect(
-      missing,
-      `rowToFeedback is missing mappings for columns:\n${missing.join('\n')}`,
-    ).toHaveLength(0);
-  });
-
-  it('maps context JSON column as parsed object', () => {
-    const wsId = `mapper-fb-ctx-${Date.now()}`;
-    createFeedback(wsId, {
-      type: 'feature',
-      title: 'Context check',
-      description: 'Context field should be parsed',
-      context: { currentTab: 'strategy', browser: 'Firefox 125' },
-    });
-
-    const items = listFeedback(wsId);
-    expect(items.length).toBeGreaterThan(0);
-    const out = items[0];
-
-    expect(out.context).toBeDefined();
-    expect(out.context!.currentTab).toBe('strategy');
-    expect(out.context!.browser).toBe('Firefox 125');
-  });
-
-  it('maps replies as empty array when absent', () => {
-    const wsId = `mapper-fb-replies-${Date.now()}`;
-    createFeedback(wsId, {
-      type: 'general',
-      title: 'No replies yet',
-      description: 'Fresh feedback with no replies',
-    });
-
-    const items = listFeedback(wsId);
-    expect(items.length).toBeGreaterThan(0);
-    expect(Array.isArray(items[0].replies)).toBe(true);
-    expect(items[0].replies).toHaveLength(0);
-  });
-});
-
-// ── 9. Structural: PRAGMA returns real column names for all tested tables ──
+// ── 8. Structural: PRAGMA returns real column names for all tested tables ──
 
 describe('PRAGMA table_info — tables exist and are populated', () => {
   const testedTables = [
@@ -903,7 +816,6 @@ describe('PRAGMA table_info — tables exist and are populated', () => {
     'action_outcomes',
     'action_playbooks',
     'workspace_learnings',
-    'feedback',
   ];
 
   for (const table of testedTables) {

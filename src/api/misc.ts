@@ -196,15 +196,6 @@ export const recommendations = {
     del(`/api/public/recommendations/${wsId}/${recId}`),
 };
 
-// ── Feedback ────────────────────────────────────────────────────
-export const feedback = {
-  submit: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/feedback/${wsId}`, body),
-
-  list: (wsId: string) =>
-    getSafe<unknown[]>(`/api/feedback/${wsId}`, []),
-};
-
 // ── Notifications ───────────────────────────────────────────────
 export const notifications = {
   list: () => getSafe<unknown[]>('/api/notifications', []),
