@@ -4,7 +4,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, Send,
+  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
 import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
@@ -22,7 +22,6 @@ import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
-import { clientActions } from '../api/clientActions';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
@@ -82,8 +81,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
-  const [sendingToClient, setSendingToClient] = useState(false);
-  const [sentToClient, setSentToClient] = useState(false);
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
@@ -247,38 +244,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     .sort((a: PageKeywordMap, b: PageKeywordMap) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
 
-  const sendStrategyToClient = async () => {
-    if (!strategy) return;
-    setSendingToClient(true);
-    setError(null);
-    try {
-      await clientActions.create(workspaceId, {
-        sourceType: 'keyword_strategy',
-        sourceId: `keyword-strategy:${strategy.generatedAt || new Date().toISOString()}`,
-        title: 'Keyword strategy recommendations',
-        summary: `Review the current keyword strategy: ${filteredPageMap.length} mapped page${filteredPageMap.length !== 1 ? 's' : ''}, ${lowHangingFruit.length} low-hanging opportunity${lowHangingFruit.length !== 1 ? 'ies' : 'y'}, and ${(strategy.contentGaps?.length ?? 0)} content gap${(strategy.contentGaps?.length ?? 0) !== 1 ? 's' : ''}.`,
-        priority: lowHangingFruit.length > 0 || (strategy.contentGaps?.length ?? 0) > 0 ? 'high' : 'medium',
-        payload: {
-          generatedAt: strategy.generatedAt,
-          mappedPages: filteredPageMap.map(p => ({
-            page: p.pagePath,
-            keyword: p.primaryKeyword,
-            currentPosition: p.currentPosition,
-          })),
-          quickWins: strategy.quickWins ?? [],
-          contentGaps: strategy.contentGaps ?? [],
-          opportunities: strategy.opportunities ?? [],
-        },
-      });
-      setSentToClient(true);
-    } catch (err) {
-      console.error('KeywordStrategy operation failed:', err);
-      setError('Failed to send keyword strategy to client');
-    } finally {
-      setSendingToClient(false);
-    }
-  };
-
   const intentCounts = filteredPageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
     const intent = p.searchIntent || 'unknown';
     acc[intent] = (acc[intent] || 0) + 1;
@@ -325,16 +290,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
             >
               Update changed pages
-            </button>
-          )}
-          {isRealStrategy && (
-            <button
-              onClick={sendStrategyToClient}
-              disabled={sendingToClient || sentToClient}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50 t-caption font-medium"
-            >
-              <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
-              {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
             </button>
           )}
           <button
