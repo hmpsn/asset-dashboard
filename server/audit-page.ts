@@ -4,6 +4,7 @@ import {
   stripHiddenElements,
 } from './seo-audit-html.js';
 import { computePageScore } from '../shared/scoring.js';
+import { decodeEntities } from './helpers.js';
 export type Severity = 'error' | 'warning' | 'info';
 
 export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
@@ -90,7 +91,7 @@ export function auditPage(
   let isNoindex = false;
 
   // --- Extract HTML-based values as fallback (Webflow API often returns empty OG/SEO data) ---
-  const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
+  const htmlTitle = html ? decodeEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
   const htmlMetaDesc = html ? (extractMetaContent(html, 'description') || '') : '';
   const htmlOgTitle = html ? (extractMetaContent(html, 'og:title') || '') : '';
   const htmlOgDesc = html ? (extractMetaContent(html, 'og:description') || '') : '';

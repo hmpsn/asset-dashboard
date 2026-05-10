@@ -2,7 +2,7 @@ import { addActivity } from './activity-log.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { applyBulkKeywordGuards, resolvePagePath, stripCodeFences, stripHtmlToText } from './helpers.js';
+import { applyBulkKeywordGuards, decodeEntities, resolvePagePath, stripCodeFences, stripHtmlToText } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { z } from './middleware/validate.js';
@@ -245,7 +245,7 @@ export async function runPageAnalysisJob({
 
           // Extract title, meta desc, body text
           const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-          const htmlTitle = titleMatch ? titleMatch[1].trim() : undefined;
+          const htmlTitle = titleMatch ? decodeEntities(titleMatch[1].trim()) : undefined;
           const metaMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
             || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
           const htmlMeta = metaMatch ? metaMatch[1].trim() : undefined;

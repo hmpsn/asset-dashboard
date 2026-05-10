@@ -154,7 +154,14 @@ export function AeoReview({ workspaceId }: Props) {
         title: `AEO recommendations for ${page.pageTitle || page.pageUrl}`,
         summary: `${page.summary}\n\n${clientReadyPage.changes.length} client-ready recommended change${clientReadyPage.changes.length !== 1 ? 's' : ''}, including ${highCount} high-priority item${highCount !== 1 ? 's' : ''}.${omittedCount > 0 ? ` ${omittedCount} citation recommendation${omittedCount !== 1 ? 's' : ''} omitted pending source research.` : ''}`,
         priority: highCount > 0 ? 'high' : 'medium',
-        payload: { page: clientReadyPage },
+        payload: {
+          diffs: (clientReadyPage.changes ?? []).map(c => ({
+            page: clientReadyPage.pageTitle || clientReadyPage.pageUrl,
+            section: c.location,
+            current: c.currentContent ?? '',
+            proposed: c.suggestedChange,
+          })),
+        },
       });
       setSentPages(prev => new Set(prev).add(page.pageUrl));
     } catch (err) {

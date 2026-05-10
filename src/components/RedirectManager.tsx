@@ -181,7 +181,11 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         priority: acceptedRules.length > 3 ? 'high' : 'medium',
         payload: {
           scannedAt: snapshotDate || data?.scannedAt,
-          rules: acceptedRules,
+          redirects: acceptedRules.map(r => ({
+            source: r.from,
+            target: r.to,
+            rationale: r.reason,
+          })),
           summary: data?.summary,
         },
       });

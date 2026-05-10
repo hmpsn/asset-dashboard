@@ -132,7 +132,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         priority: high > 0 ? 'high' : 'medium',
         payload: {
           analyzedAt: data.analyzedAt,
-          suggestions: filtered,
+          suggestions: filtered.map(s => ({
+            anchorText: s.anchorText,
+            targetUrl: s.toPage,
+            targetTitle: s.toTitle,
+            sourcePage: s.fromPage,
+            contextSnippet: s.reason,
+          })),
           summary: {
             pageCount: data.pageCount,
             existingLinkCount: data.existingLinkCount,

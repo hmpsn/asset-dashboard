@@ -42,6 +42,7 @@ vi.mock('../../server/db/json-validation.js', () => ({ parseJsonSafe: mocks.pars
 vi.mock('../../server/errors.js', () => ({ isProgrammingError: vi.fn(() => false) }));
 vi.mock('../../server/helpers.js', () => ({
   applyBulkKeywordGuards: mocks.applyBulkKeywordGuards,
+  decodeEntities: (text: string) => text,
   resolvePagePath: (page: { path?: string; slug?: string }) => page.path || `/${page.slug || ''}`,
   stripCodeFences: (value: string) => value,
   stripHtmlToText: (value: string) => value.replace(/<[^>]+>/g, ' ').trim(),
