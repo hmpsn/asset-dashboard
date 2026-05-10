@@ -28,13 +28,28 @@ These two require visual UX validation on staging before production rollout. Lan
 
 ---
 
+## Skills to Use
+
+The loop should treat these skills as the canonical execution methods. Do not improvise — use the skill where it applies:
+
+| Step | Skill | Notes |
+|------|-------|-------|
+| Worktree setup | `superpowers:using-git-worktrees` | Required for branch isolation |
+| Pre-plan audit | `pre-plan-audit` | Use `superpowers:dispatching-parallel-agents` to run multiple Explore agents concurrently for speed (the main audit pattern proved this works) |
+| Implementation plan | `superpowers:writing-plans` | TDD-disciplined task list |
+| Execution | `superpowers:subagent-driven-development` | The user's preferred workflow — fresh implementer subagent per task with mandatory two-stage review (spec compliance → code quality) |
+| Scaled review | `scaled-code-review` | Multi-agent review on the open PR diff |
+| Codex review | (gh CLI) | Independent second opinion on the same PR |
+| Multi-failure investigation | `superpowers:dispatching-parallel-agents` | If a PR's CI surfaces 3+ unrelated failures (e.g. different test files, different subsystems), dispatch one investigator agent per failure rather than serializing |
+| Test discipline within tasks | `superpowers:test-driven-development` | Implicit in subagent-driven-development; do not skip |
+
 ## Per-PR Workflow
 
 Each PR follows this exact sequence. Do not skip steps.
 
 1. **Worktree setup** — create new worktree from `staging` for this PR (per `superpowers:using-git-worktrees`)
 2. **Implementation spec** — small, scoped to this PR only (≤ 200 lines), saved to `docs/superpowers/specs/2026-05-10-pr-<number>-<slug>-design.md`
-3. **Targeted pre-plan audit** — use `pre-plan-audit` skill scoped to just this PR's surface area; save to `docs/superpowers/audits/2026-05-10-pr-<number>-<slug>-audit.md`
+3. **Targeted pre-plan audit** — use `pre-plan-audit` skill scoped to just this PR's surface area, dispatching parallel Explore agents via `superpowers:dispatching-parallel-agents` for speed; save to `docs/superpowers/audits/2026-05-10-pr-<number>-<slug>-audit.md`
 4. **Implementation plan** — use `superpowers:writing-plans` to produce a TDD-disciplined task list; save to `docs/superpowers/plans/2026-05-10-pr-<number>-<slug>-plan.md`
 5. **Execute** — use `superpowers:subagent-driven-development` (the user's preferred workflow):
    - Fresh implementer subagent per task
@@ -59,6 +74,8 @@ Each PR follows this exact sequence. Do not skip steps.
 **The default is: figure out what's wrong, fix it, keep moving.** Do not halt the loop on every failure.
 
 ### Fix-and-continue (try up to 3 attempts per failure)
+
+If multiple unrelated failures surface at once (e.g. 3 test files in 3 different subsystems), use `superpowers:dispatching-parallel-agents` to investigate in parallel rather than serializing.
 
 | Failure | Action |
 |---------|--------|
