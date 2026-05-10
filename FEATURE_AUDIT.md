@@ -5383,6 +5383,14 @@ Bug hardening included:
 
 **Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
 
+### Client Wins Surface (`client-wins-surface` flag)
+- **Component:** `WinsSurface` on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only)
+- **Source:** `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`
+- **Hook:** `useClientOutcomeWins`
+- **Tier:** Growth+ required; free sees a teaser with win count
+- **Flag off:** `PredictionShowcaseCard` ("We called it") remains on OverviewTab; WinsSurface hidden
+- **Flag on:** WinsSurface shows; PredictionShowcaseCard hidden
+
 ### 397. Hardening Sprint — Per-Feature Usage Budget Split
 **What it does:** Splits the previously shared `strategy_generations` monthly budget into dedicated feature pools so different AI workflows no longer cannibalize each other.
 
