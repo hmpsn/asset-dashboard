@@ -6712,7 +6712,7 @@ describe('Rule: inbox-legacy-filter-literal', () => {
     expect(hits[0].line).toBe(2);
   });
 
-  it('does NOT flag ?tab=seo-changes (new value)', () => {
+  it('flags ?tab=seo-changes (retired in PR 1.2)', () => {
     const file = write(
       uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
       lines(
@@ -6721,15 +6721,39 @@ describe('Rule: inbox-legacy-filter-literal', () => {
         '}',
       )
     );
-    expect(runRule(RULE, [file])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(1);
   });
 
-  it('does NOT flag ?tab=needs-action (new value)', () => {
+  it('flags ?tab=needs-action (retired in PR 1.2)', () => {
     const file = write(
       uniqPath('rule-inbox-legacy', 'src/hooks/goodHook.ts'),
       lines(
         'export function buildUrl() {',
         "  return `/inbox?tab=needs-action`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does NOT flag ?tab=decisions (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/NewGoodLink.tsx'),
+      lines(
+        'export function NewGoodLink() {',
+        '  return <a href={`/inbox?tab=decisions`}>Go</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=reviews (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/newGoodHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/inbox?tab=reviews`;",
         '}',
       )
     );
