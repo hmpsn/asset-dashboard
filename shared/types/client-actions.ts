@@ -1,3 +1,5 @@
+import type { AeoEffort } from './aeo.js';
+
 export type ClientActionSourceType =
   | 'aeo_change'
   | 'internal_link'
@@ -62,7 +64,21 @@ export interface AeoChangeDiff {
   section?: string;
   current: string;
   proposed: string;
+  /** Why this change — one sentence from AeoPageChange.rationale */
+  rationale?: string;
+  /** Admin effort estimate, mapped from AeoEffort via mapAeoEffortToClientEffort() */
+  effort?: 'low' | 'medium' | 'high';
+  /** Urgency hint from AeoPageChange.priority — hidden in client view by default (Phase 1) */
+  priority?: 'high' | 'medium' | 'low';
 }
+
+/** Maps AeoEffort (admin internal) to client-facing effort tier. */
+export function mapAeoEffortToClientEffort(e: AeoEffort): 'low' | 'medium' | 'high' {
+  if (e === 'quick') return 'low';
+  if (e === 'significant') return 'high';
+  return 'medium'; // 'moderate'
+}
+
 export interface AeoChangePayload {
   diffs: AeoChangeDiff[];
 }

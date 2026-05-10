@@ -70,6 +70,10 @@ export const FEATURE_FLAGS = {
 
   // Page-Element Catalog (schema AI extractors)
   'schema-ai-element-classifier': false, // PR2: image role classifier + HowTo disambiguation (default OFF)
+
+  // Client IA Redesign Phase 1 (PRs 1.2 + 1.3)
+  'new_inbox_ia': false,         // Gates PR 1.2 inbox restructure (high UX blast radius)
+  'client_wins_surface': false,  // Gates PR 1.3 wins surface + "we called it" hide
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
