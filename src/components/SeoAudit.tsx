@@ -152,35 +152,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     }
   };
 
-  // Send issue for client review via approval batch
-  const [sentForReview, setSentForReview] = useState<Set<string>>(new Set());
-  const [sendingReview, setSendingReview] = useState<string | null>(null);
-
-  const sendForReview = async (page: PageSeoResult, issue: SeoIssue) => {
-    if (!workspaceId) return;
-    const fixKey = `${page.pageId}-${issue.check}`;
-    const text = editedSuggestions[fixKey] || issue.suggestedFix || '';
-    const field = issue.check === 'title' ? 'seoTitle' : 'seoDescription';
-    setSendingReview(fixKey);
-    try {
-      await post(`/api/approvals/${workspaceId}`, {
-        siteId,
-        name: `Audit Fix: ${issue.message.slice(0, 60)}`,
-        items: [{
-          pageId: page.pageId,
-          pageTitle: page.page,
-          pageSlug: page.slug,
-          field,
-          currentValue: issue.value || '',
-          proposedValue: text,
-          reason: issue.recommendation || issue.message,
-        }],
-      });
-      setSentForReview(prev => new Set(prev).add(fixKey));
-    } catch (err) { console.error('Failed to send for review:', err); }
-    finally { setSendingReview(null); }
-  };
-
   // Audit → Task pipeline
   const [createdTasks, setCreatedTasks] = useState<Set<string>>(new Set());
   const [creatingTask, setCreatingTask] = useState<string | null>(null);
@@ -837,8 +808,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                           appliedFixes={appliedFixes}
                           editedSuggestions={editedSuggestions}
                           editingKey={editingKey}
-                          sentForReview={sentForReview}
-                          sendingReview={sendingReview}
                           createdTasks={createdTasks}
                           creatingTask={creatingTask}
                           flaggedIssues={flaggedIssues}
@@ -847,7 +816,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                           flagSending={flagSending}
                           actionMenuKey={actionMenuKey}
                           onAcceptSuggestion={acceptSuggestion}
-                          onSendForReview={sendForReview}
                           onSetEditingKey={setEditingKey}
                           onSetEditedSuggestion={(key, val) => setEditedSuggestions(prev => ({ ...prev, [key]: val }))}
                           onSetActionMenuKey={setActionMenuKey}

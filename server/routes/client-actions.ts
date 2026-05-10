@@ -29,6 +29,7 @@ const createActionSchema = z.object({
   summary: z.string().min(1).max(3000),
   payload: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['high', 'medium', 'low']).optional(),
+  clientNote: z.string().max(2000).optional(),
 }).strict();
 
 const adminUpdateSchema = z.object({

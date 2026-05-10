@@ -123,6 +123,7 @@ export interface CreateClientActionInput {
   summary: string;
   payload?: ClientActionPayload;
   priority?: 'high' | 'medium' | 'low';
+  clientNote?: string;
 }
 
 export interface ClientActionDecisionSummary {
@@ -162,6 +163,7 @@ export function createClientAction(input: CreateClientActionInput): ClientAction
     payload: input.payload ?? {},
     status: 'pending',
     priority: input.priority ?? 'medium',
+    clientNote: input.clientNote,
     createdAt: now,
     updatedAt: now,
   };
@@ -175,7 +177,7 @@ export function createClientAction(input: CreateClientActionInput): ClientAction
     payload: JSON.stringify(action.payload),
     status: action.status,
     priority: action.priority,
-    client_note: null,
+    client_note: input.clientNote ?? null,
     created_at: now,
     updated_at: now,
   });

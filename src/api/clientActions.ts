@@ -12,6 +12,7 @@ export const clientActions = {
     summary: string;
     payload?: ClientAction['payload'];
     priority?: ClientAction['priority'];
+    clientNote?: string;
   }) =>
     post<ClientAction>(`/api/client-actions/${wsId}`, body),
 

@@ -72,6 +72,7 @@ export function AeoReview({ workspaceId }: Props) {
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [sendingPage, setSendingPage] = useState<string | null>(null);
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
+  const [pageNotes, setPageNotes] = useState<Record<string, string>>({});
 
   // Load saved review on mount
   useEffect(() => {
@@ -155,6 +156,7 @@ export function AeoReview({ workspaceId }: Props) {
         title: `AEO recommendations for ${page.pageTitle || page.pageUrl}`,
         summary: `${page.summary}\n\n${clientReadyPage.changes.length} client-ready recommended change${clientReadyPage.changes.length !== 1 ? 's' : ''}, including ${highCount} high-priority item${highCount !== 1 ? 's' : ''}.${omittedCount > 0 ? ` ${omittedCount} citation recommendation${omittedCount !== 1 ? 's' : ''} omitted pending source research.` : ''}`,
         priority: highCount > 0 ? 'high' : 'medium',
+        clientNote: (pageNotes[page.pageUrl] ?? '').trim() || undefined,
         payload: {
           diffs: (clientReadyPage.changes ?? []).map(c => ({
             page: clientReadyPage.pageTitle || clientReadyPage.pageUrl,
@@ -407,6 +409,17 @@ export function AeoReview({ workspaceId }: Props) {
                           Re-review
                         </button>
                       </div>
+                      {!sentPages.has(page.pageUrl) && (
+                        <textarea
+                          rows={2}
+                          disabled={sendingPage === page.pageUrl}
+                          maxLength={2000}
+                          placeholder="Add a note for your client (optional)"
+                          value={pageNotes[page.pageUrl] ?? ''}
+                          onChange={e => setPageNotes(prev => ({ ...prev, [page.pageUrl]: e.target.value }))}
+                          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      )}
                     </div>
                   </div>
 
