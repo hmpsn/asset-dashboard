@@ -3,11 +3,35 @@ import {
   MessageSquare, Plus, Loader2, Send,
   CheckCircle2, X, Paperclip, FileText, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
-import type { ClientRequest, RequestCategory } from './types';
+import type { ClientRequest, RequestCategory, RequestNote } from './types';
 import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
+
+/**
+ * Maps 6 admin-internal request statuses to 4 client-visible status labels.
+ * Priority: team_replied > resolved > in_progress > awaiting_team
+ */
+function clientStatusLabel(status: string, notes: Pick<RequestNote, 'author'>[]): string {
+  // Check if there's an unread team reply
+  const lastNote = notes[notes.length - 1];
+  if (lastNote?.author === 'team') return 'Team replied';
+
+  switch (status) {
+    case 'new':
+    case 'in_review':
+      return 'Awaiting team';
+    case 'in_progress':
+    case 'on_hold':
+      return 'In progress';
+    case 'completed':
+    case 'closed':
+      return 'Resolved';
+    default:
+      return 'Awaiting team';
+  }
+}
 
 interface RequestsTabProps {
   workspaceId: string;
@@ -191,17 +215,17 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
         <div className="space-y-3">
           {requests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
             const isExpanded = expandedRequest === req.id;
+            // Group by client-visible status
             const statusColors: Record<string, string> = {
+              // Awaiting team
               new: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
-              in_review: 'bg-amber-500/10 border-amber-500/30 text-accent-warning',
+              in_review: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
+              // In progress
               in_progress: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
-              on_hold: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
+              on_hold: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
+              // Resolved
               completed: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-              closed: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
-            };
-            const statusLabels: Record<string, string> = {
-              new: 'New', in_review: 'In Review', in_progress: 'In Progress',
-              on_hold: 'On Hold', completed: 'Completed', closed: 'Closed',
+              closed: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
             };
             const catLabels: Record<string, string> = {
               bug: 'Bug', content: 'Content', design: 'Design',
@@ -220,9 +244,14 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                       <div className="flex items-center gap-2 mb-1">
                         <span className="t-body font-medium text-[var(--brand-text)] truncate">{req.title}</span>
                         <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
-                          {statusLabels[req.status] || req.status}
+                          {clientStatusLabel(req.status, req.notes)}
                         </span>
                       </div>
+                      {req.status === 'on_hold' && req.notes.some(n => n.author === 'team' && n.content?.toLowerCase().includes('on hold')) && (
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] block mb-2">
+                          {req.notes.filter(n => n.author === 'team' && n.content?.toLowerCase().includes('on hold')).at(-1)?.content}
+                        </span>
+                      )}
                       <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
                         <span className="px-1.5 py-0.5 bg-[var(--surface-3)] rounded-[var(--radius-sm)] text-[var(--brand-text-muted)]">{catLabels[req.category] || req.category}</span>
                         {req.submittedBy && <span className="text-[var(--brand-text-muted)]">by {req.submittedBy}</span>}
