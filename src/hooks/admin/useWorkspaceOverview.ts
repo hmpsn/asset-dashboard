@@ -38,20 +38,6 @@ interface ActivityEntry {
   createdAt: string;
 }
 
-interface FeedbackItem {
-  id: string;
-  workspaceId: string;
-  type: 'bug' | 'feature' | 'general';
-  title: string;
-  description: string;
-  status: 'new' | 'acknowledged' | 'fixed' | 'wontfix';
-  context?: { currentTab?: string };
-  submittedBy?: string;
-  replies: Array<{ id: string; author: 'team' | 'client'; content: string; createdAt: string }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface AnomalySummary {
   id: string;
   workspaceId: string;
@@ -68,12 +54,11 @@ export interface WorkspaceOverviewData {
   workspaces: WorkspaceSummary[];
   recentActivity: ActivityEntry[];
   anomalies: AnomalySummary[];
-  feedback: FeedbackItem[];
   presence: PresenceMap;
   timeSaved: { totalHoursSaved: number; operationCount: number } | null;
 }
 
-export type { WorkspaceSummary, ActivityEntry, FeedbackItem, AnomalySummary, PresenceMap };
+export type { WorkspaceSummary, ActivityEntry, AnomalySummary, PresenceMap };
 
 /**
  * Single aggregated query for the workspace overview (command center).
@@ -83,19 +68,17 @@ export function useWorkspaceOverviewData() {
   return useQuery<WorkspaceOverviewData>({
     queryKey: queryKeys.admin.workspaceOverview(),
     queryFn: async () => {
-      const [workspaces, recentActivity, anomalies, presence, feedback, timeSaved] = await Promise.all([
+      const [workspaces, recentActivity, anomalies, presence, timeSaved] = await Promise.all([
         get<WorkspaceSummary[]>('/api/workspace-overview'),
         getSafe<ActivityEntry[]>('/api/activity?limit=15', []),
         getSafe<AnomalySummary[]>('/api/anomalies', []),
         getOptional<PresenceMap>('/api/presence').then(v => v ?? {}).catch(() => ({} as PresenceMap)),
-        getSafe<FeedbackItem[]>('/api/feedback', []),
         getOptional<{ totalHoursSaved: number; operationCount: number }>(`/api/ai/time-saved?since=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()}`).catch(() => null),
       ]);
       return {
         workspaces: Array.isArray(workspaces) ? workspaces : [],
         recentActivity: Array.isArray(recentActivity) ? recentActivity : [],
         anomalies: Array.isArray(anomalies) ? anomalies.filter((a: AnomalySummary) => !a.dismissedAt) : [],
-        feedback: Array.isArray(feedback) ? feedback : [],
         presence: (presence && typeof presence === 'object' ? presence : {}) as PresenceMap,
         timeSaved: (timeSaved && typeof timeSaved === 'object' ? timeSaved : null) as { totalHoursSaved: number; operationCount: number } | null,
       };

@@ -25,7 +25,7 @@ export interface ClientChatWidgetProps {
   ws: WorkspaceInfo | null;
   /** Called whenever the API surface (openChat, askAi) changes. */
   onApiChange?: (api: ClientChatWidgetApi) => void;
-  /** Called when the expanded state changes — used by FeedbackWidget. */
+  /** Called when the expanded state changes. */
   onExpandedChange?: (expanded: boolean) => void;
   /**
    * Override the default quick-question buttons shown in the empty chat state.
@@ -88,7 +88,7 @@ export function ClientChatWidget({
     onApiChangeRef.current?.(api);
   }, [api]);
 
-  // Bubble up expanded state for FeedbackWidget
+  // Bubble up expanded state
   const onExpandedChangeRef = useRef(onExpandedChange);
   onExpandedChangeRef.current = onExpandedChange;
 
