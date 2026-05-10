@@ -79,7 +79,8 @@ export function createBatch(
   workspaceId: string,
   siteId: string,
   name: string,
-  items: Omit<ApprovalItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>[]
+  items: Omit<ApprovalItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>[],
+  note?: string
 ): ApprovalBatch {
   const now = new Date().toISOString();
   const batch: ApprovalBatch = {
@@ -95,6 +96,7 @@ export function createBatch(
       updatedAt: now,
     })),
     status: 'pending',
+    note,
     createdAt: now,
     updatedAt: now,
   };
