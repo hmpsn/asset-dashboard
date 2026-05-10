@@ -4,28 +4,28 @@ import { CheckCircle } from 'lucide-react';
 import { Icon } from '../ui';
 
 const SECTION_LABELS: Record<string, string> = {
-  'needs-action': 'Needs Action',
-  'seo-changes': 'SEO Changes',
-  content: 'Content',
+  decisions: 'Decisions',
+  conversations: 'Conversations',
+  reviews: 'Reviews',
 };
 
 const SECTION_CHIP_CLASS: Record<string, string> = {
-  'needs-action': 'bg-amber-500/15 text-accent-warning border-amber-500/30',
-  'seo-changes': 'bg-teal-500/15 text-accent-brand border-teal-500/30',
-  content: 'bg-blue-500/15 text-accent-info border-blue-500/30',
+  decisions: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
+  conversations: 'bg-blue-500/15 text-accent-info border-blue-500/30',
+  reviews: 'bg-teal-500/15 text-accent-brand border-teal-500/30',
 };
 
 const SECTION_ICON_CLASS: Record<string, string> = {
-  'needs-action': 'text-accent-warning',
-  'seo-changes': 'text-accent-brand',
-  content: 'text-accent-info',
+  decisions: 'text-accent-warning',
+  conversations: 'text-accent-info',
+  reviews: 'text-accent-brand',
 };
 
 export interface PriorityItem {
   id: string;
   icon: LucideIcon;
   title: string;
-  section: 'needs-action' | 'seo-changes' | 'content';
+  section: 'decisions' | 'conversations' | 'reviews';
   ctaLabel: string;
   onCta: () => void;
 }

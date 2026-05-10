@@ -3,14 +3,12 @@ import { INBOX_FILTER_VALUES, LEGACY_FILTER_MAP, isInboxFilter } from '../../src
 
 describe('INBOX_FILTER_VALUES', () => {
   it('contains exactly the four active filter values', () => {
-    expect(INBOX_FILTER_VALUES).toEqual(
-      expect.arrayContaining(['all', 'needs-action', 'seo-changes', 'content']),
-    );
+    expect(INBOX_FILTER_VALUES).toEqual(['all', 'decisions', 'reviews', 'conversations']);
     expect(INBOX_FILTER_VALUES).toHaveLength(4);
   });
 
   it('does not contain legacy or mode-only values', () => {
-    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed', 'needs-action', 'seo-changes', 'content'];
     for (const v of excluded) {
       expect(INBOX_FILTER_VALUES).not.toContain(v);
     }
@@ -24,8 +22,8 @@ describe('LEGACY_FILTER_MAP', () => {
     }
   });
 
-  it('contains all 5 legacy keys including completed', () => {
-    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+  it('contains all 8 legacy keys including completed', () => {
+    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed', 'needs-action', 'seo-changes', 'content'];
     for (const k of expectedKeys) {
       expect(LEGACY_FILTER_MAP).toHaveProperty(k);
     }

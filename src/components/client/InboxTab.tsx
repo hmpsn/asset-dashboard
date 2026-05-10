@@ -23,7 +23,7 @@ import { useBetaMode } from './BetaContext';
 import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 
-export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content';
+export type InboxFilter = 'all' | 'decisions' | 'reviews' | 'conversations';
 /**
  * Controls the Active/Completed mode toggle in the inbox page header.
  * The 'completed' branch is implemented in Task 3 (core InboxTab restructure).
@@ -31,7 +31,7 @@ export type InboxFilter = 'all' | 'needs-action' | 'seo-changes' | 'content';
 export type InboxMode = 'active' | 'completed';
 
 export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
-  ['all', 'needs-action', 'seo-changes', 'content'] as const;
+  ['all', 'decisions', 'reviews', 'conversations'] as const;
 
 /**
  * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
@@ -40,10 +40,13 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
  * was previously a filter chip but is now the Active/Completed mode toggle.
  */
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
-  approvals: 'seo-changes',
-  requests: 'needs-action',
-  copy: 'content',
-  'content-plan': 'needs-action',
+  'needs-action': 'decisions',
+  'seo-changes': 'decisions',
+  content: 'reviews',
+  approvals: 'decisions',
+  requests: 'conversations',
+  copy: 'reviews',
+  'content-plan': 'decisions',
   completed: 'all',   // completed is now a mode toggle, not a filter chip
 };
 
@@ -120,12 +123,12 @@ export function InboxTab({
   const [filter, setFilter] = useState<InboxFilter>(() => {
     const param = searchParams.get('tab');
     if (isInboxFilter(param)) {
-      // When betaMode is active, Content section is unavailable — coerce to default
-      if (param === 'content' && betaMode) return initialFilter ?? 'needs-action';
+      // When betaMode is active, Reviews section is unavailable — coerce to default
+      if (param === 'reviews' && betaMode) return initialFilter ?? 'decisions';
       return param;
     }
     if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
-    return initialFilter ?? 'needs-action';
+    return initialFilter ?? 'decisions';
   });
   const [mode, setMode] = useState<InboxMode>('active');
   const [schemaModalOpen, setSchemaModalOpen] = useState(false);
@@ -174,12 +177,12 @@ export function InboxTab({
   // Filter chips (hidden in completed mode)
   const filterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
-    { id: 'needs-action', label: 'Needs Action & Requests',
+    { id: 'decisions', label: 'Decisions & Requests',
       count: (pendingClientActions.length + requestReplies + planReviewCount) || undefined },
-    { id: 'seo-changes', label: 'SEO Changes',
-      count: ((pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)) || undefined },
-    ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content',
-      count: (contentReviews + copyReviewCount) || undefined }] : []),
+    { id: 'reviews', label: 'Reviews',
+      count: ((pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0) + contentReviews + copyReviewCount) || undefined },
+    ...(!betaMode ? [{ id: 'conversations' as InboxFilter, label: 'Conversations',
+      count: requestReplies || undefined }] : []),
   ];
 
   // Priority strip items (active mode only, ordered by urgency)
@@ -192,9 +195,9 @@ export function InboxTab({
         id: `request-${r.id}`,
         icon: MessageSquare,
         title: r.title,
-        section: 'needs-action',
+        section: 'conversations',
         ctaLabel: 'Reply →',
-        onCta: () => setFilter('needs-action'),
+        onCta: () => setFilter('conversations'),
       });
     }
   }
@@ -204,9 +207,9 @@ export function InboxTab({
       id: `batch-${b.id}`,
       icon: ClipboardCheck,
       title: b.name,
-      section: 'seo-changes',
+      section: 'decisions',
       ctaLabel: 'Review →',
-      onCta: () => setFilter('seo-changes'),
+      onCta: () => setFilter('decisions'),
     });
   }
   // 3. Schema plan pending initial feedback
@@ -215,7 +218,7 @@ export function InboxTab({
       id: 'schema-plan',
       icon: Shield,
       title: 'Schema strategy ready for review',
-      section: 'seo-changes',
+      section: 'reviews',
       ctaLabel: 'Review →',
       onCta: () => setSchemaModalOpen(true),
     });
@@ -226,10 +229,10 @@ export function InboxTab({
       id: `action-${a.id}`,
       icon: Flag,
       title: a.title,
-      section: 'needs-action',
+      section: 'decisions',
       ctaLabel: 'View →',
       // Modal wired in Task 7 — scroll to section until then
-      onCta: () => setFilter('needs-action'),
+      onCta: () => setFilter('decisions'),
     });
   }
   // 5. Content at review status
@@ -238,9 +241,9 @@ export function InboxTab({
       id: `content-${c.id}`,
       icon: FileText,
       title: c.topic || 'Content review',
-      section: 'content',
+      section: 'reviews',
       ctaLabel: 'Review →',
-      onCta: () => setFilter('content'),
+      onCta: () => setFilter('reviews'),
     });
   }
   // 6. Content plan cells at review
@@ -249,9 +252,9 @@ export function InboxTab({
       id: `plan-${cell.cellId}`,
       icon: Layers,
       title: cell.targetKeyword || 'Content plan cell',
-      section: 'needs-action',
+      section: 'reviews',
       ctaLabel: 'Review →',
-      onCta: () => setFilter('needs-action'),
+      onCta: () => setFilter('reviews'),
     });
   }
   // 7. Copy review awaiting approval
@@ -260,9 +263,9 @@ export function InboxTab({
       id: 'copy-review',
       icon: PenLine,
       title: 'Copy sections awaiting your approval',
-      section: 'content',
+      section: 'reviews',
       ctaLabel: 'Review →',
-      onCta: () => setFilter('content'),
+      onCta: () => setFilter('reviews'),
     });
   }
 
@@ -295,9 +298,9 @@ export function InboxTab({
     }
   };
 
-  const showSection1 = mode === 'active' && (filter === 'all' || filter === 'needs-action');
-  const showSection2 = mode === 'active' && (filter === 'all' || filter === 'seo-changes');
-  const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'content');
+  const showSection1 = mode === 'active' && (filter === 'all' || filter === 'decisions');
+  const showSection2 = mode === 'active' && (filter === 'all' || filter === 'reviews');
+  const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'conversations');
 
   return (
     <div className="space-y-6">
