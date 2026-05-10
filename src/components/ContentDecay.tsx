@@ -264,10 +264,12 @@ export default function ContentDecay({ workspaceId }: Props) {
                               {!sentPages.has(page.page) && (
                                 <textarea
                                   rows={2}
+                                  disabled={sendingPage === page.page}
+                                  maxLength={2000}
                                   placeholder="Add a note for your client (optional)"
                                   value={pageNotes[page.page] ?? ''}
                                   onChange={e => setPageNotes(prev => ({ ...prev, [page.page]: e.target.value }))}
-                                  className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)]"
+                                  className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                               )}
                             </div>
