@@ -12,13 +12,13 @@ const SECTION_LABELS: Record<string, string> = {
 const SECTION_CHIP_CLASS: Record<string, string> = {
   decisions: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
   conversations: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  reviews: 'bg-teal-500/15 text-accent-brand border-teal-500/30',
+  reviews: 'bg-blue-500/15 text-accent-info border-blue-500/30',
 };
 
 const SECTION_ICON_CLASS: Record<string, string> = {
   decisions: 'text-accent-warning',
   conversations: 'text-accent-info',
-  reviews: 'text-accent-brand',
+  reviews: 'text-accent-info',
 };
 
 export interface PriorityItem {

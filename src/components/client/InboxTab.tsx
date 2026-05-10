@@ -127,7 +127,11 @@ export function InboxTab({
       if (param === 'reviews' && betaMode) return initialFilter ?? 'decisions';
       return param;
     }
-    if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
+    if (param && LEGACY_FILTER_MAP[param]) {
+      const mapped = LEGACY_FILTER_MAP[param];
+      if (mapped === 'reviews' && betaMode) return initialFilter ?? 'decisions';
+      return mapped;
+    }
     return initialFilter ?? 'decisions';
   });
   const [mode, setMode] = useState<InboxMode>('active');
@@ -281,7 +285,7 @@ export function InboxTab({
               {[
                 { id: 'all' as InboxFilter, label: 'All' },
                 { id: 'decisions' as InboxFilter, label: 'Decisions', count: decisionsCount || undefined },
-                { id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined },
+                ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined }] : []),
                 { id: 'conversations' as InboxFilter, label: 'Conversations', count: conversationsCount || undefined },
               ].map(f => (
                 <button

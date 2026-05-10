@@ -10,6 +10,9 @@ import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
 
 function clientStatusLabel(status: string, notes: Pick<RequestNote, 'author'>[]): string {
+  // Priority: resolved > team_replied > in_progress > awaiting_team
+  // (matches toClientRequestStatus in shared/types/requests.ts)
+  if (status === 'completed' || status === 'closed') return 'Resolved';
   const lastNote = notes[notes.length - 1];
   if (lastNote?.author === 'team') return 'Team replied';
   switch (status) {
@@ -17,8 +20,6 @@ function clientStatusLabel(status: string, notes: Pick<RequestNote, 'author'>[])
     case 'in_review':   return 'Awaiting team';
     case 'in_progress': return 'In progress';
     case 'on_hold':     return 'In progress';
-    case 'completed':
-    case 'closed':      return 'Resolved';
     default:            return 'Awaiting team';
   }
 }

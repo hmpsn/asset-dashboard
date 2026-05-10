@@ -6736,6 +6736,19 @@ describe('Rule: inbox-legacy-filter-literal', () => {
     expect(runRule(RULE, [file])).toHaveLength(1);
   });
 
+  it('flags ?tab=content (retired in PR 1.2)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContent.tsx'),
+      lines(
+        'export function BadContent() {',
+        '  navigate(`/client/${id}/inbox?tab=content`);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+    expect(runRule(RULE, [file])[0].line).toBe(2);
+  });
+
   it('does NOT flag ?tab=decisions (new value)', () => {
     const file = write(
       uniqPath('rule-inbox-legacy', 'src/components/NewGoodLink.tsx'),
@@ -6754,6 +6767,18 @@ describe('Rule: inbox-legacy-filter-literal', () => {
       lines(
         'export function buildUrl() {',
         "  return `/inbox?tab=reviews`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=conversations (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/NewConversations.tsx'),
+      lines(
+        'export function NewConversations() {',
+        '  return <a href={`/inbox?tab=conversations`}>Go</a>;',
         '}',
       )
     );

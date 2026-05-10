@@ -24,8 +24,13 @@ describe('LEGACY_FILTER_MAP', () => {
     }
   });
 
-  it('contains all 5 legacy keys including completed', () => {
-    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+  it('contains all 8 legacy keys including PR-1.2 retired values', () => {
+    const expectedKeys = [
+      // Pre-PR-1.2 URL alias params
+      'approvals', 'requests', 'copy', 'content-plan', 'completed',
+      // PR-1.2 retired InboxFilter literals
+      'needs-action', 'seo-changes', 'content',
+    ];
     for (const k of expectedKeys) {
       expect(LEGACY_FILTER_MAP).toHaveProperty(k);
     }
