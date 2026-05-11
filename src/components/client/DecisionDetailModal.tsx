@@ -268,7 +268,7 @@ export function DecisionDetailModal({
         return;
       if (e.key === 'Escape') onDismiss();
     };
-    document.addEventListener('keydown', handler);
+    document.addEventListener('keydown', handler); // keydown-ok — isContentEditable guard is in the handler body above
     return () => document.removeEventListener('keydown', handler);
   }, [onDismiss]);
 
