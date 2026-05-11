@@ -35,10 +35,8 @@ export function DecisionCard({
   };
 
   return (
-    <div
-      className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4"
-      style={{ borderRadius: 'var(--radius-signature-lg)' }}
-    >
+    // pr-check-disable-next-line -- brand signature radius intentional; mirrors SectionCard visual identity for decision cards
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       {/* Header row: badge + priority */}
       <div className="flex items-center gap-2 mb-1">
         <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
