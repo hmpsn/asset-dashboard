@@ -22,7 +22,7 @@ export function enqueuePlaybook(workspaceId: string, action: ClientAction): void
     case 'content_decay':
       enqueueContentDecayPlaybook(workspaceId, action);
       break;
-    // aeo_change, internal_link, keyword_strategy, redirect_proposal:
+    // aeo_change, internal_link, redirect_proposal:
     // No automated playbook. Admin implements manually and marks complete via UI.
     default:
       break;
