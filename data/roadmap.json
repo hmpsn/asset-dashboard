@@ -3745,6 +3745,61 @@
       ]
     },
     {
+      "id": "sprint-may-2026",
+      "name": "✅ SHIPPED — May 2026",
+      "rationale": "Client Inbox IA Redesign (Phase 1 + Phase 2) — feedback retirement, shared type contracts, admin send convention standardization, 3-section inbox layout, wins surface, and prevention rules.",
+      "items": [
+        {
+          "id": "may-2026-feedback-retirement",
+          "name": "Feedback Module Retirement",
+          "status": "done",
+          "notes": "Shipped — PR #658 (feat/feedback-retirement). Removed FeedbackWidget from InboxTab and all import chains; retired /api/feedback routes; pr-check rule prevents reintroduction."
+        },
+        {
+          "id": "may-2026-keyword-strategy-deprecation",
+          "name": "keyword_strategy Action Type Deprecation",
+          "status": "done",
+          "notes": "Shipped — PR #659 (feat/keyword-strategy-deprecation). Existing keyword_strategy client_actions archived; new creation blocked via pr-check rule."
+        },
+        {
+          "id": "may-2026-shared-contracts",
+          "name": "Client Inbox IA — Shared Type Contracts",
+          "status": "done",
+          "notes": "Shipped — PR #660 (feat/shared-contracts). InboxFilter type, ClientAction/ClientActionSourceType/ClientActionTier types, CLIENT_INBOX_ALIASES in routes.ts, shared-contracts test."
+        },
+        {
+          "id": "may-2026-admin-send-convention",
+          "name": "Admin Send Convention Standardization",
+          "status": "done",
+          "notes": "Shipped — PR #661 (feat/admin-send-convention). 'Send for Review' and 'Flag for Client' labels replaced with canonical 'Send' pattern; pr-check rule enforces no recurrence; ui-vocabulary.md updated."
+        },
+        {
+          "id": "may-2026-inbox-ia-restructure",
+          "name": "Client Inbox IA Redesign — 3-Section Layout",
+          "status": "done",
+          "notes": "Shipped — PR #662 (feat/inbox-ia-restructure). InboxTab 3-section layout (Decisions/Reviews/Conversations) behind new-inbox-ia flag; SchemaReviewModal; ClientActionDetailModal; LEGACY_FILTER_MAP backward-compat."
+        },
+        {
+          "id": "may-2026-client-wins-surface",
+          "name": "Client Wins Surface",
+          "status": "done",
+          "notes": "Shipped — PR #663 (feat/client-wins-surface). WinsSurface in InsightsBriefingPage behind client-wins-surface flag; GET /api/public/outcomes/:wsId/wins endpoint; mutual-exclusivity with PredictionShowcaseCard enforced by pr-check."
+        },
+        {
+          "id": "may-2026-ia-prevention-rules",
+          "name": "IA Redesign Prevention Rules",
+          "status": "done",
+          "notes": "Shipped — PR #664 (feat/ia-prevention-rules). 5 new pr-check rules: feedback-module-reintroduction, keyword-strategy-action-type, send-for-review-anti-pattern, prediction-showcase-ungated, inbox-action-queue-strip. docs/rules/inbox-section-routing.md added."
+        },
+        {
+          "id": "may-2026-action-queue-strip-phase2b",
+          "name": "ActionQueueStrip Phase 2B — Final InboxFilter Values",
+          "status": "done",
+          "notes": "Shipped — PR #665 (feat/action-queue-strip-final-values). Chip section values updated from intermediate names (seo-changes/content/needs-action) to final InboxFilter values (decisions/reviews). LEGACY_FILTER_MAP trimmed to 5 URL alias entries."
+        }
+      ]
+    },
+    {
       "id": "shipped-apr-2026",
       "name": "✅ SHIPPED — April 2026",
       "items": [

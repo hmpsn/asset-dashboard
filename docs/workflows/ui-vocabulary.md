@@ -48,6 +48,17 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 | Client inbox section — approvals/actions with note + requests | **"Conversations"** | Requests, Messages |
 | Win quality indicator | **"Win"** / **"Strong win"** | "success", "confirmed win" |
 
+### ActionQueueStrip Chip Labels (Phase 2B — PR #665)
+
+The briefing page action strip chips emit final `InboxFilter` values as `?tab=` deep-link params. These are the canonical chip labels and their target inbox sections:
+
+| Chip label | `InboxFilter` value emitted | Target section in InboxTab |
+|------------|----------------------------|---------------------------|
+| Decisions | `decisions` | Decisions section (schema + action cards without note) |
+| Reviews | `reviews` | Reviews section (briefs + posts needing editorial review) |
+
+**DO NOT** use the retired intermediate values (`seo-changes`, `content`, `needs-action`) — these were trimmed from `LEGACY_FILTER_MAP` in PR #665. Only 5 URL alias entries remain in `CLIENT_INBOX_ALIASES` for backward-compat with bookmarked URLs.
+
 ## Overflow Menu Labels
 
 When actions are behind a `⋮` (MoreVertical) overflow menu:

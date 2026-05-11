@@ -242,6 +242,21 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
 
+#### Client Inbox IA — 3-Section Layout (`new-inbox-ia` flag)
+
+When the `new-inbox-ia` feature flag is on, InboxTab renders three named sections. Section headers use existing design system patterns — no new color families introduced.
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **Section header** ("Decisions", "Reviews", "Conversations") | `t-label text-[var(--brand-text-muted)] tracking-wider uppercase` | Muted label — structural chrome, not a CTA |
+| **Section header divider** | `border-b border-[var(--brand-border)]` | Standard border token |
+| **Approve CTA** (within action cards) | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
+| **Request Changes CTA** | `bg-amber-600/20 border-amber-500/30 text-amber-300 hover:bg-amber-600/30` | Amber = needs attention |
+| **SchemaReviewModal / ClientActionDetailModal** backdrop | `bg-[var(--brand-overlay)]` | Token-only — no raw `bg-black/X` |
+| Modal close ("✕") | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` | Standard muted-to-default step |
+
+**Flag-off:** Legacy single-list InboxTab renders unchanged. No color changes in the flag-off path.
+
 ##### Phase 2.5b — investor-briefing reading rhythm
 
 Phase 2.5b extends the magazine layout with five new sections in the 8-stop reading rhythm: Dateline → Issue Summary → Action Strip → **Pulse** → Lead → **Data Spread** → **Recommended for You** → Watch List. New layout conventions:
