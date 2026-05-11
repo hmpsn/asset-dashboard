@@ -42,7 +42,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   content_post_ready: 'action',
   content_published: 'action',
   fixes_applied: 'action',
-  action_approved: 'action',
+  action_approved: 'internal',
 
   // Alert — max 1/day
   anomaly_alert: 'alert',
@@ -61,7 +61,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   feedback_new: 'internal',
   client_signal: 'internal',
   content_changes_requested: 'internal',
-  client_briefing_ready: 'action',
+  client_briefing_ready: 'internal',
 };
 
 export function getThrottleCategory(type: EmailEventType): ThrottleCategory {
