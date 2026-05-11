@@ -33,15 +33,12 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
 
 /**
  * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
- * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip inbox-action-queue-strip-ok
- * chip section values are updated. Also handles the 'completed' mode value which
- * was previously a filter chip but is now the Active/Completed mode toggle.
+ * Used for backward-compat with external URLs and old bookmarks (URL alias params
+ * from CLIENT_INBOX_ALIASES in routes.ts). Intermediate filter names from the
+ * Phase 2B migration window have been removed — chips now emit final values directly.
  */
+// inbox-action-queue-strip-ok — JSDoc above documents the migration state, not an import
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
-  // old InboxFilter section names → new sections
-  'needs-action':  'decisions',
-  'seo-changes':   'decisions',
-  'content':       'reviews',
   // legacy URL alias params (from CLIENT_INBOX_ALIASES in routes.ts)
   approvals:       'decisions',
   requests:        'conversations',

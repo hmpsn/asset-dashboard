@@ -73,11 +73,11 @@ interface Chip {
   /**
    * Must be a valid InboxFilter value — see INBOX_FILTER_VALUES in InboxTab.tsx.
    * Clicking a chip navigates to `?tab=${section}` on the inbox route.
-   * approvals → seo-changes, requests/replies → needs-action, content-plan → needs-action.
+   * approvals/replies/contentPlan → decisions, briefs/posts → reviews.
    * Drift here silently sends users to the default 'all' filter — covered by the
    * tab-deep-link-wiring contract test.
    */
-  section: 'seo-changes' | 'content' | 'needs-action';
+  section: 'decisions' | 'reviews';
 }
 
 /**
@@ -101,35 +101,35 @@ export function ActionQueueStrip({
     chips.push({
       count: counts.approvals,
       label: counts.approvals === 1 ? 'approval' : 'approvals',
-      section: 'seo-changes',
+      section: 'decisions',
     });
   }
   if (counts.briefs > 0) {
     chips.push({
       count: counts.briefs,
       label: counts.briefs === 1 ? 'brief' : 'briefs',
-      section: 'content',
+      section: 'reviews',
     });
   }
   if (counts.posts > 0) {
     chips.push({
       count: counts.posts,
       label: counts.posts === 1 ? 'post' : 'posts',
-      section: 'content',
+      section: 'reviews',
     });
   }
   if (counts.replies > 0) {
     chips.push({
       count: counts.replies,
       label: counts.replies === 1 ? 'reply' : 'replies',
-      section: 'needs-action',
+      section: 'decisions',
     });
   }
   if (counts.contentPlan > 0) {
     chips.push({
       count: counts.contentPlan,
       label: counts.contentPlan === 1 ? 'page' : 'pages',
-      section: 'needs-action',
+      section: 'decisions',
     });
   }
 
