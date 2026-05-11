@@ -41,7 +41,7 @@ function ApprovalItemRow({
               </p>
             </div>
             <div>
-              <p className="t-caption-sm text-teal-400 mb-0.5">Proposed</p>
+              <p className="t-caption-sm text-accent-brand mb-0.5">Proposed</p>
               <p className="t-caption text-[var(--brand-text)] line-clamp-2">
                 {item.proposedValue}
               </p>
@@ -53,7 +53,7 @@ function ApprovalItemRow({
             <button
               type="button"
               onClick={onUnflag}
-              className="t-caption-sm text-amber-400 hover:text-[var(--brand-text)] transition-colors px-2 py-1"
+              className="t-caption-sm text-accent-warning hover:text-[var(--brand-text)] transition-colors px-2 py-1"
             >
               Unflag
             </button>
@@ -62,7 +62,7 @@ function ApprovalItemRow({
               type="button"
               aria-label="Flag"
               onClick={() => setFlagging(true)}
-              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-amber-400 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
+              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-warning hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
             >
               <Icon as={Flag} size="sm" />
               Flag
@@ -85,7 +85,7 @@ function ApprovalItemRow({
                   setFlagging(false);
                   setNote('');
                 }}
-                className="t-caption-sm font-medium text-amber-400 px-2 py-1 hover:bg-amber-500/10 rounded-[var(--radius-md)] transition-colors"
+                className="t-caption-sm font-medium text-accent-warning px-2 py-1 hover:bg-amber-500/10 rounded-[var(--radius-md)] transition-colors"
               >
                 Flag it
               </button>
@@ -105,7 +105,7 @@ function ApprovalItemRow({
         </div>
       </div>
       {flagged && (
-        <p className="t-caption-sm text-amber-400 mt-1 flex items-center gap-1">
+        <p className="t-caption-sm text-accent-warning mt-1 flex items-center gap-1">
           <Icon as={Flag} size="sm" /> Flagged — your team will hold this change for review.
         </p>
       )}
@@ -138,7 +138,7 @@ function AeoRenderer({ payload }: { payload: AeoChangePayload }) {
               </p>
             </div>
             <div>
-              <p className="t-caption-sm text-teal-400 mb-0.5">Proposed</p>
+              <p className="t-caption-sm text-accent-brand mb-0.5">Proposed</p>
               <p className="t-caption text-[var(--brand-text)] bg-teal-500/5 border border-teal-500/20 p-2 rounded-[var(--radius-md)]">
                 {d.proposed}
               </p>
@@ -185,7 +185,7 @@ function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
                 {s.anchorText}
               </td>
               <td className="py-3 pr-4 align-top">
-                <span className="t-caption text-teal-400">
+                <span className="t-caption text-accent-brand">
                   {s.targetTitle || s.targetUrl}
                 </span>
               </td>
@@ -216,7 +216,7 @@ function RedirectRenderer({ payload }: { payload: RedirectProposalPayload }) {
             {r.source}
           </p>
           <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">→</span>
-          <p className="t-caption text-teal-400 flex-1 min-w-0 break-all">{r.target}</p>
+          <p className="t-caption text-accent-brand flex-1 min-w-0 break-all">{r.target}</p>
         </div>
       ))}
     </div>
@@ -329,7 +329,7 @@ export function DecisionDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="decision-modal-title"
-      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col"
+      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col" // fixed-inset-ok — full-screen trust-first panel; escape key + backdrop click handled in component body
     >
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
@@ -356,7 +356,7 @@ export function DecisionDetailModal({
                 {decision.badge}
               </span>
               {decision.priority === 'high' && (
-                <span className="t-caption-sm font-medium text-amber-400">High priority</span>
+                <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
               )}
             </div>
             <h2

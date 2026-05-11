@@ -38,6 +38,7 @@ import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { WS_EVENTS } from '../ws-events.js';
+import db from '../db/index.js';
 
 const log = createLogger('approvals');
 
@@ -184,6 +185,53 @@ router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAut
   res.json(batch);
 });
 
+const bulkApproveSchema = z.object({
+  clientNote: z.string().max(2000).optional(),
+}).strict();
+
+// Bulk-approve all pending items in a batch (client submits trust-first approval)
+// MUST precede the /:itemId route so 'approve' is not captured as a param.
+router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClientPortalAuth(), validate(bulkApproveSchema), (req, res, next) => {
+  const { workspaceId, batchId } = req.params;
+  const { clientNote } = req.body as { clientNote?: string };
+
+  const batch = getBatch(workspaceId, batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+  const pendingItems = batch.items.filter(i => i.status === 'pending');
+  if (pendingItems.length === 0) {
+    return res.status(400).json({ error: 'No pending items to approve' });
+  }
+
+  let updatedBatch = batch;
+  try {
+    db.transaction(() => {
+      for (const item of pendingItems) {
+        const result = updateItem(workspaceId, batchId, item.id, {
+          status: 'approved',
+          ...(clientNote ? { clientNote } : {}),
+        });
+        if (result) updatedBatch = result;
+      }
+    })();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+
+  const actorInfo = getClientActor(req, workspaceId);
+  addActivity(workspaceId, 'approval_applied',
+    `${actorInfo?.name || 'Client'} approved all changes in batch "${batch.name}"`,
+    clientNote || undefined,
+    { batchId },
+    actorInfo);
+
+  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
+  res.json(updatedBatch);
+});
+
 router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {
   // Only include fields that were actually sent — passing undefined would overwrite existing values
   const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
@@ -273,46 +321,6 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: req.params.batchId, itemId: req.params.itemId, status });
   res.json(batch);
-});
-
-// Bulk-approve all pending items in a batch (client submits trust-first approval)
-router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClientPortalAuth(), (req, res, next) => {
-  const { workspaceId, batchId } = req.params;
-  const { clientNote } = req.body as { clientNote?: string };
-
-  const batch = getBatch(workspaceId, batchId);
-  if (!batch) return res.status(404).json({ error: 'Batch not found' });
-
-  const pendingItems = batch.items.filter(i => i.status === 'pending');
-  if (pendingItems.length === 0) {
-    return res.status(400).json({ error: 'No pending items to approve' });
-  }
-
-  let updatedBatch = batch;
-  try {
-    for (const item of pendingItems) {
-      const result = updateItem(workspaceId, batchId, item.id, {
-        status: 'approved',
-        ...(clientNote ? { clientNote } : {}),
-      });
-      if (result) updatedBatch = result;
-    }
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'InvalidTransitionError') {
-      return res.status(400).json({ error: err.message });
-    }
-    return next(err);
-  }
-
-  const actorInfo = getClientActor(req, workspaceId);
-  addActivity(workspaceId, 'approval_applied',
-    `${actorInfo?.name || 'Client'} approved all changes in batch "${batch.name}"`,
-    clientNote || undefined,
-    { batchId },
-    actorInfo);
-
-  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
-  res.json(updatedBatch);
 });
 
 // Apply approved items to Webflow

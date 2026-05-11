@@ -43,7 +43,7 @@ export function DecisionCard({
           {decision.badge}
         </span>
         {decision.priority === 'high' && (
-          <span className="t-caption-sm font-medium text-amber-400">High priority</span>
+          <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
         )}
       </div>
 
