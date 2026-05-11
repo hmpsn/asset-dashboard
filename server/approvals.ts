@@ -18,6 +18,7 @@ interface BatchRow {
   workspace_id: string;
   site_id: string;
   name: string;
+  note?: string | null;
   items: string;
   status: string;
   created_at: string;
@@ -26,8 +27,8 @@ interface BatchRow {
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
-    `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
-         VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)`,
+    `INSERT INTO approval_batches (id, workspace_id, site_id, name, note, items, status, created_at, updated_at)
+         VALUES (@id, @workspace_id, @site_id, @name, @note, @items, @status, @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM approval_batches WHERE workspace_id = ?`,
@@ -68,6 +69,7 @@ function rowToBatch(row: BatchRow): ApprovalBatch {
     workspaceId: row.workspace_id,
     siteId: row.site_id,
     name: row.name,
+    ...(row.note ? { note: row.note } : {}),
     items,
     status: row.status as ApprovalBatch['status'],
     createdAt: row.created_at,
@@ -105,6 +107,7 @@ export function createBatch(
     workspace_id: workspaceId,
     site_id: siteId,
     name,
+    note: note ?? null,
     items: JSON.stringify(batch.items),
     status: batch.status,
     created_at: now,
