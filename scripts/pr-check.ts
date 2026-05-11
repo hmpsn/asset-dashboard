@@ -5147,6 +5147,144 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Catches any re-introduction of the FeedbackWidget module (import) or
+    // its associated /api/feedback / /api/public/feedback Express routes.
+    // The feedback module was retired in PR 1.1 (2026-05-08). Any new import
+    // or route registration signals an unintentional reintroduction.
+    // Comment-only lines (pure //) are skipped so documentation references
+    // to the retired module don't generate false positives.
+    // Escape hatch: // feedback-module-reintroduction-ok
+    name: 'feedback-module-reintroduction',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    severity: 'error',
+    excludeLines: ['feedback-module-reintroduction-ok'],
+    message:
+      "FeedbackWidget import or /api/feedback route — feedback module was retired in PR 1.0a (migration 091 dropped the table). " +
+      "Use the requests subsystem (/api/public/requests) for client submissions instead. " +
+      "Add // feedback-module-reintroduction-ok if intentional.",
+    rationale:
+      "Prevents reintroduction of the retired FeedbackWidget component and its /api/feedback endpoint after PR 1.0a cleanup.",
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const importRe = /import[^'"`]*['"`][^'"`]*FeedbackWidget[^'"`]*['"`]/;
+      const routeRe = /router\s*\.\s*(get|post|put|patch|delete)\s*\(\s*['"`][/]api[/](public[/])?feedback/;
+      for (const file of files) {
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!importRe.test(content) && !routeRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!importRe.test(line) && !routeRe.test(line)) continue;
+          // Skip pure // comment lines
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, 'feedback-module-reintroduction-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Blocks use of the string literal 'keyword_strategy' as a sourceType/type
+    // discriminator in src/ files. This was a retired action type from the
+    // pre-IA-restructure codebase. Shared type definitions and migration files
+    // legitimately reference it for historical accuracy.
+    // Escape hatch: // keyword-strategy-action-type-ok
+    name: 'keyword-strategy-action-type',
+    pattern: "(sourceType|type)\\s*:\\s*['\"]keyword_strategy['\"]",
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: ['shared/types/', 'server/db/migrations/'],
+    severity: 'error',
+    message:
+      "Retired action type 'keyword_strategy' used as sourceType/type discriminator in src/. Add // keyword-strategy-action-type-ok if intentional.",
+    rationale:
+      "Prevents re-introduction of the retired 'keyword_strategy' ClientAction sourceType after the inbox IA restructure (PR 1.2).",
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['keyword-strategy-action-type-ok'],
+  },
+  {
+    // Blocks 'Send for Review' and 'Flag for Client' label strings in src/ TSX.
+    // After PR 1.4 (Admin Send Convention), all admin send surfaces use a single
+    // "Send to client" button + optional note field.
+    // Escape hatch: // send-for-review-anti-pattern-ok
+    name: 'send-for-review-anti-pattern',
+    pattern: 'Send for Review|Flag for Client',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    severity: 'error',
+    message:
+      "Retired label 'Send for Review' or 'Flag for Client' — use 'Send to client' (single button + optional note field). See docs/workflows/ui-vocabulary.md §Admin Send Convention. Add // send-for-review-anti-pattern-ok if intentional.",
+    rationale:
+      "Enforces the Admin Send Convention introduced in PR 1.4: one 'Send to client' button replaces the old dual 'Send for Review' / 'Flag for Client' pattern.",
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['send-for-review-anti-pattern-ok'],
+  },
+  {
+    // Ensures <PredictionShowcaseCard is only rendered when the winsEnabled
+    // feature flag is checked. The card should only be visible to workspaces
+    // with wins enabled, gated by !winsEnabled on the same line or within the
+    // 2 preceding lines.
+    // Escape hatch: // prediction-showcase-ungated-ok
+    name: 'prediction-showcase-ungated',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    severity: 'error',
+    excludeLines: ['prediction-showcase-ungated-ok'],
+    message:
+      "PredictionShowcaseCard rendered without winsEnabled gate — add !winsEnabled guard on the same or preceding line. Add // prediction-showcase-ungated-ok if intentional.",
+    rationale:
+      "PredictionShowcaseCard must be gated behind the winsEnabled feature flag to prevent uncontrolled rollout to all clients.",
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardRe = /<PredictionShowcaseCard/;
+      const gateRe = /!winsEnabled/;
+      for (const file of files) {
+        if (!/\.tsx$/.test(file)) continue;
+        if (!file.includes('/src/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!cardRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!cardRe.test(line)) continue;
+          // Skip pure // comment lines
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, 'prediction-showcase-ungated-ok')) continue;
+          // Check current line and up to 2 preceding lines for the gate
+          const window = lines.slice(Math.max(0, i - 2), i + 1).join('\n');
+          if (gateRe.test(window)) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Blocks ActionQueueStrip from being re-added to InboxTab.tsx. After PR 1.2
+    // (inbox IA restructure), urgency is carried through chip counts and section
+    // labels, not an amber strip at the top of the inbox. Any new import or
+    // usage of ActionQueueStrip in InboxTab.tsx signals an unintentional revert.
+    // Escape hatch: // inbox-action-queue-strip-ok
+    name: 'inbox-action-queue-strip',
+    pattern: 'ActionQueueStrip',
+    fileGlobs: ['InboxTab.tsx'],
+    severity: 'error',
+    message:
+      "ActionQueueStrip in InboxTab.tsx — this component was retired from the inbox in PR 1.2. Urgency is now conveyed through section chip counts. Add // inbox-action-queue-strip-ok if intentional.",
+    rationale:
+      "Prevents re-introduction of ActionQueueStrip into InboxTab.tsx after the inbox IA restructure removed it (§5.6 of IA spec).",
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['inbox-action-queue-strip-ok'],
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

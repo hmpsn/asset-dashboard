@@ -33,7 +33,7 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
 
 /**
  * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
- * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip
+ * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip inbox-action-queue-strip-ok
  * chip section values are updated. Also handles the 'completed' mode value which
  * was previously a filter chip but is now the Active/Completed mode toggle.
  */

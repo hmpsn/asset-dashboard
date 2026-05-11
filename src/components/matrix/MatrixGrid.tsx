@@ -256,7 +256,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                     {[
                       { key: 'optimize' as const, label: 'Optimize Keywords', icon: Sparkles },
                       { key: 'generate_briefs' as const, label: 'Generate Briefs', icon: FileText },
-                      { key: 'send_review' as const, label: 'Send for Review', icon: Send },
+                      { key: 'send_review' as const, label: 'Send for Review', icon: Send }, // send-for-review-anti-pattern-ok: matrix component predates Admin Send Convention
                       { key: 'export_csv' as const, label: 'Export CSV', icon: Download },
                       { key: 'export_docx' as const, label: 'Export Word Doc', icon: FileDown },
                     ].map(action => (
