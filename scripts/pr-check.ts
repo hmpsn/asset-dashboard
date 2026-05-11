@@ -5103,10 +5103,11 @@ export const CHECKS: Check[] = [
     rationale: "semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct.",
   },
   {
-    // Flags old InboxFilter string literals that were renamed in the inbox redesign.
-    // After 2026-05-08 inbox redesign: 'approvals'→'seo-changes', 'requests'→'needs-action',
-    // 'content-plan'→'needs-action', 'copy'→'content' as filter values.
-    // These must not reappear as ?tab= values in src/ after migration.
+    // Flags old InboxFilter string literals retired through the inbox IA restructure.
+    // PR 1.1 (2026-05-08): approvals→seo-changes, requests→needs-action,
+    // content-plan→needs-action, copy→content (4→4 mapping).
+    // PR 1.2 (2026-05-10): Consolidate seo-changes, needs-action, content to
+    // (decisions, reviews, conversations). All 7 old values now denied as ?tab= literals.
     // Implemented as customCheck so comment-only lines (e.g. backward-compat doc
     // in App.tsx) are skipped without needing per-file escape hatches.
     name: 'inbox-legacy-filter-literal',
@@ -5115,14 +5116,14 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     excludeLines: ['inbox-legacy-filter-literal-ok'],
     message:
-      "Old inbox filter value — update to new InboxFilter value. See 2026-05-08 inbox redesign: 'approvals'→'seo-changes', 'requests'→'needs-action', 'content-plan'→'needs-action', 'copy'→'content'. Add // inbox-legacy-filter-literal-ok if intentional.",
+      "Old inbox filter value — update to new InboxFilter value (decisions, reviews, or conversations). See 2026-05-10 inbox IA restructure: PR 1.1 renamed (approvals→seo-changes, requests→needs-action, content-plan→needs-action, copy→content); PR 1.2 retires all 7 to (decisions, reviews, conversations). Add // inbox-legacy-filter-literal-ok if intentional.",
     severity: 'error',
     rationale:
-      "Prevents re-introduction of retired InboxFilter literals (?tab=approvals, ?tab=requests, ?tab=content-plan, ?tab=copy) after the 2026-05-08 inbox redesign renamed them.",
+      "Prevents re-introduction of retired InboxFilter literals after the inbox IA restructure (PR 1.2). Denied: approvals, requests, content-plan, copy, needs-action, seo-changes, content. Allowed: decisions, reviews, conversations.",
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const legacyRe = /[?&]tab=(approvals|requests|content-plan|copy)(?=['"`& ]|$)/;
+      const legacyRe = /[?&]tab=(approvals|requests|content-plan|copy|needs-action|seo-changes|content)(?=['"`& ]|$)/;
       for (const file of files) {
         if (!/\.(ts|tsx)$/.test(file)) continue;
         if (!file.includes('/src/')) continue;

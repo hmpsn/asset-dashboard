@@ -6712,28 +6712,81 @@ describe('Rule: inbox-legacy-filter-literal', () => {
     expect(hits[0].line).toBe(2);
   });
 
-  it('does NOT flag ?tab=seo-changes (new value)', () => {
+  it('flags ?tab=seo-changes (retired in PR 1.2)', () => {
     const file = write(
-      uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
+      uniqPath('rule-inbox-legacy', 'src/components/BadSeoChanges.tsx'),
       lines(
-        'export function GoodLink() {',
+        'export function BadSeoChanges() {',
         '  return <a href={`/inbox?tab=seo-changes`}>Go</a>;',
         '}',
       )
     );
-    expect(runRule(RULE, [file])).toHaveLength(0);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
   });
 
-  it('does NOT flag ?tab=needs-action (new value)', () => {
+  it('flags ?tab=needs-action (retired in PR 1.2)', () => {
     const file = write(
-      uniqPath('rule-inbox-legacy', 'src/hooks/goodHook.ts'),
+      uniqPath('rule-inbox-legacy', 'src/hooks/badNeedsAction.ts'),
       lines(
         'export function buildUrl() {',
         "  return `/inbox?tab=needs-action`;",
         '}',
       )
     );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('does NOT flag ?tab=decisions (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
+      lines(
+        'export function GoodLink() {',
+        '  return <a href={`/inbox?tab=decisions`}>Go</a>;',
+        '}',
+      )
+    );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=reviews (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/goodHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/inbox?tab=reviews`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=conversations (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/GoodConversations.tsx'),
+      lines(
+        'export function GoodConversations() {',
+        '  navigate(`/inbox?tab=conversations`);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags ?tab=content (retired in PR 1.2)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContent.tsx'),
+      lines(
+        'export function BadContent() {',
+        '  return <a href={`/inbox?tab=content`}>Go</a>;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
   });
 
   it('does NOT flag comment-only lines with the old URL format', () => {

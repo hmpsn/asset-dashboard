@@ -38,6 +38,7 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
  * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip
  * chip section values are updated. Also handles the 'completed' mode value which
  * was previously a filter chip but is now the Active/Completed mode toggle.
+ * // inbox-action-queue-strip-ok
  */
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   'needs-action': 'decisions',

@@ -19,7 +19,8 @@
 | 2 | 1.0b keyword_strategy deprecation | ✅ Done | https://github.com/hmpsn/asset-dashboard/pull/659 | Merged to staging `a0d7c6aa`; smoke test ✓ |
 | 3 | 1.1 shared contracts | ✅ Done | https://github.com/hmpsn/asset-dashboard/pull/660 | Merged to staging `229ad3c2`; smoke test ✓ |
 | 4 | 1.4 send-to-client convention | ✅ Done | https://github.com/hmpsn/asset-dashboard/pull/661 | Merged to staging `a755f3ef`; smoke test ✓ |
-| 5 | 1.5 prevention rules + docs | ⏸ Stretch | — | Last |
+| 5 | 1.2 client inbox IA restructure | 🔄 CI running | https://github.com/hmpsn/asset-dashboard/pull/662 | 5 commits, ready for review, CI pending |
+| 6 | 1.5 prevention rules + docs | ⏸ Stretch | — | Last |
 
 ## Reference Paths (filesystem, not git-tracked on staging)
 
@@ -102,3 +103,19 @@ The IA spec, audit, and brief live in the brainstorm worktree on `feat/client-in
 - PR 1.4 marked ✅ Done
 - Wake-up summary written to `docs/superpowers/autonomous-runs/2026-05-10-wakeup-summary.md`
 - PR 1.5 (prevention rules) not started — time constraint reached; deferred to next session
+
+### Turn 6 (resumed from compact — PR 1.2 review fixes + CI)
+- PR 1.2 worktree: `.claude/worktrees/client-inbox-ia/` on `feat/client-inbox-ia`
+- Prior context: scaled code review completed, 5 fixes identified (1 already applied — RequestsTab priority order)
+- Applied all remaining fixes:
+  - InboxTab.tsx: betaMode guard added to Reviews chip in new-IA chip list (Important)
+  - InboxTab.tsx: LEGACY_FILTER_MAP betaMode coercion gate at init time (Minor)
+  - PriorityStrip.tsx: reviews chip + icon color changed from teal → blue (text-accent-info), matching InboxTab section badge color at line 368 (Important)
+  - tests/unit/PriorityStrip.test.tsx: updated color assertion for reviews (removed text-accent-brand, kept text-accent-info)
+  - tests/unit/inbox-filter-values.test.ts: added assertions for 8 LEGACY_FILTER_MAP keys (needs-action, seo-changes, content added)
+  - tests/pr-check.test.ts: added ?tab=content deny fixture + ?tab=conversations allow fixture
+- Local gates: typecheck ✓, vite build ✓, 6793 tests/544 files ✓, pr-check 0 errors ✓
+- Committed at `da674734`, pushed to remote
+- PR #662 marked ready for review
+- CI running (audit/e2e-build pending at wakeup scheduling)
+- Wakeup scheduled at 12:10 to check CI and merge
