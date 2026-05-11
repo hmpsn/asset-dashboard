@@ -5383,14 +5383,6 @@ Bug hardening included:
 
 **Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
 
-### Client Wins Surface (`client-wins-surface` flag)
-- **Component:** `WinsSurface` on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only)
-- **Source:** `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`
-- **Hook:** `useClientOutcomeWins`
-- **Tier:** Growth+ required; free sees a teaser with win count
-- **Flag off:** `PredictionShowcaseCard` ("We called it") remains on OverviewTab; WinsSurface hidden
-- **Flag on:** WinsSurface shows; PredictionShowcaseCard hidden
-
 ### 397. Hardening Sprint — Per-Feature Usage Budget Split
 **What it does:** Splits the previously shared `strategy_generations` monthly budget into dedicated feature pools so different AI workflows no longer cannibalize each other.
 
@@ -5416,3 +5408,55 @@ Bug hardening included:
 **Mutual:** Preserves existing keyword-strategy limits while reducing cross-feature coupling in billing/usage behavior.
 
 **Files:** `server/usage-tracking.ts`; `server/routes/webflow-alt-text.ts`; `server/workspace-context-generation-job.ts`; `tests/unit/usage-tracking.test.ts`; `tests/integration/tier-gate-enforcement.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+### 398. Client Wins Surface (`client-wins-surface` flag)
+**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. Mutually exclusive with `PredictionShowcaseCard` ("We called it"): flag off → PredictionShowcaseCard remains on OverviewTab, WinsSurface hidden; flag on → WinsSurface shows, PredictionShowcaseCard hidden. Mutual-exclusivity invariant enforced by pr-check rule.
+
+**Agency value:** Closes the loop on recommendations — shows which tracked actions led to measurable outcomes, giving account managers proof points for client retention conversations.
+
+**Client value:** Surfaces concrete wins ("We called it — your traffic grew 23%") in the client briefing page; Growth+ sees full win cards; Free tier sees a win-count teaser prompting upgrade.
+
+**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard enforced by pr-check rule `prediction-showcase-ungated`.
+
+**Files:** `src/components/client/Briefing/WinsSurface.tsx`; `src/hooks/client/useClientOutcomeWins.ts`; `server/routes/public-portal.ts` (`GET /api/public/outcomes/:wsId/wins`); `shared/types/outcomes.ts` (score field); `tests/unit/wins-surface.test.tsx`; `tests/integration/outcome-wins.test.ts`.
+
+**PR:** #663
+
+### 399. Client Inbox IA Redesign — 3-Section Layout (`new-inbox-ia` flag)
+**What it does:** Restructures InboxTab into three named sections (Decisions / Reviews / Conversations) behind the `new-inbox-ia` feature flag. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where client left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The old single-list layout renders when flag is off. SchemaReviewModal and ClientActionDetailModal are exposed within this layout.
+
+**Agency value:** Clearer signal routing — each inbox section maps to a distinct client workflow, reducing context-switching in account management.
+
+**Client value:** Simplified navigation — clients see three clear buckets instead of a mixed action queue; section headers communicate what kind of response is expected.
+
+**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab.
+
+**Files:** `src/components/client/InboxTab.tsx`; `shared/types/client-inbox.ts`; `shared/types/routes.ts` (InboxFilter type, CLIENT_INBOX_ALIASES); `tests/unit/inbox-filter-values.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`.
+
+**PR:** #662
+
+### 400. SchemaReviewModal
+**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management.
+
+**Agency value:** Schema review is now embedded in the client inbox workflow instead of a separate nav tab, reducing client confusion about where to find schema feedback.
+
+**Client value:** Schema review opens in context without leaving the inbox; Escape key dismissal is intuitive.
+
+**Mutual:** SchemaReviewTab component is reused (not duplicated); route cleanup removes a stale client navigation entry.
+
+**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed).
+
+**PR:** #662
+
+### 401. ClientActionDetailModal
+**What it does:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
+
+**Agency value:** Complex structured-data action reviews now have a dedicated reading surface instead of cramped inline cards.
+
+**Client value:** Internal link batches, redirect proposals, and AEO changes are presented in full-width tables/diffs that are readable without horizontal scrolling.
+
+**Mutual:** URL safety guard blocks `javascript:` and `data:` schemes in rendered anchor tags; payload renderer tree is exhaustive over all Tier-3 source types.
+
+**Files:** `src/components/client/ClientActionDetailModal.tsx`; `src/components/client/InboxTab.tsx`; `shared/types/client-actions.ts`.
+
+**PR:** #662
