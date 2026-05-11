@@ -58,12 +58,12 @@ describe('WinsSurface', () => {
     expect(screen.getByText('Strong win')).toBeInTheDocument();
   });
 
-  it('shows empty state when wins is []', () => {
+  it('renders nothing when wins is []', () => {
     (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [], isLoading: false, isError: false });
-    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
-    // EmptyState renders title + description
-    expect(screen.getByText('Wins are building')).toBeInTheDocument();
-    expect(screen.getByText(/We're working/)).toBeInTheDocument();
+    const { container } = renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    // Component returns null when there are no wins — no card, no empty state
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByText('Wins are building')).not.toBeInTheDocument();
   });
 
   it('shows skeleton rows when loading', () => {
