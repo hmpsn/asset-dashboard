@@ -6717,9 +6717,9 @@ describe('Rule: inbox-legacy-filter-literal', () => {
 
   it('flags ?tab=seo-changes (retired in PR 1.2)', () => {
     const file = write(
-      uniqPath('rule-inbox-legacy', 'src/components/GoodLink.tsx'),
+      uniqPath('rule-inbox-legacy', 'src/components/BadSeoChanges.tsx'),
       lines(
-        'export function GoodLink() {',
+        'export function BadSeoChanges() {',
         '  return <a href={`/inbox?tab=seo-changes`}>Go</a>;',
         '}',
       )
@@ -6729,7 +6729,7 @@ describe('Rule: inbox-legacy-filter-literal', () => {
 
   it('flags ?tab=needs-action (retired in PR 1.2)', () => {
     const file = write(
-      uniqPath('rule-inbox-legacy', 'src/hooks/goodHook.ts'),
+      uniqPath('rule-inbox-legacy', 'src/hooks/badNeedsAction.ts'),
       lines(
         'export function buildUrl() {',
         "  return `/inbox?tab=needs-action`;",

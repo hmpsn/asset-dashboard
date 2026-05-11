@@ -10,7 +10,7 @@ describe('INBOX_FILTER_VALUES', () => {
   });
 
   it('does not contain legacy or mode-only values', () => {
-    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
+    const excluded = ['approvals', 'requests', 'copy', 'content-plan', 'completed', 'needs-action', 'seo-changes', 'content'];
     for (const v of excluded) {
       expect(INBOX_FILTER_VALUES).not.toContain(v);
     }

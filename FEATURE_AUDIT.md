@@ -5411,6 +5411,8 @@ Bug hardening included:
 
 **Files:** `server/usage-tracking.ts`; `server/routes/webflow-alt-text.ts`; `server/workspace-context-generation-job.ts`; `tests/unit/usage-tracking.test.ts`; `tests/integration/tier-gate-enforcement.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
 
+---
+
 ### 398. Client Wins Surface (`client-wins-surface` flag)
 **What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. Mutually exclusive with `PredictionShowcaseCard` ("We called it"): flag off → PredictionShowcaseCard remains on OverviewTab, WinsSurface hidden; flag on → WinsSurface shows, PredictionShowcaseCard hidden. Mutual-exclusivity invariant enforced by pr-check rule.
 
@@ -5462,3 +5464,16 @@ Bug hardening included:
 **Files:** `src/components/client/ClientActionDetailModal.tsx`; `src/components/client/InboxTab.tsx`; `shared/types/client-actions.ts`.
 
 **PR:** #662
+
+---
+
+### 402. Action Playbooks Resolution
+**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button.
+
+**Agency value:** Approved actions no longer disappear into a void. Admin team is instantly notified. `content_decay` briefs are auto-generated—no manual creation required. Other action types show in admin UI for tracking and manual completion.
+
+**Client value:** Transparent feedback loop. Clients see their approvals were received and are being actioned.
+
+**Mutual:** Closes the approval→implementation handoff gap. Systematic post-approval workflow prevents lost context. Email notifications keep admin team in sync without requiring constant UI checks.
+
+**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `shared/types/background-jobs.ts`, `src/components/admin/ClientActionsTab.tsx` (new).

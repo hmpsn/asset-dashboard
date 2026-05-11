@@ -180,7 +180,8 @@ export type EmailEventType =
   | 'audit_complete'
   | 'client_signal'
   | 'client_briefing_ready'
-  | 'content_changes_requested';
+  | 'content_changes_requested'
+  | 'action_approved';
 
 // ── Template renderers ──
 
@@ -258,6 +259,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderClientBriefingReady(events, count, ws, dashUrl, logoUrl); break;
     case 'content_changes_requested':
       result = renderContentChangesRequested(events, count, ws, dashUrl, logoUrl); break;
+    case 'action_approved':
+      result = renderActionApproved(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -266,6 +269,39 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
 }
 
 // ── Individual template renderers ──
+
+function renderActionApproved(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => {
+    const sourceLabel = (e.data.sourceType as string)
+      ? `${(e.data.sourceType as string).replace(/_/g, ' ')} — ${(e.data.summary as string) || ''}`
+      : (e.data.summary as string) || '';
+    const clientNote = e.data.clientNote as string | undefined;
+    const detail = clientNote
+      ? `${sourceLabel}<br><em style="color:#6b7280">Client note: "${esc(clientNote)}"</em>`
+      : sourceLabel;
+    return itemRow({
+      title: (e.data.title as string) || 'Client Action',
+      detail,
+      badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  return {
+    subject: count === 1
+      ? `Client approved: ${(events[0].data.title as string) || 'action'} — ${ws}`
+      : `${count} client approvals — ${ws}`,
+    html: layout({
+      preheader: `${ws} client approved ${count} action${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'Client Approved an Action' : 'Client Approvals',
+      subtitle: ws,
+      body: count > 1 ? countPill(count, 'approval') + items : items,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
 
 function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const totalItems = events.reduce((sum, e) => sum + ((e.data.itemCount as number) || 1), 0);

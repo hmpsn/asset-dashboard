@@ -169,6 +169,22 @@ describe('Approvals — CRUD', () => {
     expect(res.status).toBe(404);
   });
 
+  it('note is persisted and returned on GET', async () => {
+    const res = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: 'Note Batch',
+      note: 'Hello client',
+      items: [{ pageId: 'p1', pageSlug: '/p1', field: 'seoTitle', currentValue: 'Old', proposedValue: 'New' }],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.note).toBe('Hello client');
+    const getRes = await api(`/api/approvals/${testWsId}/${body.id}`);
+    expect(getRes.status).toBe(200);
+    const getBatch = await getRes.json();
+    expect(getBatch.note).toBe('Hello client');
+  });
+
   // Public endpoints
   it('GET /api/public/approvals/:workspaceId returns batches', async () => {
     const res = await api(`/api/public/approvals/${testWsId}`);

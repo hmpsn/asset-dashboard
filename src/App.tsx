@@ -63,6 +63,7 @@ const FeatureLibrary = lazyWithRetry(() => import('./components/FeatureLibrary')
 const OutcomeDashboard = lazyWithRetry(() => import('./components/admin/outcomes/OutcomeDashboard'));
 const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes/OutcomesOverview'));
 const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
+const ClientActionsTab = lazyWithRetry(() => import('./components/admin/ClientActionsTab').then(m => ({ default: m.ClientActionsTab })));
 const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
@@ -231,7 +232,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
-  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests'>('signals');
+  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests' | 'actions'>('signals');
 
   // Reset requests sub-tab when workspace changes so stale state doesn't persist
   useEffect(() => { setRequestsSubTab('signals'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
@@ -456,13 +457,15 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           tabs={[
             { id: 'signals', label: 'Signals' },
             { id: 'requests', label: 'Requests' },
+            { id: 'actions', label: 'Client Actions' },
           ]}
           active={requestsSubTab}
-          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests')}
+          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests' | 'actions')}
           className="mb-6"
         />
         {requestsSubTab === 'signals' && <AdminInbox key={`inbox-${selected.id}`} workspaceId={selected.id} />}
         {requestsSubTab === 'requests' && <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />}
+        {requestsSubTab === 'actions' && <ClientActionsTab key={`actions-${selected.id}`} workspaceId={selected.id} />}
       </div>
     );
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={effectiveFocusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;

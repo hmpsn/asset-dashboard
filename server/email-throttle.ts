@@ -59,6 +59,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   churn_signal: 'internal',
   client_signal: 'internal',
   content_changes_requested: 'internal',
+  action_approved: 'internal',
   client_briefing_ready: 'action',
 };
 
