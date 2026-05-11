@@ -149,7 +149,7 @@ export function ActionQueueStrip({
       <Clipboard className="w-4 h-4 text-accent-warning flex-shrink-0" aria-hidden="true" />
       {chips.map((chip, idx) => (
         <button
-          // index-based key because briefs/posts both target section='content'
+          // index-based key because briefs/posts both target section='reviews'
           // — section alone is not unique once those two chips coexist.
           key={`${chip.section}-${idx}`}
           type="button"
