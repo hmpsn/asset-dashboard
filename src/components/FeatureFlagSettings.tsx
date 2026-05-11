@@ -65,6 +65,7 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
       'bridge-annotation-to-insight',
       'bridge-audit-site-health',
       'bridge-audit-auto-resolve',
+      'bridge-briefing-candidate-refresh',
       'bridge-client-signal',
     ],
   },
@@ -75,6 +76,18 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
     keys: ['smart-placeholders', 'client-brand-section', 'seo-editor-unified'],
+  },
+  {
+    label: 'Client Insights Briefing',
+    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
+  },
+  {
+    label: 'Client IA Redesign',
+    keys: ['new-inbox-ia', 'client-wins-surface'],
+  },
+  {
+    label: 'Schema AI',
+    keys: ['schema-ai-element-classifier'],
   },
 ];
 
@@ -114,14 +127,23 @@ const FLAG_LABELS: Record<string, string> = {
   'bridge-action-annotation':        '#13: Action recorded → analytics annotation',
   'bridge-annotation-to-insight':    '#14: Annotation → insight correlation',
   'bridge-audit-site-health':        '#15: Audit → site health insight',
-  'bridge-audit-auto-resolve':       'IG-4: Auto-resolve audit_finding insights on clean audit',
-  'bridge-client-signal':            '#16: Client feedback → signal insights',
+  'bridge-audit-auto-resolve':           'IG-4: Auto-resolve audit_finding insights on clean audit',
+  'bridge-briefing-candidate-refresh':   'CB-1: Audit complete → briefing candidate-pool freshness',
+  'bridge-client-signal':                '#16: Client feedback → signal insights',
   // Platform Intelligence Enhancements
   'smart-placeholders':   'Smart placeholders (admin chips + client ghost text)',
   'client-brand-section': 'Client portal — Brand tab (business profile)',
   'seo-editor-unified':   'SEO editor — merged static + CMS with collection filter',
   // Deep Diagnostics
   'deep-diagnostics':     'Deep diagnostics mode',
+  // Client Insights Briefing
+  'client-briefing-v2':           'Client insights briefing — v2 layout',
+  'client-briefing-v2-ai-polish': 'Client briefing — AI headline polish (premium only)',
+  // Client IA Redesign (PRs 1.2 + 1.3, May 2026)
+  'new-inbox-ia':        'New 3-section inbox layout (Decisions / Reviews / Conversations)',
+  'client-wins-surface': 'Wins surface in Insights page (hides PredictionShowcaseCard)',
+  // Schema AI
+  'schema-ai-element-classifier': 'Schema AI — page-element role classifier',
 };
 
 const SOURCE_LABEL: Record<FlagMeta['source'], string> = {
