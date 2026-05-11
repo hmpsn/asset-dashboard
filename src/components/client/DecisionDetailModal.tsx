@@ -62,7 +62,7 @@ function ApprovalItemRow({
               type="button"
               aria-label="Flag"
               onClick={() => setFlagging(true)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md t-caption-sm text-[var(--brand-text-muted)] hover:text-amber-400 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
+              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-amber-400 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
             >
               <Icon as={Flag} size="sm" />
               Flag
@@ -74,7 +74,7 @@ function ApprovalItemRow({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="What's your concern? (optional)"
-                className="px-2 py-1 rounded-md t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-amber-500/50 w-48"
+                className="px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-amber-500/50 w-48"
                 autoFocus
               />
               <button
@@ -85,7 +85,7 @@ function ApprovalItemRow({
                   setFlagging(false);
                   setNote('');
                 }}
-                className="t-caption-sm font-medium text-amber-400 px-2 py-1 hover:bg-amber-500/10 rounded-md transition-colors"
+                className="t-caption-sm font-medium text-amber-400 px-2 py-1 hover:bg-amber-500/10 rounded-[var(--radius-md)] transition-colors"
               >
                 Flag it
               </button>
@@ -133,13 +133,13 @@ function AeoRenderer({ payload }: { payload: AeoChangePayload }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current</p>
-              <p className="t-caption text-[var(--brand-text)] bg-[var(--surface-3)] p-2 rounded-md">
+              <p className="t-caption text-[var(--brand-text)] bg-[var(--surface-3)] p-2 rounded-[var(--radius-md)]">
                 {d.current}
               </p>
             </div>
             <div>
               <p className="t-caption-sm text-teal-400 mb-0.5">Proposed</p>
-              <p className="t-caption text-[var(--brand-text)] bg-teal-500/5 border border-teal-500/20 p-2 rounded-md">
+              <p className="t-caption text-[var(--brand-text)] bg-teal-500/5 border border-teal-500/20 p-2 rounded-[var(--radius-md)]">
                 {d.proposed}
               </p>
             </div>
@@ -258,6 +258,14 @@ export function DecisionDetailModal({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      )
+        return;
       if (e.key === 'Escape') onDismiss();
     };
     document.addEventListener('keydown', handler);
@@ -321,13 +329,16 @@ export function DecisionDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="decision-modal-title"
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-[var(--z-modal-fullscreen)] flex flex-col"
     >
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onDismiss}
       />
-      <div className="relative z-10 flex flex-col h-full max-w-3xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden rounded-b-2xl">
+      <div
+        className="relative z-[var(--z-sticky)] flex flex-col h-full max-w-3xl mx-auto w-full bg-[var(--surface-1)] shadow-2xl overflow-hidden"
+        style={{ borderRadius: `0 0 var(--radius-xl) var(--radius-xl)` }}
+      >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
           <button
@@ -335,13 +346,13 @@ export function DecisionDetailModal({
             autoFocus
             onClick={onDismiss}
             aria-label="Close"
-            className="p-1.5 rounded-md hover:bg-[var(--surface-3)] transition-colors"
+            className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] transition-colors"
           >
             <Icon as={X} size="md" className="text-[var(--brand-text-muted)]" />
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="t-caption-sm font-medium px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
+              <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
                 {decision.badge}
               </span>
               {decision.priority === 'high' && (
