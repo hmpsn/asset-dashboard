@@ -1,9 +1,11 @@
 import { createJob, updateJob } from './jobs.js';
 import { generateBrief } from './content-brief.js';
 import { updateClientAction } from './client-actions.js';
+import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import { createLogger } from './logger.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import type { ClientAction } from '../shared/types/client-actions.js';
@@ -29,7 +31,13 @@ export function enqueuePlaybook(workspaceId: string, action: ClientAction): void
 
 function enqueueContentDecayPlaybook(workspaceId: string, action: ClientAction): void {
   const payload = action.payload as Record<string, unknown> | undefined;
-  const targetKeyword = (payload?.targetKeyword as string) || action.title.replace(/^Refresh:\s*/i, '').trim();
+  const rawKeyword = (payload?.targetKeyword as string) || action.title.replace(/^Refresh:\s*/i, '').trim();
+  const targetKeyword = sanitizeQueryForPrompt(rawKeyword);
+
+  if (!targetKeyword) {
+    log.warn({ workspaceId, actionId: action.id }, 'content_decay playbook skipped — targetKeyword is empty');
+    return;
+  }
 
   const job = createJob(BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE, {
     message: `Generating content brief for "${targetKeyword}"...`,
@@ -63,7 +71,14 @@ async function executeContentDecayPlaybook(
     updateJob(jobId, { status: 'done', progress: 100, message: 'Content brief created' });
 
     // Transition the action to completed now that the brief exists.
-    updateClientAction(workspaceId, actionId, { status: 'completed' });
+    const completedAction = updateClientAction(workspaceId, actionId, { status: 'completed' });
+    if (completedAction) {
+      addActivity(workspaceId, 'client_action_completed',
+        `Completed client action: ${completedAction.title}`,
+        completedAction.summary,
+        { actionId: completedAction.id, sourceType: completedAction.sourceType },
+      );
+    }
     broadcastToWorkspace(workspaceId, WS_EVENTS.CLIENT_ACTION_UPDATE, { actionId, action: 'completed' });
     invalidateIntelligenceCache(workspaceId);
 

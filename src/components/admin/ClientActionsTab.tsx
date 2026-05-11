@@ -15,6 +15,7 @@ import { CheckCircle, Clock, Inbox } from 'lucide-react';
 import { useToast } from '../Toast.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
+import { ErrorState } from '../ui/ErrorState.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { Icon } from '../ui/index.js';
 import { clientActions } from '../../api/clientActions.js';
@@ -106,8 +107,10 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
             </p>
           )}
 
-          {/* Approved-specific: "Awaiting implementation" badge + Mark complete button */}
-          {action.status === 'approved' && (
+          {/* Approved-specific: "Awaiting implementation" badge + Mark complete button.
+              content_decay actions are resolved by an automated playbook — show a
+              different badge so admins know no manual step is required. */}
+          {action.status === 'approved' && action.sourceType !== 'content_decay' && (
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium bg-amber-500/10 text-accent-warning border border-amber-500/20">
                 Awaiting implementation
@@ -121,6 +124,13 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
               </button>
             </div>
           )}
+          {action.status === 'approved' && action.sourceType === 'content_decay' && (
+            <div className="mt-2">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium bg-blue-500/10 text-accent-info border border-blue-500/20">
+                Brief generating automatically
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -128,7 +138,7 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
 }
 
 export function ClientActionsTab({ workspaceId }: Props) {
-  const { data, isLoading } = useQuery<ClientAction[]>({
+  const { data, isLoading, isError } = useQuery<ClientAction[]>({
     queryKey: queryKeys.admin.clientActions(workspaceId),
     queryFn: () => clientActions.list(workspaceId),
     enabled: !!workspaceId,
@@ -153,6 +163,14 @@ export function ClientActionsTab({ workspaceId }: Props) {
         <div className="space-y-3">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
         </div>
+      </SectionCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SectionCard title="Client Actions" titleIcon={titleIcon}>
+        <ErrorState message="Could not load client actions. Please try again." />
       </SectionCard>
     );
   }

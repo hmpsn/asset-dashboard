@@ -294,14 +294,21 @@ function renderFeedbackNew(events: EmailEvent[], count: number, ws: string, _das
 }
 
 function renderActionApproved(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
-  const items = events.map((e, i) => itemRow({
-    title: (e.data.title as string) || 'Client Action',
-    detail: (e.data.sourceType as string)
+  const items = events.map((e, i) => {
+    const sourceLabel = (e.data.sourceType as string)
       ? `${(e.data.sourceType as string).replace(/_/g, ' ')} — ${(e.data.summary as string) || ''}`
-      : (e.data.summary as string) || '',
-    badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
-    isLast: i === events.length - 1,
-  })).join('');
+      : (e.data.summary as string) || '';
+    const clientNote = e.data.clientNote as string | undefined;
+    const detail = clientNote
+      ? `${sourceLabel}<br><em style="color:#6b7280">Client note: "${esc(clientNote)}"</em>`
+      : sourceLabel;
+    return itemRow({
+      title: (e.data.title as string) || 'Client Action',
+      detail,
+      badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
+      isLast: i === events.length - 1,
+    });
+  }).join('');
 
   return {
     subject: count === 1
