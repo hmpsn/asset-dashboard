@@ -24,16 +24,19 @@ describe('LEGACY_FILTER_MAP', () => {
     }
   });
 
-  it('contains all 8 legacy keys including PR-1.2 retired values', () => {
-    const expectedKeys = [
-      // Pre-PR-1.2 URL alias params
-      'approvals', 'requests', 'copy', 'content-plan', 'completed',
-      // PR-1.2 retired InboxFilter literals
-      'needs-action', 'seo-changes', 'content',
-    ];
+  it('contains exactly the 5 backward-compat URL alias keys', () => {
+    // Phase 2B complete: intermediate filter names (needs-action, seo-changes, content)
+    // have been removed — ActionQueueStrip now emits final InboxFilter values directly.
+    // Only URL alias params remain for external URL backward-compat.
+    const expectedKeys = ['approvals', 'requests', 'copy', 'content-plan', 'completed'];
     for (const k of expectedKeys) {
       expect(LEGACY_FILTER_MAP).toHaveProperty(k);
     }
+    // Intermediate keys must be absent
+    expect(LEGACY_FILTER_MAP).not.toHaveProperty('needs-action');
+    expect(LEGACY_FILTER_MAP).not.toHaveProperty('seo-changes');
+    expect(LEGACY_FILTER_MAP).not.toHaveProperty('content');
+    expect(Object.keys(LEGACY_FILTER_MAP)).toHaveLength(5);
   });
 });
 
