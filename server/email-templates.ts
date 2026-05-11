@@ -113,14 +113,20 @@ function layout(opts: {
 function itemRow(opts: {
   title: string;
   detail?: string;
+  /** Pre-composed HTML for the detail line. Bypasses esc() — caller is responsible for
+   *  escaping any user-supplied substrings before composing this string. Use when the
+   *  detail needs inline HTML (e.g. <br>, <em>). Mutually exclusive with `detail`. */
+  detailHtml?: string;
   badge?: { label: string; color: string; bg: string };
   isLast?: boolean;
 }): string {
   const border = opts.isLast ? '' : 'border-bottom:1px solid #f3f4f6;';
+  // detailHtml takes precedence over detail; detail is HTML-escaped automatically.
+  const detailContent = opts.detailHtml ?? (opts.detail ? esc(opts.detail) : null);
   return `
     <div style="padding:12px 0;${border}">
       <div class="text-primary" style="font-size:13px;font-weight:500;color:#1f2937;line-height:1.4;">${esc(opts.title)}</div>
-      ${opts.detail ? `<div class="text-secondary" style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">${esc(opts.detail)}</div>` : ''}
+      ${detailContent ? `<div class="text-secondary" style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">${detailContent}</div>` : ''}
       ${opts.badge ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;color:${opts.badge.color};background:${opts.badge.bg};">${esc(opts.badge.label)}</span>` : ''}
     </div>`;
 }
@@ -276,12 +282,14 @@ function renderActionApproved(events: EmailEvent[], count: number, ws: string, d
       ? `${(e.data.sourceType as string).replace(/_/g, ' ')} — ${(e.data.summary as string) || ''}`
       : (e.data.summary as string) || '';
     const clientNote = e.data.clientNote as string | undefined;
-    const detail = clientNote
-      ? `${sourceLabel}<br><em style="color:#6b7280">Client note: "${esc(clientNote)}"</em>`
-      : sourceLabel;
+    // detailHtml is used (bypassing itemRow's esc()) so we can include <br> and <em>.
+    // Every user-supplied substring is individually esc()-ed before composition.
+    const detailHtml = clientNote
+      ? `${esc(sourceLabel)}<br><em style="color:#6b7280">Client note: &#8220;${esc(clientNote)}&#8221;</em>`
+      : esc(sourceLabel);
     return itemRow({
       title: (e.data.title as string) || 'Client Action',
-      detail,
+      detailHtml,
       badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
       isLast: i === events.length - 1,
     });
