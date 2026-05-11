@@ -97,6 +97,10 @@ interface WinsSurfaceProps {
 export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
   const { data: wins = [], isLoading, isError } = useClientOutcomeWins(workspaceId);
 
+  // Hide entirely until there are real wins to show — no empty-state card.
+  // Loading skeleton still renders so layout doesn't shift on first paint.
+  if (!isLoading && !isError && wins.length === 0) return null;
+
   const body = (
     <>
       {isLoading && (
