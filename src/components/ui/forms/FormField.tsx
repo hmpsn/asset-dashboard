@@ -5,6 +5,7 @@ import { cn } from '../../../lib/utils';
 
 export interface FormFieldContextValue {
   hasError: boolean;
+  isValid: boolean;
   required: boolean;
   /**
    * Auto-generated id used to wire <label htmlFor> ↔ <input id>. Children
@@ -22,6 +23,7 @@ export interface FormFieldContextValue {
 
 export const FormFieldContext = createContext<FormFieldContextValue>({
   hasError: false,
+  isValid: false,
   required: false,
   inputId: '',
   descriptionId: '',
@@ -37,6 +39,8 @@ export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
   error?: string;
   hint?: string;
+  success?: string;
+  valid?: boolean;
   required?: boolean;
 }
 
@@ -44,16 +48,28 @@ export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
   function FormField(
-    { label, error, hint, required = false, children, className, ...rest },
+    {
+      label,
+      error,
+      hint,
+      success,
+      valid = false,
+      required = false,
+      children,
+      className,
+      ...rest
+    },
     ref,
   ) {
     const reactId = useId();
     const inputId = `form-field-${reactId}`;
-    const hasMessage = Boolean(error || hint);
+    const isValid = Boolean(valid && !error);
+    const hasMessage = Boolean(error || hint || (success && isValid));
     const descriptionId = hasMessage ? `${inputId}-desc` : '';
 
     const contextValue: FormFieldContextValue = {
       hasError: Boolean(error),
+      isValid,
       required,
       inputId,
       descriptionId,
@@ -66,7 +82,7 @@ export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
               readers the label-↔-control association */}
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-zinc-300 mb-1.5"
+            className="block text-sm font-medium text-[var(--brand-text-bright)] mb-1.5"
           >
             {label}
             {required && (
@@ -88,8 +104,19 @@ export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
             >
               {error}
             </p>
+          ) : success && isValid ? (
+            <p
+              id={descriptionId}
+              className="mt-1.5 text-xs text-emerald-400"
+              role="status"
+            >
+              {success}
+            </p>
           ) : hint ? (
-            <p id={descriptionId} className={cn('mt-1.5 text-xs text-zinc-500')}>
+            <p
+              id={descriptionId}
+              className={cn('mt-1.5 text-xs text-[var(--brand-text-muted)]')}
+            >
               {hint}
             </p>
           ) : null}
