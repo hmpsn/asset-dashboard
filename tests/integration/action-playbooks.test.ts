@@ -34,6 +34,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  db.prepare('DELETE FROM jobs WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM client_actions WHERE workspace_id = ?').run(wsId);
   deleteWorkspace(wsId);
