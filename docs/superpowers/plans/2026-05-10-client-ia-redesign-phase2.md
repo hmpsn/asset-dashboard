@@ -1712,7 +1712,19 @@ npx tsx scripts/pr-check.ts 2>&1 | grep -i "inbox\|decision\|approval"
 ```
 Expected: zero errors related to inbox routing.
 
-- [ ] **Step 3: Commit any final cleanup and open PR**
+- [ ] **Step 3: Scaled code review (required — parallel agents used)**
+
+PR 2.1 used parallel agents (Tasks 3+4+5 ran concurrently across 10+ files). CLAUDE.md requires `superpowers:scaled-code-review` before merging. Invoke it now with the SHA range covering Tasks 1–6:
+
+```bash
+BASE_SHA=$(git log --oneline | grep "add rationale + effort + priority" | head -1 | awk '{print $1}')~1
+HEAD_SHA=$(git rev-parse HEAD)
+echo "Review range: $BASE_SHA..$HEAD_SHA"
+```
+
+Invoke `superpowers:scaled-code-review` with `BASE_SHA` and `HEAD_SHA`. Fix all Critical and Important issues before proceeding to Step 4. Do not open the PR until the review is clean.
+
+- [ ] **Step 4: Commit any final cleanup and open PR**
 
 ```bash
 git add -p  # stage any remaining changes
@@ -1998,11 +2010,25 @@ npx vitest run tests/unit/DecisionCard.test.tsx tests/unit/decision-adapters.tes
 ```
 Expected: all pass.
 
-- [ ] **Step 6: Final quality gates + PR**
+- [ ] **Step 6: Final quality gates**
 
 ```bash
 npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts
 ```
+
+- [ ] **Step 7: Code review (single-agent task — requesting-code-review)**
+
+PR 2.2 is a single-agent task touching 2 files. CLAUDE.md requires `superpowers:requesting-code-review` before merging:
+
+```bash
+BASE_SHA=$(git log --oneline | grep "PR 2.1" | head -1 | awk '{print $1}')
+HEAD_SHA=$(git rev-parse HEAD)
+echo "Review range: $BASE_SHA..$HEAD_SHA"
+```
+
+Invoke `superpowers:requesting-code-review` with `BASE_SHA` and `HEAD_SHA`. Fix all Critical and Important issues before opening the PR.
+
+- [ ] **Step 8: Commit and open PR**
 
 ```bash
 git add src/components/client/DecisionDetailModal.tsx src/components/client/DecisionCard.tsx tests/unit/DecisionCard.test.tsx
