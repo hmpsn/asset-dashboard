@@ -75,17 +75,22 @@ export function ApprovalBatchCard({
   const updateApprovalItem = async (
     itemId: string,
     update: { status?: string; clientValue?: string; clientNote?: string },
-  ) => {
+  ): Promise<boolean> => {
     try {
       const updated = await patch<ApprovalBatch>(
         `/api/public/approvals/${workspaceId}/${batch.id}/${itemId}`, update,
       );
       if (updated.id) {
         setApprovalBatches(prev => prev.map(b => b.id === batch.id ? updated : b));
+        // Clear edit state only on success so the user can retry if the request fails
+        setEditingApproval(null);
+        setEditDraft('');
       }
-    } catch { setToast({ message: 'Failed to update approval. Please try again.', type: 'error' }); }
-    setEditingApproval(null);
-    setEditDraft('');
+      return true;
+    } catch {
+      setToast({ message: 'Failed to update approval. Please try again.', type: 'error' });
+      return false;
+    }
   };
 
   const approveAllInBatch = () => {
@@ -95,16 +100,23 @@ export function ApprovalBatchCard({
       `Approve all ${pendingCount} pending change${pendingCount !== 1 ? 's' : ''} in "${batch.name}"?`,
       async () => {
         const pending = batchRef.current.items.filter(i => i.status === 'pending');
+        let succeeded = 0;
         for (const item of pending) {
-          await updateApprovalItem(item.id, { status: 'approved' });
+          const ok = await updateApprovalItem(item.id, { status: 'approved' });
+          if (ok) succeeded++;
         }
-        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+        if (succeeded === pending.length) {
+          setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+        } else if (succeeded > 0) {
+          setToast({ message: `Approved ${succeeded} of ${pending.length} — ${pending.length - succeeded} failed, please retry`, type: 'error' });
+        }
       },
     );
   };
 
   const approveAllForPage = (pageItems: ApprovalItem[]) => {
     const pageId = pageItems[0]?.pageId;
+    if (!pageId) return;
     const pendingCount = pageItems.filter(i => i.status === 'pending').length;
     openConfirm(
       'Approve page changes',
@@ -113,10 +125,16 @@ export function ApprovalBatchCard({
         const pending = batchRef.current.items.filter(
           i => i.status === 'pending' && i.pageId === pageId,
         );
+        let succeeded = 0;
         for (const item of pending) {
-          await updateApprovalItem(item.id, { status: 'approved' });
+          const ok = await updateApprovalItem(item.id, { status: 'approved' });
+          if (ok) succeeded++;
         }
-        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+        if (succeeded === pending.length) {
+          setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+        } else if (succeeded > 0) {
+          setToast({ message: `Approved ${succeeded} of ${pending.length} — ${pending.length - succeeded} failed, please retry`, type: 'error' });
+        }
       },
     );
   };
@@ -198,7 +216,7 @@ export function ApprovalBatchCard({
           return (
             <div key={pageKey}>
               {/* Page header row */}
-              <ClickableRow onClick={() => togglePage(pageKey)} className="px-4 py-3 flex items-center gap-2">
+              <ClickableRow onClick={() => togglePage(pageKey)} aria-expanded={!isCollapsed} className="px-4 py-3 flex items-center gap-2">
                 {isCollapsed
                   ? <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                   : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}

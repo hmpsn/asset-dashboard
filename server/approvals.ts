@@ -69,7 +69,6 @@ function rowToBatch(row: BatchRow): ApprovalBatch {
     workspaceId: row.workspace_id,
     siteId: row.site_id,
     name: row.name,
-    ...(row.note ? { note: row.note } : {}),
     items,
     status: row.status as ApprovalBatch['status'],
     note: row.note ?? undefined,
