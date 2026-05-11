@@ -106,7 +106,7 @@ export function RequestList({
             brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
             client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
             approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved' },
-            changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
+            changes_requested: { icon: Clock, color: 'text-accent-orange', label: 'Changes Requested' },
             in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
             post_review: { icon: Eye, color: 'text-cyan-400', label: 'Client Review' },
             delivered: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Delivered' },
@@ -255,7 +255,7 @@ export function RequestList({
                   </div>
                 )}
                 {req.status === 'changes_requested' && req.clientFeedback && (
-                  <div className="mt-2 t-caption-sm text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-orange-400 font-medium">Client feedback:</span> {req.clientFeedback}</div>
+                  <div className="mt-2 t-caption-sm text-orange-300/80 bg-orange-500/10 px-2.5 py-1.5 rounded border border-orange-500/20"><span className="text-accent-orange font-medium">Client feedback:</span> {req.clientFeedback}</div>
                 )}
                 {req.status === 'declined' && req.declineReason && (
                   <div className="mt-2 t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)]/50 px-2.5 py-1.5 rounded border border-[var(--brand-border)]"><span className="text-[var(--brand-text)] font-medium">Reason:</span> {req.declineReason}</div>

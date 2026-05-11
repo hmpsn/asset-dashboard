@@ -685,7 +685,7 @@ export function InboxTab({
                     </span>
                     <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
                       action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
-                      action.status === 'changes_requested' ? 'bg-amber-500/15 text-accent-warning border-amber-500/30' :
+                      action.status === 'changes_requested' ? 'bg-orange-500/15 text-accent-orange border-orange-500/30' :
                       'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
                     }`}>
                       {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
