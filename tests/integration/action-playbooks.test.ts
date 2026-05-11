@@ -9,7 +9,7 @@
  * - Invalid admin transitions (completed → pending) are rejected with 409
  * - Approved actions appear in the admin list
  *
- * Port: 13352
+ * Port: 13353
  *
  * NOTE: The public respond endpoint is accessible without auth for workspaces
  * that do not have a clientPassword set. The existing auth-guard tests
@@ -22,7 +22,7 @@ import db from '../../server/db/index.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 import type { Job } from '../../server/jobs.js';
 
-const ctx = createTestContext(13352); // port-ok: 13201-13351 already allocated in integration suite
+const ctx = createTestContext(13353); // port-ok: 13201-13352 already allocated in integration suite
 const { api, postJson, patchJson } = ctx;
 
 let wsId = '';
@@ -65,8 +65,8 @@ describe('Action Playbooks — client respond endpoint', () => {
 
   it('changes_requested response returns 200 with status=changes_requested', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
-      title: 'Target local SEO',
+      sourceType: 'internal_link',
+      title: 'Add internal link to service page',
       summary: 'Add to strategy.',
     });
     expect(createRes.status).toBe(200);
@@ -216,9 +216,9 @@ describe('Action Playbooks — admin mark-complete flow', () => {
 
   it('returns 409 when transitioning completed → pending (invalid)', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
-      sourceType: 'keyword_strategy',
-      title: 'Keyword: target local seo',
-      summary: 'Add to strategy.',
+      sourceType: 'redirect_proposal',
+      title: 'Redirect: target local pages',
+      summary: 'Consolidate thin pages.',
     });
     expect(createRes.status).toBe(200);
     const action = await createRes.json() as ClientAction;
