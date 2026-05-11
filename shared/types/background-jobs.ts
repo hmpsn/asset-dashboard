@@ -16,6 +16,7 @@ export const BACKGROUND_JOB_TYPES = {
   SEO_BULK_ANALYZE: 'seo-bulk-analyze',
   SEO_BULK_REWRITE: 'seo-bulk-rewrite',
   SEO_BULK_ACCEPT_FIXES: 'seo-bulk-accept-fixes',
+  ACTION_PLAYBOOK_EXECUTE: 'action-playbook-execute',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -134,6 +135,12 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Applies approved SEO fixes to Webflow.',
     cancellable: true,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE]: {
+    label: 'Action Playbook',
+    description: 'Executes an automated implementation playbook after client approval.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
   },
 };
 

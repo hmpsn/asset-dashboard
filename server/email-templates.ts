@@ -181,7 +181,8 @@ export type EmailEventType =
   | 'audit_complete'
   | 'client_signal'
   | 'client_briefing_ready'
-  | 'content_changes_requested';
+  | 'content_changes_requested'
+  | 'action_approved';
 
 // ── Template renderers ──
 

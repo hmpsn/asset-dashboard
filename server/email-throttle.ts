@@ -42,6 +42,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   content_post_ready: 'action',
   content_published: 'action',
   fixes_applied: 'action',
+  action_approved: 'action',
 
   // Alert — max 1/day
   anomaly_alert: 'alert',
