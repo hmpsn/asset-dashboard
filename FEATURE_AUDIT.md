@@ -5478,3 +5478,16 @@ Filter rename mapping:
 **Mutual:** Mechanizes the rename contract so it survives future contributors who weren't part of the redesign.
 
 **Files:** `scripts/pr-check.ts` (new `inbox-legacy-filter-literal` check with customCheck logic).
+
+---
+
+### 402. Action Playbooks Resolution
+**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button.
+
+**Agency value:** Approved actions no longer disappear into a void. Admin team is instantly notified. `content_decay` briefs are auto-generated—no manual creation required. Other action types show in admin UI for tracking and manual completion.
+
+**Client value:** Transparent feedback loop. Clients see their approvals were received and are being actioned.
+
+**Mutual:** Closes the approval→implementation handoff gap. Systematic post-approval workflow prevents lost context. Email notifications keep admin team in sync without requiring constant UI checks.
+
+**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `shared/types/background-jobs.ts`, `src/components/admin/ClientActionsTab.tsx` (new).
