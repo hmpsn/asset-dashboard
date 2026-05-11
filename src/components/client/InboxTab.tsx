@@ -22,7 +22,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
 import { DecisionCard } from './DecisionCard';
 import { DecisionDetailModal } from './DecisionDetailModal';
-import { normalizeClientAction, normalizeApprovalBatch } from '../../lib/decision-adapters';
+import { normalizeClientAction } from '../../lib/decision-adapters';
 import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 
 export type InboxFilter = 'all' | 'decisions' | 'reviews' | 'conversations';
@@ -193,14 +193,15 @@ export function InboxTab({
     !!b.note && b.items.some(i => i.status === 'pending'),
   );
 
-  // NormalizedDecision lists for the Decisions section
+  // NormalizedDecision lists for the Decisions section.
+  // approval_batches without a note are rendered inline via ApprovalsTab (not DecisionCard),
+  // so they are excluded here and inserted separately in the Decisions section below.
   const decisionItems: NormalizedDecision[] = [
     ...pendingClientActions.map(a => normalizeClientAction(a)),
-    ...approvalsForDecisions.map(b => normalizeApprovalBatch(b)),
   ];
 
   // Filter chip counts
-  const decisionsCount = decisionItems.length + planReviewCount;
+  const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length;
   const reviewsCount = contentReviews + copyReviewCount + (schemaPlanPending ? 1 : 0);
   const conversationsCount = requestReplies + approvalsForConversations.length;
 
@@ -348,6 +349,23 @@ export function InboxTab({
                 </div>
               )}
 
+              {/* SEO title/meta approvals — rendered inline with editing, not via DecisionCard modal */}
+              {approvalsForDecisions.length > 0 && (
+                <ApprovalsTab
+                  workspaceId={workspaceId}
+                  approvalBatches={approvalsForDecisions}
+                  approvalsLoading={approvalsLoading}
+                  pendingApprovals={approvalsForDecisions.reduce(
+                    (sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0,
+                  )}
+                  effectiveTier={effectiveTier}
+                  setApprovalBatches={setApprovalBatches}
+                  loadApprovals={loadApprovals}
+                  setToast={setToast}
+                  pageMap={pageMap}
+                />
+              )}
+
               {/* Content Plan sign-offs */}
               {planReviewCount > 0 && (
                 <div className="space-y-3">
@@ -423,7 +441,7 @@ export function InboxTab({
                 </div>
               )}
 
-              {decisionsCount === 0 && planReviewCount === 0 && decisionItems.length === 0 && !approvalsLoading && (
+              {decisionsCount === 0 && !approvalsLoading && (
                 <p className="t-caption text-[var(--brand-text-muted)] py-2">All caught up — no decisions needed right now.</p>
               )}
             </section>
