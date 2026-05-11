@@ -329,7 +329,7 @@ export function InboxTab({
                 )}
               </div>
 
-              {decisionItems.length > 0 ? (
+              {decisionItems.length > 0 && (
                 <div className="space-y-3">
                   {decisionItems.map(decision => (
                     <DecisionCard
@@ -345,8 +345,6 @@ export function InboxTab({
                     />
                   ))}
                 </div>
-              ) : (
-                <p className="t-caption text-[var(--brand-text-muted)] py-2">All caught up — no decisions needed right now.</p>
               )}
 
               {/* Content Plan sign-offs */}
