@@ -20,12 +20,14 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
     { value, onChange, type = 'text', placeholder, className, id, ...rest },
     ref
   ) {
-    const { hasError, inputId, descriptionId } = useFormField();
+    const { hasError, isValid, inputId, descriptionId } = useFormField();
     const resolvedId = id ?? (inputId || undefined);
 
     const borderClass = hasError
       ? 'border-red-500/50'
-      : 'border-zinc-700 focus:border-[var(--brand-mint)]';
+      : isValid
+        ? 'border-emerald-500/50'
+      : 'border-[var(--brand-border)] focus:border-[var(--brand-mint)]';
 
     return (
       <input
@@ -39,11 +41,11 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         aria-describedby={descriptionId || undefined}
         className={cn(
           'w-full px-3 py-2',
-          'bg-zinc-900 rounded-md',
+          'bg-[var(--surface-3)] rounded-md',
           'border',
           borderClass,
-          'text-zinc-200 text-sm',
-          'placeholder:text-zinc-500',
+          'text-[var(--brand-text-bright)] text-sm',
+          'placeholder:text-[var(--brand-text-muted)]',
           'outline-none',
           'focus:ring-2 focus:ring-[var(--brand-mint-glow)]',
           'transition-colors duration-150',

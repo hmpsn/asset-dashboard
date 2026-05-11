@@ -9,27 +9,18 @@ import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
 
-/**
- * Maps 6 admin-internal request statuses to 4 client-visible status labels.
- * Priority: team_replied > resolved > in_progress > awaiting_team
- */
 function clientStatusLabel(status: string, notes: Pick<RequestNote, 'author'>[]): string {
-  // Check if there's an unread team reply
+  // Priority: resolved > team_replied > in_progress > awaiting_team
+  // (matches toClientRequestStatus in shared/types/requests.ts)
+  if (status === 'completed' || status === 'closed') return 'Resolved';
   const lastNote = notes[notes.length - 1];
   if (lastNote?.author === 'team') return 'Team replied';
-
   switch (status) {
     case 'new':
-    case 'in_review':
-      return 'Awaiting team';
-    case 'in_progress':
-    case 'on_hold':
-      return 'In progress';
-    case 'completed':
-    case 'closed':
-      return 'Resolved';
-    default:
-      return 'Awaiting team';
+    case 'in_review':   return 'Awaiting team';
+    case 'in_progress': return 'In progress';
+    case 'on_hold':     return 'In progress';
+    default:            return 'Awaiting team';
   }
 }
 
@@ -218,14 +209,14 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             // Group by client-visible status
             const statusColors: Record<string, string> = {
               // Awaiting team
-              new: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
-              in_review: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
+              new:         'bg-blue-500/10 border-blue-500/30 text-accent-info',
+              in_review:   'bg-blue-500/10 border-blue-500/30 text-accent-info',
               // In progress
               in_progress: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
-              on_hold: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
+              on_hold:     'bg-teal-500/10 border-teal-500/30 text-accent-brand',
               // Resolved
-              completed: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-              closed: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
+              completed:   'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
+              closed:      'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
             };
             const catLabels: Record<string, string> = {
               bug: 'Bug', content: 'Content', design: 'Design',
@@ -248,7 +239,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                         </span>
                       </div>
                       {req.status === 'on_hold' && req.notes.some(n => n.author === 'team' && n.content?.toLowerCase().includes('on hold')) && (
-                        <span className="t-caption-sm text-[var(--brand-text-muted)] block mb-2">
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] block mt-0.5">
                           {req.notes.filter(n => n.author === 'team' && n.content?.toLowerCase().includes('on hold')).at(-1)?.content}
                         </span>
                       )}

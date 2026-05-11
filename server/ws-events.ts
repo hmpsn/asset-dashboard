@@ -33,10 +33,6 @@ export const WS_EVENTS = {
   // Activity feed (auto-broadcast via initActivityBroadcast)
   ACTIVITY_NEW: 'activity:new',
 
-  // Feedback
-  FEEDBACK_NEW: 'feedback:new',
-  FEEDBACK_UPDATE: 'feedback:update',
-
   // Audit
   AUDIT_COMPLETE: 'audit:complete',
 

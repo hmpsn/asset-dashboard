@@ -23,8 +23,6 @@ export interface AuditIssueRowProps {
   appliedFixes: Set<string>;
   editedSuggestions: Record<string, string>;
   editingKey: string | null;
-  sentForReview: Set<string>;
-  sendingReview: string | null;
   // Task / flag state
   createdTasks: Set<string>;
   creatingTask: string | null;
@@ -35,7 +33,6 @@ export interface AuditIssueRowProps {
   actionMenuKey: string | null;
   // Callbacks
   onAcceptSuggestion: (pageId: string, issue: SeoIssue) => void;
-  onSendForReview: (page: PageSeoResult, issue: SeoIssue) => void;
   onSetEditingKey: (key: string | null) => void;
   onSetEditedSuggestion: (fixKey: string, text: string) => void;
   onSetActionMenuKey: (key: string | null) => void;
@@ -51,9 +48,8 @@ export interface AuditIssueRowProps {
 export function AuditIssueRow({
   page, issue, idx, workspaceId, siteId: _siteId,
   applyingFix, appliedFixes, editedSuggestions, editingKey,
-  sentForReview, sendingReview,
   createdTasks, creatingTask, flaggedIssues, flaggingKey, flagNote, flagSending, actionMenuKey,
-  onAcceptSuggestion, onSendForReview, onSetEditingKey, onSetEditedSuggestion,
+  onAcceptSuggestion, onSetEditingKey, onSetEditedSuggestion,
   onSetActionMenuKey, onCreateTask, onFlagForClient, onSetFlaggingKey, onSetFlagNote,
   onSuppressIssue, onSuppressPattern, issueToTaskKey,
 }: AuditIssueRowProps) {
@@ -111,30 +107,16 @@ export function AuditIssueRow({
                 <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium flex items-center gap-1">
                   <CheckCircle className="w-2.5 h-2.5" /> Applied
                 </span>
-              ) : sentForReview.has(fixKey) ? (
-                <span className="t-micro px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium flex items-center gap-1">
-                  <Send className="w-2.5 h-2.5" /> Sent for Review
-                </span>
               ) : (
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => onAcceptSuggestion(page.pageId, issue)}
-                    disabled={isApplying || sendingReview === fixKey}
+                    disabled={isApplying}
                     className="t-micro px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                   >
                     {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
                     {isApplying ? 'Pushing...' : 'Apply Now'}
                   </button>
-                  {workspaceId && (issue.check === 'title' || issue.check === 'meta-description') && (
-                    <button
-                      onClick={() => onSendForReview(page, issue)}
-                      disabled={isApplying || sendingReview === fixKey}
-                      className="t-micro px-1.5 py-0.5 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {sendingReview === fixKey ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Send className="w-2.5 h-2.5" />}
-                      Send for Review
-                    </button>
-                  )}
                 </div>
               )}
             </div>

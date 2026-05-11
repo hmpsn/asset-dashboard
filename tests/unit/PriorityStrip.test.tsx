@@ -50,20 +50,20 @@ describe('PriorityStrip', () => {
     const { container } = render(
       <PriorityStrip
         items={[
-          { id: 'a', icon: Inbox, title: 'Review item', section: 'reviews', ctaLabel: 'Go', onCta: vi.fn() },
-          { id: 'b', icon: Inbox, title: 'Conversation item', section: 'conversations', ctaLabel: 'Go', onCta: vi.fn() },
-          { id: 'c', icon: Inbox, title: 'Decision item', section: 'decisions', ctaLabel: 'Go', onCta: vi.fn() },
+          { id: 'a', icon: Inbox, title: 'Decision item', section: 'decisions', ctaLabel: 'Go', onCta: vi.fn() },
+          { id: 'b', icon: Inbox, title: 'Review item', section: 'reviews', ctaLabel: 'Go', onCta: vi.fn() },
+          { id: 'c', icon: Inbox, title: 'Conversation item', section: 'conversations', ctaLabel: 'Go', onCta: vi.fn() },
         ]}
       />,
     );
     // Each li has exactly one svg descendant; check for section color classes on the icon wrapper
     const icons = container.querySelectorAll('li svg');
     expect(icons).toHaveLength(3);
-    // Spot-check that icon color classes differ per section by checking wrapper spans
+    // Spot-check that icon color classes differ per section by checking wrapper spans.
+    // decisions → amber (text-accent-warning); reviews + conversations → blue (text-accent-info)
     const iconWrappers = container.querySelectorAll('li [class*="text-accent"]');
     const classes = Array.from(iconWrappers).map(el => el.className);
-    expect(classes.some(c => c.includes('text-accent-brand'))).toBe(true);   // reviews
-    expect(classes.some(c => c.includes('text-accent-info'))).toBe(true);    // conversations
     expect(classes.some(c => c.includes('text-accent-warning'))).toBe(true); // decisions
+    expect(classes.some(c => c.includes('text-accent-info'))).toBe(true);    // reviews + conversations
   });
 });

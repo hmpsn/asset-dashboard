@@ -134,7 +134,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         clientNote: note.trim() || undefined,
         payload: {
           analyzedAt: data.analyzedAt,
-          suggestions: filtered,
+          suggestions: filtered.map(s => ({
+            anchorText: s.anchorText,
+            targetUrl: s.toPage,
+            targetTitle: s.toTitle,
+            sourcePage: s.fromPage,
+            contextSnippet: s.reason,
+          })),
           summary: {
             pageCount: data.pageCount,
             existingLinkCount: data.existingLinkCount,
@@ -211,10 +217,12 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       {workspaceId && data.suggestions.length > 0 && !sentToClient && (
         <textarea
           rows={2}
+          disabled={sendingToClient}
+          maxLength={2000}
           placeholder="Add a note for your client (optional)"
           value={note}
           onChange={e => setNote(e.target.value)}
-          className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
         />
       )}
 

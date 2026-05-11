@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **108** — 86 error, 22 warn.
+Total rules: **113** — 91 error, 22 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -101,7 +101,12 @@ advisory but tracked.
 | 83 | schema.org property key foundedDate (should be foundingDate) | error | pattern | `server/schema/templates/` | `schema-property-name-ok` | foundedDate is not a schema.org property. foundingDate is. Caught in PR #406 review where the pre-existing wrong key prevented the newly-extracted semantics.foundingDate from reaching Google. |
 | 84 | Unfiltered staff image URL in schema template (use filterHttpUrls) | error | pattern | `server/schema/templates/` | `staff-image-filter-ok` | s.image is AI-extracted from attacker-controllable page HTML. filterHttpUrls blocks non-http(s) scheme URLs from reaching JSON-LD published to live Webflow pages. Caught in PR #406 review where static.ts missed the fix applied to local-business.ts and service.ts. |
 | 85 | Unfiltered semantics.primaryImage in schema template (use filterHttpUrls) | error | pattern | `server/schema/templates/` | `primary-image-filter-ok` | semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct. |
-| 86 | inbox-legacy-filter-literal | error | custom | `src/` | `inbox-legacy-filter-literal-ok` | Prevents re-introduction of retired InboxFilter literals (?tab=approvals, ?tab=requests, ?tab=content-plan, ?tab=copy) after the 2026-05-08 inbox redesign renamed them. |
+| 86 | inbox-legacy-filter-literal | error | custom | `src/` | `inbox-legacy-filter-literal-ok` | Prevents re-introduction of retired InboxFilter literals after the inbox IA restructure (PR 1.2). Denied: approvals, requests, content-plan, copy, needs-action, seo-changes, content. |
+| 87 | feedback-module-reintroduction | error | custom | `*.ts, *.tsx` | `feedback-module-reintroduction-ok` | Prevents reintroduction of the retired FeedbackWidget component and its /api/feedback endpoint after PR 1.0a cleanup. |
+| 88 | keyword-strategy-action-type | error | pattern | `src/` | `keyword-strategy-action-type-ok` | Prevents re-introduction of the retired 'keyword_strategy' ClientAction sourceType after the inbox IA restructure (PR 1.2). |
+| 89 | send-for-review-anti-pattern | error | pattern | `src/` | `send-for-review-anti-pattern-ok` | Enforces the Admin Send Convention introduced in PR 1.4: one 'Send to client' button replaces the old dual 'Send for Review' / 'Flag for Client' pattern. |
+| 90 | prediction-showcase-ungated | error | custom | `src/` | `prediction-showcase-ungated-ok` | PredictionShowcaseCard must be gated behind the winsEnabled feature flag to prevent uncontrolled rollout to all clients. |
+| 91 | inbox-action-queue-strip | error | pattern | `InboxTab.tsx` | `inbox-action-queue-strip-ok` | Prevents re-introduction of ActionQueueStrip into InboxTab.tsx after the inbox IA restructure removed it (§5.6 of IA spec). |
 
 ---
 

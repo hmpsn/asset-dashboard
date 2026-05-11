@@ -94,6 +94,9 @@ export function OverviewTab({
   // flag can be flipped per-workspace without touching anything below this
   // block. When OFF (default), the original overview body renders unchanged.
   const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  // client-wins-surface: when WinsSurface is active on InsightsTab, PredictionShowcaseCard
+  // must not render simultaneously (PR 1.3 mutual exclusivity invariant).
+  const winsEnabled = useFeatureFlag('client-wins-surface');
   if (briefingV2Enabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
@@ -327,8 +330,8 @@ export function OverviewTab({
     </ErrorBoundary>
     )}
 
-    {/* Predictions that came true — only render when server has populated the field (gated to growth+) */}
-    {clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
+    {/* Predictions that came true — only render when wins surface is off AND server has populated the field (growth+) */}
+    {!winsEnabled && clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

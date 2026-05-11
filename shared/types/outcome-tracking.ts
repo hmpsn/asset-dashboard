@@ -247,6 +247,7 @@ export interface OutcomeWinEntry {
   targetKeyword: string | null;
   recommendation: string;
   delta: DeltaSummary;
+  score: OutcomeScore;
   detectedAt: string;
 }
 

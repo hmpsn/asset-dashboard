@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Inbox, ClipboardCheck, MessageSquare, FileText, PenLine,
-  Flag, ExternalLink, Check, Shield, Layers,
+  Inbox, Flag, ExternalLink, Check, Shield,
   ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Button, EmptyState, Icon } from '../ui';
@@ -13,15 +12,18 @@ import { ContentTab } from './ContentTab';
 import { ClientCopyReview } from './ClientCopyReview';
 import { SchemaReviewModal } from './SchemaReviewModal';
 import { ClientActionDetailModal } from './ClientActionDetailModal';
-import { PriorityStrip } from './PriorityStrip';
-import type { PriorityItem } from './PriorityStrip';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch, ContentPlanReviewCell, ApprovalPageKeyword } from './types';
 import type { SchemaSitePlan } from '../../../shared/types/schema-plan';
 import { getOptional, patch, post } from '../../api/client';
 import { useBetaMode } from './BetaContext';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { queryKeys } from '../../lib/queryKeys';
 import type { ClientAction } from '../../../shared/types/client-actions';
+import { DecisionCard } from './DecisionCard';
+import { DecisionDetailModal } from './DecisionDetailModal';
+import { normalizeClientAction, normalizeApprovalBatch } from '../../lib/decision-adapters';
+import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 
 export type InboxFilter = 'all' | 'decisions' | 'reviews' | 'conversations';
 /**
@@ -35,20 +37,18 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
 
 /**
  * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
- * Allows backward-compat during the Phase 2B migration window when ActionQueueStrip
- * chip section values are updated. Also handles the 'completed' mode value which
- * was previously a filter chip but is now the Active/Completed mode toggle.
- * // inbox-action-queue-strip-ok
+ * Used for backward-compat with external URLs and old bookmarks (URL alias params
+ * from CLIENT_INBOX_ALIASES in routes.ts). Intermediate filter names from the
+ * Phase 2B migration window have been removed — chips now emit final values directly.
  */
+// inbox-action-queue-strip-ok — JSDoc above documents the migration state, not an import
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
-  'needs-action': 'decisions',
-  'seo-changes': 'decisions',
-  content: 'reviews',
-  approvals: 'decisions',
-  requests: 'conversations',
-  copy: 'reviews',
-  'content-plan': 'decisions',
-  completed: 'all',   // completed is now a mode toggle, not a filter chip
+  // legacy URL alias params (from CLIENT_INBOX_ALIASES in routes.ts)
+  approvals:       'decisions',
+  requests:        'conversations',
+  copy:            'reviews',
+  'content-plan':  'decisions',
+  completed:       'all',
 };
 
 export function isInboxFilter(value: string | null): value is InboxFilter {
@@ -128,7 +128,11 @@ export function InboxTab({
       if (param === 'conversations' && betaMode) return initialFilter ?? 'decisions';
       return param;
     }
-    if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
+    if (param && LEGACY_FILTER_MAP[param]) {
+      const mapped = LEGACY_FILTER_MAP[param];
+      if (mapped === 'conversations' && betaMode) return initialFilter ?? 'decisions';
+      return mapped;
+    }
     return initialFilter ?? 'decisions';
   });
   const [mode, setMode] = useState<InboxMode>('active');
@@ -142,6 +146,9 @@ export function InboxTab({
   const [changeRequestNote, setChangeRequestNote] = useState('');
   // SEO Changes section collapses when nothing pending in active mode
   const [seoSectionExpanded, setSeoSectionExpanded] = useState(false);
+  // Decision detail modal state
+  const [openDecision, setOpenDecision] = useState<NormalizedDecision | null>(null);
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
   // Schema plan summary — drives SEO Changes card + priority strip item
   const schemaPlanQuery = useQuery({
@@ -175,100 +182,39 @@ export function InboxTab({
     if (hasPendingSeoChanges) setSeoSectionExpanded(true);
   }, [hasPendingSeoChanges]);
 
+  // Feature flag: new 3-section inbox IA layout
+  const newInboxIa = useFeatureFlag('new-inbox-ia');
+
+  // Routing: approval_batches split by note presence
+  const approvalsForDecisions = approvalBatches.filter(b =>
+    !b.note && b.items.some(i => i.status === 'pending'),
+  );
+  const approvalsForConversations = approvalBatches.filter(b =>
+    !!b.note && b.items.some(i => i.status === 'pending'),
+  );
+
+  // NormalizedDecision lists for the Decisions section
+  const decisionItems: NormalizedDecision[] = [
+    ...pendingClientActions.map(a => normalizeClientAction(a)),
+    ...approvalsForDecisions.map(b => normalizeApprovalBatch(b)),
+  ];
+
+  // Filter chip counts
+  const decisionsCount = decisionItems.length + planReviewCount;
+  const reviewsCount = contentReviews + copyReviewCount + (schemaPlanPending ? 1 : 0);
+  const conversationsCount = requestReplies + approvalsForConversations.length;
+
   // Filter chips (hidden in completed mode)
   const filterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
-    { id: 'decisions', label: 'Decisions & Requests',
-      count: (pendingClientActions.length + requestReplies + planReviewCount) || undefined },
-    { id: 'reviews', label: 'Reviews',
-      count: ((pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0) + contentReviews + copyReviewCount) || undefined },
-    ...(!betaMode ? [{ id: 'conversations' as InboxFilter, label: 'Conversations',
-      count: requestReplies || undefined }] : []),
+    { id: 'decisions', label: 'Decisions',
+      count: (pendingClientActions.length + planReviewCount + (pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)) || undefined },
+    { id: 'conversations', label: 'Conversations',
+      count: requestReplies || undefined },
+    ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews',
+      count: (contentReviews + copyReviewCount) || undefined }] : []),
   ];
 
-  // Priority strip items (active mode only, ordered by urgency)
-  const priorityItems: PriorityItem[] = [];
-  // 1. Requests with team replies (most time-sensitive)
-  for (const r of requests) {
-    const lastNote = r.notes[r.notes.length - 1];
-    if (lastNote?.author === 'team' && r.status !== 'completed' && r.status !== 'closed') {
-      priorityItems.push({
-        id: `request-${r.id}`,
-        icon: MessageSquare,
-        title: r.title,
-        section: 'conversations',
-        ctaLabel: 'Reply →',
-        onCta: () => setFilter('conversations'),
-      });
-    }
-  }
-  // 2. Pending approval batches (team blocked)
-  for (const b of approvalBatches.filter(b => b.items.some(i => i.status === 'pending' || !i.status))) {
-    priorityItems.push({
-      id: `batch-${b.id}`,
-      icon: ClipboardCheck,
-      title: b.name,
-      section: 'decisions',
-      ctaLabel: 'Review →',
-      onCta: () => setFilter('decisions'),
-    });
-  }
-  // 3. Schema plan pending initial feedback
-  if (schemaPlanPending) {
-    priorityItems.push({
-      id: 'schema-plan',
-      icon: Shield,
-      title: 'Schema strategy ready for review',
-      section: 'reviews',
-      ctaLabel: 'Review →',
-      onCta: () => setSchemaModalOpen(true),
-    });
-  }
-  // 4. Pending client action cards
-  for (const a of pendingClientActions) {
-    priorityItems.push({
-      id: `action-${a.id}`,
-      icon: Flag,
-      title: a.title,
-      section: 'decisions',
-      ctaLabel: 'View →',
-      // Modal wired in Task 7 — scroll to section until then
-      onCta: () => setFilter('decisions'),
-    });
-  }
-  // 5. Content at review status
-  for (const c of contentRequests.filter(r => r.status === 'client_review' || r.status === 'post_review')) {
-    priorityItems.push({
-      id: `content-${c.id}`,
-      icon: FileText,
-      title: c.topic || 'Content review',
-      section: 'reviews',
-      ctaLabel: 'Review →',
-      onCta: () => setFilter('reviews'),
-    });
-  }
-  // 6. Content plan cells at review
-  for (const cell of contentPlanReviewCells) {
-    priorityItems.push({
-      id: `plan-${cell.cellId}`,
-      icon: Layers,
-      title: cell.targetKeyword || 'Content plan cell',
-      section: 'reviews',
-      ctaLabel: 'Review →',
-      onCta: () => setFilter('reviews'),
-    });
-  }
-  // 7. Copy review awaiting approval
-  if (hasCopyEntries) {
-    priorityItems.push({
-      id: 'copy-review',
-      icon: PenLine,
-      title: 'Copy sections awaiting your approval',
-      section: 'reviews',
-      ctaLabel: 'Review →',
-      onCta: () => setFilter('reviews'),
-    });
-  }
 
   const respondToClientAction = async (actionId: string, status: 'approved' | 'changes_requested', clientNote?: string) => {
     try {
@@ -299,9 +245,9 @@ export function InboxTab({
     }
   };
 
-  const showSection1 = mode === 'active' && (filter === 'all' || filter === 'decisions');
-  const showSection2 = mode === 'active' && (filter === 'all' || filter === 'reviews');
-  const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'conversations');
+  const showSection1 = mode === 'active' && (filter === 'all' || filter === 'decisions' || filter === 'conversations');
+  const showSection2 = mode === 'active' && (filter === 'all' || filter === 'decisions');
+  const showSection3 = mode === 'active' && !betaMode && (filter === 'all' || filter === 'reviews');
 
   return (
     <div className="space-y-6">
@@ -336,256 +282,166 @@ export function InboxTab({
         </div>
       </div>
 
-      {/* ── Filter chips (active mode only) ── */}
-      {mode === 'active' && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {filterChips.map(f => (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={filter === f.id}
-              onClick={() => setFilter(f.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
-                filter === f.id
-                  ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
-                  : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
-              }`}
-            >
-              {f.label}
-              {f.count !== undefined && (
-                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
-                  filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
-                }`}>
-                  {f.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── Priority strip (active mode only) ── */}
-      {mode === 'active' && (
-        <PriorityStrip
-          items={priorityItems}
-          showAllCaughtUp={
-            !approvalsLoading && !requestsLoading &&
-            !schemaPlanQuery.isLoading &&
-            priorityItems.length === 0
-          }
-        />
-      )}
-
-      {/* ── Section 1: Needs Action & Requests ── */}
-      {showSection1 && (
-        <section aria-label="Needs Action & Requests" className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Needs Action &amp; Requests</h3>
-            {hasNeedsAction && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
-                {pendingClientActions.length + requestReplies + planReviewCount} pending
-              </span>
-            )}
-          </div>
-
-          {/* Client Action Cards */}
-          {pendingClientActions.length > 0 && (
-            <div className="space-y-3">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Action Items</p>
-              {pendingClientActions.map(action => (
-                <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-                          {action.sourceType.replace(/_/g, ' ')}
-                        </span>
-                        {action.priority === 'high' && (
-                          <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
-                        )}
-                      </div>
-                      <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">{action.title}</h4>
-                      <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    {action.sourceType === 'content_decay' ? (
-                      <>
-                        <Button size="sm" variant="primary" onClick={() => respondToClientAction(action.id, 'approved').catch(() => {})}>
-                          Approve
-                        </Button>
-                        {changeRequestAction !== action.id ? (
-                          <Button size="sm" variant="ghost" onClick={() => setChangeRequestAction(action.id)}>
-                            Request changes
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-2 flex-1">
-                            <input
-                              type="text"
-                              value={changeRequestNote}
-                              onChange={e => setChangeRequestNote(e.target.value)}
-                              placeholder="Add a note for your team…"
-                              className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
-                            />
-                            <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim()).catch(() => {})}>
-                              Send
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setChangeRequestAction(null); setChangeRequestNote(''); }}>
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      // Modal wired in Task 7 — button present, modal not yet mounted
-                      <Button size="sm" variant="ghost" onClick={() => setDetailAction(action)}>
-                        View details →
-                      </Button>
-                    )}
-                  </div>
-                </div>
+      {newInboxIa ? (
+        /* === NEW 3-SECTION LAYOUT (flag: new-inbox-ia) === */
+        <>
+          {/* ── New filter chips ── */}
+          {mode === 'active' && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: 'all' as InboxFilter, label: 'All' },
+                { id: 'decisions' as InboxFilter, label: 'Decisions', count: decisionsCount || undefined },
+                ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined }] : []),
+                { id: 'conversations' as InboxFilter, label: 'Conversations', count: conversationsCount || undefined },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={filter === f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
+                    filter === f.id
+                      ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
+                      : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+                  }`}
+                >
+                  {f.label}
+                  {f.count !== undefined && (
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
+                      filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
+                    }`}>
+                      {f.count}
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           )}
 
-          {/* Content Plan sign-offs */}
-          {planReviewCount > 0 && (
-            <div className="space-y-3">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Plan</p>
-              {contentPlanReviewCells.map(cell => {
-                const isFlagging = flaggingCell === cell.cellId;
-                const isFlagged = cell.status === 'flagged';
-                return (
-                  // pr-check-disable-next-line -- Brand signature radius intentional
-                  <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                    <div className="px-5 py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
-                            <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
-                              isFlagged
-                                ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
-                                : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
-                            }`}>
-                              {isFlagged ? 'Flagged' : 'Needs Review'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
-                            <span>{cell.matrixName}</span>
-                            {cell.plannedUrl && (
-                              <span className="flex items-center gap-0.5">
-                                <Icon as={ExternalLink} size="xs" /> {cell.plannedUrl}
-                              </span>
+          {/* ── Section: Decisions ── */}
+          {mode === 'active' && (filter === 'all' || filter === 'decisions') && (
+            <section aria-label="Decisions" className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Decisions</h3>
+                {decisionsCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
+                    {decisionsCount} pending
+                  </span>
+                )}
+              </div>
+
+              {decisionItems.length > 0 && (
+                <div className="space-y-3">
+                  {decisionItems.map(decision => (
+                    <DecisionCard
+                      key={decision.id}
+                      decision={decision}
+                      onOpen={() => setOpenDecision(decision)}
+                      onApprove={decision.isSingleAction
+                        ? () => respondToClientAction(decision.sourceId, 'approved').catch(() => {})
+                        : undefined}
+                      onFlagWithNote={decision.isSingleAction
+                        ? (note) => respondToClientAction(decision.sourceId, 'changes_requested', note || undefined).catch(() => {})
+                        : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Content Plan sign-offs */}
+              {planReviewCount > 0 && (
+                <div className="space-y-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Plan</p>
+                  {contentPlanReviewCells.map(cell => {
+                    const isFlagging = flaggingCell === cell.cellId;
+                    const isFlagged = cell.status === 'flagged';
+                    return (
+                      // pr-check-disable-next-line -- Brand signature radius intentional
+                      <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+                        <div className="px-5 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
+                                <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
+                                  isFlagged
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
+                                    : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
+                                }`}>
+                                  {isFlagged ? 'Flagged' : 'Needs Review'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                                <span>{cell.matrixName}</span>
+                                {cell.plannedUrl && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Icon as={ExternalLink} size="xs" /> {cell.plannedUrl}
+                                  </span>
+                                )}
+                                {cell.variableValues && Object.keys(cell.variableValues).length > 0 && (
+                                  <span>{Object.values(cell.variableValues).join(' × ')}</span>
+                                )}
+                              </div>
+                            </div>
+                            {!isFlagged && !isFlagging && (
+                              <button
+                                type="button"
+                                onClick={() => setFlaggingCell(cell.cellId)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                              >
+                                <Icon as={Flag} size="sm" /> Request Changes
+                              </button>
                             )}
-                            {cell.variableValues && Object.keys(cell.variableValues).length > 0 && (
-                              <span>{Object.values(cell.variableValues).join(' × ')}</span>
-                            )}
                           </div>
+                          {isFlagging && (
+                            <div className="mt-3 space-y-2">
+                              <textarea
+                                value={flagComment}
+                                onChange={e => setFlagComment(e.target.value)}
+                                placeholder="Describe what you'd like changed..."
+                                rows={2}
+                                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="primary" disabled={flagSubmitting || !flagComment.trim()} onClick={() => handleFlagCell(cell)}>
+                                  {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
+                                </Button>
+                                <button type="button" onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
+                                  className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                          {isFlagged && (
+                            <div className="mt-2 t-caption-sm text-accent-warning flex items-center gap-1">
+                              <Icon as={Flag} size="sm" /> You've flagged this — your team is reviewing your feedback.
+                            </div>
+                          )}
                         </div>
-                        {!isFlagged && !isFlagging && (
-                          <button
-                            type="button"
-                            onClick={() => setFlaggingCell(cell.cellId)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
-                          >
-                            <Icon as={Flag} size="sm" /> Request Changes
-                          </button>
-                        )}
                       </div>
-                      {isFlagging && (
-                        <div className="mt-3 space-y-2">
-                          <textarea
-                            value={flagComment}
-                            onChange={e => setFlagComment(e.target.value)}
-                            placeholder="Describe what you'd like changed..."
-                            rows={2}
-                            className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
-                          />
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              disabled={flagSubmitting || !flagComment.trim()}
-                              onClick={() => handleFlagCell(cell)}
-                            >
-                              {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
-                            </Button>
-                            <button
-                              type="button"
-                              onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
-                              className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-                            >Cancel</button>
-                          </div>
-                        </div>
-                      )}
-                      {isFlagged && (
-                        <div className="mt-2 t-caption-sm text-accent-warning flex items-center gap-1">
-                          <Icon as={Flag} size="sm" /> You've flagged this — your team is reviewing your feedback.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {decisionsCount === 0 && planReviewCount === 0 && decisionItems.length === 0 && !approvalsLoading && (
+                <p className="t-caption text-[var(--brand-text-muted)] py-2">All caught up — no decisions needed right now.</p>
+              )}
+            </section>
           )}
 
-          {/* Requests */}
-          <div className="space-y-3">
-            <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Requests</p>
-            <RequestsTab
-              workspaceId={workspaceId}
-              requests={requests}
-              requestsLoading={requestsLoading}
-              clientUser={clientUser}
-              loadRequests={loadRequests}
-              setToast={setToast}
-            />
-          </div>
-        </section>
-      )}
+          {/* ── Section: Reviews ── */}
+          {mode === 'active' && !betaMode && (filter === 'all' || filter === 'reviews') && (
+            <section aria-label="Reviews" className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Reviews</h3>
+                {reviewsCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-blue-500/15 text-accent-info border border-blue-500/30">
+                    {reviewsCount} needs review
+                  </span>
+                )}
+              </div>
 
-      {/* ── Section 2: SEO Changes ── */}
-      {showSection2 && (
-        <section aria-label="SEO Changes" className="space-y-4">
-          <button
-            type="button"
-            className="flex items-center gap-2 w-full text-left"
-            aria-expanded={seoSectionExpanded}
-            aria-controls="seo-changes-content"
-            onClick={() => setSeoSectionExpanded(e => !e)}
-          >
-            <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
-            {hasPendingSeoChanges && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-teal-500/15 text-accent-brand border border-teal-500/30">
-                {(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending
-              </span>
-            )}
-            {!hasPendingSeoChanges && (
-              <span className="t-caption text-[var(--brand-text-muted)]">Nothing pending</span>
-            )}
-            <span className="ml-auto">
-              {seoSectionExpanded
-                ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
-                : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
-            </span>
-          </button>
-
-          {seoSectionExpanded && (
-            <div id="seo-changes-content" className="space-y-4">
-              <ApprovalsTab
-                workspaceId={workspaceId}
-                approvalBatches={approvalBatches}
-                approvalsLoading={approvalsLoading}
-                pendingApprovals={pendingApprovals}
-                effectiveTier={effectiveTier}
-                setApprovalBatches={setApprovalBatches}
-                loadApprovals={loadApprovals}
-                setToast={setToast}
-                pageMap={pageMap}
-              />
-
+              {/* Schema plan */}
               {schemaPlan && (
                 <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -614,99 +470,468 @@ export function InboxTab({
                   </div>
                 </div>
               )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ── Section 3: Content ── */}
-      {showSection3 && (
-        <section aria-label="Content" className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Content</h3>
-            {(contentReviews + copyReviewCount) > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-blue-500/15 text-accent-info border border-blue-500/30">
-                {contentReviews + copyReviewCount} needs review
-              </span>
-            )}
-          </div>
-
-          {hasCopyEntries && (
-            <div className="space-y-2">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Copy Review</p>
-              <ClientCopyReview workspaceId={workspaceId} />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Pipeline</p>
-            <ContentTab
-              contentRequests={contentRequests}
-              setContentRequests={setContentRequests}
-              effectiveTier={effectiveTier}
-              briefPrice={briefPrice}
-              fullPostPrice={fullPostPrice}
-              fmtPrice={fmtPrice}
-              setPricingModal={setPricingModal}
-              pricingConfirming={pricingConfirming}
-              workspaceId={workspaceId}
-              setToast={setToast}
-              hidePrices={hidePrices}
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Completed mode: history log ── */}
-      {mode === 'completed' && (
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
-            <ApprovalsTab
-              workspaceId={workspaceId}
-              approvalBatches={approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))}
-              approvalsLoading={approvalsLoading}
-              pendingApprovals={0}
-              effectiveTier={effectiveTier}
-              setApprovalBatches={setApprovalBatches}
-              loadApprovals={loadApprovals}
-              setToast={setToast}
-              pageMap={pageMap}
-            />
-          </div>
-          {completedClientActions.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
-              {completedClientActions.map(action => (
-                <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-                      {action.sourceType.replace(/_/g, ' ')}
-                    </span>
-                    <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
-                      action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
-                      action.status === 'changes_requested' ? 'bg-orange-500/15 text-accent-orange border-orange-500/30' :
-                      'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
-                    }`}>
-                      {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
-                    </span>
-                  </div>
-                  <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
+              {/* Copy review */}
+              {hasCopyEntries && (
+                <div className="space-y-2">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Copy Review</p>
+                  <ClientCopyReview workspaceId={workspaceId} />
                 </div>
+              )}
+
+              {/* Content pipeline */}
+              <div className="space-y-2">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Pipeline</p>
+                <ContentTab
+                  contentRequests={contentRequests}
+                  setContentRequests={setContentRequests}
+                  effectiveTier={effectiveTier}
+                  briefPrice={briefPrice}
+                  fullPostPrice={fullPostPrice}
+                  fmtPrice={fmtPrice}
+                  setPricingModal={setPricingModal}
+                  pricingConfirming={pricingConfirming}
+                  workspaceId={workspaceId}
+                  setToast={setToast}
+                  hidePrices={hidePrices}
+                />
+              </div>
+            </section>
+          )}
+
+          {/* ── Section: Conversations ── */}
+          {mode === 'active' && (filter === 'all' || filter === 'conversations') && (
+            <section aria-label="Conversations" className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Conversations</h3>
+                {conversationsCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-teal-500/15 text-accent-brand border border-teal-500/30">
+                    {conversationsCount} active
+                  </span>
+                )}
+              </div>
+              <RequestsTab
+                workspaceId={workspaceId}
+                requests={requests}
+                requestsLoading={requestsLoading}
+                clientUser={clientUser}
+                loadRequests={loadRequests}
+                setToast={setToast}
+              />
+            </section>
+          )}
+
+          {/* ── Completed mode: history log (new layout) ── */}
+          {mode === 'completed' && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
+                <ApprovalsTab
+                  workspaceId={workspaceId}
+                  approvalBatches={approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))}
+                  approvalsLoading={approvalsLoading}
+                  pendingApprovals={0}
+                  effectiveTier={effectiveTier}
+                  setApprovalBatches={setApprovalBatches}
+                  loadApprovals={loadApprovals}
+                  setToast={setToast}
+                  pageMap={pageMap}
+                />
+              </div>
+              {completedClientActions.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
+                  {completedClientActions.map(action => (
+                    <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
+                          {action.sourceType.replace(/_/g, ' ')}
+                        </span>
+                        <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
+                          action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
+                          action.status === 'changes_requested' ? 'bg-amber-500/15 text-accent-warning border-amber-500/30' :
+                          'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
+                        }`}>
+                          {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
+                        </span>
+                      </div>
+                      <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {completedClientActions.length === 0 && approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied')).length === 0 && (
+                <EmptyState
+                  icon={Check}
+                  title="No completed items yet"
+                  description="Resolved approvals, actions, and requests will appear here."
+                />
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        /* === EXISTING LAYOUT (flag off — do not modify) === */
+        <>
+          {/* ── Filter chips (active mode only) ── */}
+          {mode === 'active' && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {filterChips.map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={filter === f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
+                    filter === f.id
+                      ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
+                      : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+                  }`}
+                >
+                  {f.label}
+                  {f.count !== undefined && (
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
+                      filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
+                    }`}>
+                      {f.count}
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           )}
-          {completedClientActions.length === 0 && approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied')).length === 0 && (
-            <EmptyState
-              icon={Check}
-              title="No completed items yet"
-              description="Resolved approvals, actions, and requests will appear here."
-            />
+
+          {/* ── Section 1: Needs Action & Requests ── */}
+          {showSection1 && (
+            <section aria-label="Needs Action & Requests" className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Needs Action &amp; Requests</h3>
+                {hasNeedsAction && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
+                    {pendingClientActions.length + requestReplies + planReviewCount} pending
+                  </span>
+                )}
+              </div>
+
+              {/* Client Action Cards */}
+              {pendingClientActions.length > 0 && (
+                <div className="space-y-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Action Items</p>
+                  {pendingClientActions.map(action => (
+                    <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
+                              {action.sourceType.replace(/_/g, ' ')}
+                            </span>
+                            {action.priority === 'high' && (
+                              <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
+                            )}
+                          </div>
+                          <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">{action.title}</h4>
+                          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        {action.sourceType === 'content_decay' ? (
+                          <>
+                            <Button size="sm" variant="primary" onClick={() => respondToClientAction(action.id, 'approved').catch(() => {})}>
+                              Approve
+                            </Button>
+                            {changeRequestAction !== action.id ? (
+                              <Button size="sm" variant="ghost" onClick={() => setChangeRequestAction(action.id)}>
+                                Request changes
+                              </Button>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-1">
+                                <input
+                                  type="text"
+                                  value={changeRequestNote}
+                                  onChange={e => setChangeRequestNote(e.target.value)}
+                                  placeholder="Add a note for your team…"
+                                  className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
+                                />
+                                <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim()).catch(() => {})}>
+                                  Send
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => { setChangeRequestAction(null); setChangeRequestNote(''); }}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          // Modal wired in Task 7 — button present, modal not yet mounted
+                          <Button size="sm" variant="ghost" onClick={() => setDetailAction(action)}>
+                            View details →
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Content Plan sign-offs */}
+              {planReviewCount > 0 && (
+                <div className="space-y-3">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Content Plan</p>
+                  {contentPlanReviewCells.map(cell => {
+                    const isFlagging = flaggingCell === cell.cellId;
+                    const isFlagged = cell.status === 'flagged';
+                    return (
+                      // pr-check-disable-next-line -- Brand signature radius intentional
+                      <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+                        <div className="px-5 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
+                                <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
+                                  isFlagged
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
+                                    : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
+                                }`}>
+                                  {isFlagged ? 'Flagged' : 'Needs Review'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                                <span>{cell.matrixName}</span>
+                                {cell.plannedUrl && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Icon as={ExternalLink} size="xs" /> {cell.plannedUrl}
+                                  </span>
+                                )}
+                                {cell.variableValues && Object.keys(cell.variableValues).length > 0 && (
+                                  <span>{Object.values(cell.variableValues).join(' × ')}</span>
+                                )}
+                              </div>
+                            </div>
+                            {!isFlagged && !isFlagging && (
+                              <button
+                                type="button"
+                                onClick={() => setFlaggingCell(cell.cellId)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                              >
+                                <Icon as={Flag} size="sm" /> Request Changes
+                              </button>
+                            )}
+                          </div>
+                          {isFlagging && (
+                            <div className="mt-3 space-y-2">
+                              <textarea
+                                value={flagComment}
+                                onChange={e => setFlagComment(e.target.value)}
+                                placeholder="Describe what you'd like changed..."
+                                rows={2}
+                                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={flagSubmitting || !flagComment.trim()}
+                                  onClick={() => handleFlagCell(cell)}
+                                >
+                                  {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
+                                </Button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
+                                  className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                                >Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                          {isFlagged && (
+                            <div className="mt-2 t-caption-sm text-accent-warning flex items-center gap-1">
+                              <Icon as={Flag} size="sm" /> You've flagged this — your team is reviewing your feedback.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Requests */}
+              <div className="space-y-3">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Requests</p>
+                <RequestsTab
+                  workspaceId={workspaceId}
+                  requests={requests}
+                  requestsLoading={requestsLoading}
+                  clientUser={clientUser}
+                  loadRequests={loadRequests}
+                  setToast={setToast}
+                />
+              </div>
+            </section>
           )}
-        </div>
+
+          {/* ── Section 2: SEO Changes ── */}
+          {showSection2 && (
+            <section aria-label="SEO Changes" className="space-y-4">
+              <button
+                type="button"
+                className="flex items-center gap-2 w-full text-left"
+                aria-expanded={seoSectionExpanded}
+                aria-controls="seo-changes-content"
+                onClick={() => setSeoSectionExpanded(e => !e)}
+              >
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
+                {hasPendingSeoChanges && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-teal-500/15 text-accent-brand border border-teal-500/30">
+                    {(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending
+                  </span>
+                )}
+                {!hasPendingSeoChanges && (
+                  <span className="t-caption text-[var(--brand-text-muted)]">Nothing pending</span>
+                )}
+                <span className="ml-auto">
+                  {seoSectionExpanded
+                    ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
+                    : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
+                </span>
+              </button>
+
+              {seoSectionExpanded && (
+                <div id="seo-changes-content" className="space-y-4">
+                  <ApprovalsTab
+                    workspaceId={workspaceId}
+                    approvalBatches={approvalBatches}
+                    approvalsLoading={approvalsLoading}
+                    pendingApprovals={pendingApprovals}
+                    effectiveTier={effectiveTier}
+                    setApprovalBatches={setApprovalBatches}
+                    loadApprovals={loadApprovals}
+                    setToast={setToast}
+                    pageMap={pageMap}
+                  />
+
+                  {schemaPlan && (
+                    <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Icon as={Shield} size="sm" className="text-accent-brand" />
+                            <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
+                            {schemaPlanPending && (
+                              <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/30">Ready for review</span>
+                            )}
+                          </div>
+                          <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
+                            Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
+                          </h4>
+                          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
+                            {schemaPlanPending
+                              ? 'Your schema strategy is ready for your review and approval.'
+                              : schemaPlan.status === 'client_approved' ? 'Approved — implementation in progress.'
+                              : schemaPlan.status === 'active' ? 'Active schema strategy.'
+                              : 'Schema strategy on file.'}
+                          </p>
+                        </div>
+                        <Button size="sm" variant={schemaPlanPending ? 'primary' : 'ghost'} onClick={() => setSchemaModalOpen(true)}>
+                          Review schema plan →
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Section 3: Content ── */}
+          {showSection3 && (
+            <section aria-label="Content" className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Content</h3>
+                {(contentReviews + copyReviewCount) > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-blue-500/15 text-accent-info border border-blue-500/30">
+                    {contentReviews + copyReviewCount} needs review
+                  </span>
+                )}
+              </div>
+
+              {hasCopyEntries && (
+                <div className="space-y-2">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Copy Review</p>
+                  <ClientCopyReview workspaceId={workspaceId} />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] uppercase font-semibold tracking-wider">Pipeline</p>
+                <ContentTab
+                  contentRequests={contentRequests}
+                  setContentRequests={setContentRequests}
+                  effectiveTier={effectiveTier}
+                  briefPrice={briefPrice}
+                  fullPostPrice={fullPostPrice}
+                  fmtPrice={fmtPrice}
+                  setPricingModal={setPricingModal}
+                  pricingConfirming={pricingConfirming}
+                  workspaceId={workspaceId}
+                  setToast={setToast}
+                  hidePrices={hidePrices}
+                />
+              </div>
+            </section>
+          )}
+
+          {/* ── Completed mode: history log ── */}
+          {mode === 'completed' && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
+                <ApprovalsTab
+                  workspaceId={workspaceId}
+                  approvalBatches={approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))}
+                  approvalsLoading={approvalsLoading}
+                  pendingApprovals={0}
+                  effectiveTier={effectiveTier}
+                  setApprovalBatches={setApprovalBatches}
+                  loadApprovals={loadApprovals}
+                  setToast={setToast}
+                  pageMap={pageMap}
+                />
+              </div>
+              {completedClientActions.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
+                  {completedClientActions.map(action => (
+                    <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
+                          {action.sourceType.replace(/_/g, ' ')}
+                        </span>
+                        <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
+                          action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
+                          action.status === 'changes_requested' ? 'bg-amber-500/15 text-accent-warning border-amber-500/30' :
+                          'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
+                        }`}>
+                          {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
+                        </span>
+                      </div>
+                      <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {completedClientActions.length === 0 && approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied')).length === 0 && (
+                <EmptyState
+                  icon={Check}
+                  title="No completed items yet"
+                  description="Resolved approvals, actions, and requests will appear here."
+                />
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Modals wired in Tasks 6 & 7 — state holders keep compile green */}
       {/* Schema Review Modal */}
       {schemaModalOpen && (
         <SchemaReviewModal
@@ -715,7 +940,52 @@ export function InboxTab({
           onClose={() => setSchemaModalOpen(false)}
         />
       )}
-      {/* Tier-3 Client Action Detail Modal */}
+      {/* DecisionDetailModal — trust-first full-screen approval for both client_actions and approval_batches */}
+      {openDecision && (() => {
+        const origAction = pendingClientActions.find(a => a.id === openDecision.sourceId);
+        const origBatch = approvalsForDecisions.find(b => b.id === openDecision.sourceId);
+        if (!origAction && !origBatch) return null;
+        const originalData = origAction
+          ? { type: 'client_action' as const, action: origAction }
+          : { type: 'approval_batch' as const, batch: origBatch! };
+        return (
+          <DecisionDetailModal
+            decision={openDecision}
+            originalData={originalData}
+            submitting={decisionSubmitting}
+            onDismiss={() => setOpenDecision(null)}
+            onApprove={async (flaggedItems: FlaggedItem[]) => {
+              setDecisionSubmitting(true);
+              try {
+                if (originalData.type === 'client_action') {
+                  const note = flaggedItems.length > 0
+                    ? flaggedItems.map(f => `${f.itemId}: ${f.note || 'flagged'}`).join('; ')
+                    : undefined;
+                  await respondToClientAction(originalData.action.id, 'approved', note);
+                } else {
+                  const clientNote = flaggedItems.length > 0
+                    ? `Flagged items: ${flaggedItems.map(f => `${f.itemId}: ${f.note || 'flagged'}`).join('; ')}`
+                    : undefined;
+                  await patch(`/api/public/approvals/${workspaceId}/${originalData.batch.id}/approve`, { clientNote });
+                  setApprovalBatches(prev => prev.map(b => b.id === originalData.batch.id
+                    ? { ...b, items: b.items.map(item => ({ ...item, status: 'approved' as const, clientNote })) }
+                    : b,
+                  ));
+                  queryClient.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
+                  setToast({ message: 'Approved. Your team will implement the changes.', type: 'success' });
+                }
+                setOpenDecision(null);
+              } catch {
+                setToast({ message: 'Failed to submit approval. Please try again.', type: 'error' });
+                throw new Error('approval failed');
+              } finally {
+                setDecisionSubmitting(false);
+              }
+            }}
+          />
+        );
+      })()}
+      {/* Tier-3 Client Action Detail Modal (old layout only) */}
       {detailAction && (
         <ClientActionDetailModal
           action={detailAction}

@@ -1,7 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail } from 'lucide-react';
+import { Controller, useForm, type SubmitHandler } from 'react-hook-form';
+import { z } from 'zod';
 import { post } from '../../api/client';
-import { Icon, Button } from '../ui';
+import { Icon, Button, FormField, FormInput } from '../ui';
 import type { WorkspaceInfo } from './types';
 
 export interface EmailCaptureGateProps {
@@ -11,34 +14,48 @@ export interface EmailCaptureGateProps {
   onSkip: () => void;
 }
 
+const emailCaptureSchema = z.object({
+  name: z.string().trim().max(120, 'Keep name under 120 characters').optional().or(z.literal('')),
+  email: z.string().trim().min(1, 'Email is required').email('Enter a valid email address'),
+});
+
+type EmailCaptureFormValues = z.infer<typeof emailCaptureSchema>;
+
 export function EmailCaptureGate({
   workspaceId,
   ws,
   onComplete,
   onSkip,
 }: EmailCaptureGateProps) {
-  const [captureName, setCaptureName] = useState('');
-  const [captureEmail, setCaptureEmail] = useState('');
-  const [captureSubmitting, setCaptureSubmitting] = useState(false);
+  const {
+    control,
+    handleSubmit,
+    formState: { errors, dirtyFields, touchedFields, isSubmitting, isValid },
+  } = useForm<EmailCaptureFormValues>({
+    resolver: zodResolver(emailCaptureSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      email: '',
+    },
+  });
 
-  const submitEmailCapture = useCallback(
-    async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      if (!captureEmail.trim() || captureSubmitting) return;
-      setCaptureSubmitting(true);
+  const submitEmailCapture: SubmitHandler<EmailCaptureFormValues> = useCallback(
+    async (values) => {
+      const email = values.email.trim();
+      const name = values.name?.trim();
       try {
         await post(`/api/public/capture-email/${workspaceId}`, {
-          email: captureEmail.trim(),
-          name: captureName.trim() || undefined,
+          email,
+          name: name || undefined,
         });
-        localStorage.setItem(`portal_email_${workspaceId}`, captureEmail.trim());
+        localStorage.setItem(`portal_email_${workspaceId}`, email);
       } catch (err) {
         console.error('EmailCaptureGate operation failed:', err);
       }
-      setCaptureSubmitting(false);
       onComplete();
     },
-    [captureEmail, captureName, captureSubmitting, workspaceId, onComplete]
+    [workspaceId, onComplete]
   );
 
   const handleSkip = () => {
@@ -64,31 +81,59 @@ export function EmailCaptureGate({
               Enter your email to receive performance reports and important updates about your site.
             </p>
           </div>
-          <form onSubmit={submitEmailCapture} className="space-y-3">
-            <input
-              type="text"
-              value={captureName}
-              onChange={(e) => setCaptureName(e.target.value)}
-              placeholder="Your name (optional)"
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
+          <form onSubmit={handleSubmit(submitEmailCapture)} className="space-y-3" noValidate>
+            <Controller
+              control={control}
+              name="name"
+              render={({ field }) => (
+                <FormField
+                  label="Your name"
+                  error={errors.name?.message}
+                  hint="Optional"
+                  valid={Boolean(dirtyFields.name && field.value && !errors.name)}
+                >
+                  <FormInput
+                    {...field}
+                    type="text"
+                    value={field.value ?? ''}
+                    placeholder="Your name"
+                    autoComplete="name"
+                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                  />
+                </FormField>
+              )}
             />
-            <input
-              type="email"
-              value={captureEmail}
-              onChange={(e) => setCaptureEmail(e.target.value)}
-              placeholder="Your email address"
-              required
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
-              autoFocus
+            <Controller
+              control={control}
+              name="email"
+              render={({ field }) => (
+                <FormField
+                  label="Email address"
+                  error={errors.email?.message}
+                  success="Email looks good"
+                  valid={Boolean(field.value && (dirtyFields.email || touchedFields.email) && !errors.email)}
+                  required
+                >
+                  <FormInput
+                    {...field}
+                    type="email"
+                    value={field.value}
+                    placeholder="Your email address"
+                    autoComplete="email"
+                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                    autoFocus
+                  />
+                </FormField>
+              )}
             />
             <Button
               type="submit"
               variant="primary"
-              disabled={captureSubmitting || !captureEmail.trim()}
-              loading={captureSubmitting}
+              disabled={isSubmitting || !isValid}
+              loading={isSubmitting}
               className="w-full"
             >
-              {captureSubmitting ? '' : 'Continue to Dashboard'}
+              {isSubmitting ? '' : 'Continue to Dashboard'}
             </Button>
             <button
               type="button"

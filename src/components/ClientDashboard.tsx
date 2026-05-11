@@ -27,7 +27,6 @@ import { SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
-import { FeedbackWidget } from './client/FeedbackWidget';
 import { PlansTab } from './client/PlansTab';
 import { ContentPlanTab } from './client/ContentPlanTab';
 import { StrategyTab } from './client/StrategyTab';
@@ -319,7 +318,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
   // API surface bubbled up from ClientChatWidget for cross-component usage
   const [chatApi, setChatApi] = useState<ClientChatWidgetApi | null>(null);
-  const [chatExpanded, setChatExpanded] = useState(false);
 
   // ── UI-only state ──
   const clientNavigate = useNavigate();
@@ -791,7 +789,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         workspaceId={workspaceId}
         ws={ws}
         onApiChange={api => setChatApi(api)}
-        onExpandedChange={expanded => setChatExpanded(expanded)}
       />
 
 
@@ -911,9 +908,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           workspaceId={workspaceId}
         />
       )}
-
-      {/* Beta Feedback Widget */}
-      {ws && <FeedbackWidget workspaceId={workspaceId} currentTab={tab} submittedBy={undefined} chatExpanded={chatExpanded} />}
 
       {/* Toast notification */}
       {/* z-index-ok — client toast must float above modal-backdrop but below cart */}

@@ -381,6 +381,7 @@ router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), 
       targetKeyword: w.targetKeyword,
       recommendation: `${w.actionType.replace(/_/g, ' ')} action`,
       delta: w.delta,
+      score: w.score,
       detectedAt: w.scoredAt,
     }));
     res.json(entries);

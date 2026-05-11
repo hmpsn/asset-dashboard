@@ -21,7 +21,7 @@ interface ClientActionRow {
 }
 
 const validStatuses: ClientActionStatus[] = ['pending', 'approved', 'changes_requested', 'completed', 'archived'];
-const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'keyword_strategy', 'redirect_proposal', 'content_decay'];
+const validSources: ClientActionSourceType[] = ['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay'];
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
@@ -94,7 +94,7 @@ const stmts = createStmtCache(() => ({
 function rowToAction(row: ClientActionRow): ClientAction {
   const sourceType = validSources.includes(row.source_type as ClientActionSourceType)
     ? row.source_type as ClientActionSourceType
-    : 'keyword_strategy';
+    : 'aeo_change';  // fallback for any legacy rows with retired source types
   const status = validStatuses.includes(row.status as ClientActionStatus)
     ? row.status as ClientActionStatus
     : 'pending';
@@ -123,6 +123,7 @@ export interface CreateClientActionInput {
   summary: string;
   payload?: ClientActionPayload;
   priority?: 'high' | 'medium' | 'low';
+  clientNote?: string;
 }
 
 export interface ClientActionDecisionSummary {
@@ -162,6 +163,7 @@ export function createClientAction(input: CreateClientActionInput): ClientAction
     payload: input.payload ?? {},
     status: 'pending',
     priority: input.priority ?? 'medium',
+    clientNote: input.clientNote,
     createdAt: now,
     updatedAt: now,
   };
@@ -175,7 +177,7 @@ export function createClientAction(input: CreateClientActionInput): ClientAction
     payload: JSON.stringify(action.payload),
     status: action.status,
     priority: action.priority,
-    client_note: null,
+    client_note: input.clientNote ?? null,
     created_at: now,
     updated_at: now,
   });

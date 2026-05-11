@@ -183,7 +183,11 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         clientNote: note.trim() || undefined,
         payload: {
           scannedAt: snapshotDate || data?.scannedAt,
-          rules: acceptedRules,
+          redirects: acceptedRules.map(r => ({
+            source: r.from,
+            target: r.to,
+            rationale: r.reason,
+          })),
           summary: data?.summary,
         },
       });
@@ -381,10 +385,12 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             <div className="px-4 py-3 border-b border-[var(--brand-border)]">
               <textarea
                 rows={2}
+                disabled={sendingToClient}
+                maxLength={2000}
                 placeholder="Add a note for your client (optional)"
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)]"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           )}

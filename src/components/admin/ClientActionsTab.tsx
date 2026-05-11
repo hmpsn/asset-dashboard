@@ -29,7 +29,6 @@ interface Props {
 const SOURCE_TYPE_LABELS: Record<ClientAction['sourceType'], string> = {
   aeo_change: 'AEO Change',
   internal_link: 'Internal Link',
-  keyword_strategy: 'Keyword Strategy',
   redirect_proposal: 'Redirect Proposal',
   content_decay: 'Content Decay',
 };

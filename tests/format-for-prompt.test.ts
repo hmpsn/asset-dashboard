@@ -101,10 +101,6 @@ function makeClientSignals(): ClientSignalsSlice {
     roi: { organicValue: 5000, growth: 12.5, period: 'monthly' },
     engagement: { lastLoginAt: '2026-03-30', loginFrequency: 'weekly', chatSessionCount: 15, portalUsage: null },
     compositeHealthScore: 75,
-    feedbackItems: [
-      { id: 'f1', type: 'feature_request', status: 'new', createdAt: '2026-03-28' },
-      { id: 'f2', type: 'bug_report', status: 'resolved', createdAt: '2026-03-25' },
-    ],
   };
 }
 
@@ -262,12 +258,6 @@ describe('formatForPrompt', () => {
     it('shows engagement at standard', () => {
       const output = formatForPrompt(makeFullIntelligence(), { verbosity: 'standard' });
       expect(output).toContain('weekly login frequency');
-    });
-
-    it('shows feedback items at detailed', () => {
-      const output = formatForPrompt(makeFullIntelligence(), { verbosity: 'detailed' });
-      expect(output).toContain('Feedback: 2 items');
-      expect(output).toContain('1 open');
     });
   });
 

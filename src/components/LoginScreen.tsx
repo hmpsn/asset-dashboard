@@ -1,25 +1,42 @@
-import { useState } from 'react';
-import { Icon } from './ui';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock } from 'lucide-react';
+import { Controller, useForm, type SubmitHandler } from 'react-hook-form';
+import { z } from 'zod';
+import { Icon, Button, FormField, FormInput } from './ui';
 
 interface Props {
   onLogin: (password: string) => Promise<boolean>;
 }
 
-export function LoginScreen({ onLogin }: Props) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
+const loginSchema = z.object({
+  password: z.string().min(1, 'Enter your password'),
+});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(false);
-    setLoading(true);
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+export function LoginScreen({ onLogin }: Props) {
+  const {
+    control,
+    handleSubmit,
+    resetField,
+    setError,
+    formState: { errors, isSubmitting, isValid },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    mode: 'onChange',
+    defaultValues: {
+      password: '',
+    },
+  });
+
+  const submitLogin: SubmitHandler<LoginFormValues> = async ({ password }) => {
     const ok = await onLogin(password);
-    setLoading(false);
     if (!ok) {
-      setError(true);
-      setPassword('');
+      resetField('password');
+      setError('password', {
+        type: 'manual',
+        message: 'Incorrect password',
+      });
     }
   };
 
@@ -31,28 +48,36 @@ export function LoginScreen({ onLogin }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)]">Asset Dashboard</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="relative">
-            <Icon as={Lock} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Enter password"
-              autoFocus
-              className={`w-full pl-10 pr-4 py-2.5 rounded-[var(--radius-lg)] text-sm outline-none bg-[var(--surface-2)] text-[var(--brand-text)] border ${error ? 'border-red-500' : 'border-[var(--brand-border-hover)]'}`}
-            />
-          </div>
-          {error && (
-            <p className="t-caption text-red-400/80">Incorrect password</p>
-          )}
-          <button
+        <form onSubmit={handleSubmit(submitLogin)} className="space-y-3" noValidate>
+          <Controller
+            control={control}
+            name="password"
+            render={({ field }) => (
+              <FormField label="Password" error={errors.password?.message} required>
+                <div className="relative">
+                  <Icon as={Lock} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
+                  <FormInput
+                    {...field}
+                    type="password"
+                    value={field.value}
+                    placeholder="Enter password"
+                    autoComplete="current-password"
+                    autoFocus
+                    className="pl-10 pr-4 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--brand-text)]"
+                  />
+                </div>
+              </FormField>
+            )}
+          />
+          <Button
             type="submit"
-            disabled={loading || !password}
-            className="w-full py-2.5 rounded-[var(--radius-lg)] text-sm font-medium transition-colors disabled:opacity-50 bg-teal-400 text-[var(--surface-1)]"
+            variant="primary"
+            disabled={isSubmitting || !isValid}
+            loading={isSubmitting}
+            className="w-full"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+            {isSubmitting ? 'Signing in...' : 'Sign in'}
+          </Button>
         </form>
       </div>
     </div>

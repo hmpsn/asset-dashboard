@@ -12,7 +12,7 @@ import { discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
-import { resolvePagePath } from '../helpers.js';
+import { resolvePagePath, decodeEntities } from '../helpers.js';
 import type { SeoIssue } from '../seo-audit.js';
 import { createLogger } from '../logger.js';
 
@@ -73,7 +73,7 @@ router.post('/api/aeo-review/:workspaceId/page', requireWorkspaceAccess('workspa
       }
     }
 
-    const pageTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || targetUrl;
+    const pageTitle = decodeEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || targetUrl);
     const review = await reviewPage(targetUrl, pageTitle, html, pageIssues, workspaceId);
 
     // Activity log
@@ -175,7 +175,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
         const htmlRes = await fetch(page.url, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
-          const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name;
+          const title = decodeEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name);
           const pageKey = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
           pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(pageKey) || [] });
         }

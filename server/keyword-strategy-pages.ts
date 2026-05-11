@@ -1,4 +1,4 @@
-import { resolvePagePath, stripHtmlToText } from './helpers.js';
+import { resolvePagePath, stripHtmlToText, decodeEntities } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { discoverSitemapUrls } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
@@ -224,7 +224,7 @@ async function fetchPageContent(
             }
             if (!wfMeta) {
               const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-              if (titleMatch) htmlTitle = titleMatch[1].trim();
+              if (titleMatch) htmlTitle = decodeEntities(titleMatch[1].trim());
               const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)
                 || html.match(/<meta\s+content=["']([^"']+)["']\s+name=["']description["']/i);
               if (descMatch) htmlMetaDesc = descMatch[1].trim();

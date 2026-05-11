@@ -489,6 +489,8 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 **Final warn→error promotion (2026-04-27):** Promoted 24 warn-level pr-check rules to error severity after verifying zero violations across the full codebase. Rule count: 96 → 96 (76 error, 20 warn). Remaining 20 warn rules all have active violations (range: 1–406 hits). Design-system backlogs: `Raw rounded-*` (406), `Arbitrary pixel text-size` (85), `Raw text-zinc-N` (84), `Raw bg-zinc-N` (35), `Inline asymmetric border-radius` (32), `Raw border-zinc-N` (24), `Trend icon import outside TrendBadge` (16), `Hand-rolled fixed inset-0` (9), `Page component missing PageHeader` (9), `Hand-rolled gradient CTA` (5), `Hardcoded card radius` (1).
 
+**Form validation standardization (2026-05-11):** React Hook Form + Zod resolver added as the standard client form stack. Shared form primitives now carry error-authoritative valid/success state through context: `aria-invalid`, `aria-describedby`, alert/status messages, red error borders, and emerald valid borders are all applied consistently by `FormField` + `FormInput`/`FormSelect`/`FormTextarea`. Admin `LoginScreen` and client `EmailCaptureGate` migrated from manual/basic HTML validation to Zod-backed forms with inline field-level errors, disabled-invalid submit buttons, loading states, trimmed submit values, and tests covering valid/error precedence plus both migrated flows.
+
 **Status:** Phases 0, 2, 3, A, B, C, D, follow-up sweep, and final promotion complete. Phase 1 (primitive implementation — superseded by Phase A) and Phase 4 (light-theme parity validation) remain. 20 warn-level rules remain with active violations for future cleanup passes.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
@@ -1233,7 +1235,6 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Skeleton/shimmer loading states~~: ✅ Shipped (March 2026) — `Skeleton.tsx` UI primitive with shimmer animation. Applied to client dashboard data loading across tabs. See Feature #83.
 - ~~Centralized number formatting~~: ✅ Shipped (March 2026) — Duplicate number formatting utilities consolidated into shared helpers. Eliminates inconsistent formatting across components.
 - ~~Mobile date picker~~: ✅ Shipped (March 2026) — Date picker popover made mobile-friendly with responsive positioning.
-- ~~Chat/FeedbackWidget mobile overlap fix~~: ✅ Shipped (March 2026) — Fixed z-index and positioning conflict between floating chat button and feedback widget on small screens.
 - ~~Frontend component decomposition~~: ✅ Shipped (March 2026) — 7 monolithic components decomposed into focused sub-modules (SeoAudit, ContentBriefs, SchemaSuggester, KeywordStrategy, AssetBrowser, WorkspaceSettings, WorkspaceHome). See Feature #83.
 - ~~Server route decomposition (webflow.ts)~~: ✅ Shipped (March 2026) — `webflow.ts` route split into 6 focused sub-routes. `seo-audit.ts` decomposed into `audit-page.ts` + `seo-audit-html.ts`. See Feature #63.
 - **WCAG AA compliance**: Full contrast ratio audit, focus indicators, keyboard navigation for all interactive elements.
@@ -5412,72 +5413,57 @@ Bug hardening included:
 
 ---
 
-### 398. Client Inbox Redesign — PriorityStrip & InboxTab Restructure (Phase 1–2)
-**What it does:** Complete redesign of the client Inbox tab across five phases on `feat/client-inbox-redesign`. Phase 1–2 delivered:
+### 398. Client Wins Surface (`client-wins-surface` flag)
+**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. Mutually exclusive with `PredictionShowcaseCard` ("We called it"): flag off → PredictionShowcaseCard remains on OverviewTab, WinsSurface hidden; flag on → WinsSurface shows, PredictionShowcaseCard hidden. Mutual-exclusivity invariant enforced by pr-check rule.
 
-- **`PriorityStrip`** (`src/components/client/PriorityStrip.tsx`) — urgency strip rendered at the top of `InboxTab`. Surfaces the single highest-priority item across all three inbox sections (SEO Changes, Actions, Needs Your Attention). Teal action CTA triggers the relevant modal or scroll target. Renders `null` when no items are pending.
-- **`InboxTab` restructure** — replaced the flat filter-chip list with three collapsible sections: SEO Changes, Actions, Needs Your Attention. Mode toggle (Active / Completed) at tab level. Four filter chips (All / SEO Changes / Needs Action / Content).
-- **`schema-review` standalone `ClientTab` retired** — schema plan card moved into InboxTab SEO Changes section. Stale `?tab=schema-review` URLs now redirect to `?tab=inbox`. `SchemaReviewTab.tsx` remains on disk but is route-orphaned. Public API endpoints unchanged.
-- **`ClientTab` type consolidated** — `src/routes.ts` is now the single source of truth for the `ClientTab` union (previously split between `routes.ts` and `src/components/client/types.ts`). `content-plan` added to the canonical union.
+**Agency value:** Closes the loop on recommendations — shows which tracked actions led to measurable outcomes, giving account managers proof points for client retention conversations.
 
-**Agency value:** Single inbox surface for all outstanding client work. Priority strip ensures the most urgent item is impossible to miss.
+**Client value:** Surfaces concrete wins ("We called it — your traffic grew 23%") in the client briefing page; Growth+ sees full win cards; Free tier sees a win-count teaser prompting upgrade.
 
-**Client value:** Clear three-section structure (what changed / what you need to do / what needs attention) replaces an undifferentiated list. Active/Completed toggle gives progress visibility.
+**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard enforced by pr-check rule `prediction-showcase-ungated`.
 
-**Mutual:** Schema plan reviews surface in context alongside other SEO changes — clients no longer miss the schema review tab.
+**Files:** `src/components/client/Briefing/WinsSurface.tsx`; `src/hooks/client/useClientOutcomeWins.ts`; `server/routes/public-portal.ts` (`GET /api/public/outcomes/:wsId/wins`); `shared/types/outcomes.ts` (score field); `tests/unit/wins-surface.test.tsx`; `tests/integration/outcome-wins.test.ts`.
 
-**Files:** `src/components/client/PriorityStrip.tsx` (new), `src/components/client/InboxTab.tsx` (restructured), `src/routes.ts` (`ClientTab` consolidated, `schema-review` removed, `content-plan` added), `src/components/client/types.ts` (ClientTab removed — now only in routes.ts), `src/components/ClientDashboard.tsx` (schema-review redirect + inbox wiring).
+**PR:** #663
 
----
+### 399. Client Inbox IA Redesign — 3-Section Layout (`new-inbox-ia` flag)
+**What it does:** Restructures InboxTab into three named sections (Decisions / Reviews / Conversations) behind the `new-inbox-ia` feature flag. Decisions = schema changes and action cards requiring approval without note. Reviews = briefs and posts requiring editorial review. Conversations = client requests and action cards where client left a note. Legacy `?tab=` URL params remain supported via `LEGACY_FILTER_MAP` (`CLIENT_INBOX_ALIASES` in `shared/types/routes.ts`). The old single-list layout renders when flag is off. SchemaReviewModal and ClientActionDetailModal are exposed within this layout.
 
-### 399. Client Inbox Redesign — SchemaReviewModal (Phase 3)
-**What it does:** Full-screen WAI-ARIA dialog (`SchemaReviewModal`) wrapping the existing `SchemaReviewTab` component, opened when the client clicks the schema plan card in InboxTab's SEO Changes section.
+**Agency value:** Clearer signal routing — each inbox section maps to a distinct client workflow, reducing context-switching in account management.
 
-- Shell: `fixed inset-0 z-[var(--z-modal-fullscreen)]` (new token, value `55` — between `--z-modal: 50` and `--z-toast: 60`). Backdrop `bg-black/80 backdrop-blur-sm`. Panel slides up from bottom or fills viewport.
-- WAI-ARIA: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing to `<h2>` title. Close button receives `autoFocus`. Escape key handler dismisses.
-- **`--z-modal-fullscreen: 55` token** added to `src/tokens.css` for all full-screen takeover modals.
+**Client value:** Simplified navigation — clients see three clear buckets instead of a mixed action queue; section headers communicate what kind of response is expected.
 
-**Agency value:** Schema review no longer requires navigating away from the Inbox — clients approve or request changes without losing their place.
+**Mutual:** LEGACY_FILTER_MAP provides backward-compat for bookmarked URLs; pr-check rule `inbox-action-queue-strip` prevents ActionQueueStrip from re-entering InboxTab.
 
-**Client value:** Full-screen immersive review experience with no context switching.
+**Files:** `src/components/client/InboxTab.tsx`; `shared/types/client-inbox.ts`; `shared/types/routes.ts` (InboxFilter type, CLIENT_INBOX_ALIASES); `tests/unit/inbox-filter-values.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`.
 
-**Files:** `src/components/client/SchemaReviewModal.tsx` (new), `src/components/client/InboxTab.tsx` (open modal on schema card click), `src/tokens.css` (`--z-modal-fullscreen: 55` added).
+**PR:** #662
 
----
+### 400. SchemaReviewModal
+**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management.
 
-### 400. Client Inbox Redesign — ClientActionDetailModal (Phase 4)
-**What it does:** Full-screen WAI-ARIA dialog (`ClientActionDetailModal`) for Tier-3 client action cards. Opened from InboxTab's Actions section when a client clicks a rich action card. Four typed payload renderers:
+**Agency value:** Schema review is now embedded in the client inbox workflow instead of a separate nav tab, reducing client confusion about where to find schema feedback.
 
-- **`internal_link`** — HTML table with anchor text / target URL / source page / context columns. `safeHref()` helper validates URLs before rendering `<a>` tags (XSS-safe).
-- **`redirect_proposal`** — source→target pairs with redirect type (301/302) and rationale.
-- **`keyword_strategy`** — mapped pages table, quick wins list, content gaps list, opportunities list.
-- **`aeo_change`** — current vs. proposed side-by-side diff per page.
-- **`default`** — raw JSON fallback for unknown payload types.
+**Client value:** Schema review opens in context without leaving the inbox; Escape key dismissal is intuitive.
 
-Shell follows the same pattern as `SchemaReviewModal`: `fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-labelledby`, `autoFocus` on close, Escape key dismiss. `respondToClientAction` re-throws on error (retry-safe modal pattern — modal stays open on failure so the client can try again).
+**Mutual:** SchemaReviewTab component is reused (not duplicated); route cleanup removes a stale client navigation entry.
 
-**Agency value:** Clients can review full action details — link tables, redirect mappings, keyword strategy — without leaving the Inbox.
+**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed).
 
-**Client value:** Rich structured detail view replaces truncated card previews. Approve or request changes on any action type from within the modal.
+**PR:** #662
 
-**Files:** `src/components/client/ClientActionDetailModal.tsx` (new, four typed renderers + `safeHref()`), `src/components/client/InboxTab.tsx` (open modal on action card click), `src/api/content.ts` (`respondToClientAction` re-throw added).
+### 401. ClientActionDetailModal
+**What it does:** Tier-3 full-screen modal for action cards with complex payloads — `internal_link`, `redirect_proposal`, and `aeo_change` source types. Renders a payload-specific review UI (table for link suggestions, before/after diff for redirects/AEO). Approve or Request Changes (with note field) directly from the modal. `content_decay` actions remain Tier 1 (inline approve/reject on the card — no modal needed).
 
----
+**Agency value:** Complex structured-data action reviews now have a dedicated reading surface instead of cramped inline cards.
 
-### 401. Client Inbox Redesign — `inbox-legacy-filter-literal` pr-check Rule (Phase 5)
-**What it does:** New pr-check rule (`inbox-legacy-filter-literal`) in `scripts/pr-check.ts` that prevents re-introduction of legacy inbox filter string literals after the Phase 1–2 filter rename. Catches `?tab=approvals`, `?tab=requests`, `?tab=content-plan`, and `?tab=copy` anywhere in `src/` and `server/`. Escape hatch: `// inbox-legacy-filter-literal-ok`.
+**Client value:** Internal link batches, redirect proposals, and AEO changes are presented in full-width tables/diffs that are readable without horizontal scrolling.
 
-Filter rename mapping:
-- `approvals` → `seo-changes`
-- `requests` → `needs-action`
-- `content-plan` → `needs-action`
-- `copy` → `content`
+**Mutual:** URL safety guard blocks `javascript:` and `data:` schemes in rendered anchor tags; payload renderer tree is exhaustive over all Tier-3 source types.
 
-**Agency value:** Prevents the silent regression where a future component navigates to a retired filter value — client lands on the default tab instead of the intended section.
+**Files:** `src/components/client/ClientActionDetailModal.tsx`; `src/components/client/InboxTab.tsx`; `shared/types/client-actions.ts`.
 
-**Mutual:** Mechanizes the rename contract so it survives future contributors who weren't part of the redesign.
-
-**Files:** `scripts/pr-check.ts` (new `inbox-legacy-filter-literal` check with customCheck logic).
+**PR:** #662
 
 ---
 

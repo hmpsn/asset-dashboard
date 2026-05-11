@@ -31,12 +31,14 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
     { options, value, onChange, placeholder, disabled, className, id, ...rest },
     ref
   ) {
-    const { hasError, inputId, descriptionId } = useFormField();
+    const { hasError, isValid, inputId, descriptionId } = useFormField();
     const resolvedId = id ?? (inputId || undefined);
 
     const borderClass = hasError
       ? 'border-red-500/50'
-      : 'border-zinc-700 focus:border-[var(--brand-mint)]';
+      : isValid
+        ? 'border-emerald-500/50'
+      : 'border-[var(--brand-border)] focus:border-[var(--brand-mint)]';
 
     return (
       <select
@@ -49,10 +51,10 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
         aria-describedby={descriptionId || undefined}
         className={cn(
           'w-full px-3 py-2',
-          'bg-zinc-900 rounded-md',
+          'bg-[var(--surface-3)] rounded-md',
           'border',
           borderClass,
-          'text-zinc-200 text-sm',
+          'text-[var(--brand-text-bright)] text-sm',
           'outline-none',
           'focus:ring-2 focus:ring-[var(--brand-mint-glow)]',
           'transition-colors duration-150',

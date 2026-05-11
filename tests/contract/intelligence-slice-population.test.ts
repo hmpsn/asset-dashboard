@@ -210,9 +210,6 @@ vi.mock('../../server/roi.js', () => ({
   computeROI: vi.fn(() => null),
 }));
 
-vi.mock('../../server/feedback.js', () => ({
-  listFeedback: vi.fn(() => []),
-}));
 
 vi.mock('../../server/requests.js', () => ({
   listRequests: vi.fn(() => []),
@@ -232,9 +229,9 @@ vi.mock('../../server/client-actions.js', () => ({
     completed: 1,
     recentDecisions: [
       {
-        title: 'Keyword strategy',
+        title: 'AEO change review',
         status: 'approved',
-        sourceType: 'keyword_strategy',
+        sourceType: 'aeo_change',
         updatedAt: '2026-05-01T12:00:00Z',
       },
       {
@@ -829,11 +826,6 @@ describe('contract: ClientSignalsSlice field population', () => {
       expect(result.compositeHealthScore === null || typeof result.compositeHealthScore === 'number').toBe(true);
     }
 
-    // feedbackItems — assembler always sets this
-    if (result.feedbackItems !== undefined) {
-      expect(Array.isArray(result.feedbackItems)).toBe(true);
-    }
-
     // serviceRequests — assembler always sets this
     if (result.serviceRequests !== undefined) {
       expect(typeof result.serviceRequests.pending).toBe('number');
@@ -856,13 +848,12 @@ describe('contract: ClientSignalsSlice field population', () => {
     }
   });
 
-  it('assembler always populates churnSignals, engagement, feedbackItems, serviceRequests, clientActions', async () => {
+  it('assembler always populates churnSignals, engagement, serviceRequests, clientActions', async () => {
     const result = await getSlice<ClientSignalsSlice>('clientSignals');
 
     // These are always set in the assembler's return statement
     expect(result.churnSignals).toBeDefined();
     expect(result.engagement).toBeDefined();
-    expect(result.feedbackItems).toBeDefined();
     expect(result.serviceRequests).toBeDefined();
     expect(result.clientActions).toBeDefined();
   });

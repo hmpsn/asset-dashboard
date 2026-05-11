@@ -146,8 +146,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Label** | `ui/typography/Label.tsx` | Inherits muted text; uppercase DIN Pro via `.t-label` | Phase 5. Form labels, uppercase section markers. forwardRef. |
 | **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
 | **Icon** | `ui/Icon.tsx` | Inherits `currentColor`; consumer supplies hue via `className` (e.g. `text-teal-400`). Inner SVG `aria-hidden="true"` by default — pass `aria-label` for semantic icons. | Phase 5. Wraps any Lucide component. Strict size enum: `xs\|sm\|md\|lg\|xl\|2xl` (8/12/16/20/24/32px). Inline-flex `<span>` wrapper so it is safe inside `<p>`, `<li>`, flex rows. forwardRef. |
-| **FormField** | `ui/forms/FormField.tsx` | Label text: `text-zinc-300`; error message: `text-red-400`; hint: `text-zinc-500`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. forwardRef. |
-| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Default border: `border-zinc-700`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Placeholder: `text-zinc-500`. | Phase 5. Dark-theme inputs, mint focus ring. Consume error state + id from FormFieldContext. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
+| **FormField** | `ui/forms/FormField.tsx` | Label text: `text-[var(--brand-text-bright)]`; error message: `text-red-400`; success message: `text-emerald-400`; hint: `text-[var(--brand-text-muted)]`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/success/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. Errors are authoritative over valid state. forwardRef. |
+| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Surface: `bg-[var(--surface-3)]`; default border: `border-[var(--brand-border)]`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Valid border: `border-emerald-500/50`. Placeholder: `text-[var(--brand-text-muted)]`. | Phase 5. Tokenized theme-aware inputs, mint focus ring. Consume error/valid state + id from FormFieldContext and wire `aria-invalid` / `aria-describedby`. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
 | **Checkbox** | `ui/forms/Checkbox.tsx` | Checked: `bg-[var(--brand-mint)] border-[var(--brand-mint)]` (Law 01). Unchecked: `bg-zinc-800 border-zinc-700`. Check icon: `text-zinc-900`. | Phase 5. Custom visual checkbox over hidden native input (preserves Space-key + a11y). Required `label` string. forwardRef to input. |
 | **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
 | **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Sizes preserve hierarchy: `.t-caption-sm` / `.t-caption` / `.t-body`. Spinner replaces icon while `loading`. `link` variant skips size padding. |
@@ -243,6 +243,21 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+
+#### Client Inbox IA — 3-Section Layout (`new-inbox-ia` flag)
+
+When the `new-inbox-ia` feature flag is on, InboxTab renders three named sections. Section headers use existing design system patterns — no new color families introduced.
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **Section header** ("Decisions", "Reviews", "Conversations") | `t-label text-[var(--brand-text-muted)] tracking-wider uppercase` | Muted label — structural chrome, not a CTA |
+| **Section header divider** | `border-b border-[var(--brand-border)]` | Standard border token |
+| **Approve CTA** (within action cards) | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
+| **Request Changes CTA** | `bg-amber-600/20 border-amber-500/30 text-amber-300 hover:bg-amber-600/30` | Amber = needs attention |
+| **SchemaReviewModal / ClientActionDetailModal** backdrop | `bg-[var(--brand-overlay)]` | Token-only — no raw `bg-black/X` |
+| Modal close ("✕") | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` | Standard muted-to-default step |
+
+**Flag-off:** Legacy single-list InboxTab renders unchanged. No color changes in the flag-off path.
 
 ##### Phase 2.5b — investor-briefing reading rhythm
 

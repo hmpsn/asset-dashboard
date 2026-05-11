@@ -3,8 +3,7 @@
  * ClientActionDetailModal — Tier-3 full-screen modal for client action cards
  * that have complex payloads requiring full-width review before deciding.
  *
- * Source types with modals: internal_link, redirect_proposal,
- * keyword_strategy, aeo_change.
+ * Source types with modals: internal_link, redirect_proposal, aeo_change.
  * (content_decay is Tier 1 — inline approve/reject in the action card.)
  */
 import { useState, useEffect } from 'react';
@@ -16,7 +15,6 @@ import type {
   InternalLinkItem,
   RedirectProposalPayload,
   RedirectItem,
-  KeywordStrategyPayload,
   AeoChangePayload,
   AeoChangeDiff,
 } from '../../../shared/types/client-actions';
@@ -123,91 +121,6 @@ function RedirectProposalRenderer({ payload }: { payload: RedirectProposalPayloa
   );
 }
 
-function KeywordStrategyRenderer({ payload }: { payload: KeywordStrategyPayload }) {
-  if (!payload) {
-    return <p className="t-body text-[var(--brand-text-muted)]">No strategy data available.</p>;
-  }
-  const { mappedPages = [], quickWins = [], contentGaps = [], opportunities = [] } = payload;
-  return (
-    <div className="space-y-6">
-      {mappedPages.length > 0 && (
-        <section>
-          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Mapped Pages</h3>
-          <div className="rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
-            <table className="w-full t-caption text-[var(--brand-text)]">
-              <thead className="bg-[var(--surface-3)] border-b border-[var(--brand-border)]">
-                <tr>
-                  <th className="text-left px-4 py-2 text-[var(--brand-text-muted)] font-medium">Page</th>
-                  <th className="text-left px-4 py-2 text-[var(--brand-text-muted)] font-medium">Keyword</th>
-                  <th className="text-right px-4 py-2 text-[var(--brand-text-muted)] font-medium">Position</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mappedPages.map((mp, i) => (
-                  <tr key={i} className="border-b border-[var(--brand-border)] last:border-b-0 bg-[var(--surface-2)]">
-                    <td className="px-4 py-2 text-[var(--brand-text)] break-all">{mp.page}</td>
-                    <td className="px-4 py-2 text-[var(--brand-text-bright)]">{mp.keyword}</td>
-                    <td className="px-4 py-2 text-right text-[var(--brand-text-muted)]">
-                      {mp.currentPosition != null ? `#${mp.currentPosition}` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-      {quickWins.length > 0 && (
-        <section>
-          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Quick Wins</h3>
-          <div className="space-y-2">
-            {quickWins.map((qw, i) => (
-              <div key={i} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-3">
-                <span className="t-body font-medium text-[var(--brand-text-bright)]">{qw.keyword}</span>
-                {qw.opportunity && (
-                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{qw.opportunity}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      {contentGaps.length > 0 && (
-        <section>
-          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Content Gaps</h3>
-          <ul className="space-y-1.5">
-            {contentGaps.map((gap, i) => (
-              <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-[50%] bg-amber-400 flex-shrink-0" />
-                {gap}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {opportunities.length > 0 && (
-        <section>
-          <h3 className="t-ui font-semibold text-[var(--brand-text)] mb-3">Opportunities</h3>
-          <ul className="space-y-1.5">
-            {opportunities.map((opp, i) => (
-              <li key={i} className="flex items-start gap-2 t-body text-[var(--brand-text)]">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-[50%] bg-teal-400 flex-shrink-0" />
-                {opp}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {!mappedPages.length && !quickWins.length && !contentGaps.length && !opportunities.length && (
-        <div className="flex items-center gap-2 text-[var(--brand-text-muted)]">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span className="t-body">No keyword strategy data found in this action.</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AeoChangeRenderer({ payload }: { payload: AeoChangePayload }) {
   const { diffs } = payload;
   if (!diffs?.length) {
@@ -281,8 +194,6 @@ export function ClientActionDetailModal({
         return <InternalLinkRenderer payload={p as unknown as InternalLinkPayload} />;
       case 'redirect_proposal':
         return <RedirectProposalRenderer payload={p as unknown as RedirectProposalPayload} />;
-      case 'keyword_strategy':
-        return <KeywordStrategyRenderer payload={p as unknown as KeywordStrategyPayload} />;
       case 'aeo_change':
         return <AeoChangeRenderer payload={p as unknown as AeoChangePayload} />;
       default:

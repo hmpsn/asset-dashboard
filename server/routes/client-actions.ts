@@ -20,7 +20,7 @@ import { InvalidTransitionError } from '../state-machines.js';
 
 const router = Router();
 
-const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'keyword_strategy', 'redirect_proposal', 'content_decay']);
+const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay']);
 const statusSchema = z.enum(['pending', 'approved', 'changes_requested', 'completed', 'archived']);
 
 const createActionSchema = z.object({
@@ -30,6 +30,7 @@ const createActionSchema = z.object({
   summary: z.string().min(1).max(3000),
   payload: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['high', 'medium', 'low']).optional(),
+  clientNote: z.string().max(2000).optional(),
 }).strict();
 
 const adminUpdateSchema = z.object({

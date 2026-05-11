@@ -9,6 +9,7 @@
  * - GET /api/public/approvals/:workspaceId (public list)
  * - GET /api/public/approvals/:workspaceId/:batchId (public get)
  * - PATCH /api/public/approvals/:workspaceId/:batchId/:itemId (client review)
+ * - PATCH /api/public/approvals/:workspaceId/:batchId/approve (bulk trust-first approve)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -417,5 +418,111 @@ describe('Approvals — CRUD', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+  });
+});
+
+describe('Approvals — bulk trust-first approve', () => {
+  let bulkBatchId = '';
+  let bulkItem1Id = '';
+  let bulkItem2Id = '';
+
+  beforeAll(async () => {
+    const res = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: 'Bulk Approve Batch',
+      items: [
+        {
+          pageId: 'bulk_page_1',
+          pageSlug: '/bulk-1',
+          pageTitle: 'Bulk Page 1',
+          field: 'seoTitle',
+          currentValue: 'Old Title 1',
+          proposedValue: 'New SEO Title 1',
+        },
+        {
+          pageId: 'bulk_page_2',
+          pageSlug: '/bulk-2',
+          pageTitle: 'Bulk Page 2',
+          field: 'seoDescription',
+          currentValue: 'Old description 2',
+          proposedValue: 'New meta description 2',
+        },
+      ],
+    });
+    const body = await res.json();
+    bulkBatchId = body.id;
+    bulkItem1Id = body.items[0].id;
+    bulkItem2Id = body.items[1].id;
+  });
+
+  afterAll(() => {
+    db.prepare('DELETE FROM approval_batches WHERE id = ?').run(bulkBatchId);
+  });
+
+  it('returns 404 for a non-existent batch', async () => {
+    const res = await patchJson(
+      `/api/public/approvals/${testWsId}/batch_missing/approve`,
+      {},
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 if clientNote exceeds 2000 chars', async () => {
+    const res = await patchJson(
+      `/api/public/approvals/${testWsId}/${bulkBatchId}/approve`,
+      { clientNote: 'x'.repeat(2001) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('approves all pending items and stamps clientNote when provided', async () => {
+    const res = await patchJson(
+      `/api/public/approvals/${testWsId}/${bulkBatchId}/approve`,
+      { clientNote: 'Flagged: bulk_page_1: please double-check' },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const item1 = body.items.find((i: { id: string }) => i.id === bulkItem1Id);
+    const item2 = body.items.find((i: { id: string }) => i.id === bulkItem2Id);
+    expect(item1.status).toBe('approved');
+    expect(item2.status).toBe('approved');
+    expect(item1.clientNote).toBe('Flagged: bulk_page_1: please double-check');
+    expect(item2.clientNote).toBe('Flagged: bulk_page_1: please double-check');
+  });
+
+  it('returns 400 when called again with no pending items remaining', async () => {
+    const res = await patchJson(
+      `/api/public/approvals/${testWsId}/${bulkBatchId}/approve`,
+      {},
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/no pending/i);
+  });
+
+  it('does not approve a batch through the wrong workspace', async () => {
+    const createRes = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: 'Cross-Workspace Batch',
+      items: [{
+        pageId: 'cross_page_1', pageSlug: '/cross-1', pageTitle: 'Cross Page 1',
+        field: 'seoTitle', currentValue: 'Old', proposedValue: 'New',
+      }],
+    });
+    const created = await createRes.json();
+    const crossBatchId = created.id;
+
+    const crossRes = await patchJson(
+      `/api/public/approvals/${otherWsId}/${crossBatchId}/approve`,
+      {},
+    );
+    expect(crossRes.status).toBe(404);
+
+    // Verify item still pending
+    const ownerRes = await api(`/api/approvals/${testWsId}/${crossBatchId}`);
+    const ownerBatch = await ownerRes.json();
+    expect(ownerBatch.items[0].status).toBe('pending');
+
+    db.prepare('DELETE FROM approval_batches WHERE id = ?').run(crossBatchId);
   });
 });

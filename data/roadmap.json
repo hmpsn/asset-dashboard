@@ -66,8 +66,9 @@
           "source": "UI_UX_AUDIT §9",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Replace basic HTML validation with consistent form library. Inline field-level validation with clear errors. aria-invalid + aria-describedby support. Success states for valid fields.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-11: added React Hook Form + @hookform/resolvers as the standard client form stack; extended shared FormField/FormInput/FormSelect/FormTextarea primitives with error-authoritative valid/success state, emerald valid borders, aria-invalid, aria-describedby, alert/status messages; migrated LoginScreen and EmailCaptureGate from basic/manual validation to Zod-backed forms with inline field errors, disabled-invalid submits, loading states, and trimmed submit values. Focused tests cover primitive valid/error precedence, client email validation/submission, and admin login behavior. Remaining form migrations should be tracked as specific follow-up component items rather than this broad standardization item.",
+          "status": "done",
+          "shippedAt": "2026-05-11"
         },
         {
           "id": 518,
@@ -3791,60 +3792,57 @@
       ]
     },
     {
-      "id": "sprint-client-inbox-redesign",
-      "name": "✅ SHIPPED — Client Inbox Redesign",
-      "hours": "16-24",
-      "rationale": "Five-phase redesign of the client Inbox tab: PriorityStrip urgency surfacing, 3-section layout (SEO Changes / Actions / Needs Your Attention), full-screen modals for schema and action detail review, and a pr-check guard to lock in the filter rename.",
+      "id": "sprint-may-2026",
+      "name": "✅ SHIPPED — May 2026",
+      "rationale": "Client Inbox IA Redesign (Phase 1 + Phase 2) — feedback retirement, shared type contracts, admin send convention standardization, 3-section inbox layout, wins surface, and prevention rules.",
       "items": [
         {
-          "id": "client-inbox-phase1-priority-strip",
-          "title": "InboxTab Phase 1 — PriorityStrip urgency component",
-          "source": "feat/client-inbox-redesign",
-          "est": "3-4h",
-          "priority": "P1",
+          "id": "may-2026-feedback-retirement",
+          "name": "Feedback Module Retirement",
           "status": "done",
-          "createdAt": "2026-05-06",
-          "notes": "Shipped. PriorityStrip component surfaces highest-priority item across all inbox sections. Teal action CTA. Renders null when nothing is pending."
+          "notes": "Shipped — PR #658 (feat/feedback-retirement). Removed FeedbackWidget from InboxTab and all import chains; retired /api/feedback routes; pr-check rule prevents reintroduction."
         },
         {
-          "id": "client-inbox-phase2-restructure",
-          "title": "InboxTab Phase 2 — 3-section restructure + schema-review tab retirement",
-          "source": "feat/client-inbox-redesign",
-          "est": "4-6h",
-          "priority": "P1",
+          "id": "may-2026-keyword-strategy-deprecation",
+          "name": "keyword_strategy Action Type Deprecation",
           "status": "done",
-          "createdAt": "2026-05-06",
-          "notes": "Shipped. InboxTab restructured into SEO Changes / Actions / Needs Your Attention with Active/Completed mode toggle and 4 filter chips. schema-review standalone ClientTab retired — content moves to Inbox SEO Changes section. ClientTab type consolidated to routes.ts as single source of truth. content-plan added to canonical ClientTab union."
+          "notes": "Shipped — PR #659 (feat/keyword-strategy-deprecation). Existing keyword_strategy client_actions archived; new creation blocked via pr-check rule."
         },
         {
-          "id": "client-inbox-phase3-schema-review-modal",
-          "title": "InboxTab Phase 3 — SchemaReviewModal full-screen dialog",
-          "source": "feat/client-inbox-redesign",
-          "est": "2-3h",
-          "priority": "P1",
+          "id": "may-2026-shared-contracts",
+          "name": "Client Inbox IA — Shared Type Contracts",
           "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Shipped. SchemaReviewModal: fixed inset-0 full-screen WAI-ARIA dialog wrapping SchemaReviewTab. New --z-modal-fullscreen: 55 token in tokens.css (between --z-modal: 50 and --z-toast: 60). autoFocus on close button, Escape key handler, aria-labelledby."
+          "notes": "Shipped — PR #660 (feat/shared-contracts). InboxFilter type, ClientAction/ClientActionSourceType/ClientActionTier types, CLIENT_INBOX_ALIASES in routes.ts, shared-contracts test."
         },
         {
-          "id": "client-inbox-phase4-action-detail-modal",
-          "title": "InboxTab Phase 4 — ClientActionDetailModal with typed payload renderers",
-          "source": "feat/client-inbox-redesign",
-          "est": "4-6h",
-          "priority": "P1",
+          "id": "may-2026-admin-send-convention",
+          "name": "Admin Send Convention Standardization",
           "status": "done",
-          "createdAt": "2026-05-07",
-          "notes": "Shipped. ClientActionDetailModal: full-screen WAI-ARIA dialog for Tier-3 client action cards. Four typed payload renderers: internal_link (HTML table + safeHref()), redirect_proposal (source→target pairs), keyword_strategy (mapped pages + quick wins + content gaps), aeo_change (current vs proposed diff). Default JSON fallback. respondToClientAction re-throws on error for retry-safe UX."
+          "notes": "Shipped — PR #661 (feat/admin-send-convention). 'Send for Review' and 'Flag for Client' labels replaced with canonical 'Send' pattern; pr-check rule enforces no recurrence; ui-vocabulary.md updated."
         },
         {
-          "id": "client-inbox-phase5-pr-check-rule",
-          "title": "InboxTab Phase 5 — inbox-legacy-filter-literal pr-check rule",
-          "source": "feat/client-inbox-redesign",
-          "est": "1-2h",
-          "priority": "P1",
+          "id": "may-2026-inbox-ia-restructure",
+          "name": "Client Inbox IA Redesign — 3-Section Layout",
           "status": "done",
-          "createdAt": "2026-05-08",
-          "notes": "Shipped. New pr-check rule prevents re-introduction of legacy filter literals (approvals, requests, content-plan, copy) after the Phase 1-2 rename. Escape hatch: // inbox-legacy-filter-literal-ok."
+          "notes": "Shipped — PR #662 (feat/inbox-ia-restructure). InboxTab 3-section layout (Decisions/Reviews/Conversations) behind new-inbox-ia flag; SchemaReviewModal; ClientActionDetailModal; LEGACY_FILTER_MAP backward-compat."
+        },
+        {
+          "id": "may-2026-client-wins-surface",
+          "name": "Client Wins Surface",
+          "status": "done",
+          "notes": "Shipped — PR #663 (feat/client-wins-surface). WinsSurface in InsightsBriefingPage behind client-wins-surface flag; GET /api/public/outcomes/:wsId/wins endpoint; mutual-exclusivity with PredictionShowcaseCard enforced by pr-check."
+        },
+        {
+          "id": "may-2026-ia-prevention-rules",
+          "name": "IA Redesign Prevention Rules",
+          "status": "done",
+          "notes": "Shipped — PR #664 (feat/ia-prevention-rules). 5 new pr-check rules: feedback-module-reintroduction, keyword-strategy-action-type, send-for-review-anti-pattern, prediction-showcase-ungated, inbox-action-queue-strip. docs/rules/inbox-section-routing.md added."
+        },
+        {
+          "id": "may-2026-action-queue-strip-phase2b",
+          "name": "ActionQueueStrip Phase 2B — Final InboxFilter Values",
+          "status": "done",
+          "notes": "Shipped — PR #665 (feat/action-queue-strip-final-values). Chip section values updated from intermediate names (seo-changes/content/needs-action) to final InboxFilter values (decisions/reviews). LEGACY_FILTER_MAP trimmed to 5 URL alias entries."
         },
         {
           "id": "client-inbox-phase35-action-playbooks-resolution",
