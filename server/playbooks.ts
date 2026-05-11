@@ -59,6 +59,7 @@ async function executeContentDecayPlaybook(
       referenceUrls: payload?.pageUrl ? [payload.pageUrl as string] : undefined,
     });
 
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', workspaceId });
     updateJob(jobId, { status: 'done', progress: 100, message: 'Content brief created' });
 
     // Transition the action to completed now that the brief exists.
@@ -70,5 +71,6 @@ async function executeContentDecayPlaybook(
   } catch (err) {
     updateJob(jobId, { status: 'error', error: String(err), message: 'Brief generation failed' });
     log.error({ err, workspaceId, actionId, jobId }, 'content_decay playbook error');
+    throw err; // allow outer .catch() to serve as the final safety net
   }
 }
