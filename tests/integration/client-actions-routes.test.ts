@@ -367,6 +367,35 @@ describe('client action routes', () => {
     expect(after?.updatedAt).toBe(before?.updatedAt);
   });
 
+  it('stores and returns enriched AeoChangeDiff fields (rationale, effort, priority) round-trip', async () => {
+    const diff = {
+      page: '/about',
+      section: 'What we do',
+      current: 'We build websites',
+      proposed: 'We build growth-focused websites that convert',
+      rationale: 'The proposed copy is more specific and outcome-oriented.',
+      effort: 'low' as const,
+      priority: 'high' as const,
+    };
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'aeo_change',
+      sourceId: `aeo:/about:enriched-diff-test`,
+      title: 'AEO recommendations for /about',
+      summary: 'Review enriched AEO diff fields.',
+      payload: { diffs: [diff] },
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json() as ClientAction;
+
+    const stored = (await listActions(wsId)).find(action => action.id === created.id);
+    expect(stored).toBeDefined();
+    const storedDiff = (stored?.payload as { diffs: typeof diff[] })?.diffs?.[0];
+    expect(storedDiff).toMatchObject(diff);
+    expect(storedDiff?.rationale).toBe('The proposed copy is more specific and outcome-oriented.');
+    expect(storedDiff?.effort).toBe('low');
+    expect(storedDiff?.priority).toBe('high');
+  });
+
   it('requires client auth for password-protected public action reads', async () => {
     const res = await api(`/api/public/client-actions/${privateWsId}`);
     expect(res.status).toBe(401);
