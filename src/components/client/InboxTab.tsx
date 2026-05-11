@@ -124,8 +124,8 @@ export function InboxTab({
   const [filter, setFilter] = useState<InboxFilter>(() => {
     const param = searchParams.get('tab');
     if (isInboxFilter(param)) {
-      // When betaMode is active, Reviews section is unavailable — coerce to default
-      if (param === 'reviews' && betaMode) return initialFilter ?? 'decisions';
+      // When betaMode is active, Conversations section is unavailable — coerce to default
+      if (param === 'conversations' && betaMode) return initialFilter ?? 'decisions';
       return param;
     }
     if (param && LEGACY_FILTER_MAP[param]) return LEGACY_FILTER_MAP[param];
