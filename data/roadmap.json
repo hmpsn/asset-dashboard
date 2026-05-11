@@ -816,6 +816,52 @@
       ]
     },
     {
+      "id": "sprint-client-inbox-ia-phase3-deferred",
+      "items": [
+        {
+          "id": "client-inbox-phase31-schema-admin-consolidation",
+          "title": "InboxTab Phase 3.1 — Schema admin consolidation (retire standalone client schema route)",
+          "source": "Session 2026-05-11 — Phase 3 planning",
+          "est": "3-4h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-11",
+          "notes": "SchemaReviewModal now exists in the Decisions section. The standalone client-facing schema approval route (if any) should be retired or redirected. Audit all entry points to the schema review flow and consolidate to the modal path."
+        },
+        {
+          "id": "client-inbox-phase32-wins-enrichment",
+          "title": "InboxTab Phase 3.2 — Wins enrichment (more signal types in WinsSurface)",
+          "source": "Session 2026-05-11 — Phase 3 planning",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-11",
+          "notes": "WinsSurface currently shows a narrow set of win signals. Enrich with: completed client actions (approval loop closed), published content posts, improved page health scores, and resolved anomalies. Requires wiring new signal types into ClientSignalsSlice in workspace-intelligence.ts."
+        },
+        {
+          "id": "client-inbox-phase33-per-item-exclusion",
+          "title": "InboxTab Phase 3.3 — Per-item exclusion in approval batches",
+          "source": "Session 2026-05-11 — Phase 3 planning",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-11",
+          "notes": "Clients can currently only approve/reject an entire approval batch. Add per-item approve/reject/exclude in DecisionDetailModal so clients can accept most items and flag specific ones. Requires ApprovalItem status transitions per-item and UI changes in DecisionDetailModal."
+        },
+        {
+          "id": "client-inbox-phase34-client-signals-resolution",
+          "title": "InboxTab Phase 3.4 — Client signals resolution (loop engagement → insight engine)",
+          "source": "Session 2026-05-11 — Phase 3 planning",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-05-11",
+          "notes": "Client actions approved/completed should feed back into the insight engine: mark the originating insight as resolved, update ClientSignalsSlice engagement metrics, and credit the win in WinsSurface. Currently approval data is siloed from the intelligence layer."
+        }
+      ],
+      "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
       "id": "sprint-hardening",
       "name": "✅ SHIPPED — Hardening Pass",
       "hours": "28-42",
@@ -3799,6 +3845,16 @@
           "status": "done",
           "createdAt": "2026-05-08",
           "notes": "Shipped. New pr-check rule prevents re-introduction of legacy filter literals (approvals, requests, content-plan, copy) after the Phase 1-2 rename. Escape hatch: // inbox-legacy-filter-literal-ok."
+        },
+        {
+          "id": "client-inbox-phase35-action-playbooks-resolution",
+          "title": "InboxTab Phase 3.5 — Action playbooks resolution (approval → implementation)",
+          "source": "docs/superpowers/plans/2026-05-11-action-playbooks-resolution.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-05-11",
+          "notes": "Closes the approval dead-end: client approves a client_action → (1) admin team email notification, (2) content_decay auto-creates content brief via ACTION_PLAYBOOK_EXECUTE background job, (3) other types get admin UI 'Awaiting implementation' badge + Mark complete button."
         }
       ]
     },
