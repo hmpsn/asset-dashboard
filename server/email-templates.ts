@@ -262,6 +262,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderClientBriefingReady(events, count, ws, dashUrl, logoUrl); break;
     case 'content_changes_requested':
       result = renderContentChangesRequested(events, count, ws, dashUrl, logoUrl); break;
+    case 'action_approved':
+      result = renderActionApproved(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -286,6 +288,31 @@ function renderFeedbackNew(events: EmailEvent[], count: number, ws: string, _das
       headline: 'Client Feedback Received',
       subtitle: ws,
       body: countPill(count, 'feedback item') + items,
+      logoUrl,
+    }),
+  };
+}
+
+function renderActionApproved(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.title as string) || 'Client Action',
+    detail: (e.data.sourceType as string)
+      ? `${(e.data.sourceType as string).replace(/_/g, ' ')} — ${(e.data.summary as string) || ''}`
+      : (e.data.summary as string) || '',
+    badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `Client approved: ${(events[0].data.title as string) || 'action'} — ${ws}`
+      : `${count} client approvals — ${ws}`,
+    html: layout({
+      preheader: `${ws} client approved ${count} action${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'Client Approved an Action' : 'Client Approvals',
+      subtitle: ws,
+      body: count > 1 ? countPill(count, 'approval') + items : items,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),
   };
