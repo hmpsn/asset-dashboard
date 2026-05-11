@@ -1724,13 +1724,13 @@ echo "Review range: $BASE_SHA..$HEAD_SHA"
 
 Invoke `superpowers:scaled-code-review` with `BASE_SHA` and `HEAD_SHA`. Fix all Critical and Important issues before proceeding to Step 4. Do not open the PR until the review is clean.
 
-- [ ] **Step 4: Commit any final cleanup and open PR**
+- [ ] **Step 4: Commit any final cleanup and open draft PR**
 
 ```bash
 git add -p  # stage any remaining changes
 git commit -m "chore: cleanup DecisionDetailModal + InboxTab routing"
 # Open PR targeting staging
-gh pr create --title "feat(inbox): Presenter unification + section routing correction (PR 2.1)" \
+gh pr create --draft --title "feat(inbox): Presenter unification + section routing correction (PR 2.1)" \
   --body "$(cat <<'EOF'
 ## Summary
 - Fixes InboxTab section routing: approval_batches → Decisions, content → Reviews, requests → Conversations
@@ -1753,6 +1753,30 @@ gh pr create --title "feat(inbox): Presenter unification + section routing corre
 - [ ] \`npx vitest run\` all green
 EOF
 )"
+```
+
+- [ ] **Step 5: Codex CLI independent review**
+
+With the draft PR open, request an independent Codex review:
+
+```bash
+codex "Review the open draft PR for feat/ia-presenter-unification. Focus on: correctness of the note-based approval_batch routing split (batches with note → Conversations, without → Decisions), per-item flagging state management in DecisionDetailModal, and whether the NormalizedDecision adapters correctly handle all ClientActionSourceType values. Project conventions are in CLAUDE.md (.codex/config.toml points there)."
+```
+
+Capture all findings. Fix every Critical and Important finding, push fix commits to the draft PR. If >20 lines changed by fixes, re-run scaled-code-review (Step 3) on the updated diff before Step 6.
+
+- [ ] **Step 6: Mark PR ready + wait for CI**
+
+```bash
+gh pr ready  # un-drafts the PR
+```
+
+Wait for staging CI to go green. If CI fails, diagnose and fix before proceeding.
+
+- [ ] **Step 7: Merge to staging once CI green**
+
+```bash
+gh pr merge --squash
 ```
 
 ---
@@ -2028,13 +2052,13 @@ echo "Review range: $BASE_SHA..$HEAD_SHA"
 
 Invoke `superpowers:requesting-code-review` with `BASE_SHA` and `HEAD_SHA`. Fix all Critical and Important issues before opening the PR.
 
-- [ ] **Step 8: Commit and open PR**
+- [ ] **Step 8: Commit and open draft PR**
 
 ```bash
-git add src/components/client/DecisionDetailModal.tsx src/components/client/DecisionCard.tsx tests/unit/DecisionCard.test.tsx
+git add src/components/client/DecisionDetailModal.tsx src/components/client/DecisionCard.tsx tests/unit/DecisionCard.test.tsx tests/unit/DecisionDetailModal.test.tsx
 git commit -m "feat(inbox): at-scale Decisions — type breakdown, search, grouped collapse (PR 2.2)"
 
-gh pr create --title "feat(inbox): At-scale Decisions — type breakdown + search + grouping (PR 2.2)" \
+gh pr create --draft --title "feat(inbox): At-scale Decisions — type breakdown + search + grouping (PR 2.2)" \
   --body "$(cat <<'EOF'
 ## Summary
 - Type breakdown pills in DecisionDetailModal header for batches ≥25 items
@@ -2053,6 +2077,22 @@ gh pr create --title "feat(inbox): At-scale Decisions — type breakdown + searc
 - [ ] \`npx vitest run\` all green
 EOF
 )"
+```
+
+- [ ] **Step 9: Codex CLI independent review**
+
+```bash
+codex "Review the open draft PR for feat/ia-at-scale-decisions. Focus on: the AT_SCALE_THRESHOLD=25 branching logic, search filter correctness for both pageTitle and pageSlug, grouped collapse state management (Set<string> expand toggle), and whether the TypeBreakdown pill counts are accurate. Project conventions are in CLAUDE.md (.codex/config.toml points there)."
+```
+
+Fix all Critical and Important findings. Push fix commits to the draft PR.
+
+- [ ] **Step 10: Mark PR ready + wait for CI, then merge**
+
+```bash
+gh pr ready
+# Wait for CI green
+gh pr merge --squash
 ```
 
 ---
