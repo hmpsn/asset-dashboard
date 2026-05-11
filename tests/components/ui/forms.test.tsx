@@ -48,6 +48,30 @@ describe('FormField', () => {
     expect(screen.getByText('Enter your work email')).toBeTruthy();
   });
 
+  it('shows success message and passes valid state to child FormInput', () => {
+    const { container } = render(
+      <FormField label="Email" success="Email looks good" valid>
+        <FormInput value="hello@example.com" onChange={vi.fn()} />
+      </FormField>
+    );
+    const input = container.querySelector('input');
+    expect(screen.getByRole('status').textContent).toBe('Email looks good');
+    expect(input?.className).toContain('border-emerald-500/50');
+    expect(input?.getAttribute('aria-describedby')).toBeTruthy();
+  });
+
+  it('keeps error state authoritative over valid state', () => {
+    const { container } = render(
+      <FormField label="Email" error="Invalid email" success="Email looks good" valid>
+        <FormInput value="bad" onChange={vi.fn()} />
+      </FormField>
+    );
+    const input = container.querySelector('input');
+    expect(screen.getByRole('alert').textContent).toBe('Invalid email');
+    expect(screen.queryByText('Email looks good')).toBeNull();
+    expect(input?.className).toContain('border-red-500/50');
+  });
+
   it('passes error state to child FormInput via context', () => {
     const { container } = render(
       <FormField label="Email" error="Required">

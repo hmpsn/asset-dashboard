@@ -66,8 +66,9 @@
           "source": "UI_UX_AUDIT §9",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Replace basic HTML validation with consistent form library. Inline field-level validation with clear errors. aria-invalid + aria-describedby support. Success states for valid fields.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-11: added React Hook Form + @hookform/resolvers as the standard client form stack; extended shared FormField/FormInput/FormSelect/FormTextarea primitives with error-authoritative valid/success state, emerald valid borders, aria-invalid, aria-describedby, alert/status messages; migrated LoginScreen and EmailCaptureGate from basic/manual validation to Zod-backed forms with inline field errors, disabled-invalid submits, loading states, and trimmed submit values. Focused tests cover primitive valid/error precedence, client email validation/submission, and admin login behavior. Remaining form migrations should be tracked as specific follow-up component items rather than this broad standardization item.",
+          "status": "done",
+          "shippedAt": "2026-05-11"
         },
         {
           "id": 518,
