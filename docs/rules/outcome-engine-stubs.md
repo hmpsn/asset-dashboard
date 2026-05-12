@@ -1,6 +1,6 @@
 # Outcome Intelligence Engine — Known Stubs & Limitations
 
-> Last updated: 2026-03-29
+> Last updated: 2026-05-11
 > Branch: claude/zen-bell (PR #106)
 > Purpose: Document every stub, placeholder, and known limitation so you can diagnose "why isn't this working?" when the feature goes live.
 
@@ -76,8 +76,8 @@ The fallback `EMPTY_BASELINE` uses `new Date().toISOString()` at module load. On
 
 1. **No outcomes being scored** → Verify GSC is connected for the workspace (`gscPropertyUrl` + `webflowSiteId` set). Check cron logs for `outcome-measurement`. Confirm the page URL on tracked actions matches the URL format GSC reports.
 2. **Win rate always 0%** → Check if `fetchCurrentMetrics` is returning data (non-empty GSC rows). If workspace has no GSC, all checkpoints will score `inconclusive`.
-3. **External wins never detected** → `checkExternalExecution` stub (#2 above). External detection runs but never returns `true`.
-4. **Playbooks section empty** → No route exists to serve playbooks (#3 above). Also `detectPlaybookPatterns` is never called.
+3. **External wins never detected** → `checkExternalExecution` is wired (shipped 2026-03-29). Check that the workspace has GSC connected and the action has a baseline with `position` or `clicks` data — guard skips detection when baseline is absent.
+4. **Playbooks section empty** → Route and detection are wired (shipped 2026-03-29). Check cron logs for `detectAllWorkspacePlaybooks`. Playbooks only generate after sufficient scored actions exist; a fresh workspace with few actions may legitimately have no patterns yet.
 5. **Learnings not updating** → Check if `totalScoredActions` > 0. Learnings only compute when there are scored actions. With stub active, all actions score `neutral` but still count as "scored".
 6. **Per-workspace scoring thresholds not working** → `scoring_config` column is never read (#5 above).
 7. **No data after fresh deploy** → Cron jobs don't run on startup (#6 above). Wait up to 24h or restart after first cron interval.

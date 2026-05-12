@@ -331,6 +331,54 @@ const batchInsert = db.transaction((items: Item[]) => {
 batchInsert(items);
 ```
 
+### Normalized Table Pattern
+
+Large repeated JSON arrays extracted from workspace-level JSON blobs are stored in indexed tables so they can be queried efficiently. Examples: `keyword_gaps`, `topic_clusters`, `cannibalization_issues` (migrations 088-090).
+
+**Write path** — replace-all inside a transaction:
+
+```ts
+const replaceKeywordGaps = db.transaction((workspaceId: string, gaps: KeywordGap[]) => {
+  stmts().deleteByWorkspace.run(workspaceId);
+  for (const gap of gaps) {
+    stmts().insert.run(gap.id, workspaceId, gap.keyword, gap.volume, gap.difficulty);
+  }
+});
+```
+
+**Read path** — query the normalized table directly, never re-parse the parent blob:
+
+```ts
+const gaps = stmts().selectByWorkspace.all(workspaceId).map(rowToKeywordGap);
+```
+
+---
+
+## State Machine Validation
+
+Status transitions on approval batches, content items, and outcome actions must go through `validateTransition()` in `server/state-machines.ts` before any DB write. This prevents impossible transitions (e.g. `applied → pending`) that corrupt workflows.
+
+```ts
+import { validateTransition } from '../state-machines.js';
+
+router.patch('/api/approvals/:workspaceId/:batchId/status',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({ status: z.string() })),
+  (req, res) => {
+    const batch = stmts().selectBatch.get(req.params.batchId);
+    if (!batch) return res.status(404).json({ error: 'Not found' });
+
+    const error = validateTransition(batch.status, req.body.status);
+    if (error) return res.status(400).json({ error });
+
+    stmts().updateStatus.run(req.body.status, req.params.batchId);
+    res.json({ ok: true });
+  }
+);
+```
+
+`validateTransition` returns `null` on success or an error string on invalid transition. Always check before mutating.
+
 ---
 
 ## Testing Quick Reference
@@ -342,8 +390,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers';
 
 // IMPORTANT: Use a unique port — check with: grep -r 'createTestContext(' tests/
-// Current range: 13201–13319. Next available: 13320.
-const ctx = createTestContext(13320);
+// Current range: 13201–13353. Next available: 13354.
+const ctx = createTestContext(13354);
 
 describe('my-feature', () => {
   beforeAll(() => ctx.startServer());
