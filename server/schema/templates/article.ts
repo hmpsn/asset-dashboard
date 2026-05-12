@@ -4,6 +4,7 @@
  * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
+import { filterAuthorityCitations } from '../extractors/page-elements/citation.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ArticleInput {
@@ -39,6 +40,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
   const author = pageData.author
     ? { '@type': 'Person', 'name': pageData.author }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
+  const citations = filterAuthorityCitations(pageData.elements?.citations ?? [], pageData.canonicalUrl);
 
   const primary = dropUndefined({
     '@type': kind,
@@ -64,8 +66,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'keywords': pageData.keywords,
     'wordCount': pageData.wordCount,
     'about': kind === 'Article' ? 'Case study' : undefined,
-    'citation': pageData.elements?.citations && pageData.elements.citations.length > 0
-      ? pageData.elements.citations.map(c => ({
+    'citation': citations.length > 0
+      ? citations.map(c => ({
           '@type': 'WebPage' as const,
           'url': c.url,
           'name': c.text || c.url,
