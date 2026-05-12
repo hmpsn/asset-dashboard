@@ -218,6 +218,126 @@ describe('validateWholeSiteSchemaGraph', () => {
     }));
   });
 
+  it('warns when multiple page schemas emit the same root identity body', () => {
+    const result = validateWholeSiteSchemaGraph({
+      siteTemplate,
+      pages: [
+        page('/', graph([
+          {
+            '@type': 'LocalBusiness',
+            '@id': `${baseUrl}/#localbusiness`,
+            name: 'Example Co',
+            url: baseUrl,
+          },
+        ]), 'home'),
+        page('/contact', graph([
+          {
+            '@type': 'ContactPage',
+            '@id': `${baseUrl}/contact#contactpage`,
+            mainEntity: { '@id': `${baseUrl}/#localbusiness` },
+          },
+          {
+            '@type': 'LocalBusiness',
+            '@id': `${baseUrl}/#localbusiness`,
+            name: 'Example Co',
+            url: baseUrl,
+          },
+        ]), 'contact'),
+      ],
+    });
+
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      ruleId: 'schema-graph-duplicate-site-identity-body',
+      sourceId: `${baseUrl}/#localbusiness`,
+    }));
+  });
+
+  it('treats Blog output as compatible with an Article primary type for blog index plans', () => {
+    const activePlan: SchemaSitePlan = {
+      id: 'plan-blog',
+      siteId: 'site-test',
+      workspaceId: 'ws-test',
+      siteUrl: baseUrl,
+      canonicalEntities: [],
+      pageRoles: [{
+        pagePath: '/insights',
+        pageTitle: 'Insights',
+        role: 'blog',
+        primaryType: 'Article',
+        entityRefs: [],
+      }],
+      status: 'active',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const blogPage = page('/insights', graph([
+      {
+        '@type': 'Blog',
+        '@id': `${baseUrl}/insights#blog`,
+        blogPost: [{ '@id': `${baseUrl}/insights/post#article` }],
+      },
+    ]));
+    blogPage.generationDiagnostics = {
+      plannedRole: 'blog',
+      effectiveRole: 'blog',
+      roleSource: 'site-plan',
+      emittedTypes: ['Blog'],
+      skippedSchemaTypes: [],
+      richResultsEligibility: [],
+      validationStatus: 'valid',
+    };
+
+    const result = validateWholeSiteSchemaGraph({ siteTemplate, activePlan, pages: [blogPage] });
+
+    expect(result.findings.find(finding => finding.ruleId === 'schema-graph-plan-primary-type-mismatch')).toBeUndefined();
+  });
+
+  it('treats CMS article output as compatible with partnership plan roles', () => {
+    const activePlan: SchemaSitePlan = {
+      id: 'plan-partnership',
+      siteId: 'site-test',
+      workspaceId: 'ws-test',
+      siteUrl: baseUrl,
+      canonicalEntities: [],
+      pageRoles: [{
+        pagePath: '/insights/partner-story',
+        pageTitle: 'Partner Story',
+        role: 'partnership',
+        primaryType: 'WebPage',
+        entityRefs: [],
+      }],
+      status: 'active',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const articlePage = page('/insights/partner-story', graph([
+      {
+        '@type': 'BlogPosting',
+        '@id': `${baseUrl}/insights/partner-story#article`,
+        headline: 'Partner Story',
+      },
+      {
+        '@type': 'WebPage',
+        '@id': `${baseUrl}/insights/partner-story#webpage`,
+        about: { '@id': `${baseUrl}/insights/partner-story#article` },
+      },
+    ]));
+    articlePage.generationDiagnostics = {
+      plannedRole: 'partnership',
+      effectiveRole: 'blog',
+      roleSource: 'collection-inferred',
+      emittedTypes: ['BlogPosting', 'WebPage'],
+      skippedSchemaTypes: [],
+      richResultsEligibility: [],
+      validationStatus: 'valid',
+    };
+
+    const result = validateWholeSiteSchemaGraph({ siteTemplate, activePlan, pages: [articlePage] });
+
+    expect(result.findings.find(finding => finding.ruleId === 'schema-graph-plan-role-mismatch')).toBeUndefined();
+  });
+
   it('reports hub pages that reference non-child pages', () => {
     const result = validateWholeSiteSchemaGraph({
       siteTemplate,

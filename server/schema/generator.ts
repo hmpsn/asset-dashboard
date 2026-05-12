@@ -245,6 +245,17 @@ function normalizeSchemaUrlPath(url: string | undefined): string | null {
   }
 }
 
+function normalizeSchemaNodeId(id: string | undefined): string | null {
+  if (!id) return null;
+  try {
+    const parsed = new URL(id);
+    const path = parsed.pathname.replace(/\/+$/, '') || '/';
+    return `${parsed.origin}${path}${parsed.search}${parsed.hash}`;
+  } catch { // catch-ok: malformed node ids cannot be matched safely
+    return null;
+  }
+}
+
 function isValidHttpUrl(value: string | undefined): boolean {
   if (!value) return false;
   try {
@@ -264,6 +275,23 @@ function canonicalEntityNode(entity: CanonicalEntity): Record<string, unknown> |
     'url': entity.canonicalUrl,
     'description': entity.description,
   });
+}
+
+function canonicalEntityNodeEntries(
+  canonicalEntities: CanonicalEntity[],
+): Array<{ entity: CanonicalEntity; node: Record<string, unknown> }> {
+  const seenNormalizedIds = new Set<string>();
+  return canonicalEntities.reduce<Array<{ entity: CanonicalEntity; node: Record<string, unknown> }>>((entries, entity) => {
+    const node = canonicalEntityNode(entity);
+    if (!node) return entries;
+    const normalizedId = normalizeSchemaNodeId(entity.id);
+    if (normalizedId) {
+      if (seenNormalizedIds.has(normalizedId)) return entries;
+      seenNormalizedIds.add(normalizedId);
+    }
+    entries.push({ entity, node });
+    return entries;
+  }, []);
 }
 
 function dropEmptySchemaFields(obj: Record<string, unknown>): Record<string, unknown> {
@@ -300,6 +328,18 @@ function refIds(value: unknown): Set<string> {
   return ids;
 }
 
+function replaceReferenceIds(value: unknown, oldId: string, newId: string): void {
+  if (!value || oldId === newId) return;
+  if (Array.isArray(value)) {
+    for (const item of value) replaceReferenceIds(item, oldId, newId);
+    return;
+  }
+  if (typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if (record['@id'] === oldId) record['@id'] = newId;
+  for (const nested of Object.values(record)) replaceReferenceIds(nested, oldId, newId);
+}
+
 function addCanonicalReferencesToNode(node: Record<string, unknown>, refs: string[]): void {
   const normalizedRefs = refs
     .filter(ref => typeof ref === 'string' && ref.trim())
@@ -334,28 +374,42 @@ function applyCanonicalEntityGraph(input: {
 
   const pagePath = normalizeSchemaUrlPath(input.pageCanonicalUrl);
   const existingById = new Map<string, Record<string, unknown>>();
+  const existingByNormalizedId = new Map<string, Record<string, unknown>>();
   for (const node of graph) {
     const id = node['@id'];
-    if (typeof id === 'string' && id.trim()) existingById.set(id, node);
+    if (typeof id === 'string' && id.trim()) {
+      existingById.set(id, node);
+      const normalizedId = normalizeSchemaNodeId(id);
+      if (normalizedId) existingByNormalizedId.set(normalizedId, node);
+    }
   }
 
-  const entityNodes = input.canonicalEntities
-    .map(entity => ({ entity, node: canonicalEntityNode(entity) }))
-    .filter((entry): entry is { entity: CanonicalEntity; node: Record<string, unknown> } => !!entry.node);
+  const entityNodes = canonicalEntityNodeEntries(input.canonicalEntities);
 
   for (const { entity, node } of entityNodes) {
     const entityPath = normalizeSchemaUrlPath(entity.canonicalUrl);
     if (!pagePath || !entityPath || pagePath !== entityPath) continue;
-    const existing = existingById.get(entity.id);
+    const normalizedEntityId = normalizeSchemaNodeId(entity.id);
+    const existing = existingById.get(entity.id)
+      ?? (normalizedEntityId ? existingByNormalizedId.get(normalizedEntityId) : undefined);
     if (existing) {
+      const existingId = typeof existing['@id'] === 'string' ? existing['@id'] : undefined;
       for (const [key, value] of Object.entries(node)) {
         if (existing[key] === undefined || existing[key] === null || existing[key] === '') {
           existing[key] = value;
         }
       }
+      if (existingId && normalizedEntityId && existingId !== entity.id && normalizeSchemaNodeId(existingId) === normalizedEntityId) {
+        existing['@id'] = entity.id;
+        for (const graphNode of graph) replaceReferenceIds(graphNode, existingId, entity.id);
+        existingById.delete(existingId);
+        existingById.set(entity.id, existing);
+        existingByNormalizedId.set(normalizedEntityId, existing);
+      }
     } else {
       graph.push(node);
       existingById.set(entity.id, node);
+      if (normalizedEntityId) existingByNormalizedId.set(normalizedEntityId, node);
     }
   }
 
@@ -681,8 +735,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
-      reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: catalog?.semantics });
+      reason = 'Contact page — ContactPage with canonical business identity mainEntity.';
       break;
     case 'BlogIndex': {
       const children = resolveHubChildren(input);
@@ -736,9 +790,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
 
   const canonicalEntities = input.siteContext?.canonicalEntities ?? [];
   const validCanonicalEntityIds = new Set(
-    canonicalEntities
-      .filter(entity => canonicalEntityNode(entity))
-      .map(entity => entity.id),
+    canonicalEntityNodeEntries(canonicalEntities).map(({ entity }) => entity.id),
   );
   const canonicalEntityRefs = (input.canonicalEntityRefs ?? []).filter(ref => validCanonicalEntityIds.has(ref));
   applyCanonicalEntityGraph({
