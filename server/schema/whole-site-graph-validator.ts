@@ -25,14 +25,14 @@ interface IdReference {
   propertyPath: string;
 }
 
-const SITEWIDE_ORG_TYPES = new Set(['Organization', 'LocalBusiness', 'MedicalOrganization', 'FinancialService']);
+const SITEWIDE_ORG_TYPES = new Set(['Organization', 'LocalBusiness', 'MedicalOrganization', 'MedicalBusiness', 'Dentist', 'FinancialService']);
 const COMPATIBLE_TYPES: Record<string, Set<string>> = {
   Article: new Set(['Article', 'Blog', 'BlogPosting', 'NewsArticle']),
   Blog: new Set(['Blog', 'CollectionPage']),
   BlogPosting: new Set(['Article', 'BlogPosting', 'NewsArticle']),
   WebPage: new Set(['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage', 'ProfilePage']),
   CollectionPage: new Set(['CollectionPage', 'Blog', 'ItemList']),
-  LocalBusiness: new Set(['LocalBusiness', 'MedicalOrganization', 'FinancialService']),
+  LocalBusiness: new Set(['LocalBusiness', 'MedicalOrganization', 'MedicalBusiness', 'Dentist', 'FinancialService']),
 };
 const COMPATIBLE_ROLES: Record<string, Set<string>> = {
   partnership: new Set(['blog']),
@@ -152,7 +152,7 @@ function siteIdentityGroup(node: InternalNode): string | null {
   if (idPath !== '/') return null;
   if (node.type === 'Organization') return 'Organization';
   if (
-    node.type === 'LocalBusiness' || node.type === 'MedicalOrganization' || node.type === 'FinancialService'
+    node.type === 'LocalBusiness' || node.type === 'MedicalOrganization' || node.type === 'MedicalBusiness' || node.type === 'Dentist' || node.type === 'FinancialService'
   ) return 'LocalBusiness';
   return null;
 }

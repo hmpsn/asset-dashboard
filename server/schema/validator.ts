@@ -49,6 +49,14 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'url', 'inLanguage'],
     recommended: ['address', 'telephone', 'openingHours', 'image'],
   },
+  MedicalBusiness: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
+  },
+  Dentist: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
+  },
   FinancialService: {
     required: ['name', 'url', 'inLanguage'],
     recommended: ['address', 'telephone', 'openingHours', 'image'],
@@ -117,6 +125,23 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'image'],
   },
 };
+
+function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
+  const value = field === 'openingHours'
+    ? node.openingHours ?? node.openingHoursSpecification
+    : node[field];
+  if (field === 'address') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const address = value as Record<string, unknown>;
+    if (address['@type'] !== 'PostalAddress') return false;
+    return ['streetAddress', 'addressLocality', 'addressRegion'].every(addressField =>
+      typeof address[addressField] === 'string' && address[addressField].trim().length > 0);
+  }
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
   const findings: ValidationFinding[] = [];
@@ -421,7 +446,7 @@ function validateArticleShape(node: Record<string, unknown>): ValidationFinding[
  * three locator fields — Google rejects bare-string addresses.
  */
 function validateLocalBusinessShape(node: Record<string, unknown>): ValidationFinding[] {
-  const localTypes = new Set(['LocalBusiness', 'MedicalOrganization', 'FinancialService']);
+  const localTypes = new Set(['LocalBusiness', 'MedicalOrganization', 'MedicalBusiness', 'Dentist', 'FinancialService']);
   const nodeType = typeof node['@type'] === 'string' ? node['@type'] : 'LocalBusiness';
   if (!localTypes.has(nodeType)) return [];
   const findings: ValidationFinding[] = [];
@@ -561,7 +586,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     const rules = REQUIRED_BY_TYPE[t];
     if (rules) {
       for (const field of rules.required) {
-        if (node[field] === undefined || node[field] === null) {
+        if (!hasSchemaField(node, field)) {
           findings.push({
             severity: 'error',
             type: t,
@@ -572,7 +597,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         }
       }
       for (const field of rules.recommended ?? []) {
-        if (node[field] === undefined || node[field] === null) {
+        if (!hasSchemaField(node, field)) {
           findings.push({
             severity: 'warning',
             type: t,

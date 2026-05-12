@@ -142,6 +142,25 @@ function getNodeTypes(node: Record<string, unknown>): string[] {
   return [];
 }
 
+function hasCompletePostalAddress(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const address = value as Record<string, unknown>;
+  if (address['@type'] !== 'PostalAddress') return false;
+  return ['streetAddress', 'addressLocality', 'addressRegion'].every(field =>
+    typeof address[field] === 'string' && address[field].trim().length > 0);
+}
+
+function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
+  const value = field === 'openingHours'
+    ? node.openingHours ?? node.openingHoursSpecification
+    : node[field];
+  if (field === 'address') return hasCompletePostalAddress(value);
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
 export function validateForGoogleRichResults(schema: Record<string, unknown>): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
@@ -165,8 +184,7 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
       // Check required fields
       for (const field of rules.required) {
         if (seenErrorFields.has(field)) continue;
-        const val = node[field];
-        if (val === undefined || val === null || val === '') {
+        if (!hasSchemaField(node, field)) {
           seenErrorFields.add(field);
           nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
         }
@@ -175,8 +193,7 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
       // Check recommended fields
       for (const field of rules.recommended) {
         if (seenWarningFields.has(field)) continue;
-        const val = node[field];
-        if (val === undefined || val === null || val === '') {
+        if (!hasSchemaField(node, field)) {
           seenWarningFields.add(field);
           warnings.push({ type, field, message: `Missing recommended property "${field}" for ${type}` });
         }
@@ -185,8 +202,7 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
       // Rich result eligibility: type is eligible if ALL its required fields are present
       const typeRules = RICH_RESULT_RULES[type];
       const typeMissingRequired = typeRules ? typeRules.required.some(field => {
-        const val = node[field];
-        return val === undefined || val === null || val === '';
+        return !hasSchemaField(node, field);
       }) : false;
       if (RICH_RESULT_TYPES.has(type) && !typeMissingRequired) {
         richResults.push(type);

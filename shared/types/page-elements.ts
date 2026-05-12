@@ -124,6 +124,8 @@ export interface ExtractionDiagnostics {
 
 export interface SemanticPageData {
   // Contact / NAP
+  businessName?: string;
+  businessType?: 'LocalBusiness' | 'Dentist' | 'MedicalBusiness' | 'MedicalOrganization' | 'FinancialService';
   phone?: string;
   email?: string;
   address?: {

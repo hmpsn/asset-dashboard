@@ -31,6 +31,7 @@ export type SchemaFieldTarget =
 
 export type SchemaEvidenceSource =
   | 'rendered-html'
+  | 'existing-json-ld'
   | `cms-field:${string}`
   | 'business-profile'
   | 'workspace-intelligence'

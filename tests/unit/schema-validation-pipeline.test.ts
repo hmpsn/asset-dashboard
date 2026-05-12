@@ -133,7 +133,7 @@ describe('checkRichResultsEligibility', () => {
         '@type': 'LocalBusiness',
         '@id': 'https://example.com/#business',
         name: 'Acme Plumbing',
-        address: { '@type': 'PostalAddress', streetAddress: '123 Main St', addressLocality: 'Springfield' },
+        address: { '@type': 'PostalAddress', streetAddress: '123 Main St', addressLocality: 'Springfield', addressRegion: 'IL' },
       }],
     };
     const result = checkRichResultsEligibility(schema);
@@ -681,7 +681,7 @@ describe('validateForGoogleRichResults — pipeline validation pass', () => {
         '@type': 'LocalBusiness',
         '@id': 'https://example.com/#business',
         name: 'Acme Plumbing',
-        address: { '@type': 'PostalAddress', streetAddress: '123 Main St', addressLocality: 'Springfield' },
+        address: { '@type': 'PostalAddress', streetAddress: '123 Main St', addressLocality: 'Springfield', addressRegion: 'IL' },
         // Missing recommended: telephone, openingHours, geo, url, image
       }],
     };
