@@ -43,6 +43,7 @@ import { callAI } from '../ai.js';
 import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 import type { AIReviewResult, AiFixResult, IssueKey, PostSection } from '../../shared/types/content.js';
 import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
@@ -149,6 +150,15 @@ function mergeSectionUpdates(
   }
 
   return { sections: merged };
+}
+
+function sanitizeSectionUpdates(sectionUpdates: PostSectionUpdate[]): PostSectionUpdate[] {
+  return sectionUpdates.map(section => ({
+    ...section,
+    heading: sanitizePlainText(section.heading).trim(),
+    content: sanitizeRichText(section.content),
+    keywords: section.keywords?.map(k => sanitizePlainText(k).trim()).filter(Boolean),
+  }));
 }
 
 const regenerateSectionSchema = z.object({
@@ -258,8 +268,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   if (!previous) return res.status(404).json({ error: 'Post not found' });
 
   const updates = { ...req.body };
+  if (typeof updates.title === 'string') updates.title = sanitizePlainText(updates.title).trim();
+  if (typeof updates.metaDescription === 'string') updates.metaDescription = sanitizePlainText(updates.metaDescription).trim();
+  if (typeof updates.seoTitle === 'string') updates.seoTitle = sanitizePlainText(updates.seoTitle).trim();
+  if (typeof updates.seoMetaDescription === 'string') updates.seoMetaDescription = sanitizePlainText(updates.seoMetaDescription).trim();
+  if (typeof updates.introduction === 'string') updates.introduction = sanitizeRichText(updates.introduction);
+  if (typeof updates.conclusion === 'string') updates.conclusion = sanitizeRichText(updates.conclusion);
+  if (typeof updates.voiceFeedback === 'string') updates.voiceFeedback = sanitizePlainText(updates.voiceFeedback).trim();
   if (req.body.sections !== undefined) {
-    const merged = mergeSectionUpdates(previous.sections, req.body.sections);
+    const merged = mergeSectionUpdates(previous.sections, sanitizeSectionUpdates(req.body.sections));
     if ('error' in merged) return res.status(400).json({ error: merged.error });
     updates.sections = merged.sections;
   }
@@ -477,12 +494,17 @@ Return ONLY valid JSON like:
   "word_count_target": { "pass": true, "reason": "..." }
 }`;
 
-  try {
-    const result = await callAI({
-      model: 'gpt-5.4-mini',
-      messages: [{ role: 'user', content: prompt }],
-      maxTokens: 1000,
-      temperature: 0.3,
+    try {
+      const systemPrompt = buildSystemPrompt(
+        req.params.workspaceId,
+        'You are a strict content QA reviewer. Return only valid JSON matching the requested checklist schema.',
+      );
+      const result = await callAI({
+        model: 'gpt-5.4-mini',
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 1000,
+        temperature: 0.3,
       responseFormat: { type: 'json_object' },
       feature: 'content-review',
       workspaceId: req.params.workspaceId,
@@ -617,7 +639,12 @@ ${originalText}`;
     }
 
     try {
+      const systemPrompt = buildSystemPrompt(
+        req.params.workspaceId,
+        'You are an SEO content editor. Follow the requested field constraints exactly and return only the requested output format.',
+      );
       const aiResult = await callAI({
+        system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         feature: 'content-fix',
         workspaceId: req.params.workspaceId,

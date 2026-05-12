@@ -19,6 +19,7 @@ import {
 import { getWorkspace } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
+import { sanitizePlainText } from '../html-sanitize.js';
 
 const router = Router();
 
@@ -58,7 +59,14 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
 // Public: client creates a request
 router.post('/api/public/requests/:workspaceId', validate(createRequestSchema), (req, res) => {
   const { title, description, category, priority, pageUrl, submittedBy } = req.body;
-  const request = createRequest(req.params.workspaceId, { title, description, category, priority, pageUrl, submittedBy });
+  const request = createRequest(req.params.workspaceId, {
+    title: sanitizePlainText(title).trim(),
+    description: sanitizePlainText(description).trim(),
+    category,
+    priority,
+    pageUrl: pageUrl ? sanitizePlainText(pageUrl).trim() : undefined,
+    submittedBy: submittedBy ? sanitizePlainText(submittedBy).trim() : undefined,
+  });
   broadcast(ADMIN_EVENTS.REQUEST_CREATED, request);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.REQUEST_CREATED, { id: request.id });
   // Email team
@@ -83,7 +91,7 @@ router.get('/api/public/requests/:workspaceId/:requestId', (req, res) => {
 
 // Public: client adds a note
 router.post('/api/public/requests/:workspaceId/:requestId/notes', validate(addRequestNoteSchema), (req, res) => {
-  const { content } = req.body;
+  const content = sanitizePlainText((req.body?.content ?? '').toString()).trim();
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content);
@@ -111,7 +119,7 @@ router.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.a
 router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upload.array('files', 5), (req, res) => {
   const contentResult = requestNoteContentSchema.optional().safeParse(req.body.content);
   if (!contentResult.success) return res.status(400).json({ error: contentResult.error.issues[0]?.message || 'Invalid content' });
-  const content = contentResult.data || '';
+  const content = sanitizePlainText(contentResult.data || '').trim();
   const files = req.files as Express.Multer.File[];
   if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
   const r = getRequest(req.params.requestId);

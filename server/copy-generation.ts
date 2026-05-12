@@ -438,7 +438,7 @@ export async function buildCopyGenerationContext(
     try {
       const brief = await generateBrief(wsId, entry.primaryKeyword, {
         pageType: entry.pageType,
-      });
+      }, { persist: false });
       const briefLines: string[] = [];
       if (brief.suggestedTitle) briefLines.push(`Suggested title: ${brief.suggestedTitle}`);
       if (brief.executiveSummary) briefLines.push(`Executive summary: ${brief.executiveSummary}`);

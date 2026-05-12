@@ -15,6 +15,7 @@ import { createJob, getJob, hasActiveJob, registerAbort, unregisterAbort, update
 import { WS_EVENTS } from './ws-events.js';
 import { abortableDelay, isAbortSignalAborted, throwIfSignalAborted } from './abort-helpers.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
+import { sanitizePlainText, sanitizeRichText } from './html-sanitize.js';
 
 // Re-export everything from sub-modules for backward compatibility
 export * from './content-posts-db.js';
@@ -80,8 +81,8 @@ export function createPostSkeleton(
     workspaceId,
     briefId: brief.id,
     targetKeyword: brief.targetKeyword,
-    title: brief.suggestedTitle,
-    metaDescription: brief.suggestedMetaDesc,
+    title: sanitizePlainText(brief.suggestedTitle).trim(),
+    metaDescription: sanitizePlainText(brief.suggestedMetaDesc).trim(),
     introduction: '',
     sections: brief.outline.map((s, i) => ({
       index: i,
@@ -326,7 +327,9 @@ export async function generatePost(
   reportProgress('Writing introduction...', completedSteps);
   try {
     throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
-    post.introduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal });
+    post.introduction = sanitizeRichText(
+      await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal }),
+    );
     post.updatedAt = new Date().toISOString();
     savePost(workspaceId, post);
   } catch (err) {
@@ -351,10 +354,11 @@ export async function generatePost(
       const content = await generateSection(
         brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain, { signal: options.signal },
       );
-      post.sections[i].content = content;
-      post.sections[i].wordCount = countHtmlWords(content);
+      const safeContent = sanitizeRichText(content);
+      post.sections[i].content = safeContent;
+      post.sections[i].wordCount = countHtmlWords(safeContent);
       post.sections[i].status = 'done';
-      completedSections.push(content);
+      completedSections.push(safeContent);
     } catch (err) {
       if (isAbortSignalAborted(options.signal)) throw err;
       post.sections[i].status = 'error';
@@ -372,7 +376,9 @@ export async function generatePost(
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Writing conclusion...', completedSteps);
   try {
-    post.conclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal });
+    post.conclusion = sanitizeRichText(
+      await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal }),
+    );
   } catch (err) {
     if (isAbortSignalAborted(options.signal)) throw err;
     post.conclusion = `*[Conclusion generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
@@ -392,14 +398,15 @@ export async function generatePost(
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId, { signal: options.signal });
     if (unified) {
-      if (unified.introduction) post.introduction = unified.introduction;
+      if (unified.introduction) post.introduction = sanitizeRichText(unified.introduction);
       for (let i = 0; i < post.sections.length; i++) {
         if (unified.sections?.[i]) {
-          post.sections[i].content = unified.sections[i];
-          post.sections[i].wordCount = countHtmlWords(unified.sections[i]);
+          const safeSection = sanitizeRichText(unified.sections[i]);
+          post.sections[i].content = safeSection;
+          post.sections[i].wordCount = countHtmlWords(safeSection);
         }
       }
-      if (unified.conclusion) post.conclusion = unified.conclusion;
+      if (unified.conclusion) post.conclusion = sanitizeRichText(unified.conclusion);
       const postUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
       post.unificationStatus = 'success';
       post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
@@ -426,8 +433,8 @@ export async function generatePost(
   try {
     const seoMeta = await generateSeoMeta(post, brief, workspaceId, { signal: options.signal });
     if (seoMeta) {
-      post.seoTitle = seoMeta.seoTitle;
-      post.seoMetaDescription = seoMeta.seoMetaDescription;
+      post.seoTitle = sanitizePlainText(seoMeta.seoTitle).trim();
+      post.seoMetaDescription = sanitizePlainText(seoMeta.seoMetaDescription).trim();
       log.info(`SEO meta generated: "${seoMeta.seoTitle}" (${seoMeta.seoTitle.length} chars)`);
     }
   } catch (err) {
@@ -479,8 +486,9 @@ export async function regenerateSection(
     const content = await generateSection(
       brief, brief.outline[sectionIndex], sectionIndex, previousSections, voiceCtx, workspaceId,
     );
-    post.sections[sectionIndex].content = content;
-    post.sections[sectionIndex].wordCount = countHtmlWords(content);
+    const safeContent = sanitizeRichText(content);
+    post.sections[sectionIndex].content = safeContent;
+    post.sections[sectionIndex].wordCount = countHtmlWords(safeContent);
     post.sections[sectionIndex].status = 'done';
     post.sections[sectionIndex].error = undefined;
   } catch (err) {
