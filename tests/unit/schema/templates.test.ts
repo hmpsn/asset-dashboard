@@ -324,6 +324,18 @@ describe('buildLocalBusinessSchema', () => {
     expect(node.sameAs).toEqual(['https://twitter.com/acme']);
   });
 
+  it('filters empty sameAs entries before schema emission', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        socialProfiles: ['https://twitter.com/acme', '   ', ''],
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.sameAs).toEqual(['https://twitter.com/acme']);
+  });
+
   it('omits all contact fields when business profile is null (no fabrication)', () => {
     const input = { ...localInput, businessProfile: null };
     const graph = buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>;
@@ -740,6 +752,15 @@ describe('buildHomepageSchema', () => {
     const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
     expect(org.sameAs).toEqual(['https://twitter.com/acme']);
     expect(org.foundingDate).toBe('2020-01-01');
+  });
+
+  it('Organization omits empty sameAs values from business profile', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      businessProfile: { socialProfiles: ['https://twitter.com/acme', '', '   '] },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
   });
 
   it('WebSite emits inLanguage but NOT potentialAction (no site-search guarantee)', () => {

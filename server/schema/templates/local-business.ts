@@ -30,6 +30,9 @@ function safeText(value: string | undefined): string | undefined {
 
 export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<string, unknown> {
   const { pageData, businessProfile, baseUrl, siteHasSearch } = input;
+  const safeSocialProfiles = businessProfile?.socialProfiles
+    ?.map(url => url.trim())
+    .filter(Boolean);
   const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
   const lbId = isHomepageUsage
     ? `${baseUrl}/#localbusiness`
@@ -97,7 +100,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'email': safeText(businessProfile?.email),
     'openingHours': businessProfile?.openingHours,
     'address': address,
-    'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
     'areaServed': safeText(pageData.areaServed) ? { '@type': 'Place' as const, name: safeText(pageData.areaServed) } : undefined,

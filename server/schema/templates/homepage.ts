@@ -16,6 +16,9 @@ export interface HomepageInput {
 
 export function buildHomepageSchema(input: HomepageInput): Record<string, unknown> {
   const { baseUrl, pageData, businessProfile, siteHasSearch } = input;
+  const safeSocialProfiles = businessProfile?.socialProfiles
+    ?.map(url => url.trim())
+    .filter(Boolean);
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -27,7 +30,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'sameAs': safeSocialProfiles?.length ? safeSocialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
     'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });

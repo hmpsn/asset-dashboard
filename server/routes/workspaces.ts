@@ -49,6 +49,7 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import { normalizeSocialProfiles } from '../social-profiles.js';
 import type { Workspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
@@ -298,7 +299,12 @@ const businessProfileSchema = z.object({
 });
 
 router.put('/api/workspaces/:id/business-profile', requireWorkspaceAccess(), validate(businessProfileSchema), (req, res) => {
-  const ws = updateWorkspace(req.params.id, { businessProfile: req.body });
+  const normalizedSocialProfiles = normalizeSocialProfiles(req.body.socialProfiles);
+  const businessProfile = {
+    ...req.body,
+    ...(normalizedSocialProfiles !== undefined ? { socialProfiles: normalizedSocialProfiles } : {}),
+  };
+  const ws = updateWorkspace(req.params.id, { businessProfile });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, { businessProfile: ws.businessProfile });
   res.json({ businessProfile: ws.businessProfile });
