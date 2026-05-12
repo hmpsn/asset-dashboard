@@ -4,13 +4,15 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 ---
 
+**ActionPlaybook** — A detected pattern of high-win-rate actions and their typical contexts, stored in the `outcome_playbooks` table and surfaced in `LearningsSlice.playbooks`. Playbooks are auto-detected weekly by `detectAllWorkspacePlaybooks()` in `server/outcome-playbooks.ts` and served via `GET /api/outcomes/:workspaceId/playbooks`. Used by the Outcomes dashboard "Playbooks" tab and injected into AI prompt context as strategy guidance.
+
 **Activity Log** — A chronological audit trail of significant platform operations, recorded via `addActivity()` in `server/activity-log.ts`. Covers audits, metadata changes, approvals, brief generation, schema publishing, and more. Distinct from the application error log (Pino/Sentry). Accessible in both admin and client portals. WS event: `WS_EVENTS.ACTIVITY_NEW`.
 
 **Admin Events** — WebSocket events broadcast to all connected admin sessions (site-wide fanout), defined in `ADMIN_EVENTS` in `server/ws-events.ts`. Distinct from workspace-scoped events. Examples: `workspace:created`, `queue:update`. Frontend handlers must use `useGlobalAdminEvents`, not `useWorkspaceEvents`.
 
 **Annotation** — A date-label marker placed on an analytics chart to correlate traffic changes with known events (e.g., "Launched new homepage"). Stored in `analytics_annotations` / `annotations` tables. Surfaced in the `OperationalSlice` of workspace intelligence and injected into AI prompt context.
 
-**Approval Batch** — A named collection of `ApprovalItem` records sent to a client for review before changes are published to Webflow. Defined in `shared/types/approvals.ts`. Batch status progresses through `pending → partial → approved/rejected → applied`. Created by the SEO Editor, Schema Generator, and CMS Editor. WS event: `WS_EVENTS.APPROVAL_UPDATE`.
+**Approval Batch** — A named collection of `ApprovalItem` records sent to a client for review before changes are published to Webflow. Defined in `shared/types/approvals.ts`. Batch status progresses through `pending → partial → approved/rejected → applied`. Created by the SEO Editor, Schema Generator, and CMS Editor. An optional `note` field on the batch determines inbox routing — batches without a note route to Decisions; batches with a note route to Conversations. WS event: `WS_EVENTS.APPROVAL_UPDATE`.
 
 **Approval Item** — A single proposed change within an `ApprovalBatch` (e.g., a proposed SEO title or schema). Fields include `currentValue`, `proposedValue`, `clientValue` (client edit), and `status` (`pending | approved | rejected | applied`). See `shared/types/approvals.ts`.
 
@@ -32,7 +34,7 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 **Client Session** — The authentication mechanism for the client portal: an HMAC cookie named `client_session_<wsId>`. Distinct from JWT-based user accounts. Managed by `requireClientPortalAuth()` middleware and the public portal auth flow.
 
-**ClientSignalsSlice** — The workspace intelligence slice that captures client engagement and feedback signals: keyword feedback votes, content gap votes, business priorities, approval patterns, chat topics, churn risk, intent signals, and ROI estimates. Assembled by `server/workspace-intelligence.ts`. The relevant slice for wiring new client-facing engagement data into the AI context.
+**ClientSignalsSlice** — The workspace intelligence slice that captures client engagement and feedback signals: keyword feedback votes, content gap votes, business priorities, approval patterns, chat topics, churn risk, intent signals, and ROI estimates. Assembled by `server/intelligence/client-signals-slice.ts`, orchestrated by the `server/workspace-intelligence.ts` facade. The relevant slice for wiring new client-facing engagement data into the AI context.
 
 **Content Matrix** — A planning grid that generates content cells from configurable dimensions (e.g., service × location). Each cell has a `targetKeyword`, a `plannedUrl`, and a `MatrixCellStatus` that progresses through seven states: `planned → keyword_validated → brief_generated → draft → review → approved → published`. Defined in `shared/types/content.ts`.
 
@@ -40,11 +42,17 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 **Deep Diagnostics** — An on-demand AI investigation triggered for a specific anomaly or insight. Runs a structured root-cause analysis and stores results as a `diagnostic_reports` record. Gated by the `deep-diagnostics` feature flag. WS events: `WS_EVENTS.DIAGNOSTIC_COMPLETE`, `DIAGNOSTIC_FAILED`.
 
+**DecisionDetailModal** — A full-screen modal in the client inbox that renders the detail view for a `NormalizedDecision` with `isSingleAction: false` (i.e., an `ApprovalBatch`). Distinct from the inline card UI used for `isSingleAction: true` decisions. Opened from `DecisionCard` when the item is a batch; never used for single-action items.
+
 **Discovery** — Source ingestion for the Copy & Brand Engine (Phase 1). Ingests transcripts, brand documents, and competitor analysis to build the brandscript and feed voice calibration. Processed by `server/discovery-ingestion.ts`. WS event: `WS_EVENTS.DISCOVERY_UPDATED`.
 
 **Feature Flag** — A compile-time-keyed toggle defined in `shared/types/feature-flags.ts` as `FEATURE_FLAGS`. Controls which features are dark-launched or enabled per environment. Checked at runtime via `isFeatureEnabled(flag)` (server) or `hasFeatureFlag(ws, flag)` (workspace-scoped). The type `FeatureFlagKey` is the union of all valid flag names. Default value is `false` (dark-launched). Override via env vars: `FEATURE_<FLAG_NAME_UPPERCASED>=true` (server) / `VITE_FEATURE_<FLAG_NAME_UPPERCASED>=true` (Vite build).
 
 **Impact Score** — A numeric ranking field on `AnalyticsInsight` used to sort the priority feed. Higher scores surface an insight earlier. Computed at insight-store time from severity, traffic volume, and other signals. Stored as `impact_score` in `analytics_insights`.
+
+**InboxFilter** — The discriminated union value that controls which section of the client inbox is displayed. Values: `decisions | reviews | conversations`. Replaces the legacy `approvals | requests | content` values (aliases preserved for backward compat). Defined in `shared/types/inbox.ts`. Deep-linkable via `?tab=decisions` (and similar) in client portal URLs.
+
+**InboxSection** — One of three logical regions of the client inbox: **Decisions** (approval batches and single actions without a note), **Reviews** (content briefs, posts, copy pipeline items), **Conversations** (items with an admin note). Routing logic: items with a `note` field go to Conversations; items without go to Decisions. Static review content always goes to Reviews. Full routing rules: `docs/rules/inbox-section-routing.md`.
 
 **Insight** — An AI-generated finding stored in the `analytics_insights` table. Each insight has a typed `InsightType` discriminator (see `shared/types/analytics.ts`), a typed `data` payload keyed by `InsightDataMap`, and optional enrichment fields (page title, strategy alignment, pipeline status, audit issues). Generated by `server/analytics-intelligence.ts`. Resolution states: `in_progress | resolved | null`. The `bridgeSource` field, when non-null, marks an insight as bridge-authored and grants it immunity from stale cleanup.
 
@@ -56,9 +64,11 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 **Intent Signal** — A signal detected in client chat indicating a service or content interest (types: `service_interest | content_interest`). Stored in the `client_signals` table and surfaced in `ClientSignalsSlice.intentSignals`. Wired by bridge `bridge-client-signal`.
 
-**`parseJsonSafe` / `parseJsonSafeArray`** — DB-boundary validation utilities in `server/db/json-validation.ts`. `parseJsonSafe` validates a JSON column against a Zod schema and returns a fallback on parse failure (never throws). `parseJsonSafeArray` validates items individually and filters out bad items rather than dropping the whole array. Required pattern for all JSON column reads — bare `JSON.parse` on DB columns is forbidden by pr-check.
+**`parseJsonSafe` / `parseJsonSafeArray` / `parseJsonFallback`** — DB-boundary validation utilities in `server/db/json-validation.ts`. `parseJsonSafe` validates a JSON column against a Zod schema and returns a fallback on parse failure (never throws). `parseJsonSafeArray` validates items individually and filters out bad items rather than dropping the whole array. `parseJsonFallback<T>(raw, fallback)` is the schema-free variant for columns where no Zod schema exists yet — parses and casts but still returns the fallback on error. Required pattern for all JSON column reads — bare `JSON.parse` on DB columns is forbidden by pr-check.
 
 **Page Intelligence** — Per-page SEO analysis persisted in the `page_analyses` table. Includes primary keyword, optimization score, content gaps, audit issues, rank history, schema status, and link health. Assembled into `PageProfileSlice` when a `pagePath` is provided to `assembleWorkspaceIntelligence`. Feeds the Schema Generator, Content Briefs, and the SEO rewriter.
+
+**NormalizedDecision** — A unified inbox item interface in `shared/types/decision.ts` that flattens `ClientAction` and `ApprovalBatch` into a single shape for the client inbox. The discriminator field `isSingleAction: true` means the item renders inline (as a `DecisionCard`); `false` means it opens in a `DecisionDetailModal`. Produced by the normalization layer in `server/routes/client-decisions.ts` and consumed by the Decisions section of the client inbox.
 
 **Probe** — A read-only diagnostic endpoint used for health checks and integration testing. Referenced in pr-check escape-hatch rules; a route annotated as a probe is exempt from the `addActivity()` requirement.
 
@@ -66,7 +76,7 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 **`rowToX()` mapper** — The convention for transforming a raw SQLite row object into a typed domain object. Every table has a corresponding mapper (e.g., `rowToWorkspace`, `rowToInsight`, `rowToBatch`). Adding columns to a table requires updating the mapper in the same commit. TypeScript does not catch a mapper that silently ignores a new column.
 
-**Slice** — A named component of the `WorkspaceIntelligence` assembly. Each slice is an interface in `shared/types/intelligence.ts` and is assembled by a corresponding `assemble*` function in `server/workspace-intelligence.ts`. Slice names: `seoContext`, `insights`, `learnings`, `pageProfile`, `contentPipeline`, `siteHealth`, `clientSignals`, `operational`. New data sources must be wired into the appropriate slice to be visible to AI prompts and AdminChat.
+**Slice** — A named component of the `WorkspaceIntelligence` assembly. Each slice is an interface in `shared/types/intelligence.ts`; each slice's `assemble*` function lives in `server/intelligence/<name>-slice.ts`. `server/workspace-intelligence.ts` is the public facade that orchestrates all slices — callers use `buildWorkspaceIntelligence()` from the facade and must not call slice functions directly. Slice names: `seoContext`, `insights`, `learnings`, `pageProfile`, `contentPipeline`, `siteHealth`, `clientSignals`, `operational`. New data sources must be wired into the appropriate slice to be visible to AI prompts and AdminChat.
 
 **`stmts()` / `createStmtCache()`** — The lazy prepared-statement pattern from `server/db/stmt-cache.ts`. Statements are compiled once on first use and reused thereafter. All new DB code must use this pattern — local `let stmt` caching and bare `db.prepare()` at module scope are both forbidden by pr-check.
 
@@ -81,6 +91,8 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 **Workspace** — The primary multi-tenant unit of the platform. One workspace corresponds to one client site. Every resource (insights, audits, briefs, approvals, activity, users) is scoped to a `workspaceId`. Workspace-level settings include tier, integrations (Webflow, GSC, GA4, SEMRush), and feature flags. The workspace record lives in the `workspaces` table.
 
 **`useWorkspaceEvents`** — The frontend React hook for receiving workspace-scoped WebSocket broadcasts. Must be used (not `useGlobalAdminEvents`) for all events emitted via `broadcastToWorkspace()`. The hook sends a `subscribe` action to the server so the workspace filter routes the message to the correct connection. `useGlobalAdminEvents` does not subscribe and will silently miss workspace-scoped events.
+
+**WinsSurface** — A client-facing module (gated by `client-wins-surface` feature flag) that surfaces a curated feed of verified positive outcomes from the `outcome_tracking` table. Shows only actions that scored `positive` outcome, paired with context about the change and its impact. Distinct from the full Outcomes dashboard (admin-only). Located in `src/components/client/wins/`.
 
 **Work Order** — A billable deliverable unit associated with a workspace and optionally a Stripe payment. Tracked in the `work_orders` table. Active work orders are surfaced in `ContentPipelineSlice.workOrders`. WS event: `WS_EVENTS.WORK_ORDER_UPDATE`.
 

@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Button, EmptyState, Icon } from '../ui';
+import { ApprovalBatchCard } from './ApprovalBatchCard';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
@@ -365,22 +366,19 @@ export function InboxTab({
                 </div>
               )}
 
-              {/* SEO title/meta approvals — rendered inline with editing, not via DecisionCard modal */}
-              {approvalsForDecisions.length > 0 && (
-                <ApprovalsTab
+              {/* SEO title/meta approvals — one card per batch, inline in the Decisions flow */}
+              {approvalsForDecisions.map(batch => (
+                <ApprovalBatchCard
+                  key={batch.id}
+                  batch={batch}
                   workspaceId={workspaceId}
-                  approvalBatches={approvalsForDecisions}
-                  approvalsLoading={approvalsLoading}
-                  pendingApprovals={approvalsForDecisions.reduce(
-                    (sum, b) => sum + b.items.filter(i => i.status === 'pending').length, 0,
-                  )}
                   effectiveTier={effectiveTier}
                   setApprovalBatches={setApprovalBatches}
                   loadApprovals={loadApprovals}
                   setToast={setToast}
                   pageMap={pageMap}
                 />
-              )}
+              ))}
 
               {/* Content Plan sign-offs */}
               {planReviewCount > 0 && (
@@ -587,17 +585,20 @@ export function InboxTab({
             <div className="space-y-6">
               <div className="space-y-4">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
-                <ApprovalsTab
-                  workspaceId={workspaceId}
-                  approvalBatches={approvalBatches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))}
-                  approvalsLoading={approvalsLoading}
-                  pendingApprovals={0}
-                  effectiveTier={effectiveTier}
-                  setApprovalBatches={setApprovalBatches}
-                  loadApprovals={loadApprovals}
-                  setToast={setToast}
-                  pageMap={pageMap}
-                />
+                {approvalBatches
+                  .filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'))
+                  .map(batch => (
+                    <ApprovalBatchCard
+                      key={batch.id}
+                      batch={batch}
+                      workspaceId={workspaceId}
+                      effectiveTier={effectiveTier}
+                      setApprovalBatches={setApprovalBatches}
+                      loadApprovals={loadApprovals}
+                      setToast={setToast}
+                      pageMap={pageMap}
+                    />
+                  ))}
               </div>
               {completedClientActions.length > 0 && (
                 <div className="space-y-4">

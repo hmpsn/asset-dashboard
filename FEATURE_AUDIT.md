@@ -876,14 +876,12 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 ---
 
-### 67. Beta Client Feedback Widget
-**What it does:** In-dashboard floating feedback widget for beta clients. Positioned bottom-left in the client portal — clients can submit bug reports, feature requests, or general feedback without leaving the dashboard. Auto-captures context (current tab, browser, screen size, URL) with every submission. Feedback stored per-workspace on disk (`DATA_DIR/feedback/`). Admin Command Center shows a cross-workspace feed of all submissions with status tracking (New → Acknowledged → Resolved / Won't Fix), threaded replies (team ↔ client), and inline reply input. Email notification sent to admin on each new submission. Activity log entry auto-created. Real-time WebSocket broadcast on new feedback.
+### 67. Beta Client Feedback Widget *(RETIRED)*
+**Status:** Retired in PR 1.0a. `server/feedback.ts` deleted, migration 091 migrated existing rows to activity log and dropped the `feedback` table. Feedback route removed. The in-portal feedback widget and admin Command Center feed no longer exist.
 
-**Agency value:** Structured beta feedback collection without external tools (replaces Canny, Intercom, or email chaos). Every submission includes auto-attached context so you know exactly where the client was when they hit the issue. Status workflow keeps feedback organized.
+**What it did:** In-dashboard floating feedback widget for beta clients. Feedback stored per-workspace on disk (`DATA_DIR/feedback/`) and in the `feedback` table. Admin Command Center showed a cross-workspace feed with status tracking and reply threads.
 
-**Client value:** One-click bug reports and feature requests from inside the dashboard they're already using. Can track status of their submissions and see team replies without switching tools. Feels heard.
-
-**Mutual:** Lightweight alternative to heavyweight feedback tools. Keeps everything in-platform. Reply threads create a natural conversation about priorities.
+**Replaced by:** General activity log + direct client communication via the Conversations inbox section.
 
 ---
 
@@ -5477,3 +5475,47 @@ Bug hardening included:
 **Mutual:** Closes the approval→implementation handoff gap. Systematic post-approval workflow prevents lost context. Email notifications keep admin team in sync without requiring constant UI checks.
 
 **Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `shared/types/background-jobs.ts`, `src/components/admin/ClientActionsTab.tsx` (new).
+
+---
+
+### 403. DecisionDetailModal
+**What it does:** Full-screen modal that renders the detail view for an `ApprovalBatch` item in the client inbox. Opened by `DecisionCard` when `NormalizedDecision.isSingleAction` is `false`. Mirrors the layout and action controls of `ClientActionDetailModal` (feature #401) but for batch-type items. Implements the same approve/reject item-level controls, client edit field, and submission flow as the original approval batch review UI.
+
+**Agency value:** Batch changes surface in the unified Decisions inbox without losing any review functionality.
+
+**Client value:** Review multi-item approval batches in the same inbox UI as single-action decisions — no context switch.
+
+**Files:** `src/components/client/inbox/DecisionDetailModal.tsx` (new), `src/components/client/inbox/DecisionCard.tsx`.
+
+---
+
+### 404. ApprovalBatchCard
+**What it does:** Inline card component for the Decisions inbox section that renders a single `ApprovalBatch` as a collapsed summary card. Shows batch name, item count, and status badge. Clicking opens `DecisionDetailModal`. Part of the client inbox IA redesign (feature #399).
+
+**Agency value:** Approval batches are first-class citizens in the client inbox alongside single-action decision cards.
+
+**Client value:** All pending decisions — whether single actions or multi-item batches — appear in one unified list.
+
+**Files:** `src/components/client/inbox/ApprovalBatchCard.tsx` (new).
+
+---
+
+### 405. DecisionCard
+**What it does:** Inline card component for the Decisions inbox section that renders a single `ClientAction` as an actionable card. For `isSingleAction: true` items, all approve/decline controls are inline — no modal required. Wraps `ApprovalBatchCard` for batch items. Part of the client inbox IA redesign (feature #399).
+
+**Agency value:** Single-action decisions resolve without a modal round-trip, reducing friction in the approval workflow.
+
+**Client value:** Approve or decline simple recommendations directly from the inbox list view.
+
+**Files:** `src/components/client/inbox/DecisionCard.tsx` (new).
+
+---
+
+### 406. PriorityStrip
+**What it does:** Horizontal strip at the top of the Decisions inbox section that surfaces the highest-priority pending item(s) with a teal accent. Derived from the `NormalizedDecision` list, sorted by `priorityScore`. Acts as a "your attention is needed here" signal without requiring the client to scroll through the full list.
+
+**Agency value:** Ensures high-urgency approvals don't go unnoticed in a long decision queue.
+
+**Client value:** Immediately see what needs attention most — highest-impact items are highlighted above the full list.
+
+**Files:** `src/components/client/inbox/PriorityStrip.tsx` (new).
