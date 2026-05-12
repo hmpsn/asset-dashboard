@@ -7,7 +7,7 @@ import type {
   SchemaFieldResolutionStatus,
 } from './site-inventory';
 
-export type SchemaRoleSource = 'ui' | 'site-plan' | 'collection-map' | 'collection-inferred' | 'auto-detect';
+export type SchemaRoleSource = 'ui' | 'site-plan' | 'collection-map' | 'collection-inferred' | 'saved-page-type' | 'auto-detect';
 export type SchemaValidationStatus = 'valid' | 'warnings' | 'errors';
 export type SchemaDeliveryMethod = 'webflow-api' | 'manual-native-schema-field';
 export type SchemaDeliveryStatus = 'ready' | 'published' | 'manual-required' | 'failed';

@@ -1,13 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { post, put, get, getSafe } from '../../api/client';
+import { put, get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../../shared/types/site-inventory';
 import type {
   CmsMappingCollection,
   CmsMappingsResponse,
-  CmsTemplatePage,
-  CmsTemplateResult,
   SchemaMappingCollection,
 } from './schemaSuggesterTypes';
 
@@ -41,16 +39,6 @@ export function useSchemaSuggesterCmsWorkflow({
   siteId,
   workspaceId,
 }: UseSchemaSuggesterCmsWorkflowOptions) {
-  const [showCmsPanel, setShowCmsPanel] = useState(false);
-  const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
-  const [loadingCmsPages, setLoadingCmsPages] = useState(false);
-  const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
-  const [cmsTemplateResult, setCmsTemplateResult] = useState<CmsTemplateResult | null>(null);
-  const [cmsSelectedPage, setCmsSelectedPage] = useState<CmsTemplatePage | null>(null);
-  const [publishingCmsTemplate, setPublishingCmsTemplate] = useState(false);
-  const [cmsPublished, setCmsPublished] = useState(false);
-  const [cmsCopied, setCmsCopied] = useState(false);
-  const [cmsError, setCmsError] = useState<string | null>(null);
   const [cmsMappingError, setCmsMappingError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -123,85 +111,11 @@ export function useSchemaSuggesterCmsWorkflow({
     })
     .filter((collection): collection is SchemaMappingCollection => Boolean(collection)), [cmsMappings]);
 
-  const fetchCmsTemplatePages = async () => {
-    if (cmsTemplatePages.length > 0) {
-      setShowCmsPanel(true);
-      return;
-    }
-    setLoadingCmsPages(true);
-    setCmsError(null);
-    try {
-      const pages = await getSafe<CmsTemplatePage[]>(`/api/webflow/cms-template-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, []);
-      if (Array.isArray(pages)) setCmsTemplatePages(pages);
-      setShowCmsPanel(true);
-    } catch {
-      setCmsError('Failed to load CMS collections');
-    } finally {
-      setLoadingCmsPages(false);
-    }
-  };
-
-  const generateCmsTemplate = async (page: CmsTemplatePage) => {
-    setCmsSelectedPage(page);
-    setGeneratingCmsTemplate(page.collectionId);
-    setCmsTemplateResult(null);
-    setCmsPublished(false);
-    setCmsError(null);
-    try {
-      const result = await post<CmsTemplateResult>(`/api/webflow/schema-cms-template/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { collectionId: page.collectionId });
-      setCmsTemplateResult(result);
-    } catch (err) {
-      setCmsError(err instanceof Error ? err.message : 'Failed to generate CMS template schema');
-    } finally {
-      setGeneratingCmsTemplate(null);
-    }
-  };
-
-  const publishCmsTemplate = async () => {
-    if (!cmsSelectedPage || !cmsTemplateResult) return;
-    setPublishingCmsTemplate(true);
-    setCmsError(null);
-    try {
-      await post(`/api/webflow/schema-cms-template/${siteId}/publish${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, {
-        pageId: cmsSelectedPage.pageId,
-        templateString: cmsTemplateResult.templateString,
-        publishAfter: true,
-      });
-      setCmsPublished(true);
-    } catch (err) {
-      setCmsError(err instanceof Error ? err.message : 'Publish failed');
-    } finally {
-      setPublishingCmsTemplate(false);
-    }
-  };
-
-  const copyCmsTemplate = () => {
-    if (!cmsTemplateResult) return;
-    const script = `<script type="application/ld+json">\n${cmsTemplateResult.templateString}\n</script>`;
-    navigator.clipboard.writeText(script);
-    setCmsCopied(true);
-    setTimeout(() => setCmsCopied(false), 2000);
-  };
-
   return {
-    showCmsPanel,
-    setShowCmsPanel,
-    cmsTemplatePages,
-    loadingCmsPages,
-    generatingCmsTemplate,
-    cmsTemplateResult,
-    publishingCmsTemplate,
-    cmsPublished,
-    cmsCopied,
-    cmsError,
     cmsMappingError,
     savingCmsMapping,
     fieldMappingTargets: SCHEMA_FIELD_MAPPING_TARGETS,
     schemaMappingCollections,
-    fetchCmsTemplatePages,
-    generateCmsTemplate,
-    publishCmsTemplate,
-    copyCmsTemplate,
     saveCmsFieldMapping,
   };
 }

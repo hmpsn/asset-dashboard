@@ -122,9 +122,26 @@ describe('schema-store', () => {
     expect(sent?.clientPreviewBatchId).toBe('batch-1');
 
     const updated = updateSchemaPlanRoles(SITE_ID, [
-      { pagePath: '/services', pageTitle: 'Services', role: 'service', primaryType: 'Service', entityRefs: ['org'] },
+      { pagePath: '/services', pageTitle: 'Services', role: 'service', primaryType: 'WebPage', entityRefs: ['org'] },
     ]);
     expect(updated?.pageRoles[0].role).toBe('service');
+    expect(updated?.pageRoles[0].primaryType).toBe('Service');
+    expect(updated?.pageRoles[0].entityRefs).toEqual([]);
+
+    const referenced = updateSchemaPlanRoles(SITE_ID, [
+      { pagePath: '/for-founders', pageTitle: 'For Founders', role: 'audience', primaryType: 'Service', entityRefs: [] },
+    ]);
+    expect(referenced?.pageRoles[0].primaryType).toBe('WebPage');
+    expect(referenced?.pageRoles[0].entityRefs).toEqual(['org']);
+
+    const ambiguousRefs = updateSchemaPlanRoles(SITE_ID, [
+      { pagePath: '/for-startups', pageTitle: 'For Startups', role: 'audience', primaryType: 'Service', entityRefs: [] },
+    ], [
+      { type: 'Organization', name: 'Example', canonicalUrl: 'https://example.com', id: 'org' },
+      { type: 'Service', name: 'Consulting', canonicalUrl: 'https://example.com/services', id: 'service' },
+    ]);
+    expect(ambiguousRefs?.pageRoles[0].primaryType).toBe('WebPage');
+    expect(ambiguousRefs?.pageRoles[0].entityRefs).toEqual([]);
 
     expect(updateSchemaPlanStatus('missing-site', 'active')).toBeNull();
     expect(deleteSchemaPlan(SITE_ID)).toBe(true);

@@ -4,7 +4,7 @@
  * and produce a blueprint that guides per-page schema generation.
  */
 import crypto from 'crypto';
-import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment, SchemaPageRole } from '../shared/types/schema-plan.ts';
+import { SCHEMA_ROLE_PRIMARY_TYPE, type SchemaSitePlan, type CanonicalEntity, type PageRoleAssignment, type SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callAI } from './ai.js';
 import { resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
@@ -515,7 +515,7 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
       pagePath: p.path,
       pageTitle: p.title,
       role,
-      primaryType,
+      primaryType: SCHEMA_ROLE_PRIMARY_TYPE[role] ?? primaryType,
       entityRefs: [],
       notes: undefined,
     };

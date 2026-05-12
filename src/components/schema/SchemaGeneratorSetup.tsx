@@ -1,6 +1,6 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Database, HelpCircle, Loader2, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, HelpCircle, Loader2, Sparkles, X } from 'lucide-react';
 import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { SchemaFieldTarget } from '../../../shared/types/site-inventory';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
@@ -61,15 +61,11 @@ export function SchemaBusinessProfileCallout({
 }
 
 interface SchemaGeneratorHeroProps {
-  loadingCmsPages: boolean;
   onRunScan: () => void;
-  onFetchCmsTemplatePages: () => void;
 }
 
 export function SchemaGeneratorHero({
-  loadingCmsPages,
   onRunScan,
-  onFetchCmsTemplatePages,
 }: SchemaGeneratorHeroProps) {
   return (
     <div className="flex flex-col items-center justify-center py-8 gap-4">
@@ -80,21 +76,12 @@ export function SchemaGeneratorHero({
         <p className="t-body font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
         <p className="t-caption text-[var(--brand-text-muted)] max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
       </div>
-      <div className="flex items-center gap-3 mt-2">
-        <button
-          onClick={onRunScan}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-        >
-          <Icon as={Sparkles} size="md" /> Generate All Pages
-        </button>
-        <button
-          onClick={onFetchCmsTemplatePages}
-          disabled={loadingCmsPages}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-accent-warning border border-amber-500/30 transition-colors disabled:opacity-50"
-        >
-          {loadingCmsPages ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Database} size="md" />} CMS Templates
-        </button>
-      </div>
+      <button
+        onClick={onRunScan}
+        className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors mt-2"
+      >
+        <Icon as={Sparkles} size="md" /> Generate All Pages
+      </button>
     </div>
   );
 }
@@ -107,7 +94,7 @@ interface SchemaInitialPageTypePickerProps {
   loadingPages: boolean;
   generatingSingle: string | null;
   onPageSearchChange: (value: string) => void;
-  onPageTypesChange: Dispatch<SetStateAction<Record<string, string>>>;
+  onPageTypeSelect: (pageId: string, pageType: string) => void;
   onGenerateSinglePage: (pageId: string) => void;
 }
 
@@ -119,7 +106,7 @@ export function SchemaInitialPageTypePicker({
   loadingPages,
   generatingSingle,
   onPageSearchChange,
-  onPageTypesChange,
+  onPageTypeSelect,
   onGenerateSinglePage,
 }: SchemaInitialPageTypePickerProps) {
   const [showTypeGuide, setShowTypeGuide] = useState(false);
@@ -170,7 +157,7 @@ export function SchemaInitialPageTypePicker({
               value={pageTypes[page.id] || 'auto'}
               onChange={event => {
                 const pageType = event.target.value;
-                onPageTypesChange(prev => ({ ...prev, [page.id]: pageType }));
+                onPageTypeSelect(page.id, pageType);
               }}
               className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 cursor-pointer"
             >

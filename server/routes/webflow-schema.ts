@@ -15,7 +15,7 @@ import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
-import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
+import { generateSchemaSuggestions, generateSchemaForPage } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
 import { SCHEMA_ROLE_LABELS, type SchemaPageRole, type SchemaSitePlan } from '../../shared/types/schema-plan.ts';
@@ -30,7 +30,6 @@ import {
   publishCollectionItems,
   publishSite,
   publishSchemaToPage,
-  publishRawSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
 import { buildSiteInventory, detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
@@ -45,7 +44,6 @@ import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 import {
   validateForGoogleRichResults,
-  validateEntityConsistency,
   upsertValidation,
   getValidation,
   getValidations,
@@ -373,9 +371,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceSite
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    // Use explicitly-passed pageType, fall back to persisted type for this page
-    const resolvedPageType = pageType || getPageTypes(req.params.siteId)[pageId];
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, resolvedPageType);
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await prepareSinglePageSchemaGenerationContext(req.params.siteId, pageId, pageType);
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
@@ -539,80 +535,6 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema publish error');
     res.status(500).json({ error: `Schema publish failed: ${msg}` });
-  }
-});
-
-// --- CMS Template Schema ---
-router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
-  const { collectionId } = req.body;
-  if (!collectionId) return res.status(400).json({ error: 'collectionId required' });
-  try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx } = await buildSchemaContext(req.params.siteId);
-    const result = await generateCmsTemplateSchema(req.params.siteId, collectionId, token, ctx);
-    if (!result) return res.status(500).json({ error: 'Failed to generate CMS template schema' });
-    res.json(result);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error({ detail: msg, err }, 'CMS template schema error');
-    res.status(500).json({ error: `CMS template schema failed: ${msg}` });
-  }
-});
-
-router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
-  const { pageId, templateString, publishAfter } = req.body;
-  if (!pageId || !templateString) return res.status(400).json({ error: 'pageId and templateString required' });
-  try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
-    const result = await publishRawSchemaToPage(req.params.siteId, pageId, templateString, token);
-    if (!result.success) return res.status(500).json(result);
-
-    let sitePublished = false;
-    if (publishAfter) {
-      const pubResult = await publishSite(req.params.siteId, token);
-      sitePublished = pubResult.success;
-    }
-
-    // Track schema change
-    const cmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
-    if (cmsWs) {
-      updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-      recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-template');
-    }
-
-    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error({ detail: msg, err }, 'CMS template publish error');
-    res.status(500).json({ error: `CMS template publish failed: ${msg}` });
-  }
-});
-
-// --- List CMS template pages (pages with collectionId) ---
-router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
-  try {
-    const siteId = req.params.siteId;
-    const token = getTokenForSite(siteId) || undefined;
-    const cmsWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
-    const allPages = cmsWs ? await getWorkspaceAllPages(cmsWs.id, siteId) : [];
-    const collections = await listCollections(siteId, token);
-    const collMap = new Map(collections.map(c => [c.id, c]));
-
-    const templatePages = allPages
-      .filter(p => p.collectionId)
-      .map(p => ({
-        pageId: p.id,
-        pageTitle: p.title,
-        slug: p.slug,
-        collectionId: p.collectionId,
-        collectionName: collMap.get(p.collectionId!)?.displayName || '',
-        collectionSlug: collMap.get(p.collectionId!)?.slug || '',
-      }));
-
-    res.json(templatePages);
-  } catch (err) {
-    log.error({ err: err }, 'CMS template pages error');
-    res.json([]);
   }
 });
 
@@ -946,13 +868,6 @@ const schemaValidateBody = z.object({
   schema: z.record(z.unknown()),
 });
 
-const schemaConsistencyBody = z.object({
-  schemas: z.array(z.object({
-    pageId: z.string().min(1),
-    schema: z.record(z.unknown()),
-  })).min(1),
-});
-
 // Validate a single page schema against Google Rich Results rules
 router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaValidateBody), (req, res) => {
   try {
@@ -974,18 +889,6 @@ router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceSiteAccessFr
   } catch (err) {
     log.error({ err }, 'Schema validate error');
     res.status(500).json({ error: 'Schema validation failed' });
-  }
-});
-
-// Batch validate all schemas for entity consistency across a workspace
-router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceSiteAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
-  try {
-    const { schemas } = req.body as { schemas: Array<{ pageId: string; schema: Record<string, unknown> }> };
-    const result = validateEntityConsistency(schemas);
-    res.json(result);
-  } catch (err) {
-    log.error({ err }, 'Schema consistency validate error');
-    res.status(500).json({ error: 'Entity consistency check failed' });
   }
 });
 
