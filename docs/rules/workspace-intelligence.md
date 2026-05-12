@@ -1,7 +1,7 @@
 # Workspace Intelligence — Reference
 
 > Assembly system, slice architecture, caching, and extension rules.
-> Source: `server/workspace-intelligence.ts`, `shared/types/intelligence.ts`, `server/intelligence-cache.ts`
+> Source: `server/workspace-intelligence.ts` (public facade), `server/intelligence/` (slice implementations), `shared/types/intelligence.ts`, `server/intelligence-cache.ts`
 
 ---
 
@@ -70,7 +70,7 @@ Each assembler is an `async` function that loads data from modules via dynamic `
 | `assemblePageProfile` | `page-keywords.ts`, `rank-tracking.ts`, `recommendations.ts`, `analytics-insights-store.ts`, `audit-page.ts`, `schema-validator.ts`, `site-architecture.ts`, `seo-change-tracker.ts`, `content-posts.ts`, `content-decay.ts`, `content-brief.ts` |
 | `assembleContentPipeline` | `workspace-data.ts` (summary counts), `content-brief.ts`, `content-subscriptions.ts`, `schema-store.ts`, `content-matrices.ts`, `cannibalization-detection.ts`, `content-decay.ts`, `suggested-briefs-store.ts`, copy pipeline SQL via `copyStmts()` |
 | `assembleSiteHealth` | `reports.ts` (audit snapshot), `performance-store.ts` (dead links, PageSpeed/CWV), `redirect-store.ts`, `site-architecture.ts` (orphan pages), `schema-validator.ts`, `anomaly-detection.ts`, `seo-change-tracker.ts`, `diagnostic-store.ts`, AEO review files |
-| `assembleClientSignals` | `keyword_feedback` table, `content_gap_votes` table, `client_business_priorities` table, `churn-signals.ts`, `approvals.ts`, `client-users.ts`, `chat-memory.ts`, `activity-log.ts`, `roi.ts`, `feedback.ts`, `requests.ts`, `client-signals-store.ts` |
+| `assembleClientSignals` | `keyword_feedback` table, `content_gap_votes` table, `client_business_priorities` table, `churn-signals.ts`, `approvals.ts`, `client-users.ts`, `chat-memory.ts`, `activity-log.ts`, `roi.ts`, `requests.ts`, `client-signals-store.ts` |
 | `assembleOperational` | `activity-log.ts`, `analytics-annotations.ts`, `annotations.ts`, `jobs.ts`, `usage-tracking.ts`, `approvals.ts`, `recommendations.ts`, `outcome-tracking.ts`, `outcome-playbooks.ts`, `work-orders.ts`, `analytics-insights-store.ts` |
 
 The `siteHealth` assembler has a 5-second timeout. If it exceeds the timeout the slice is omitted rather than blocking the full assembly.
@@ -133,7 +133,7 @@ The churn component is excluded if `listChurnSignals()` threw (e.g., table missi
 
 Per CLAUDE.md data flow rule 6:
 
-> Any new table or store that captures workspace activity must be surfaced in `server/workspace-intelligence.ts`. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND read from the new store inside the corresponding `assemble*` function.
+> Any new table or store that captures workspace activity must be surfaced in `server/intelligence/`. Each slice lives at `server/intelligence/<name>-slice.ts` and exports a single `assembleX(workspaceId, opts?)` function plus a typed interface. `server/workspace-intelligence.ts` is the public facade — call `buildWorkspaceIntelligence()` from there; do not call slice functions directly.
 
 ### Step-by-step pattern
 
@@ -143,22 +143,22 @@ Per CLAUDE.md data flow rule 6:
 export interface ClientSignalsSlice {
   // ... existing fields ...
 
-  /** New data source: count of unresolved feedback escalations */
+  /** New data source: count of unresolved escalations */
   escalationCount?: number;
 }
 ```
 
 Use `?` (optional) because the field may not be available on older DBs or when the module hasn't shipped yet.
 
-**2. Read from the store in the assembler** (`server/workspace-intelligence.ts`):
+**2. Read from the store in the assembler** (`server/intelligence/client-signals-slice.ts`):
 
 ```ts
-async function assembleClientSignals(workspaceId: string, _opts?: IntelligenceOptions): Promise<ClientSignalsSlice> {
+export async function assembleClientSignals(workspaceId: string, _opts?: IntelligenceOptions): Promise<ClientSignalsSlice> {
   // ... existing assembly ...
 
   let escalationCount: number | undefined;
   try {
-    const { getEscalationCount } = await import('./escalations.js');
+    const { getEscalationCount } = await import('../escalations.js');
     escalationCount = getEscalationCount(workspaceId);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: escalations optional, degrading gracefully');

@@ -135,7 +135,7 @@ The confusion: `t-ui` and `text-sm` are semantically close ("small UI text"), bu
 ## After Phase B Completes
 
 Once all Phase B domain sweeps have merged:
-1. Remove the `!important` overrides at `src/index.css:113-119`
+1. Remove the `!important` overrides at `src/index.css:256-258`
 2. Restore `.t-*` classes to their target sizes:
    - `.t-caption-sm`: 13.5px → 12px
    - `.t-caption`: 13.5px → 13px
