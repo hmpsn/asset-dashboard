@@ -51,6 +51,7 @@ import {
   getValidations,
   deleteValidation,
 } from '../schema-validator.js';
+import { validateLeanSchema } from '../schema/validator.js';
 import { isProgrammingError } from '../errors.js';
 
 const router = Router();
@@ -83,7 +84,7 @@ function broadcastSchemaSnapshotUpdated(
   });
 }
 
-async function publishSchemaToCmsField(opts: {
+export async function publishSchemaToCmsField(opts: {
   siteId: string;
   pageId: string;
   schema: Record<string, unknown>;
@@ -123,12 +124,26 @@ async function publishSchemaToCmsField(opts: {
   const currentItem = await getCollectionItem(collection.collectionId, collection.itemId, opts.token);
   const currentFieldData = (currentItem?.fieldData || currentItem || {}) as Record<string, unknown>;
   if (currentFieldData[fieldSlug] === schemaJson) {
+    if (opts.publishAfter) {
+      const publishResult = await publishCollectionItems(collection.collectionId, [collection.itemId], opts.token);
+      if (!publishResult.success) {
+        return {
+          mode: 'cms-field',
+          status: 'failed',
+          fieldSlug,
+          hash,
+          message: publishResult.error || `CMS item publish failed for unchanged ${fieldSlug}.`,
+        };
+      }
+    }
     return {
       mode: 'cms-field',
       status: 'unchanged',
       fieldSlug,
       hash,
-      message: `CMS field unchanged: ${fieldSlug}.`,
+      message: opts.publishAfter
+        ? `CMS field unchanged: ${fieldSlug}; CMS item published.`
+        : `CMS field unchanged: ${fieldSlug}.`,
     };
   }
 
@@ -378,6 +393,18 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
   try {
     // Validation gate: validate before publishing (unless explicitly skipped)
     if (!skipValidation) {
+      const structuralFindings = validateLeanSchema(schema, 'WebPage');
+      const structuralErrors = structuralFindings.filter(f => f.severity === 'error');
+      if (structuralErrors.length > 0) {
+        return res.status(422).json({
+          error: 'Schema has structural errors — fix before publishing',
+          validation: {
+            status: 'errors',
+            errors: structuralErrors,
+            warnings: structuralFindings.filter(f => f.severity === 'warning'),
+          },
+        });
+      }
       const validation = validateForGoogleRichResults(schema);
       const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
       const workspaceId = ws?.id || req.params.siteId;

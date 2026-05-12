@@ -22,6 +22,7 @@ import {
   publishTargetSchema, businessProfileSchema, audiencePersonaSchema, intelligenceProfileSchema,
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
+import { normalizeSocialProfiles } from './social-profiles.js';
 import { z } from 'zod';
 
 // ── Brand name resolution ──
@@ -423,7 +424,16 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
   if (!row) return null;
 
   const existing = rowToWorkspace(row);
-  const merged = Object.assign(existing, updates);
+  const normalizedUpdates = { ...updates };
+  if (normalizedUpdates.businessProfile) {
+    const normalizedSocialProfiles = normalizeSocialProfiles(normalizedUpdates.businessProfile.socialProfiles);
+    normalizedUpdates.businessProfile = {
+      ...normalizedUpdates.businessProfile,
+      ...(normalizedSocialProfiles !== undefined ? { socialProfiles: normalizedSocialProfiles } : {}),
+    };
+  }
+
+  const merged = Object.assign(existing, normalizedUpdates);
 
   // Build dynamic UPDATE SET clause — only update columns that were provided
   const setClauses: string[] = [];
@@ -455,7 +465,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
   for (const [key, col] of Object.entries(columnMap)) {
-    if (key in updates) {
+    if (key in normalizedUpdates) {
       setClauses.push(`${col} = @${col}`);
       params[col] = (p as Record<string, unknown>)[col];
     }
@@ -469,8 +479,8 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
   }
 
   // Handle pageEditStates — these go to a separate table
-  if (updates.pageEditStates !== undefined) {
-    const states = updates.pageEditStates || {};
+  if (normalizedUpdates.pageEditStates !== undefined) {
+    const states = normalizedUpdates.pageEditStates || {};
     // Get existing page IDs so we can detect removals
     const existingRows = stmts().listPageEditStates.all(id) as PageEditRow[];
     const existingIds = new Set(existingRows.map(r => r.page_id));

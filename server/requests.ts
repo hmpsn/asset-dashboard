@@ -9,6 +9,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getUploadRoot } from './data-dir.js';
+import { sanitizePlainText } from './html-sanitize.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 
@@ -106,17 +107,22 @@ export function createRequest(workspaceId: string, data: {
   pageId?: string;
 }): ClientRequest {
   const now = new Date().toISOString();
+  const title = sanitizePlainText(data.title).trim();
+  const description = sanitizePlainText(data.description).trim();
+  const submittedBy = data.submittedBy ? sanitizePlainText(data.submittedBy).trim() : undefined;
+  const pageUrl = data.pageUrl ? sanitizePlainText(data.pageUrl).trim() : undefined;
+  const pageId = data.pageId ? sanitizePlainText(data.pageId).trim() : undefined;
   const request: ClientRequest = {
     id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     workspaceId,
-    title: data.title,
-    description: data.description,
+    title,
+    description,
     category: data.category,
     priority: data.priority || 'medium',
     status: 'new',
-    submittedBy: data.submittedBy,
-    pageUrl: data.pageUrl,
-    pageId: data.pageId,
+    submittedBy,
+    pageUrl,
+    pageId,
     notes: [],
     createdAt: now,
     updatedAt: now,
@@ -212,7 +218,7 @@ export function addNote(workspaceId: string, requestId: string, author: 'client'
   const note: RequestNote = {
     id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     author,
-    content,
+    content: sanitizePlainText(content).trim(),
     attachments: attachments && attachments.length > 0 ? attachments : undefined,
     createdAt: new Date().toISOString(),
   };

@@ -539,11 +539,11 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
+      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex': {

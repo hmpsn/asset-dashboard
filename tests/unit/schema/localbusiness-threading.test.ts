@@ -85,8 +85,16 @@ describe('buildContactPageSchema — businessProfile threading', () => {
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData, businessProfile: withAddress });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
+    const businessNode = graph.find((n) => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(contactNode).toBeDefined();
     expect(contactNode['mainEntity']).toEqual({ '@id': 'https://example.com/#localbusiness' });
+    expect(businessNode?.address).toMatchObject({
+      streetAddress: '123 Main St',
+      addressLocality: 'Austin',
+      addressRegion: 'TX',
+      postalCode: '78701',
+      addressCountry: 'US',
+    });
   });
 
   it('mainEntity is absent when businessProfile.address is not set', () => {

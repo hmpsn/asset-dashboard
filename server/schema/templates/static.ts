@@ -49,13 +49,21 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
   const { semantics } = input;
   const phone = semantics?.phone || input.businessProfile?.phone;
   const email = semantics?.email || input.businessProfile?.email;
-  const semanticsAddress = semantics?.address ? dropUndefined({
+  const businessAddress = input.businessProfile?.address;
+  const contactAddress = semantics?.address ? dropUndefined({
     '@type': 'PostalAddress' as const,
     'streetAddress': semantics.address.street,
     'addressLocality': semantics.address.city,
     'addressRegion': semantics.address.state,
     'postalCode': semantics.address.postalCode,
     'addressCountry': semantics.address.country,
+  }) : businessAddress && (businessAddress.street || businessAddress.city) ? dropUndefined({
+    '@type': 'PostalAddress' as const,
+    'streetAddress': businessAddress.street,
+    'addressLocality': businessAddress.city,
+    'addressRegion': businessAddress.state,
+    'postalCode': businessAddress.zip,
+    'addressCountry': businessAddress.country,
   }) : undefined;
   const openingHoursSpec = semantics?.hours?.length
     ? semantics.hours.map(h => dropUndefined({
@@ -65,7 +73,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
         'closes': h.closes,
       }))
     : undefined;
-  const hasAddress = !!(input.businessProfile?.address?.street || input.businessProfile?.address?.city);
+  const hasAddress = !!(contactAddress?.streetAddress || contactAddress?.addressLocality);
   const primary = dropUndefined({
     '@type': 'ContactPage',
     '@id': `${pageData.canonicalUrl}#contactpage`,
@@ -80,7 +88,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
   });
   // Emit contact properties on a LocalBusiness/Organization sibling node —
   // telephone/email/address/openingHoursSpecification are not valid on ContactPage (a WebPage subtype).
-  const hasContactData = !!(phone || email || semanticsAddress || openingHoursSpec);
+  const hasContactData = !!(phone || email || contactAddress || openingHoursSpec);
   const nodes: Array<Record<string, unknown>> = [primary];
   if (hasContactData) {
     const contactEntity = hasAddress
@@ -91,7 +99,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
           'url': baseUrl,
           'telephone': phone,
           'email': email,
-          'address': semanticsAddress,
+          'address': contactAddress,
           'openingHoursSpecification': openingHoursSpec,
         })
       : dropUndefined({

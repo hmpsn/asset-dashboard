@@ -661,8 +661,14 @@ Return the complete brief as valid JSON with these fields:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    'You are an expert content strategist. Regenerate the requested brief and return only valid JSON matching the requested schema.',
+  );
+
   const aiResult = await callAI({
     model: 'gpt-5.4',
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
     temperature: 0.5,
@@ -805,8 +811,14 @@ Rules:
 - Do NOT use generic headings like "Introduction" or "Conclusion" — those are handled separately
 - Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
 
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    'You are an expert SEO content strategist. Return only valid JSON for the outline array requested by the user prompt.',
+  );
+
   const aiResult = await callAI({
     model: 'gpt-5.4',
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
@@ -817,13 +829,49 @@ Rules:
   // Parse the outline from the response
   const outlineRaw = aiResult.text || '[]';
   const outlineParsed = parseAiJson<Record<string, unknown> | unknown[]>(outlineRaw, 'outline-regen');
-  // Handle both { outline: [...] } and direct array
-  const newOutline: ContentBrief['outline'] = Array.isArray(outlineParsed)
-    ? outlineParsed as ContentBrief['outline']
-    : ((outlineParsed as Record<string, unknown>).outline || (outlineParsed as Record<string, unknown>).sections || []) as ContentBrief['outline'];
-  if (!Array.isArray(newOutline) || newOutline.length === 0) {
+  const candidateItems = Array.isArray(outlineParsed)
+    ? outlineParsed
+    : ((outlineParsed as Record<string, unknown>).outline
+      ?? (outlineParsed as Record<string, unknown>).sections
+      ?? []);
+
+  if (!Array.isArray(candidateItems) || candidateItems.length === 0) {
     throw new Error('Failed to parse regenerated outline');
   }
+
+  const normalizedItems = candidateItems.map((item, index) => {
+    const result = outlineItemSchema.safeParse(item);
+    if (!result.success) {
+      throw new Error(`Invalid outline section at index ${index + 1}`);
+    }
+
+    const parsedItem = result.data;
+    const heading = parsedItem.heading.trim();
+    const notes = parsedItem.notes.trim();
+    const subheadings = Array.isArray(parsedItem.subheadings)
+      ? parsedItem.subheadings.map(h => h.trim()).filter(Boolean)
+      : [];
+    const keywords = Array.isArray(parsedItem.keywords)
+      ? parsedItem.keywords.map(k => k.trim()).filter(Boolean)
+      : [];
+    const wordCount = Number.isFinite(parsedItem.wordCount)
+      ? Math.max(80, Math.round(Number(parsedItem.wordCount)))
+      : ptConfig.avgSectionWords;
+
+    if (!heading || !notes) {
+      throw new Error(`Invalid outline section at index ${index + 1}`);
+    }
+
+    return {
+      heading,
+      notes,
+      subheadings,
+      keywords,
+      wordCount,
+    };
+  });
+
+  const newOutline: ContentBrief['outline'] = normalizedItems;
 
   // Update only the outline field
   const updated = updateBrief(workspaceId, briefId, { outline: newOutline });
@@ -870,7 +918,11 @@ export async function generateBrief(
     strategyCardContext?: StrategyCardContext;
     /** If this brief is being generated for a decaying page, the pre-formatted decay query breakdown block to inject into the prompt. */
     decayQueryContext?: string;
-  }
+  },
+  options?: {
+    /** Persist generated brief row to content_briefs (default: true). */
+    persist?: boolean;
+  },
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
@@ -1261,43 +1313,45 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     templateId: context.templateId || undefined,
   };
 
-  stmts().insert.run({
-    id: brief.id,
-    workspace_id: workspaceId,
-    target_keyword: brief.targetKeyword,
-    secondary_keywords: JSON.stringify(brief.secondaryKeywords),
-    suggested_title: brief.suggestedTitle,
-    suggested_meta_desc: brief.suggestedMetaDesc,
-    outline: JSON.stringify(brief.outline),
-    word_count_target: brief.wordCountTarget,
-    intent: brief.intent,
-    audience: brief.audience,
-    competitor_insights: brief.competitorInsights,
-    internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
-    created_at: brief.createdAt,
-    executive_summary: brief.executiveSummary ?? null,
-    content_format: brief.contentFormat ?? null,
-    tone_and_style: brief.toneAndStyle ?? null,
-    people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
-    topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
-    serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
-    difficulty_score: brief.difficultyScore ?? null,
-    traffic_potential: brief.trafficPotential ?? null,
-    cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
-    eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
-    content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
-    schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
-    page_type: brief.pageType ?? null,
-    reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
-    real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
-    real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
-    keyword_locked: brief.keywordLocked ? 1 : 0,
-    keyword_source: brief.keywordSource ?? null,
-    keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
-    template_id: brief.templateId ?? null,
-    title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
-    meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
-  });
+  if (options?.persist !== false) {
+    stmts().insert.run({
+      id: brief.id,
+      workspace_id: workspaceId,
+      target_keyword: brief.targetKeyword,
+      secondary_keywords: JSON.stringify(brief.secondaryKeywords),
+      suggested_title: brief.suggestedTitle,
+      suggested_meta_desc: brief.suggestedMetaDesc,
+      outline: JSON.stringify(brief.outline),
+      word_count_target: brief.wordCountTarget,
+      intent: brief.intent,
+      audience: brief.audience,
+      competitor_insights: brief.competitorInsights,
+      internal_link_suggestions: JSON.stringify(brief.internalLinkSuggestions),
+      created_at: brief.createdAt,
+      executive_summary: brief.executiveSummary ?? null,
+      content_format: brief.contentFormat ?? null,
+      tone_and_style: brief.toneAndStyle ?? null,
+      people_also_ask: brief.peopleAlsoAsk ? JSON.stringify(brief.peopleAlsoAsk) : null,
+      topical_entities: brief.topicalEntities ? JSON.stringify(brief.topicalEntities) : null,
+      serp_analysis: brief.serpAnalysis ? JSON.stringify(brief.serpAnalysis) : null,
+      difficulty_score: brief.difficultyScore ?? null,
+      traffic_potential: brief.trafficPotential ?? null,
+      cta_recommendations: brief.ctaRecommendations ? JSON.stringify(brief.ctaRecommendations) : null,
+      eeat_guidance: brief.eeatGuidance ? JSON.stringify(brief.eeatGuidance) : null,
+      content_checklist: brief.contentChecklist ? JSON.stringify(brief.contentChecklist) : null,
+      schema_recommendations: brief.schemaRecommendations ? JSON.stringify(brief.schemaRecommendations) : null,
+      page_type: brief.pageType ?? null,
+      reference_urls: brief.referenceUrls ? JSON.stringify(brief.referenceUrls) : null,
+      real_people_also_ask: brief.realPeopleAlsoAsk ? JSON.stringify(brief.realPeopleAlsoAsk) : null,
+      real_top_results: brief.realTopResults ? JSON.stringify(brief.realTopResults) : null,
+      keyword_locked: brief.keywordLocked ? 1 : 0,
+      keyword_source: brief.keywordSource ?? null,
+      keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
+      template_id: brief.templateId ?? null,
+      title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
+      meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
+    });
+  }
 
   return brief;
 }

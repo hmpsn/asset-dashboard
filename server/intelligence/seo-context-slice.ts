@@ -4,6 +4,7 @@ import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../helpers.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import db from '../db/index.js';
+import { normalizeSocialProfiles } from '../social-profiles.js';
 import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, getRawKnowledge } from './seo-context-source.js';
 
 const log = createLogger('workspace-intelligence/seo-context');
@@ -145,8 +146,9 @@ export async function assembleSeoContext(
         .filter(Boolean)
         .join(', ');
     }
-    if (contactProfile!.socialProfiles?.length) {
-      base.businessProfile.socialProfiles = contactProfile!.socialProfiles;
+    const normalizedSocialProfiles = normalizeSocialProfiles(contactProfile!.socialProfiles);
+    if (normalizedSocialProfiles?.length) {
+      base.businessProfile.socialProfiles = normalizedSocialProfiles;
     }
     if (contactProfile!.openingHours) {
       base.businessProfile.openingHours = contactProfile!.openingHours;

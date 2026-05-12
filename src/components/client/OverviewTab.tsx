@@ -211,14 +211,14 @@ export function OverviewTab({
 
     {/* Action-needed banner — full-width, above content grid */}
     {(() => {
-      const actions: { label: string; count: number; tab: ClientTab; color: string; icon: string }[] = [];
-      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-accent-warning', icon: 'approval' });
+      const actions: { label: string; count: number; tab: ClientTab; inboxSection?: 'decisions' | 'reviews' | 'conversations'; color: string; icon: string }[] = [];
+      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', inboxSection: 'decisions', color: 'text-accent-warning', icon: 'approval' });
       const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
       const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
-      if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
-      if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
-      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-accent-brand', icon: 'reply' });
-      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'inbox', color: 'text-accent-info', icon: 'content-plan' });
+      if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', inboxSection: 'reviews', color: 'text-accent-info', icon: 'content' });
+      if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', inboxSection: 'reviews', color: 'text-accent-info', icon: 'content' });
+      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', inboxSection: 'conversations', color: 'text-accent-brand', icon: 'reply' });
+      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'inbox', inboxSection: 'decisions', color: 'text-accent-info', icon: 'content-plan' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (
@@ -229,7 +229,17 @@ export function OverviewTab({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {actions.map((a, i) => (
-              <ClickableRow key={i} onClick={() => navigate(clientPath(workspaceId, a.tab, betaMode))} className="inline-flex w-auto items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50">
+              <ClickableRow
+                key={i}
+                onClick={() => {
+                  if (a.tab === 'inbox' && a.inboxSection) {
+                    navigate(`${clientPath(workspaceId, a.tab, betaMode)}?tab=${a.inboxSection}`);
+                    return;
+                  }
+                  navigate(clientPath(workspaceId, a.tab, betaMode));
+                }}
+                className="inline-flex w-auto items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50"
+              >
                 <span className={`t-caption-sm font-semibold ${a.color}`}>{a.count}</span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{a.label.replace(/^\d+\s*/, '')}</span>
               </ClickableRow>

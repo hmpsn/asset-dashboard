@@ -49,6 +49,7 @@ import {
   type KeywordFeedbackBody,
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
+import { normalizeSocialProfiles } from '../social-profiles.js';
 
 const log = createLogger('public-portal');
 
@@ -604,9 +605,11 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
   const existing = getWorkspace(wsId);
   if (!existing) return res.status(404).json({ error: 'Workspace not found' });
   const existingProfile = existing.businessProfile ?? {};
+  const normalizedSocialProfiles = normalizeSocialProfiles(parsed.data.socialProfiles);
   const mergedProfile = {
     ...existingProfile,
     ...parsed.data,
+    ...(normalizedSocialProfiles !== undefined ? { socialProfiles: normalizedSocialProfiles } : {}),
     // Deep-merge address sub-object so partial address PATCHes don't wipe sibling fields
     ...(parsed.data.address !== undefined
       ? { address: { ...(existingProfile.address ?? {}), ...parsed.data.address } }

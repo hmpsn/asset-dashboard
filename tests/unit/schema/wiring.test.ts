@@ -41,6 +41,7 @@ vi.mock('../../../server/ai.js', () => ({
 
 import { generateLeanSchema } from '../../../server/schema/generator.js';
 import { getPageElements } from '../../../server/page-elements-store.js';
+import type { SiteInventoryCmsItem } from '../../../shared/types/site-inventory.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -252,6 +253,62 @@ describe('pageKindOverride', () => {
     expect(lbNode.areaServed).toEqual({ '@type': 'Place', name: 'Kyle' });
     expect(JSON.stringify(output.suggestedSchemas[0].template)).not.toContain('65d25be3772349200f0af0ab');
   });
+
+  it('threads stored semantic contact data into ContactPage output', async () => {
+    vi.mocked(getPageElements).mockReturnValueOnce({
+      workspaceId: 'ws-test',
+      pagePath: '/contact',
+      sourcePublishedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      catalog: {
+        extractedAt: '2026-01-01T00:00:00.000Z',
+        sourcePublishedAt: null,
+        headings: [],
+        tables: [],
+        images: [],
+        videos: [],
+        lists: [],
+        testimonials: [],
+        codeBlocks: [],
+        citations: [],
+        diagnostics: {
+          aiClassificationCalls: 0,
+          hitAiBudgetCap: false,
+          rawCounts: {},
+        },
+        semantics: {
+          phone: '512-555-1212',
+          email: 'hello@example.com',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            postalCode: '78701',
+            country: 'US',
+          },
+        },
+      },
+    });
+    const output = await generateLeanSchema(
+      makeInput('/contact', {
+        pageKindOverride: 'ContactPage',
+      }),
+    );
+
+    const graph = getGraph(output);
+    const contactEntity = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
+    expect(contactEntity).toBeDefined();
+    expect(contactEntity?.telephone).toBe('512-555-1212');
+    expect(contactEntity?.email).toBe('hello@example.com');
+    expect(contactEntity?.address).toMatchObject({
+      streetAddress: '100 Main St',
+      addressLocality: 'Austin',
+      addressRegion: 'TX',
+      postalCode: '78701',
+      addressCountry: 'US',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -379,5 +436,37 @@ describe('static sitemap path resolution', () => {
     ], BASE_URL);
 
     expect(pages[0].publishedPath).toBe('/services/veneers');
+  });
+
+  it('adds CMS item pages to site context so hubs can reference collection children', async () => {
+    const { buildSiteContextPages } = await import('../../../server/schema-suggester.js');
+    const { assembleSiteContext } = await import('../../../server/schema/site-context.js');
+    const cmsItem: SiteInventoryCmsItem = {
+      pageId: 'cms-blog-example-post',
+      title: 'Example Post',
+      path: '/blog/example-post',
+      url: 'https://example.com/blog/example-post',
+      collectionId: 'collection-blog',
+      collectionName: 'Blog Posts',
+      collectionSlug: 'blog',
+      itemId: 'item-example',
+      lastPublished: '2026-01-02T00:00:00.000Z',
+      createdOn: '2026-01-01T00:00:00.000Z',
+      fieldData: null,
+      effectiveRole: 'blog',
+      roleSource: 'inferred',
+      schemaFieldAvailable: false,
+      isUtility: false,
+      fieldTargets: {},
+    };
+
+    const contextPages = buildSiteContextPages([
+      { id: 'page-blog', title: 'Blog', slug: 'blog', publishedPath: '/blog' },
+    ], [cmsItem]);
+    const ctx = assembleSiteContext(contextPages, BASE_URL);
+    const blogHub = ctx.pages.find(p => p.path === '/blog');
+
+    expect(blogHub?.childPaths).toContain('/blog/example-post');
+    expect(ctx.pages.find(p => p.path === '/blog/example-post')?.id).toBe('https://example.com/blog/example-post#article');
   });
 });
