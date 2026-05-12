@@ -382,7 +382,7 @@
           "priority": "P1",
           "sprint": "future",
           "status": "pending",
-          "notes": "Quick-win Tier-4 fields with data the platform already has. Article.wordCount (already computed in TipTap on every save). Article.timeRequired = wordCount/250wpm rounded. WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; almost nobody implements correctly. Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
+          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
         },
         {
           "id": "schema-eeat-amplifiers",

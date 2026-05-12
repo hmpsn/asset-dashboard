@@ -308,6 +308,8 @@ const PE_WS_IDS = {
   citation: 'ws_test_pe_citation',
   noElements: 'ws_test_pe_none',
   mixed: 'ws_test_pe_mixed',
+  articleGallery: 'ws_test_pe_article_gallery',
+  thinMedia: 'ws_test_pe_thin_media',
   cacheHit: 'ws_test_pe_cache_hit',
   refresh: 'ws_test_pe_refresh',
   nullToSet: 'ws_test_pe_null_to_set',
@@ -455,7 +457,95 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
     expect(new Set(ids).size).toBe(ids.length); // unique
     const primary = graph.find(n => n['@type'] === 'BlogPosting')!;
     expect(primary.citation).toBeDefined();
+    expect(primary.wordCount).toBeGreaterThan(20);
     db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('emits BlogPosting metadata plus ImageGallery from meaningful safe body images', async () => {
+    const html = `
+      <html>
+        <head>
+          <meta property="og:image" content="https://cdn.example.com/hero.jpg">
+        </head>
+        <body>
+          <article>
+            <h1>How teams actually choose CMS architecture</h1>
+            <p class="byline">By Jordan Lee</p>
+            <p>This guide explains how teams compare CMS architecture options for complex editorial operations.</p>
+            <figure>
+              <img src="https://cdn.example.com/workflow.jpg" alt="Workflow diagram showing editorial review stages" width="900" height="500">
+              <figcaption>Editorial review workflow across teams.</figcaption>
+            </figure>
+            <figure>
+              <img src="https://cdn.example.com/model.jpg" alt="Content model showing article fields and reference links" width="900" height="500">
+            </figure>
+            <img src="/relative.jpg" alt="Relative image should not enter public schema gallery" width="900" height="500">
+            <p>Teams should document ownership, review steps, and publishing responsibilities before launch.</p>
+          </article>
+        </body>
+      </html>
+    `;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-article-gallery-test',
+      pageMeta: {
+        title: 'Title Cased Fallback',
+        slug: 'cms-architecture',
+        publishedPath: '/blog/cms-architecture',
+        seo: { description: 'A practical CMS architecture guide.' },
+        sourcePublishedAt: null,
+        lastPublished: '2026-04-15T00:00:00Z',
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.articleGallery },
+    });
+
+    const graph = (out.suggestedSchemas[0].template as Record<string, unknown>)['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph.find(n => n['@type'] === 'BlogPosting')!;
+    const gallery = graph.find(n => n['@type'] === 'ImageGallery')!;
+    expect(primary.headline).toBe('How teams actually choose CMS architecture');
+    expect(primary.author).toEqual({ '@type': 'Person', 'name': 'Jordan Lee' });
+    expect(primary.wordCount).toBeGreaterThan(20);
+    expect(primary.image).toEqual(['https://cdn.example.com/hero.jpg']);
+    expect(gallery.image).toEqual([
+      'https://cdn.example.com/workflow.jpg',
+      'https://cdn.example.com/model.jpg',
+    ]);
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(PE_WS_IDS.articleGallery);
+  });
+
+  it('does not emit ImageGallery for thin or unsafe media', async () => {
+    const html = `
+      <html><body>
+        <article>
+          <h1>Thin media article</h1>
+          <p>Body copy with enough visible text for a normal article.</p>
+          <img src="https://cdn.example.com/thin.jpg" alt="Icon" width="900" height="500">
+          <img src="javascript:alert(1)" alt="Meaningful malicious image source should be dropped" width="900" height="500">
+          <iframe src="https://player.example.com/video/123" title="Unsupported provider"></iframe>
+        </article>
+      </body></html>
+    `;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-thin-media-test',
+      pageMeta: {
+        title: 'Thin Media Article',
+        slug: 'thin-media',
+        publishedPath: '/blog/thin-media',
+        seo: { description: 'A media gating example.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.thinMedia },
+    });
+
+    const graph = (out.suggestedSchemas[0].template as Record<string, unknown>)['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'ImageGallery')).toBeUndefined();
+    expect(graph.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(PE_WS_IDS.thinMedia);
   });
 
   it('cache hit: second call with same sourcePublishedAt re-uses stored catalog (no re-extraction)', async () => {
