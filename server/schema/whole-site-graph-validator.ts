@@ -27,11 +27,15 @@ interface IdReference {
 
 const SITEWIDE_ORG_TYPES = new Set(['Organization', 'LocalBusiness', 'MedicalOrganization', 'FinancialService']);
 const COMPATIBLE_TYPES: Record<string, Set<string>> = {
-  Article: new Set(['Article', 'BlogPosting', 'NewsArticle']),
+  Article: new Set(['Article', 'Blog', 'BlogPosting', 'NewsArticle']),
+  Blog: new Set(['Blog', 'CollectionPage']),
   BlogPosting: new Set(['Article', 'BlogPosting', 'NewsArticle']),
   WebPage: new Set(['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage', 'ProfilePage']),
   CollectionPage: new Set(['CollectionPage', 'Blog', 'ItemList']),
   LocalBusiness: new Set(['LocalBusiness', 'MedicalOrganization', 'FinancialService']),
+};
+const COMPATIBLE_ROLES: Record<string, Set<string>> = {
+  partnership: new Set(['blog']),
 };
 
 function normalizePath(path: string | undefined): string {
@@ -126,6 +130,16 @@ function isCompatibleType(expected: string, emittedTypes: Set<string>): boolean 
   if (emittedTypes.has(expected)) return true;
   const compatible = COMPATIBLE_TYPES[expected];
   return compatible ? [...emittedTypes].some(type => compatible.has(type)) : false;
+}
+
+function isCompatibleRole(expected: string, generated: string, emittedTypes: Set<string>): boolean {
+  if (expected === generated) return true;
+  const compatible = COMPATIBLE_ROLES[expected];
+  if (!compatible?.has(generated)) return false;
+  if (expected === 'partnership' && generated === 'blog') {
+    return emittedTypes.has('BlogPosting') || emittedTypes.has('Article') || emittedTypes.has('WebPage');
+  }
+  return true;
 }
 
 function siteIdentityGroup(node: InternalNode): string | null {
@@ -279,6 +293,17 @@ export function validateWholeSiteSchemaGraph(
         }
       }
     }
+    const pageSchemaIdentityMatches = matches.filter(node => node.source === 'page-schema' && siteIdentityGroup(node));
+    const pagePaths = new Set(pageSchemaIdentityMatches.map(node => node.pagePath));
+    if (pagePaths.size > 1) {
+      addFinding(findings, {
+        severity: 'warning',
+        type: canonical.type,
+        ruleId: 'schema-graph-duplicate-site-identity-body',
+        message: `Site identity node "${id}" is emitted by multiple page schemas (${[...pagePaths].join(', ')}). Prefer one canonical owner page and @id references elsewhere.`,
+        sourceId: id,
+      });
+    }
   }
 
   const siteIdentityIdsByGroup = new Map<string, Set<string>>();
@@ -360,7 +385,7 @@ export function validateWholeSiteSchemaGraph(
       if (!page) continue;
       const emittedTypes = new Set(graphNodes(primarySchema(page)).flatMap(node => nodeTypes(node)));
       const diagnosticRole = page.generationDiagnostics?.effectiveRole ?? page.generationDiagnostics?.plannedRole;
-      if (diagnosticRole && diagnosticRole !== role.role) {
+      if (diagnosticRole && !isCompatibleRole(role.role, diagnosticRole, emittedTypes)) {
         addFinding(findings, {
           severity: 'warning',
           type: role.primaryType || 'WebPage',

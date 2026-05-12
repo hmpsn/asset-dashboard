@@ -254,7 +254,7 @@ describe('pageKindOverride', () => {
     expect(JSON.stringify(output.suggestedSchemas[0].template)).not.toContain('65d25be3772349200f0af0ab');
   });
 
-  it('threads stored semantic contact data into ContactPage output', async () => {
+  it('does not let page-only semantic contact data create a dangling root LocalBusiness reference', async () => {
     vi.mocked(getPageElements).mockReturnValueOnce({
       workspaceId: 'ws-test',
       pagePath: '/contact',
@@ -297,17 +297,30 @@ describe('pageKindOverride', () => {
     );
 
     const graph = getGraph(output);
+    const contactNode = graph.find(n => n['@type'] === 'ContactPage') as Record<string, unknown> | undefined;
     const contactEntity = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
-    expect(contactEntity).toBeDefined();
-    expect(contactEntity?.telephone).toBe('512-555-1212');
-    expect(contactEntity?.email).toBe('hello@example.com');
-    expect(contactEntity?.address).toMatchObject({
-      streetAddress: '100 Main St',
-      addressLocality: 'Austin',
-      addressRegion: 'TX',
-      postalCode: '78701',
-      addressCountry: 'US',
-    });
+    expect(contactNode?.mainEntity).toEqual({ '@id': 'https://example.com/#organization' });
+    expect(contactEntity).toBeUndefined();
+  });
+
+  it('threads verified workspace business identity into ContactPage without duplicating the identity body', async () => {
+    const output = await generateLeanSchema(
+      makeInput('/contact', {
+        pageKindOverride: 'ContactPage',
+        workspace: {
+          ...minimalWorkspace,
+          businessProfile: {
+            address: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+          },
+        },
+      }),
+    );
+
+    const graph = getGraph(output);
+    const contactNode = graph.find(n => n['@type'] === 'ContactPage') as Record<string, unknown> | undefined;
+    const contactEntity = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
+    expect(contactNode?.mainEntity).toEqual({ '@id': 'https://example.com/#localbusiness' });
+    expect(contactEntity).toBeUndefined();
   });
 });
 
