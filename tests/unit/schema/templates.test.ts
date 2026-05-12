@@ -129,6 +129,57 @@ describe('buildArticleSchema (BlogPosting)', () => {
     const node = (buildArticleSchema(noKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.keywords).toBeUndefined();
   });
+
+  it('sanitizes citations at template emission time', () => {
+    const withCitations = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          citations: [
+            { url: 'https://example.com/internal', text: 'Internal cite', isExternal: true },
+            { url: 'https://calendly.grsm.io/acme', text: 'Calendly', isExternal: true },
+            { url: 'javascript:void(0)', text: 'Bad scheme', isExternal: true },
+            { url: 'https://developers.google.com/search/docs/appearance/structured-data/article#guidelines', text: 'Google Article structured data guidelines', isExternal: true },
+            { url: 'https://developer.mozilla.org/en-US/docs/Web/API/Performance_API', text: 'MDN Performance API guide', isExternal: true },
+            { url: 'https://web.dev/articles/vitals', text: 'Web Vitals research', isExternal: true },
+            { url: 'https://example.edu/research', text: 'Research report', isExternal: true },
+            { url: 'https://example.org/report', text: 'Industry report', isExternal: true },
+            { url: 'https://example.net/report', text: 'Overflow report', isExternal: true },
+          ],
+        },
+      },
+    };
+
+    const node = (buildArticleSchema(withCitations, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.citation).toEqual([
+      {
+        '@type': 'WebPage',
+        url: 'https://developers.google.com/search/docs/appearance/structured-data/article',
+        name: 'Google Article structured data guidelines',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://developer.mozilla.org/en-US/docs/Web/API/Performance_API',
+        name: 'MDN Performance API guide',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://web.dev/articles/vitals',
+        name: 'Web Vitals research',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://example.edu/research',
+        name: 'Research report',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://example.org/report',
+        name: 'Industry report',
+      },
+    ]);
+  });
 });
 
 const serviceInput = {

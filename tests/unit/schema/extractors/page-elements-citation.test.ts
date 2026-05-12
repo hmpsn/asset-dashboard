@@ -38,12 +38,12 @@ describe('extractCitations', () => {
         <a href="">Empty</a>
         <a href="javascript:void(0)">JS</a>
         <a href="mailto:a@b.com">Email</a>
-        <a href="https://example.com">Real external</a>
+        <a href="https://example.com/research/report">External research report</a>
       </article>
     `);
     const citations = extractCitations($, 'https://www.hmpsn.studio');
     expect(citations).toHaveLength(1);
-    expect(citations[0].url).toBe('https://example.com/');
+    expect(citations[0].url).toBe('https://example.com/research/report');
   });
 
   it('skips relative-path links (treats them as internal)', () => {
@@ -73,12 +73,12 @@ describe('extractCitations', () => {
         <a href="blob:https://example.com/abc">Blob</a>
         <a href="file:///etc/passwd">File</a>
         <a href="vbscript:msgbox(1)">VB</a>
-        <a href="https://example.com">Allowed</a>
+        <a href="https://example.com/research/report">Allowed research report</a>
       </article>
     `);
     const citations = extractCitations($, 'https://www.hmpsn.studio');
     expect(citations).toHaveLength(1);
-    expect(citations[0].url).toBe('https://example.com/');
+    expect(citations[0].url).toBe('https://example.com/research/report');
   });
 
   it('skips in-page anchor hrefs (#section)', () => {
@@ -98,16 +98,16 @@ describe('extractCitations', () => {
     const $ = cheerio.load(`
       <article>
         <a href="https://www.hmpsn.studio/about">Same host</a>
-        <a href="https://blog.hmpsn.studio/post">Subdomain (different hostname)</a>
-        <a href="https://external.com">External</a>
+        <a href="https://blog.hmpsn.studio/research/report">Subdomain research report</a>
+        <a href="https://external.com/research/report">External research report</a>
       </article>
     `);
     const citations = extractCitations($, 'https://www.hmpsn.studio');
     // Same exact hostname is filtered; subdomain is a different hostname (treated external).
     expect(citations).toHaveLength(2);
     expect(citations.map(c => c.url)).toEqual([
-      'https://blog.hmpsn.studio/post',
-      'https://external.com/',
+      'https://blog.hmpsn.studio/research/report',
+      'https://external.com/research/report',
     ]);
   });
 
@@ -164,5 +164,22 @@ describe('extractCitations', () => {
       'https://d.example.com/report',
       'https://e.example.com/report',
     ]);
+  });
+
+  it('filters scheduling, form, widget, and affiliate links from real-world article citations', () => {
+    const $ = cheerio.load(`
+      <article>
+        <a href="http://www.jobportraits.com/">Job Portraits</a>
+        <a href="http://www.pro.goodshuffle.com/">Goodshuffle</a>
+        <a href="https://www.quercus.design/">Quercus</a>
+        <a href="https://calendly.grsm.io/hmpsn">Calendly</a>
+        <a href="https://typeform.grsm.io/hmpsn">Typeform</a>
+        <a href="https://webflow.grsm.io/hmpsn">Webflow</a>
+        <a href="https://elfsight.com/?ref=939044be-3028-4145-87f8-9accc2341da9">Elfsight</a>
+        <a href="http://www.hmpsn.com/post/our-partnership-with-job-portraits-building-a-scalable-blueprint-for-careers-microsites">career micro-site template</a>
+      </article>
+    `);
+
+    expect(extractCitations($, 'https://www.hmpsn.studio')).toEqual([]);
   });
 });
