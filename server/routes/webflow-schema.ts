@@ -14,7 +14,7 @@ import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
+import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
@@ -52,6 +52,7 @@ import {
   deleteValidation,
 } from '../schema-validator.js';
 import { validateLeanSchema } from '../schema/validator.js';
+import { validateWholeSiteSchemaGraph } from '../schema/whole-site-graph-validator.js';
 import { isProgrammingError } from '../errors.js';
 
 const router = Router();
@@ -985,6 +986,23 @@ router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspace
   } catch (err) {
     log.error({ err }, 'Schema consistency validate error');
     res.status(500).json({ error: 'Entity consistency check failed' });
+  }
+});
+
+// Validate the latest generated snapshot as one whole-site JSON-LD graph.
+router.get('/api/webflow/schema-graph-validation/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
+  try {
+    const snapshot = getSchemaSnapshot(req.params.siteId);
+    const plan = getSchemaPlan(req.params.siteId);
+    const result = validateWholeSiteSchemaGraph({
+      pages: snapshot?.results ?? [],
+      siteTemplate: getSiteTemplate(req.params.siteId),
+      activePlan: plan?.status === 'active' ? plan : null,
+    });
+    res.json(result);
+  } catch (err) {
+    log.error({ err }, 'Schema graph validation error');
+    res.status(500).json({ error: 'Schema graph validation failed' });
   }
 });
 

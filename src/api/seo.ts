@@ -128,6 +128,9 @@ export const schemaValidation = {
 
   get: (siteId: string, pageId: string, workspaceId?: string) =>
     getOptional<SchemaValidationRecord>(appendWorkspaceQuery(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`, workspaceId)),
+
+  getGraph: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/schema-graph-validation/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── Schema Site Plan ────────────────────────────────────────────
