@@ -21,6 +21,7 @@ import type { SchemaPageRole } from '../shared/types/schema-plan.js';
 import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
 import { buildSiteInventory, isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
+import type { WebflowPage } from './webflow-pages.js';
 
 const log = createLogger('schema');
 
@@ -521,6 +522,34 @@ function recordSkippedUtility(skippedUtilities: Map<string, number>, path: strin
   skippedUtilities.set(reason, (skippedUtilities.get(reason) ?? 0) + 1);
 }
 
+function cmsItemToSiteContextPage(item: SiteInventoryCmsItem): WebflowPage {
+  const slug = item.path.replace(/^\/|\/$/g, '').split('/').pop() || item.path.replace(/^\//, '');
+  return {
+    id: item.pageId,
+    title: item.title,
+    slug,
+    publishedPath: item.path,
+    lastPublished: item.lastPublished,
+  };
+}
+
+export function buildSiteContextPages(
+  staticPages: WebflowPage[],
+  cmsItems: SiteInventoryCmsItem[] = [],
+  activePlan: ReturnType<typeof getSchemaPlan> | null = null,
+): WebflowPage[] {
+  const byPath = new Map<string, WebflowPage>();
+  for (const page of staticPages) {
+    byPath.set(resolvePagePath(page).replace(/\/$/, '').toLowerCase() || '/', page);
+  }
+  for (const item of cmsItems) {
+    if (shouldSkipBulkPage(item.path, findPlanRole(activePlan, item.path)?.role)) continue;
+    const key = item.path.replace(/\/$/, '').toLowerCase() || '/';
+    if (!byPath.has(key)) byPath.set(key, cmsItemToSiteContextPage(item));
+  }
+  return Array.from(byPath.values());
+}
+
 export async function generateSchemaForPage(
   siteId: string,
   pageId: string,
@@ -631,11 +660,13 @@ export async function generateSchemaForPage(
       if (matched?.publishedPath) {
         publishedPath = matched.publishedPath;
       }
-      const activePlan = getSchemaPlan(siteId);
+      const latestPlan = getSchemaPlan(siteId);
+      const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+      const contextPages = buildSiteContextPages(allPages, siteInventory?.cmsItems, activePlan);
       siteContextForPage = assembleSiteContext(
-        allPages,
+        contextPages,
         baseUrl,
-        activePlan?.status === 'active' ? activePlan.canonicalEntities : [],
+        activePlan?.canonicalEntities ?? [],
       );
     }
   } catch { /* page list failure — fall back to derived path */ } // catch-ok
@@ -744,8 +775,9 @@ export async function generateSchemaSuggestions(
       })
     : undefined;
 
-  let siteContext: SiteContext | undefined = pages.length > 0
-    ? assembleSiteContext(pages, baseUrl, activePlan?.canonicalEntities ?? [])
+  const contextPages = buildSiteContextPages(pages, siteInventory?.cmsItems, activePlan);
+  let siteContext: SiteContext | undefined = contextPages.length > 0
+    ? assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])
     : undefined;
 
   // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
@@ -891,6 +923,7 @@ export async function generateSchemaSuggestions(
           industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
         },
         aiBudget, // PR2: same shared budget — drains across CMS pages in same run
+        siteContext,
         pageKindOverride: roleOverride.pageKindOverride,
         schemaRoleOverride: roleOverride.schemaRoleOverride,
         plannedSchemaRole: roleOverride.plannedRole,

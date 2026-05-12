@@ -10,7 +10,7 @@
  * the failure reason captured in diagnostics.rawCounts.error.
  */
 import * as cheerio from 'cheerio';
-import type { PageElementCatalog } from '../../../shared/types/page-elements.js';
+import type { PageElementCatalog, SemanticPageData } from '../../../shared/types/page-elements.js';
 import { extractVideos } from './page-elements/video.js';
 import { extractLists } from './page-elements/howto.js';
 import { extractCitations } from './page-elements/citation.js';
@@ -22,6 +22,7 @@ import { aiDisambiguateHowTo } from './page-elements/howto-ai-fallback.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
 import { contentScope } from './page-elements/content-scope.js';
 import { createLogger } from '../../logger.js';
+import { parseJsonFallback } from '../../db/json-validation.js';
 
 const log = createLogger('schema/extractors/page-elements');
 
@@ -68,6 +69,103 @@ function emptyCatalog(opts: ExtractPageElementsOpts, errorMarker: 1 | 0 = 0): Pa
   };
 }
 
+function cleanSemanticText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  return cleaned || undefined;
+}
+
+function normalizePhone(value: unknown): string | undefined {
+  const cleaned = cleanSemanticText(value);
+  if (!cleaned) return undefined;
+  const stripped = cleaned.replace(/^tel:/i, '').trim();
+  const digitCount = stripped.replace(/\D/g, '').length;
+  return digitCount >= 7 ? stripped : undefined;
+}
+
+function normalizeEmail(value: unknown): string | undefined {
+  const cleaned = cleanSemanticText(value);
+  if (!cleaned) return undefined;
+  const stripped = cleaned.replace(/^mailto:/i, '').split('?')[0].trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stripped) ? stripped : undefined;
+}
+
+function extractJsonLdObjects($: cheerio.CheerioAPI): Record<string, unknown>[] {
+  const nodes: Record<string, unknown>[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const parsed = parseJsonFallback<unknown>($(el).contents().text(), null);
+      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const obj = item as Record<string, unknown>;
+        nodes.push(obj);
+        const graph = obj['@graph'];
+        if (Array.isArray(graph)) queue.push(...graph);
+      }
+    } catch { /* invalid inline JSON-LD is ignored by the semantic extractor */ } // catch-ok
+  });
+  return nodes;
+}
+
+function semanticAddressFromObject(value: unknown): SemanticPageData['address'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const obj = value as Record<string, unknown>;
+  const street = cleanSemanticText(obj.streetAddress);
+  const city = cleanSemanticText(obj.addressLocality);
+  const state = cleanSemanticText(obj.addressRegion);
+  const postalCode = cleanSemanticText(obj.postalCode);
+  const country = cleanSemanticText(obj.addressCountry);
+  if (!street || !city || !state) return undefined;
+  return {
+    street,
+    city,
+    state,
+    ...(postalCode ? { postalCode } : {}),
+    ...(country ? { country } : {}),
+  };
+}
+
+function firstItemprop($: cheerio.CheerioAPI, prop: string): string | undefined {
+  const el = $(`[itemprop="${prop}"]`).first();
+  if (!el.length) return undefined;
+  return cleanSemanticText(el.attr('content') || el.attr('datetime') || el.text());
+}
+
+function extractSemantics($: cheerio.CheerioAPI): SemanticPageData | undefined {
+  const jsonLdNodes = extractJsonLdObjects($);
+  const businessNode = jsonLdNodes.find(node => {
+    const type = node['@type'];
+    const types = Array.isArray(type) ? type : [type];
+    return types.some(t => typeof t === 'string' && /^(LocalBusiness|Organization|MedicalOrganization|FinancialService)$/.test(t));
+  });
+  const phone = normalizePhone(businessNode?.telephone)
+    ?? normalizePhone($('a[href^="tel:"]').first().attr('href'));
+  const email = normalizeEmail(businessNode?.email)
+    ?? normalizeEmail($('a[href^="mailto:"]').first().attr('href'));
+  const jsonLdAddress = semanticAddressFromObject(businessNode?.address);
+  const itempropAddress = semanticAddressFromObject({
+    streetAddress: firstItemprop($, 'streetAddress'),
+    addressLocality: firstItemprop($, 'addressLocality'),
+    addressRegion: firstItemprop($, 'addressRegion'),
+    postalCode: firstItemprop($, 'postalCode'),
+    addressCountry: firstItemprop($, 'addressCountry'),
+  });
+  const sameAsRaw = businessNode?.sameAs;
+  const sameAs = Array.isArray(sameAsRaw)
+    ? sameAsRaw.map(v => cleanSemanticText(v)).filter((v): v is string => !!v && /^https?:\/\//.test(v))
+    : undefined;
+
+  const semantics: SemanticPageData = {
+    ...(phone ? { phone } : {}),
+    ...(email ? { email } : {}),
+    ...(jsonLdAddress ?? itempropAddress ? { address: jsonLdAddress ?? itempropAddress } : {}),
+    ...(sameAs && sameAs.length > 0 ? { sameAs } : {}),
+  };
+  return Object.keys(semantics).length > 0 ? semantics : undefined;
+}
+
 export async function extractPageElements(
   html: string,
   opts: ExtractPageElementsOpts,
@@ -108,6 +206,7 @@ export async function extractPageElements(
     });
     const tables = extractTables($);
     const testimonials = extractTestimonials($);
+    const semantics = extractSemantics($);
 
     // PR3 elements — empty arrays until PR3
     const headings: PageElementCatalog['headings'] = [];
@@ -124,6 +223,7 @@ export async function extractPageElements(
       testimonials,
       codeBlocks,
       citations,
+      ...(semantics ? { semantics } : {}),
       diagnostics: {
         aiClassificationCalls: opts.aiBudget.used,
         hitAiBudgetCap: opts.aiBudget.exhausted,

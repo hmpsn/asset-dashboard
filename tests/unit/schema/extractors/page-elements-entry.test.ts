@@ -86,6 +86,42 @@ describe('extractPageElements entry-point', () => {
     expect(catalog.diagnostics.rawCounts.error).toBeFalsy(); // happy path = no error marker
   });
 
+  it('extracts conservative semantic contact data from explicit links and microdata', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<body>
+  <main>
+    <a href="tel:+15125551212">Call</a>
+    <a href="mailto:hello@example.com?subject=Hi">Email</a>
+    <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+      <span itemprop="streetAddress">100 Main St</span>
+      <span itemprop="addressLocality">Austin</span>
+      <span itemprop="addressRegion">TX</span>
+      <span itemprop="postalCode">78701</span>
+      <span itemprop="addressCountry">US</span>
+    </div>
+  </main>
+</body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.example.com',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics).toMatchObject({
+      phone: '+15125551212',
+      email: 'hello@example.com',
+      address: {
+        street: '100 Main St',
+        city: 'Austin',
+        state: 'TX',
+        postalCode: '78701',
+        country: 'US',
+      },
+    });
+  });
+
   it('PR2: extracts images, tables, testimonials when present', async () => {
     const html = `<!DOCTYPE html>
 <html>
