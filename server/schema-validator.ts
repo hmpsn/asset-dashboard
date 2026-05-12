@@ -1,10 +1,9 @@
 /**
- * Schema validation — Google-compliant rich results validator + entity consistency checker.
+ * Schema validation — Google-compliant rich results validator.
  *
  * Provides:
  * 1. Validation store (CRUD for schema_validations table)
  * 2. validateForGoogleRichResults() — rule-based pre-publish validator per Google's documented requirements
- * 3. validateEntityConsistency() — cross-page entity mismatch detection
  */
 import db from './db/index.js';
 import { randomUUID } from 'crypto';
@@ -25,18 +24,6 @@ export interface ValidationResult {
   richResults: string[];
   errors: ValidationError[];
   warnings: ValidationError[];
-}
-
-interface EntityMismatch {
-  field: string;
-  expected: string;
-  found: string;
-  pageId: string;
-}
-
-interface ConsistencyResult {
-  consistent: boolean;
-  mismatches: EntityMismatch[];
 }
 
 // ── Validation Store (CRUD) ──
@@ -215,60 +202,4 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
     'valid';
 
   return { status, richResults, errors, warnings };
-}
-
-// ── Entity Consistency Checker ──
-
-const CONSISTENCY_FIELDS = ['name', 'url', 'telephone', 'logo', 'address', 'sameAs'];
-
-export function validateEntityConsistency(
-  schemas: Array<{ pageId: string; schema: Record<string, unknown> }>
-): ConsistencyResult {
-  const mismatches: EntityMismatch[] = [];
-
-  // Gather all Organization nodes across pages
-  const orgEntries: Array<{ pageId: string; node: Record<string, unknown> }> = [];
-
-  const ORG_TYPES = new Set(['Organization', 'LocalBusiness', 'MedicalOrganization', 'FinancialService']);
-  for (const { pageId, schema } of schemas) {
-    const nodes = extractGraphNodes(schema);
-    for (const node of nodes) {
-      const types = getNodeTypes(node);
-      if (types.some(t => ORG_TYPES.has(t))) {
-        orgEntries.push({ pageId, node });
-      }
-    }
-  }
-
-  if (orgEntries.length <= 1) {
-    return { consistent: true, mismatches: [] };
-  }
-
-  // Use first occurrence as canonical reference
-  const canonical = orgEntries[0];
-
-  for (let i = 1; i < orgEntries.length; i++) {
-    const entry = orgEntries[i];
-    for (const field of CONSISTENCY_FIELDS) {
-      const expected = canonical.node[field];
-      const found = entry.node[field];
-      if (expected !== undefined && found !== undefined) {
-        const expStr = typeof expected === 'object' ? JSON.stringify(expected) : String(expected);
-        const fndStr = typeof found === 'object' ? JSON.stringify(found) : String(found);
-        if (expStr !== fndStr) {
-          mismatches.push({
-            field,
-            expected: expStr,
-            found: fndStr,
-            pageId: entry.pageId,
-          });
-        }
-      }
-    }
-  }
-
-  return {
-    consistent: mismatches.length === 0,
-    mismatches,
-  };
 }
