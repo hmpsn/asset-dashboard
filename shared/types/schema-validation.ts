@@ -22,3 +22,27 @@ export interface ValidationFinding {
   /** Human-readable message for admin UI rendering. */
   message: string;
 }
+
+export interface WholeSiteSchemaGraphNode {
+  id: string;
+  type: string;
+  pageId: string;
+  pagePath: string;
+  source: 'site-template' | 'page-schema';
+}
+
+export interface WholeSiteSchemaGraphFinding extends ValidationFinding {
+  pageId?: string;
+  pagePath?: string;
+  sourceId?: string;
+  targetId?: string;
+}
+
+export interface WholeSiteSchemaGraphValidationResult {
+  status: 'valid' | 'warnings' | 'errors';
+  checkedPageCount: number;
+  nodeCount: number;
+  referenceCount: number;
+  findings: WholeSiteSchemaGraphFinding[];
+  nodes: WholeSiteSchemaGraphNode[];
+}

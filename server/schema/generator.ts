@@ -34,7 +34,7 @@ import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
-import type { SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
+import type { CanonicalEntity, SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
@@ -103,6 +103,7 @@ export interface LeanGeneratorInput {
     source: Exclude<SchemaRoleSource, 'auto-detect'>;
     industrySubtype?: SchemaIndustrySubtype;
   };
+  canonicalEntityRefs?: string[];
   plannedSchemaRole?: SchemaPageRole;
   roleDecisionDiagnostics?: SkippedSchemaType[];
   inactivePlanStatus?: string;
@@ -233,6 +234,141 @@ function roleToDiagnosticsType(role: SchemaPageRole): string | null {
   return map[role] ?? null;
 }
 
+function normalizeSchemaUrlPath(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '') || '/';
+    return path;
+  } catch { // catch-ok: malformed plan URLs are ignored by canonical entity enrichment
+    return null;
+  }
+}
+
+function isValidHttpUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch { // catch-ok: invalid URL means the entity is not safe to emit
+    return false;
+  }
+}
+
+function canonicalEntityNode(entity: CanonicalEntity): Record<string, unknown> | null {
+  if (!isValidHttpUrl(entity.id) || !entity.type || !entity.name || !isValidHttpUrl(entity.canonicalUrl)) return null;
+  return dropEmptySchemaFields({
+    '@type': entity.type,
+    '@id': entity.id,
+    'name': entity.name,
+    'url': entity.canonicalUrl,
+    'description': entity.description,
+  });
+}
+
+function dropEmptySchemaFields(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  );
+}
+
+function graphArray(schema: Record<string, unknown>): Array<Record<string, unknown>> {
+  const graph = schema['@graph'];
+  if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
+  return [];
+}
+
+function nodeTypeList(node: Record<string, unknown>): string[] {
+  const type = node['@type'];
+  if (typeof type === 'string' && type.trim()) return [type.trim()];
+  if (Array.isArray(type)) return type.filter((item): item is string => typeof item === 'string' && !!item.trim());
+  return [];
+}
+
+function refIds(value: unknown): Set<string> {
+  const ids = new Set<string>();
+  const visit = (item: unknown) => {
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (!item || typeof item !== 'object') return;
+    const record = item as Record<string, unknown>;
+    if (typeof record['@id'] === 'string') ids.add(record['@id']);
+  };
+  visit(value);
+  return ids;
+}
+
+function addCanonicalReferencesToNode(node: Record<string, unknown>, refs: string[]): void {
+  const normalizedRefs = refs
+    .filter(ref => typeof ref === 'string' && ref.trim())
+    .map(ref => ({ '@id': ref.trim() }));
+  if (normalizedRefs.length === 0) return;
+
+  const existingAbout = refIds(node.about);
+  const existingMentions = refIds(node.mentions);
+  const missingRefs = normalizedRefs.filter(ref => !existingAbout.has(ref['@id']) && !existingMentions.has(ref['@id']));
+  if (missingRefs.length === 0) return;
+
+  if (!node.about) {
+    node.about = missingRefs.length === 1 ? missingRefs[0] : missingRefs;
+    return;
+  }
+  const currentMentions = Array.isArray(node.mentions)
+    ? node.mentions
+    : node.mentions
+      ? [node.mentions]
+      : [];
+  node.mentions = [...currentMentions, ...missingRefs];
+}
+
+function applyCanonicalEntityGraph(input: {
+  schema: Record<string, unknown>;
+  pageCanonicalUrl: string;
+  canonicalEntities: CanonicalEntity[];
+  entityRefs: string[];
+}): void {
+  const graph = graphArray(input.schema);
+  if (graph.length === 0) return;
+
+  const pagePath = normalizeSchemaUrlPath(input.pageCanonicalUrl);
+  const existingById = new Map<string, Record<string, unknown>>();
+  for (const node of graph) {
+    const id = node['@id'];
+    if (typeof id === 'string' && id.trim()) existingById.set(id, node);
+  }
+
+  const entityNodes = input.canonicalEntities
+    .map(entity => ({ entity, node: canonicalEntityNode(entity) }))
+    .filter((entry): entry is { entity: CanonicalEntity; node: Record<string, unknown> } => !!entry.node);
+
+  for (const { entity, node } of entityNodes) {
+    const entityPath = normalizeSchemaUrlPath(entity.canonicalUrl);
+    if (!pagePath || !entityPath || pagePath !== entityPath) continue;
+    const existing = existingById.get(entity.id);
+    if (existing) {
+      for (const [key, value] of Object.entries(node)) {
+        if (existing[key] === undefined || existing[key] === null || existing[key] === '') {
+          existing[key] = value;
+        }
+      }
+    } else {
+      graph.push(node);
+      existingById.set(entity.id, node);
+    }
+  }
+
+  const validEntityIds = new Set(entityNodes.map(({ entity }) => entity.id));
+  const refs = input.entityRefs.filter(ref => validEntityIds.has(ref));
+  if (refs.length === 0) return;
+  const referenceTarget = graph.find(node => {
+    const types = nodeTypeList(node);
+    return types.some(type => ['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage', 'Blog', 'ProfilePage'].includes(type));
+  }) ?? graph[0];
+  if (referenceTarget) addCanonicalReferencesToNode(referenceTarget, refs);
+}
+
 function isOpaqueIdentifier(value: string): boolean {
   const trimmed = value.trim();
   return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
@@ -291,6 +427,7 @@ function buildGenerationDiagnostics(input: {
   cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
   evidenceSources?: SchemaGenerationDiagnostics['evidenceSources'];
   fieldEvidence?: SchemaGenerationDiagnostics['fieldEvidence'];
+  canonicalEntityReferences?: string[];
 }): SchemaGenerationDiagnostics {
   const skippedSchemaTypes = [...input.skippedSchemaTypes];
   if (input.inactivePlanStatus && input.roleSource === 'auto-detect') {
@@ -303,6 +440,7 @@ function buildGenerationDiagnostics(input: {
     plannedRole: input.plannedRole ?? input.role,
     effectiveRole: input.role,
     roleSource: input.roleSource,
+    canonicalEntityReferences: input.canonicalEntityReferences?.length ? input.canonicalEntityReferences : undefined,
     collection: input.collection,
     emittedTypes: input.emittedTypes,
     skippedSchemaTypes,
@@ -596,6 +734,20 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     }
   }
 
+  const canonicalEntities = input.siteContext?.canonicalEntities ?? [];
+  const validCanonicalEntityIds = new Set(
+    canonicalEntities
+      .filter(entity => canonicalEntityNode(entity))
+      .map(entity => entity.id),
+  );
+  const canonicalEntityRefs = (input.canonicalEntityRefs ?? []).filter(ref => validCanonicalEntityIds.has(ref));
+  applyCanonicalEntityGraph({
+    schema,
+    pageCanonicalUrl: pageData.canonicalUrl,
+    canonicalEntities,
+    entityRefs: canonicalEntityRefs,
+  });
+
   // Validate the base schema BEFORE FAQ enrichment so we can distinguish FAQ-specific
   // errors from pre-existing base errors (e.g. a BlogPosting missing datePublished
   // shouldn't cause us to roll back a perfectly valid FAQPage append).
@@ -685,6 +837,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     cmsDeliveryStatus: input.cmsDeliveryStatus,
     evidenceSources: pageData.evidenceSources,
     fieldEvidence: pageData.fieldEvidence,
+    canonicalEntityReferences: canonicalEntityRefs,
   });
 
   return {

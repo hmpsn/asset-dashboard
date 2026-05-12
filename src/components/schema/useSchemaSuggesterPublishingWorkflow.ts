@@ -10,6 +10,7 @@ interface UseSchemaSuggesterPublishingWorkflowOptions {
   workspaceId?: string;
   data: SchemaPageSuggestion[] | null;
   setData: Dispatch<SetStateAction<SchemaPageSuggestion[] | null>>;
+  bulkPublishBlocked?: boolean;
 }
 
 export function useSchemaSuggesterPublishingWorkflow({
@@ -17,6 +18,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   workspaceId,
   data,
   setData,
+  bulkPublishBlocked = false,
 }: UseSchemaSuggesterPublishingWorkflowOptions) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
@@ -196,6 +198,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   }, [data, getEffectiveSchema, siteId, workspaceId]);
 
   const publishAllToWebflow = useCallback(async () => {
+    if (bulkPublishBlocked) return;
     if (!data) return;
     const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
     if (publishable.length === 0) return;
@@ -208,7 +211,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     }
     setBulkPublishing(false);
     setBulkProgress(null);
-  }, [data, getEffectiveSchema, publishToWebflow, published]);
+  }, [bulkPublishBlocked, data, getEffectiveSchema, publishToWebflow, published]);
 
   const toggleDiff = useCallback((pageId: string) => {
     setShowDiff(prev => {

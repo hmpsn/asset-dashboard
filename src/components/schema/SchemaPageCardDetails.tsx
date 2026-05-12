@@ -227,6 +227,11 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
           {diagnostics.collection.itemPath ? ` · ${diagnostics.collection.itemPath}` : ''}
         </div>
       )}
+      {diagnostics.canonicalEntityReferences && diagnostics.canonicalEntityReferences.length > 0 && (
+        <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1 break-words">
+          Canonical refs: <span className="text-[var(--brand-text)]">{diagnostics.canonicalEntityReferences.join(', ')}</span>
+        </div>
+      )}
       {diagnostics.cmsDeliveryStatus && diagnostics.cmsDeliveryStatus.mode === 'cms-field' && (
         <div className="mb-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1.5">
           <div className="t-caption-sm font-medium text-[var(--brand-text)]">CMS delivery</div>

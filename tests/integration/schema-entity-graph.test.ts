@@ -179,6 +179,86 @@ describe('ServiceIndex hub dispatch', () => {
   });
 });
 
+describe('Canonical entity graph compilation', () => {
+  const platformEntity = {
+    type: 'SoftwareApplication',
+    name: 'Acme Platform',
+    canonicalUrl: `${BASE}/platform`,
+    id: `${BASE}/platform#software`,
+    description: 'A platform for growth teams.',
+  };
+
+  it('emits active plan canonical entities on their canonical owner page', async () => {
+    const out = await generateLeanSchema({
+      pageId: 'platform',
+      pageMeta: { title: 'Platform', slug: 'platform', publishedPath: '/platform', seo: { description: 'Platform' } },
+      html: '<html><body>Platform page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [platformEntity],
+      },
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toContainEqual(expect.objectContaining({
+      '@type': 'SoftwareApplication',
+      '@id': `${BASE}/platform#software`,
+      name: 'Acme Platform',
+      url: `${BASE}/platform`,
+    }));
+  });
+
+  it('adds stable @id references to pages assigned canonical entity refs', async () => {
+    const out = await generateLeanSchema({
+      pageId: 'teams',
+      pageMeta: { title: 'For Teams', slug: 'for-teams', publishedPath: '/for-teams', seo: { description: 'For teams' } },
+      html: '<html><body>Audience page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [platformEntity],
+      },
+      schemaRoleOverride: { role: 'audience', source: 'site-plan' },
+      canonicalEntityRefs: [platformEntity.id],
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const webPage = graph.find(node => node['@type'] === 'WebPage');
+    expect(webPage?.about).toEqual({ '@id': `${BASE}/platform#software` });
+    expect(out.generationDiagnostics?.canonicalEntityReferences).toEqual([platformEntity.id]);
+  });
+
+  it('does not emit or reference canonical entities with unstable ids', async () => {
+    const unstableEntity = {
+      ...platformEntity,
+      id: 'platform-software',
+    };
+    const out = await generateLeanSchema({
+      pageId: 'platform',
+      pageMeta: { title: 'Platform', slug: 'platform', publishedPath: '/platform', seo: { description: 'Platform' } },
+      html: '<html><body>Platform page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [unstableEntity],
+      },
+      canonicalEntityRefs: [unstableEntity.id],
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).not.toContainEqual(expect.objectContaining({ '@id': unstableEntity.id }));
+    expect(JSON.stringify(graph)).not.toContain(unstableEntity.id);
+    expect(out.generationDiagnostics?.canonicalEntityReferences).toBeUndefined();
+  });
+});
+
 describe('CaseStudyIndex hub dispatch', () => {
   const ctx = buildContext([
     { path: '/our-work' },

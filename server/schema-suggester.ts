@@ -213,6 +213,7 @@ function resolveRoleOverride(opts: {
     return {
       pageKindOverride: pageKindForRole(role, opts.pagePath),
       schemaRoleOverride: { role, source: 'ui' as const, industrySubtype: planRole?.industrySubtype },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? role,
       inactivePlanStatus: activePlan ? undefined : latestPlan?.status,
       activePlan,
@@ -226,6 +227,7 @@ function resolveRoleOverride(opts: {
         source: 'site-plan' as const,
         industrySubtype: planRole.industrySubtype,
       },
+      canonicalEntityRefs: planRole.entityRefs,
       plannedRole: planRole.role,
       inactivePlanStatus: undefined,
       activePlan,
@@ -238,6 +240,7 @@ function resolveRoleOverride(opts: {
         role: opts.collectionRole,
         source: 'collection-map' as const,
       },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? opts.collectionRole,
       roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
         type: 'SchemaSitePlan',
@@ -254,6 +257,7 @@ function resolveRoleOverride(opts: {
         role: opts.collectionRole,
         source: 'collection-inferred' as const,
       },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? opts.collectionRole,
       roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
         type: 'SchemaSitePlan',
@@ -268,6 +272,7 @@ function resolveRoleOverride(opts: {
     return {
       pageKindOverride: pageKindForRole(role, opts.pagePath),
       schemaRoleOverride: { role, source: 'saved-page-type' as const, industrySubtype: planRole?.industrySubtype },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? role,
       inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
       activePlan,
@@ -276,6 +281,7 @@ function resolveRoleOverride(opts: {
   return {
     pageKindOverride: undefined,
     schemaRoleOverride: undefined,
+    canonicalEntityRefs: planRole?.entityRefs ?? [],
     plannedRole: planRole?.role,
     inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
     activePlan,
@@ -587,6 +593,12 @@ export async function generateSchemaForPage(
 
   const cmsItem = siteInventory?.cmsItems.find(item => item.pageId === pageId);
   if (cmsItem) {
+    const latestPlan = getSchemaPlan(siteId);
+    const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+    const contextPages = buildSiteContextPages(allPages, siteInventory?.cmsItems, activePlan);
+    const siteContextForCms = contextPages.length > 0
+      ? assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])
+      : undefined;
     const itemHtml = await fetchPublishedHtml(cmsItem.url);
     const roleOverride = resolveRoleOverride({
       siteId,
@@ -639,8 +651,10 @@ export async function generateSchemaForPage(
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
       aiBudget,
+      siteContext: siteContextForCms,
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      canonicalEntityRefs: roleOverride.canonicalEntityRefs,
       plannedSchemaRole: roleOverride.plannedRole,
       roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
@@ -741,6 +755,7 @@ export async function generateSchemaForPage(
     siteContext: siteContextForPage, // cross-page hub enrichment
     pageKindOverride: roleOverride.pageKindOverride,
     schemaRoleOverride: roleOverride.schemaRoleOverride,
+    canonicalEntityRefs: roleOverride.canonicalEntityRefs,
     plannedSchemaRole: roleOverride.plannedRole,
     roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
     inactivePlanStatus: roleOverride.inactivePlanStatus,
@@ -871,6 +886,7 @@ export async function generateSchemaSuggestions(
       siteContext, // cross-page hub enrichment
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      canonicalEntityRefs: roleOverride.canonicalEntityRefs,
       plannedSchemaRole: roleOverride.plannedRole,
       roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
@@ -947,6 +963,7 @@ export async function generateSchemaSuggestions(
         siteContext,
         pageKindOverride: roleOverride.pageKindOverride,
         schemaRoleOverride: roleOverride.schemaRoleOverride,
+        canonicalEntityRefs: roleOverride.canonicalEntityRefs,
         plannedSchemaRole: roleOverride.plannedRole,
         roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
         inactivePlanStatus: roleOverride.inactivePlanStatus,

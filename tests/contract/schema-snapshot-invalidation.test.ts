@@ -32,6 +32,7 @@ describe('schema snapshot invalidation contract', () => {
 
     expect(adminSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
     expect(adminSource).toContain('queryKeys.admin.schemaSnapshot(siteId, workspaceId)');
+    expect(adminSource).toContain('queryKeys.admin.schemaGraphValidation(siteId, workspaceId)');
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_PLAN_SENT]');
     expect(clientSource).toContain('queryKeys.client.schemaPlan(workspaceId)');
     expect(clientSource).toContain('[WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED]');
