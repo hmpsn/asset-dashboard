@@ -55,6 +55,27 @@ export function isInboxFilter(value: string | null): value is InboxFilter {
   return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
 }
 
+function resolveInboxFilter(
+  param: string | null,
+  betaMode: boolean,
+  initialFilter?: InboxFilter,
+): InboxFilter {
+  const fallback = initialFilter === 'reviews' && betaMode
+    ? 'decisions'
+    : (initialFilter ?? 'decisions');
+
+  if (isInboxFilter(param)) {
+    if (param === 'reviews' && betaMode) return fallback;
+    return param;
+  }
+  if (param && LEGACY_FILTER_MAP[param]) {
+    const mapped = LEGACY_FILTER_MAP[param];
+    if (mapped === 'reviews' && betaMode) return fallback;
+    return mapped;
+  }
+  return fallback;
+}
+
 interface InboxTabProps {
   workspaceId: string;
   effectiveTier: Tier;
@@ -121,20 +142,9 @@ export function InboxTab({
   const [searchParams] = useSearchParams();
   // betaMode must be declared before useState<InboxFilter> so the init closure can reference it
   const betaMode = useBetaMode();
-  const [filter, setFilter] = useState<InboxFilter>(() => {
-    const param = searchParams.get('tab');
-    if (isInboxFilter(param)) {
-      // When betaMode is active, Conversations section is unavailable — coerce to default
-      if (param === 'conversations' && betaMode) return initialFilter ?? 'decisions';
-      return param;
-    }
-    if (param && LEGACY_FILTER_MAP[param]) {
-      const mapped = LEGACY_FILTER_MAP[param];
-      if (mapped === 'conversations' && betaMode) return initialFilter ?? 'decisions';
-      return mapped;
-    }
-    return initialFilter ?? 'decisions';
-  });
+  const [filter, setFilter] = useState<InboxFilter>(() =>
+    resolveInboxFilter(searchParams.get('tab'), betaMode, initialFilter),
+  );
   const [mode, setMode] = useState<InboxMode>('active');
   const [schemaModalOpen, setSchemaModalOpen] = useState(false);
   const [detailAction, setDetailAction] = useState<ClientAction | null>(null);
@@ -182,6 +192,11 @@ export function InboxTab({
     if (hasPendingSeoChanges) setSeoSectionExpanded(true);
   }, [hasPendingSeoChanges]);
 
+  // Keep local filter state in sync with ?tab= deep links while the component remains mounted.
+  useEffect(() => {
+    setFilter(resolveInboxFilter(searchParams.get('tab'), betaMode, initialFilter));
+  }, [searchParams, betaMode, initialFilter]);
+
   // Feature flag: new 3-section inbox IA layout
   const newInboxIa = useFeatureFlag('new-inbox-ia');
 
@@ -202,7 +217,7 @@ export function InboxTab({
 
   // Filter chip counts
   const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length;
-  const reviewsCount = contentReviews + copyReviewCount + (schemaPlanPending ? 1 : 0);
+  const reviewsCount = contentReviews + copyReviewCount + (!betaMode && schemaPlanPending ? 1 : 0);
   const conversationsCount = requestReplies + approvalsForConversations.length;
 
   // Filter chips (hidden in completed mode)
@@ -235,6 +250,7 @@ export function InboxTab({
     setFlagSubmitting(true);
     try {
       await post(`/api/public/content-plan/${workspaceId}/${cell.matrixId}/cells/${cell.cellId}/flag`, { comment: flagComment.trim() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.contentPlan(workspaceId) });
       setToast({ message: 'Feedback submitted — your team will review it.', type: 'success' });
       setFlaggingCell(null);
       setFlagComment('');
@@ -438,6 +454,34 @@ export function InboxTab({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {betaMode && schemaPlan && (
+                <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon as={Shield} size="sm" className="text-accent-brand" />
+                        <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
+                        {schemaPlanPending && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
+                            Awaiting review
+                          </span>
+                        )}
+                      </div>
+                      <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
+                        {schemaPlanPending
+                          ? 'Your schema strategy is ready for your review and approval.'
+                          : schemaPlan.status === 'client_approved' ? 'Approved — implementation in progress.'
+                          : schemaPlan.status === 'active' ? 'Active schema strategy.'
+                          : 'Schema strategy on file.'}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setSchemaModalOpen(true)}>
+                      Review
+                    </Button>
+                  </div>
                 </div>
               )}
 

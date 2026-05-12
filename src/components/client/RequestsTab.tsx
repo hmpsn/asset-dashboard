@@ -204,7 +204,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
       {/* Request list */}
       {!requestsLoading && requests.length > 0 && (
         <div className="space-y-3">
-          {requests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
+          {[...requests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
             const isExpanded = expandedRequest === req.id;
             // Group by client-visible status
             const statusColors: Record<string, string> = {

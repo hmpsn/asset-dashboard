@@ -73,11 +73,11 @@ interface Chip {
   /**
    * Must be a valid InboxFilter value — see INBOX_FILTER_VALUES in InboxTab.tsx.
    * Clicking a chip navigates to `?tab=${section}` on the inbox route.
-   * approvals/replies/contentPlan → decisions, briefs/posts → reviews.
+   * approvals/contentPlan → decisions, briefs/posts → reviews, replies → conversations.
    * Drift here silently sends users to the default 'all' filter — covered by the
    * tab-deep-link-wiring contract test.
    */
-  section: 'decisions' | 'reviews';
+  section: 'decisions' | 'reviews' | 'conversations';
 }
 
 /**
@@ -122,7 +122,7 @@ export function ActionQueueStrip({
     chips.push({
       count: counts.replies,
       label: counts.replies === 1 ? 'reply' : 'replies',
-      section: 'decisions',
+      section: 'conversations',
     });
   }
   if (counts.contentPlan > 0) {
