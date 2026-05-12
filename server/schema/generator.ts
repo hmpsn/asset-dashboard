@@ -35,7 +35,7 @@ import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
 import type { CanonicalEntity, SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
-import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity } from '../../shared/types/site-inventory.js';
+import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SchemaFieldEvidence } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
@@ -114,21 +114,31 @@ export interface LeanGeneratorInput {
 function detectExistingSchemas(html: string): string[] {
   const $ = cheerio.load(html);
   const types: string[] = [];
+  const pushTypes = (rawType: unknown) => {
+    if (typeof rawType === 'string') {
+      types.push(rawType);
+    } else if (Array.isArray(rawType)) {
+      types.push(...rawType.filter((value): value is string => typeof value === 'string'));
+    }
+  };
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
       const json = JSON.parse($(el).html() || '{}') as Record<string, unknown>;
-      const t = json['@type'];
-      if (typeof t === 'string') types.push(t);
-      else if (Array.isArray(t)) types.push(...(t as string[]));
+      pushTypes(json['@type']);
       const graph = json['@graph'] as Array<Record<string, unknown>> | undefined;
       if (Array.isArray(graph)) {
         for (const n of graph) {
-          if (typeof n['@type'] === 'string') types.push(n['@type']);
+          pushTypes(n['@type']);
         }
       }
     } catch { /* ignore unparseable */ } // catch-ok: malformed JSON-LD on third-party pages
   });
   return Array.from(new Set(types));
+}
+
+function hasLocalBusinessJsonLdEvidence(html: string): boolean {
+  const localTypes = new Set(['Dentist', 'MedicalBusiness', 'MedicalOrganization', 'LocalBusiness', 'FinancialService']);
+  return detectExistingSchemas(html).some(type => localTypes.has(type));
 }
 
 function plainText(html: string): string {
@@ -442,29 +452,81 @@ function formatAreaServed(address: { city?: string; state?: string } | undefined
   return city || state;
 }
 
+function stripWww(hostname: string): string {
+  return hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function sameSiteOrigin(url: string, baseUrl: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const base = new URL(baseUrl);
+    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    return parsed.origin;
+  } catch { // catch-ok: malformed canonical URL should not block schema generation
+    return undefined;
+  }
+}
+
 function mergeSemanticBusinessProfile(
   semantics: PageElementCatalog['semantics'] | undefined,
   fallback: WorkspaceSchemaInput['businessProfile'],
+  fieldEvidence: SchemaFieldEvidence[] | undefined,
 ): WorkspaceSchemaInput['businessProfile'] {
+  const isFallbackEvidence = (field: string) => (fieldEvidence ?? []).some(e =>
+    e.field === field && e.source === 'business-profile' && e.status === 'fallback-used');
+  const preferSemanticOverFallback = (field: string, fallbackValue: string | undefined, semanticValue: string | undefined) =>
+    isFallbackEvidence(field)
+      ? safePublicText(semanticValue) ?? safePublicText(fallbackValue)
+      : safePublicText(fallbackValue) ?? safePublicText(semanticValue);
   const semanticAddress = semantics?.address;
   const fallbackAddress = fallback?.address;
   const address = {
-    street: safePublicText(semanticAddress?.street) ?? safePublicText(fallbackAddress?.street),
-    city: safePublicText(semanticAddress?.city) ?? safePublicText(fallbackAddress?.city),
-    state: safePublicText(semanticAddress?.state) ?? safePublicText(fallbackAddress?.state),
-    zip: safePublicText(semanticAddress?.postalCode) ?? safePublicText(fallbackAddress?.zip),
-    country: safePublicText(semanticAddress?.country) ?? safePublicText(fallbackAddress?.country),
+    street: preferSemanticOverFallback('streetAddress', fallbackAddress?.street, semanticAddress?.street),
+    city: preferSemanticOverFallback('addressLocality', fallbackAddress?.city, semanticAddress?.city),
+    state: preferSemanticOverFallback('addressRegion', fallbackAddress?.state, semanticAddress?.state),
+    zip: preferSemanticOverFallback('postalCode', fallbackAddress?.zip, semanticAddress?.postalCode),
+    country: preferSemanticOverFallback('addressCountry', fallbackAddress?.country, semanticAddress?.country),
   };
   const hasAddress = Object.values(address).some(Boolean);
-  const phone = safePublicText(semantics?.phone) ?? safePublicText(fallback?.phone);
-  const email = safePublicText(semantics?.email) ?? safePublicText(fallback?.email);
-  if (!fallback && !hasAddress && !phone && !email) return null;
+  const phone = preferSemanticOverFallback('phone', fallback?.phone, semantics?.phone);
+  const email = preferSemanticOverFallback('email', fallback?.email, semantics?.email);
+  const openingHours = safePublicText(fallback?.openingHours);
+  const socialProfiles = fallback?.socialProfiles?.length
+    ? fallback.socialProfiles
+    : semantics?.sameAs;
+  if (!fallback && !hasAddress && !phone && !email && !openingHours && !socialProfiles?.length) return null;
   return {
     ...(fallback ?? {}),
     phone,
     email,
+    openingHours,
+    socialProfiles,
     address: hasAddress ? address : fallback?.address,
   };
+}
+
+function semanticFieldEvidence(semantics: PageElementCatalog['semantics'] | undefined): SchemaFieldEvidence[] {
+  if (!semantics) return [];
+  const evidence: SchemaFieldEvidence[] = [];
+  const push = (field: string, message: string) => evidence.push({
+    field,
+    source: 'existing-json-ld',
+    status: 'resolved',
+    message,
+  });
+  if (semantics.businessName) push('locationName', 'locationName resolved from existing local business JSON-LD.');
+  if (semantics.businessType) push('businessType', 'businessType resolved from existing local business JSON-LD.');
+  if (semantics.address?.street) push('streetAddress', 'streetAddress resolved from existing local business JSON-LD.');
+  if (semantics.address?.city) push('addressLocality', 'addressLocality resolved from existing local business JSON-LD.');
+  if (semantics.address?.state) push('addressRegion', 'addressRegion resolved from existing local business JSON-LD.');
+  if (semantics.address?.postalCode) push('postalCode', 'postalCode resolved from existing local business JSON-LD.');
+  if (semantics.address?.country) push('addressCountry', 'addressCountry resolved from existing local business JSON-LD.');
+  if (semantics.geo) push('geo', 'geo resolved from existing local business JSON-LD.');
+  if (semantics.phone) push('phone', 'phone resolved from existing local business JSON-LD when no stronger source is present.');
+  if (semantics.email) push('email', 'email resolved from existing local business JSON-LD when no stronger source is present.');
+  if (semantics.primaryImage) push('image', 'image resolved from existing local business JSON-LD.');
+  if (semantics.hours?.length) push('openingHoursSpecification', 'openingHoursSpecification normalized from existing local business JSON-LD.');
+  return evidence;
 }
 
 function buildGenerationDiagnostics(input: {
@@ -536,6 +598,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     baseUrl,
     workspace: input.workspace,
   });
+  const schemaBaseUrl = sameSiteOrigin(pageData.canonicalUrl, baseUrl) ?? baseUrl;
 
   // Lazy-refresh element catalog: read from store; if missing or
   // stale-vs-Webflow-lastPublished, extract from current HTML + persist.
@@ -546,11 +609,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let catalog: PageElementCatalog | undefined;
   if (workspaceId && pagePath) {
     const stored = getPageElements(workspaceId, pagePath);
-    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null)) {
+    const shouldRefreshForJsonLdEvidence = !!stored
+      && hasLocalBusinessJsonLdEvidence(input.html ?? '')
+      && (!stored.catalog.semantics?.businessType || !stored.catalog.semantics?.address);
+    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null) || shouldRefreshForJsonLdEvidence) {
       try {
         const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
         catalog = await extractPageElements(input.html ?? '', {
-          pageBaseUrl: baseUrl,
+          pageBaseUrl: pageData.canonicalUrl,
           sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
           aiBudget,
           workspaceId,
@@ -577,7 +643,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   if (!catalog && (role === 'howto' || role === 'video')) {
     try {
       catalog = await extractPageElements(input.html ?? '', {
-        pageBaseUrl: baseUrl,
+        pageBaseUrl: pageData.canonicalUrl,
         sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
         aiBudget: input.aiBudget ?? createAiBudget(0),
         workspaceId: workspaceId ?? 'schema-preview',
@@ -586,11 +652,23 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.warn({ err, pageId: input.pageId }, 'page-element extraction failed; planned rich role will fall back conservatively');
     }
   }
-  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile);
+  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile, pageData.fieldEvidence);
   pageData = {
     ...pageData,
     elements: catalog,
     areaServed: formatAreaServed(businessProfileForPage?.address) ?? pageData.areaServed,
+    fieldEvidence: [
+      ...(pageData.fieldEvidence ?? []),
+      ...semanticFieldEvidence(catalog?.semantics),
+    ],
+    evidenceSources: {
+      ...(pageData.evidenceSources ?? {}),
+      ...(catalog?.semantics?.businessName ? { locationName: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.businessType ? { businessType: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.address ? { address: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.geo ? { geo: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.hours?.length ? { openingHoursSpecification: 'existing-json-ld' as const } : {}),
+    },
   };
   const businessKind: BusinessKind = businessProfileForPage?.address ? 'local' : 'unknown';
   const classified: ClassifiedPage = input.pageKindOverride
@@ -599,7 +677,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
         pagePath: input.pageMeta.publishedPath,
       }
-    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
+    : classifyPage(`${schemaBaseUrl}${input.pageMeta.publishedPath}`, schemaBaseUrl, { businessKind });
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {
@@ -621,7 +699,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const serviceOffers = pageData.offers && pageData.offers.length > 0 ? pageData.offers : offers;
 
   if (role === 'product') {
-    schema = buildProductSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers });
+    schema = buildProductSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, offers });
     reason = offers.length > 0
       ? 'Product page — Product with visible price-backed Offer data.'
       : 'Product page — Product without Offer because no visible price/currency was verified.';
@@ -633,7 +711,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       });
     }
   } else if (role === 'pricing') {
-    schema = buildPricingPageSchema({ baseUrl, pageData, offers });
+    schema = buildPricingPageSchema({ baseUrl: schemaBaseUrl, pageData, offers });
     reason = offers.length > 0
       ? 'Pricing page — WebPage with visible price-backed Offer nodes.'
       : 'Pricing page — WebPage only because no visible price/currency was verified.';
@@ -645,19 +723,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       });
     }
   } else if (role === 'author') {
-    schema = buildProfilePageSchema({ baseUrl, pageData });
+    schema = buildProfilePageSchema({ baseUrl: schemaBaseUrl, pageData });
     reason = 'Author/profile page — ProfilePage with Person mainEntity from visible page data.';
   } else if (role === 'faq') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     reason = 'FAQ role — WebPage base; FAQPage is emitted only when valid Q&A pairs are visible.';
   } else if (role === 'howto') {
-    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
     reason = 'How-to role — Article base; HowTo is emitted only when visible step lists are extracted.';
   } else if (role === 'video') {
-    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
     reason = 'Video role — Article base; VideoObject is emitted only when required video fields are verified.';
   } else if (role === 'job-posting' || role === 'course' || role === 'event') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     const type = roleToDiagnosticsType(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
@@ -665,7 +743,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason: `${type} skipped: required fields were not fully verified from visible or workspace data.`,
     });
   } else if (role === 'review' || role === 'recipe') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     const type = roleToDiagnosticsType(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
@@ -677,7 +755,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'Homepage':
       if (classified.primaryType === 'LocalBusiness') {
         schema = buildLocalBusinessSchema({
-          baseUrl,
+          baseUrl: schemaBaseUrl,
           pageData,
           businessProfile: businessProfileForPage,
           siteHasSearch: input.workspace.siteHasSearch,
@@ -685,7 +763,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
+        schema = buildHomepageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
         skippedSchemaTypes.push({
           type: 'LocalBusiness',
@@ -695,15 +773,15 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'BlogPosting':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'BlogPosting');
+      schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'BlogPosting');
       reason = 'Blog post — BlogPosting with author/publisher/dates.';
       break;
     case 'CaseStudy':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+      schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
+      schema = buildServiceSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
       reason = 'Service detail page — Service with provider reference.';
       if (serviceOffers.length === 0) {
         skippedSchemaTypes.push({
@@ -715,7 +793,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     case 'Location':
         schema = buildLocalBusinessSchema({
-          baseUrl,
+          baseUrl: schemaBaseUrl,
           pageData,
           businessProfile: businessProfileForPage,
           siteHasSearch: input.workspace.siteHasSearch,
@@ -731,20 +809,20 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
+      schema = buildAboutPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: catalog?.semantics });
+      schema = buildContactPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: catalog?.semantics });
       reason = 'Contact page — ContactPage with canonical business identity mainEntity.';
       break;
     case 'BlogIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildBlogIndexSchema({ baseUrl, pageData, children });
+        schema = buildBlogIndexSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Blog index — Blog with cross-page child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Blog index — CollectionPage (no child context available).';
       }
       break;
@@ -752,10 +830,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'ServiceIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildServiceHubSchema({ baseUrl, pageData, children });
+        schema = buildServiceHubSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Service index — Service + OfferCatalog with child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Service index — CollectionPage (no child context available).';
       }
       break;
@@ -763,17 +841,17 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'CaseStudyIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildCollectionPageSchema({ baseUrl, pageData, children });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Case study index — CollectionPage + ItemList with child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Case study index — CollectionPage (no child context available).';
       }
       break;
     }
     case 'Legal':
     case 'WebPage':
-      schema = buildWebPageSchema({ baseUrl, pageData });
+      schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
       reason = 'Generic page — WebPage with breadcrumb.';
       break;
     default: {
@@ -781,7 +859,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       // without a corresponding case above.
       const _exhaustive: never = classified.kind;
       void _exhaustive;
-      schema = buildWebPageSchema({ baseUrl, pageData });
+      schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
       reason = 'Generic page — WebPage (unreachable fallback).';
       break;
     }

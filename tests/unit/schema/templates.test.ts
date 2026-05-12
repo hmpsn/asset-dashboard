@@ -6,6 +6,7 @@ import { buildLocalBusinessSchema } from '../../../server/schema/templates/local
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from '../../../server/schema/templates/static.js';
 import { buildHomepageSchema } from '../../../server/schema/templates/homepage.js';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
+import { validateForGoogleRichResults } from '../../../server/schema-validator.js';
 
 const baseInput = {
   baseUrl: 'https://example.com',
@@ -375,6 +376,69 @@ describe('buildLocalBusinessSchema', () => {
     expect(node.sameAs).toEqual(['https://twitter.com/acme']);
   });
 
+  it('uses verified location JSON-LD semantics for specific business type, name, geo, image, and hours', () => {
+    const schema = buildLocalBusinessSchema({
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        cleanTitle: 'Alamo Heights',
+        canonicalUrl: 'https://www.acme.dental/location/alamo-heights',
+        elements: {
+          extractedAt: '2026-05-12T00:00:00.000Z',
+          sourcePublishedAt: null,
+          headings: [],
+          tables: [],
+          images: [],
+          videos: [],
+          lists: [],
+          testimonials: [],
+          codeBlocks: [],
+          citations: [],
+          semantics: {
+            businessName: 'Acme Dental - Alamo Heights',
+            businessType: 'Dentist',
+            primaryImage: 'https://cdn.example.com/alamo.avif',
+            geo: { latitude: 29.48221, longitude: -98.46608 },
+            hours: [{ dayOfWeek: ['Monday', 'Tuesday'], opens: '09:00', closes: '18:00' }],
+            priceRange: '$$',
+          },
+          diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+        },
+      },
+    });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown>;
+    expect(node).toMatchObject({
+      '@id': 'https://www.acme.dental/location/alamo-heights#localbusiness',
+      name: 'Acme Dental - Alamo Heights',
+      image: 'https://cdn.example.com/alamo.avif',
+      geo: { '@type': 'GeoCoordinates', latitude: 29.48221, longitude: -98.46608 },
+      priceRange: '$$',
+      parentOrganization: { '@id': 'https://acme.dental/#organization' },
+    });
+    expect(node.openingHoursSpecification).toEqual([{
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday'],
+      opens: '09:00',
+      closes: '18:00',
+    }]);
+    expect(node.openingHours).toBeUndefined();
+    expect(validateLeanSchema(schema, 'Dentist').some(f => f.field === 'openingHours')).toBe(false);
+  });
+
+  it('does not emit raw HTML openingHours', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        openingHours: '<ul><li>MON: 9am - 6pm</li></ul>',
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.openingHours).toBeUndefined();
+    expect(node.openingHoursSpecification).toBeUndefined();
+  });
+
   it('filters empty sameAs entries before schema emission', () => {
     const graph = buildLocalBusinessSchema({
       ...localInput,
@@ -385,6 +449,33 @@ describe('buildLocalBusinessSchema', () => {
     })['@graph'] as Array<Record<string, unknown>>;
     const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(node.sameAs).toEqual(['https://twitter.com/acme']);
+  });
+
+  it('deduplicates sameAs entries from business profile and verified page evidence', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        elements: {
+          extractedAt: '2026-05-12T00:00:00.000Z',
+          sourcePublishedAt: null,
+          headings: [],
+          tables: [],
+          images: [],
+          videos: [],
+          lists: [],
+          testimonials: [],
+          codeBlocks: [],
+          citations: [],
+          semantics: {
+            sameAs: ['https://twitter.com/acme', 'https://www.linkedin.com/company/acme-dental'],
+          },
+          diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+        },
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.sameAs).toEqual(['https://twitter.com/acme', 'https://www.linkedin.com/company/acme-dental']);
   });
 
   it('omits all contact fields when business profile is null (no fabrication)', () => {
@@ -400,6 +491,21 @@ describe('buildLocalBusinessSchema', () => {
 
   it('passes validator with full profile', () => {
     expect(validateLeanSchema(buildLocalBusinessSchema(localInput), 'LocalBusiness')).toEqual([]);
+  });
+
+  it('does not mark partial PostalAddress as rich-result eligible', () => {
+    const schema = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        address: { city: 'Austin', state: 'TX' },
+      },
+    });
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).not.toContain('LocalBusiness');
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'LocalBusiness', field: 'address' }),
+    ]));
   });
 
   it('emits sibling WebSite node — local-business homepages still need site-name + publisher reference', () => {

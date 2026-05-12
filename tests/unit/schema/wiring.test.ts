@@ -353,6 +353,236 @@ describe('per-location @id uniqueness', () => {
     expect(lbNode!['@id']).toBe('https://example.com/location/downtown#localbusiness');
     expect(lbNode!['@id']).not.toBe('https://example.com/#localbusiness');
   });
+
+  it('uses existing local-business JSON-LD as evidence for rich location output', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <link rel="canonical" href="https://www.example.com/location/alamo-heights-san-antonio" />
+  <title>Alamo Heights San Antonio, TX Dental Office | Swish Dental</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "image": "https://cdn.example.com/alamo.avif",
+      "telephone": "210-764-6787",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX",
+        "postalCode": "78209",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "29.48221",
+        "longitude": "-98.46608"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Swish Dental Alamo Heights San Antonio, TX</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/alamo-heights-san-antonio', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: { ...minimalWorkspace, name: 'Swish' },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist).toMatchObject({
+      '@id': 'https://www.example.com/location/alamo-heights-san-antonio#localbusiness',
+      name: 'Swish Dental - Alamo Heights',
+      url: 'https://www.example.com/location/alamo-heights-san-antonio',
+      telephone: '210-764-6787',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '6011 Broadway, STE 100',
+        addressLocality: 'San Antonio',
+        addressRegion: 'TX',
+        postalCode: '78209',
+        addressCountry: 'US',
+      },
+      geo: { '@type': 'GeoCoordinates', latitude: 29.48221, longitude: -98.46608 },
+    });
+    expect(output.url).toBe('https://www.example.com/location/alamo-heights-san-antonio');
+    const breadcrumb = graph.find(n => n['@type'] === 'BreadcrumbList') as Record<string, unknown> | undefined;
+    const crumbItems = breadcrumb?.itemListElement as Array<Record<string, unknown>> | undefined;
+    expect(crumbItems?.at(-1)?.item).toBe('https://www.example.com/location/alamo-heights-san-antonio');
+    expect(output.generationDiagnostics?.validationStatus).not.toBe('errors');
+    expect(output.generationDiagnostics?.missingRequiredFields ?? []).not.toContain('streetAddress');
+    expect(output.richResultsEligibility?.find(e => e.type === 'Dentist')?.eligible).toBe(true);
+  });
+
+  it('uses page-local JSON-LD over workspace fallback evidence for CMS location gaps', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "telephone": "210-764-6787",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX",
+        "postalCode": "78209",
+        "addressCountry": "US"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Alamo Heights</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/alamo-heights-san-antonio', {
+      html,
+      pageKindOverride: 'Location',
+      pageMeta: {
+        slug: 'alamo-heights-san-antonio',
+        title: 'Alamo Heights',
+        publishedPath: '/location/alamo-heights-san-antonio',
+        sourcePublishedAt: null,
+        fieldEvidence: [
+          { field: 'streetAddress', source: 'business-profile', status: 'fallback-used' },
+          { field: 'addressLocality', source: 'business-profile', status: 'fallback-used' },
+          { field: 'addressRegion', source: 'business-profile', status: 'fallback-used' },
+          { field: 'postalCode', source: 'business-profile', status: 'fallback-used' },
+          { field: 'phone', source: 'business-profile', status: 'fallback-used' },
+        ],
+      },
+      workspace: {
+        ...minimalWorkspace,
+        businessProfile: {
+          phone: '512-555-1111',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+          },
+        },
+      },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.telephone).toBe('210-764-6787');
+    expect(dentist?.address).toMatchObject({
+      streetAddress: '6011 Broadway, STE 100',
+      addressLocality: 'San Antonio',
+      addressRegion: 'TX',
+      postalCode: '78209',
+    });
+  });
+
+  it('keeps explicit CMS/workspace location mappings above existing JSON-LD evidence', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Existing Page Name",
+      "telephone": "210-000-0000",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Old Street",
+        "addressLocality": "Old City",
+        "addressRegion": "TX",
+        "postalCode": "00000"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Mapped Location</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/mapped', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: {
+        ...minimalWorkspace,
+        businessProfile: {
+          phone: '512-555-1111',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+          },
+        },
+      },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.telephone).toBe('512-555-1111');
+    expect(dentist?.address).toMatchObject({
+      streetAddress: '100 Main St',
+      addressLocality: 'Austin',
+      addressRegion: 'TX',
+      postalCode: '78701',
+    });
+  });
+
+  it('refreshes old cached element catalogs when JSON-LD @graph uses array @type values', async () => {
+    vi.mocked(getPageElements).mockReturnValueOnce({
+      workspaceId: 'ws-test',
+      pagePath: '/location/graph-array-type',
+      sourcePublishedAt: null,
+      createdAt: '2026-05-12T00:00:00.000Z',
+      updatedAt: '2026-05-12T00:00:00.000Z',
+      catalog: {
+        extractedAt: '2026-05-12T00:00:00.000Z',
+        sourcePublishedAt: null,
+        headings: [],
+        tables: [],
+        images: [],
+        videos: [],
+        lists: [],
+        testimonials: [],
+        codeBlocks: [],
+        citations: [],
+        diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+      },
+    });
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [{
+        "@type": ["LocalBusiness", "Dentist"],
+        "name": "Swish Dental - Graph",
+        "telephone": "210-764-6787",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "6011 Broadway, STE 100",
+          "addressLocality": "San Antonio",
+          "addressRegion": "TX",
+          "postalCode": "78209"
+        }
+      }]
+    }
+  </script>
+</head>
+<body><main><h1>Graph Location</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/graph-array-type', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: { ...minimalWorkspace, id: 'ws-test' },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.name).toBe('Swish Dental - Graph');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -182,7 +182,7 @@ describe('validateForGoogleRichResults', () => {
         '@type': 'LocalBusiness',
         '@id': 'https://example.com/#business',
         name: 'Acme Corp',
-        address: { '@type': 'PostalAddress', streetAddress: '123 Main', addressLocality: 'Springfield' },
+        address: { '@type': 'PostalAddress', streetAddress: '123 Main', addressLocality: 'Springfield', addressRegion: 'IL' },
       }],
     };
     const result = validateForGoogleRichResults(schema);
@@ -341,7 +341,7 @@ describe('validateForGoogleRichResults', () => {
         '@type': 'MedicalOrganization',
         '@id': 'https://example.com/#medical',
         name: 'Springfield Medical Center',
-        address: { '@type': 'PostalAddress', streetAddress: '123 Health Ave' },
+        address: { '@type': 'PostalAddress', streetAddress: '123 Health Ave', addressLocality: 'Springfield', addressRegion: 'IL' },
       }],
     };
     const result = validateForGoogleRichResults(schema);
@@ -356,7 +356,7 @@ describe('validateForGoogleRichResults', () => {
         '@type': 'FinancialService',
         '@id': 'https://example.com/#financial',
         name: 'Acme Financial Advisors',
-        address: { '@type': 'PostalAddress', streetAddress: '456 Wall St' },
+        address: { '@type': 'PostalAddress', streetAddress: '456 Wall St', addressLocality: 'Springfield', addressRegion: 'IL' },
       }],
     };
     const result = validateForGoogleRichResults(schema);
