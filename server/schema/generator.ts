@@ -407,21 +407,25 @@ function applyTrustedJsonLdEvidence(input: {
     ?? (typeof webPageLike?.['@id'] === 'string' ? webPageLike['@id'] : undefined);
   const existingReviewCount = graph.filter(node => node['@type'] === 'Review').length;
   const validReviews = (semantics.reviews ?? []).filter(review =>
-    !!review.author && !!review.reviewBody && Number.isFinite(review.ratingValue));
+    !!review.author && !!review.reviewBody && (Number.isFinite(review.ratingValue) || !!review.datePublished));
   if (reviewTargetId && validReviews.length > 0) {
     validReviews.slice(0, 3).forEach((review, idx) => {
+      const reviewRating = Number.isFinite(review.ratingValue)
+        ? {
+            '@type': 'Rating',
+            'ratingValue': review.ratingValue,
+            'bestRating': 5,
+            'worstRating': 1,
+          }
+        : undefined;
       graph.push(compactSchemaNode({
         '@type': 'Review',
         '@id': `${pageData.canonicalUrl}#review-existing-${existingReviewCount + idx}`,
         'itemReviewed': schemaIdRef(reviewTargetId),
-        'reviewRating': {
-          '@type': 'Rating',
-          'ratingValue': review.ratingValue,
-          'bestRating': 5,
-          'worstRating': 1,
-        },
+        'reviewRating': reviewRating,
         'author': { '@type': 'Person', 'name': review.author },
         'reviewBody': review.reviewBody,
+        'datePublished': review.datePublished,
       }));
     });
   }

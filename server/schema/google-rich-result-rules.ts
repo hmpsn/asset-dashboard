@@ -46,8 +46,8 @@ export const GOOGLE_RICH_RESULT_RULES: Record<string, GoogleRichResultRule> = {
     feature: 'Course info in search',
   },
   Review: {
-    required: ['itemReviewed', 'reviewRating', 'author'],
-    recommended: ['datePublished', 'reviewBody'],
+    required: ['itemReviewed', 'author'],
+    recommended: ['reviewRating', 'datePublished', 'reviewBody'],
     feature: 'Review rich result',
   },
   HowTo: {

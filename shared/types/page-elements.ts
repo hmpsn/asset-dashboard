@@ -153,6 +153,7 @@ export interface SemanticPageData {
     author: string;
     reviewBody: string;
     ratingValue?: number;
+    datePublished?: string;
   }>;
 
   // Business identity

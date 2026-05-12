@@ -191,6 +191,11 @@ describe('generateLeanSchema', () => {
               reviewBody: 'Helpful for prioritizing engineering investments.',
               ratingValue: 4.8,
             },
+            {
+              author: 'Morgan',
+              reviewBody: 'Solid onboarding and support.',
+              datePublished: '2026-05-01',
+            },
           ],
         }),
       },
@@ -222,8 +227,22 @@ describe('generateLeanSchema', () => {
     expect(webPage?.mentions).toEqual([{ '@id': 'https://example.com/developer-experience#software' }]);
     const faq = graph.find(node => node['@type'] === 'FAQPage');
     expect(faq?.mainEntity).toHaveLength(2);
-    const review = graph.find(node => node['@type'] === 'Review');
-    expect(review?.itemReviewed).toEqual({ '@id': 'https://example.com/developer-experience#software' });
+    const reviews = graph.filter(node => node['@type'] === 'Review');
+    expect(reviews).toHaveLength(2);
+    expect(reviews[0]?.itemReviewed).toEqual({ '@id': 'https://example.com/developer-experience#software' });
+    expect(reviews[0]?.reviewRating).toEqual({
+      '@type': 'Rating',
+      ratingValue: 4.8,
+      bestRating: 5,
+      worstRating: 1,
+    });
+    expect(reviews[1]).toMatchObject({
+      itemReviewed: { '@id': 'https://example.com/developer-experience#software' },
+      author: { '@type': 'Person', name: 'Morgan' },
+      reviewBody: 'Solid onboarding and support.',
+      datePublished: '2026-05-01',
+    });
+    expect(reviews[1]?.reviewRating).toBeUndefined();
     expect(out.validationErrors).toBeUndefined();
   });
 

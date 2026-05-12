@@ -161,6 +161,10 @@ function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
   return true;
 }
 
+function hasReviewRatingOrDate(node: Record<string, unknown>): boolean {
+  return hasSchemaField(node, 'reviewRating') || hasSchemaField(node, 'datePublished');
+}
+
 export function validateForGoogleRichResults(schema: Record<string, unknown>): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
@@ -189,6 +193,14 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
           nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
         }
       }
+      if (type === 'Review' && !hasReviewRatingOrDate(node) && !seenErrorFields.has('reviewRating')) {
+        seenErrorFields.add('reviewRating');
+        nodeErrors.push({
+          type,
+          field: 'reviewRating',
+          message: 'Missing required property "reviewRating" or "datePublished" for Review',
+        });
+      }
 
       // Check recommended fields
       for (const field of rules.recommended) {
@@ -203,7 +215,7 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
       const typeRules = RICH_RESULT_RULES[type];
       const typeMissingRequired = typeRules ? typeRules.required.some(field => {
         return !hasSchemaField(node, field);
-      }) : false;
+      }) || (type === 'Review' && !hasReviewRatingOrDate(node)) : false;
       if (RICH_RESULT_TYPES.has(type) && !typeMissingRequired) {
         richResults.push(type);
       }

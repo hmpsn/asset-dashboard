@@ -459,6 +459,13 @@ function normalizeReviewRating(rating: Record<string, unknown>): number | undefi
   return ratingRaw;
 }
 
+function normalizeIsoDate(value: unknown): string | undefined {
+  const text = cleanPublicText(value);
+  if (!text) return undefined;
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? text : undefined;
+}
+
 function normalizeReviewEvidence(
   nodes: Record<string, unknown>[],
   opts: { pageUrl?: string; visibleText: string },
@@ -478,7 +485,13 @@ function normalizeReviewEvidence(
     const ratingValue = typeof node.reviewRating === 'object' && node.reviewRating && !Array.isArray(node.reviewRating)
       ? normalizeReviewRating(node.reviewRating as Record<string, unknown>)
       : undefined;
-    return [{ author, reviewBody, ...(ratingValue !== undefined ? { ratingValue } : {}) }];
+    const datePublished = normalizeIsoDate(node.datePublished);
+    return [{
+      author,
+      reviewBody,
+      ...(ratingValue !== undefined ? { ratingValue } : {}),
+      ...(datePublished ? { datePublished } : {}),
+    }];
   });
   return reviews.length > 0 ? reviews : undefined;
 }

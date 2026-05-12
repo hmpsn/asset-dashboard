@@ -155,7 +155,8 @@ describe('extractPageElements JSON-LD evidence hardening', () => {
         {
           "@type": "Review",
           "author": "Morgan",
-          "reviewBody": "Solid onboarding and support."
+          "reviewBody": "Solid onboarding and support.",
+          "datePublished": "2026-05-01"
         },
         {
           "@type": "Review",
@@ -187,6 +188,7 @@ describe('extractPageElements JSON-LD evidence hardening', () => {
       {
         author: 'Morgan',
         reviewBody: 'Solid onboarding and support.',
+        datePublished: '2026-05-01',
       },
     ]);
   });
