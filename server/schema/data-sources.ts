@@ -160,6 +160,17 @@ function sameSiteUrl(candidate: string, baseUrl: string): string | undefined {
   }
 }
 
+function safeHttpUrl(candidate: string | null | undefined): string | undefined {
+  if (!candidate?.trim()) return undefined;
+  try {
+    const parsed = new URL(candidate.trim());
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return parsed.toString();
+  } catch { // catch-ok: malformed logo URLs are omitted from public schema
+    return undefined;
+  }
+}
+
 function deriveArticleSection(publishedPath: string): string | undefined {
   const segs = publishedPath.replace(/^\//, '').split('/').filter(Boolean);
   if (segs.length < 2) return undefined; // root or single-segment paths have no section
@@ -239,6 +250,66 @@ function leafSlug(publishedPath: string): string | undefined {
   return segs[segs.length - 1];
 }
 
+const SERVICE_SLUG_NOISE_TOKENS = new Set([
+  'page',
+  'pages',
+  'category',
+  'categories',
+]);
+
+const GENERIC_LEADING_BRAND_TOKENS = new Set(['a', 'an', 'the']);
+
+function primaryBrandSlugTokens(workspaceName: string): Set<string> {
+  const tokens = workspaceName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .map(part => part.trim())
+    .filter(part => part.length >= 2 && !GENERIC_LEADING_BRAND_TOKENS.has(part));
+  return new Set(tokens.slice(0, 1));
+}
+
+function cleanServiceSlug(slug: string, workspaceName: string): string | undefined {
+  let cleaned = slug.trim().toLowerCase();
+  if (!cleaned) return undefined;
+
+  const slugParts = cleaned.split('-').filter(Boolean);
+  const brandTokens = primaryBrandSlugTokens(workspaceName);
+  if (slugParts[0] === 'service' || slugParts[0] === 'services') {
+    cleaned = slugParts.slice(1).join('-');
+  } else if (slugParts.length > 2 && brandTokens.has(slugParts[0]) && (slugParts[1] === 'service' || slugParts[1] === 'services')) {
+    cleaned = slugParts.slice(2).join('-');
+  }
+
+  const parts = cleaned
+    .split('-')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .filter((part, index, allParts) => {
+      if (SERVICE_SLUG_NOISE_TOKENS.has(part)) return false;
+      if (index === 0 && (part === 'service' || part === 'services') && allParts.length > 1) return false;
+      return true;
+    });
+  if (parts.length === 0) return undefined;
+  return parts.map(part => part[0].toUpperCase() + part.slice(1)).join(' ');
+}
+
+function serviceTypeFromTitleCandidate(candidate: string | undefined): string | undefined {
+  if (!candidate) return undefined;
+  const cleaned = candidate
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return undefined;
+  // Slug-like values should not outrank the dedicated slug cleaner.
+  if (cleaned.includes('-') && !cleaned.includes(' ')) return undefined;
+  const withoutPrefix = cleaned
+    .replace(/^[A-Za-z0-9&'’.-]{2,30}\s+services?\s+/i, '')
+    .replace(/^services?\s+/i, '')
+    .trim();
+  if (!withoutPrefix) return undefined;
+  return withoutPrefix.length <= 80 ? withoutPrefix : undefined;
+}
+
 /** Format a Place name for areaServed. Returns "City, State" when both present, "City" or "State" if only one, undefined if neither. */
 function formatAreaServed(address: { city?: string; state?: string } | undefined): string | undefined {
   if (!address) return undefined;
@@ -278,9 +349,19 @@ export function extractPageData(input: ExtractInput): PageData {
   const wordCount = countVisibleWords($);
   const fieldEvidence: SchemaFieldEvidence[] = [...(input.pageMeta.fieldEvidence ?? [])];
   const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
+  const publisherLogoUrl = safeHttpUrl(input.workspace.publisherLogoUrl);
   if (h1Title && !seoTitle) evidenceSources.title = 'rendered-html';
   if (description) evidenceSources.description = 'rendered-html';
   if (image) evidenceSources.image = 'rendered-html';
+  if (publisherLogoUrl) {
+    evidenceSources.logo = 'business-profile';
+    fieldEvidence.push({
+      field: 'logo',
+      source: 'business-profile',
+      status: 'resolved',
+      message: 'Organization logo resolved from the workspace brand logo URL.',
+    });
+  }
 
   const datePublished = $('time[itemprop="datePublished"]').attr('datetime')
     || datePublishedCms?.value
@@ -341,9 +422,13 @@ export function extractPageData(input: ExtractInput): PageData {
   // Derive Service.areaServed + LocalBusiness.areaServed from BusinessProfile address.
   const areaServed = formatAreaServed(input.workspace.businessProfile?.address);
 
-  // Derive Service.serviceType from URL slug.
+  // Derive Service.serviceType from mapped profile (authoritative), then visible/CMS title, then cleaned slug.
   const slug = leafSlug(input.pageMeta.publishedPath);
-  const serviceType = input.pageMeta.serviceProfile?.serviceType || (slug ? capitalizeSlugSegment(slug) : undefined);
+  const serviceType = input.pageMeta.serviceProfile?.serviceType
+    || serviceTypeFromTitleCandidate(input.pageMeta.serviceProfile?.serviceName)
+    || serviceTypeFromTitleCandidate(cleanTitle)
+    || serviceTypeFromTitleCandidate(title)
+    || (slug ? cleanServiceSlug(slug, input.workspace.name) || capitalizeSlugSegment(slug) : undefined);
   const serviceName = input.pageMeta.serviceProfile?.serviceName;
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
 
@@ -355,7 +440,7 @@ export function extractPageData(input: ExtractInput): PageData {
     canonicalUrl,
     publisher: {
       name: input.workspace.name,
-      logoUrl: input.workspace.publisherLogoUrl ?? undefined,
+      logoUrl: publisherLogoUrl,
     },
     datePublished,
     dateModified,

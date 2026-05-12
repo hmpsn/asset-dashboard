@@ -14,14 +14,14 @@ import * as cheerio from 'cheerio';
 import { classifyPage } from './classifier.js';
 import type { BusinessKind, ClassifiedPage, PageKind } from './classifier.js';
 import { extractPageData } from './data-sources.js';
-import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
+import type { PageData, PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
 import { extractFaq } from './extractors/faq.js';
 import { extractPageElements } from './extractors/page-elements.js';
 import { createAiBudget } from './extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './extractors/page-elements/ai-budget.js';
 import { getPageElements, upsertPageElements } from '../page-elements-store.js';
-import type { PageElementCatalog } from '../../shared/types/page-elements.js';
+import type { PageElementCatalog, SemanticPageData } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema, buildProductSchema } from './templates/service.js';
 import { buildPricingPageSchema, buildProfilePageSchema } from './templates/rich-roles.js';
@@ -111,8 +111,25 @@ export interface LeanGeneratorInput {
   cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
 }
 
-function detectExistingSchemas(html: string): string[] {
+function jsonLdObjectsFromHtml(html: string): Record<string, unknown>[] {
   const $ = cheerio.load(html);
+  const objects: Record<string, unknown>[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).html() || '{}') as unknown;
+      if (!json || typeof json !== 'object' || Array.isArray(json)) return;
+      const node = json as Record<string, unknown>;
+      objects.push(node);
+      const graph = node['@graph'] as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(graph)) {
+        objects.push(...graph.filter((n): n is Record<string, unknown> => !!n && typeof n === 'object' && !Array.isArray(n)));
+      }
+    } catch { /* ignore unparseable */ } // catch-ok: malformed JSON-LD on third-party pages
+  });
+  return objects;
+}
+
+function detectExistingSchemas(html: string): string[] {
   const types: string[] = [];
   const pushTypes = (rawType: unknown) => {
     if (typeof rawType === 'string') {
@@ -121,24 +138,52 @@ function detectExistingSchemas(html: string): string[] {
       types.push(...rawType.filter((value): value is string => typeof value === 'string'));
     }
   };
-  $('script[type="application/ld+json"]').each((_, el) => {
-    try {
-      const json = JSON.parse($(el).html() || '{}') as Record<string, unknown>;
-      pushTypes(json['@type']);
-      const graph = json['@graph'] as Array<Record<string, unknown>> | undefined;
-      if (Array.isArray(graph)) {
-        for (const n of graph) {
-          pushTypes(n['@type']);
-        }
-      }
-    } catch { /* ignore unparseable */ } // catch-ok: malformed JSON-LD on third-party pages
-  });
+  for (const node of jsonLdObjectsFromHtml(html)) {
+    pushTypes(node['@type']);
+  }
   return Array.from(new Set(types));
 }
 
 function hasLocalBusinessJsonLdEvidence(html: string): boolean {
   const localTypes = new Set(['Dentist', 'MedicalBusiness', 'MedicalOrganization', 'LocalBusiness', 'FinancialService']);
   return detectExistingSchemas(html).some(type => localTypes.has(type));
+}
+
+function schemaNodeHasType(node: Record<string, unknown>, expected: string): boolean {
+  const type = node['@type'];
+  if (typeof type === 'string') return type === expected;
+  return Array.isArray(type) && type.some(value => value === expected);
+}
+
+function hasAudienceEvidence(value: unknown): boolean {
+  if (!value) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(hasAudienceEvidence);
+  if (typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return typeof obj.audienceType === 'string' && obj.audienceType.trim().length > 0
+    || typeof obj.name === 'string' && obj.name.trim().length > 0;
+}
+
+function hasSoftwareApplicationAudienceJsonLdEvidence(html: string): boolean {
+  return jsonLdObjectsFromHtml(html).some(node =>
+    schemaNodeHasType(node, 'SoftwareApplication') && hasAudienceEvidence(node.audience),
+  );
+}
+
+function shouldRefreshStoredCatalogForJsonLdEvidence(catalog: PageElementCatalog, html: string): boolean {
+  if (!html.trim()) return false;
+  const semantics = catalog.semantics;
+  const detectedTypes = new Set(detectExistingSchemas(html));
+  const hasType = (...types: string[]) => types.some(type => detectedTypes.has(type));
+
+  if (hasLocalBusinessJsonLdEvidence(html) && (!semantics?.businessType || !semantics?.address)) return true;
+  if (hasType('SoftwareApplication') && !semantics?.softwareApplication) return true;
+  if (hasType('Audience') && !semantics?.pageAudience) return true;
+  if (hasSoftwareApplicationAudienceJsonLdEvidence(html) && !semantics?.pageAudience) return true;
+  if (hasType('FAQPage') && !semantics?.existingFaq) return true;
+  if (hasType('Review') && !semantics?.reviews) return true;
+  return false;
 }
 
 function plainText(html: string): string {
@@ -185,7 +230,51 @@ function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | 
   return resolved.length > 0 ? resolved : null;
 }
 
-function extractVisibleOffers(html: string, fallbackName: string): OfferData[] {
+function looksDiscountOrPromoContext(context: string): boolean {
+  return /\b(?:off|discount|promo|promotion|coupon|save|saving|rebate)\b/i.test(context);
+}
+
+const OFFER_NAME_LEADING_NOISE = new Set([
+  'pricing',
+  'package',
+  'packages',
+  'plan',
+  'plans',
+  'service',
+  'services',
+]);
+
+function normalizeOfferName(candidate: string | undefined): string | undefined {
+  if (!candidate) return undefined;
+  const cleaned = candidate
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[|>]+/g, ' ')
+    .trim();
+  if (!cleaned) return undefined;
+  if (/[a-z][A-Z]/.test(cleaned) && !/\s/.test(cleaned)) return undefined;
+  const sentenceTail = cleaned.split(/[\n\r|:;.!?]+/).map(part => part.trim()).filter(Boolean).pop() ?? cleaned;
+  const withoutPricingTail = sentenceTail
+    .replace(/\b(?:cost|price|pricing|starts?|starting|from|for|only|is)\b\s*$/i, '')
+    .replace(/\b(?:cost|price)\s+is\s*$/i, '')
+    .replace(/\b(?:cost|price)\b\s*$/i, '')
+    .trim();
+  if (!withoutPricingTail) return undefined;
+  const words = withoutPricingTail.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return undefined;
+  const tailWords = words.slice(-4);
+  const first = tailWords[0]?.toLowerCase();
+  const meaningfulWords = first && OFFER_NAME_LEADING_NOISE.has(first) && tailWords.length > 2
+    ? tailWords.slice(1)
+    : tailWords;
+  const normalized = meaningfulWords.join(' ');
+  if (!/[A-Za-z]/.test(normalized)) return undefined;
+  if (normalized.length < 3 || normalized.length > 70) return undefined;
+  return normalized;
+}
+
+function extractVisibleOffers(html: string): OfferData[] {
   const $ = cheerio.load(html || '');
   $('script, style, noscript').remove();
   const text = $('body').text().replace(/\s+/g, ' ').trim();
@@ -194,10 +283,15 @@ function extractVisibleOffers(html: string, fallbackName: string): OfferData[] {
   for (const match of matches) {
     const rawPrice = match[1]?.replace(/,/g, '');
     if (!rawPrice) continue;
-    const before = text.slice(Math.max(0, match.index - 80), match.index).trim();
-    const name = before.match(/([A-Z][A-Za-z0-9 +&/-]{2,40})$/)?.[1]?.trim();
+    const before = text.slice(Math.max(0, (match.index ?? 0) - 90), match.index).trim();
+    const after = text.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 45).trim();
+    const nearContext = `${text.slice(Math.max(0, (match.index ?? 0) - 24), match.index)} ${after}`.trim();
+    if (looksDiscountOrPromoContext(nearContext)) continue;
+    const rawName = before.match(/([A-Za-z][A-Za-z0-9 +&/().'-]{2,70})$/)?.[1]?.trim();
+    const name = normalizeOfferName(rawName);
+    if (!name) continue;
     offers.push({
-      name: name || fallbackName,
+      name,
       price: rawPrice,
       priceCurrency: 'USD',
     });
@@ -209,6 +303,128 @@ function extractVisibleOffers(html: string, fallbackName: string): OfferData[] {
 function hasGraphType(schema: Record<string, unknown>, type: string): boolean {
   const graph = schema['@graph'] as Array<Record<string, unknown>> | undefined;
   return Array.isArray(graph) && graph.some(node => node['@type'] === type);
+}
+
+function graphNodeByType(schema: Record<string, unknown>, type: string): Record<string, unknown> | undefined {
+  return graphArray(schema).find(node => nodeTypeList(node).includes(type));
+}
+
+function compactSchemaNode(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  }));
+}
+
+function schemaIdRef(id: string): { '@id': string } {
+  return { '@id': id };
+}
+
+function audienceNode(audienceType: string | undefined): Record<string, unknown> | undefined {
+  const cleaned = safePublicText(audienceType);
+  return cleaned ? { '@type': 'Audience', audienceType: cleaned } : undefined;
+}
+
+function mergeMissingSchemaFields(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (target[key] === undefined || target[key] === null || target[key] === '') {
+      target[key] = value;
+    }
+  }
+}
+
+function applyTrustedJsonLdEvidence(input: {
+  schema: Record<string, unknown>;
+  pageData: PageData;
+  semantics?: SemanticPageData;
+  role?: SchemaPageRole;
+  canonicalEntityRefs?: string[];
+}): void {
+  const { schema, pageData, semantics, role } = input;
+  if (!semantics) return;
+  const graph = graphArray(schema);
+  if (graph.length === 0) return;
+
+  let softwareApplicationId: string | undefined;
+  const softwareApplication = semantics.softwareApplication;
+  const existingSoftware = graphNodeByType(schema, 'SoftwareApplication');
+  const canonicalSoftwareRef = (input.canonicalEntityRefs ?? []).find(ref => ref.includes('#software'))
+    ?? input.canonicalEntityRefs?.[0];
+  if (softwareApplication?.name) {
+    softwareApplicationId = typeof existingSoftware?.['@id'] === 'string' ? existingSoftware['@id'] : undefined;
+    const shouldMaterializeSoftware = !!existingSoftware || role !== 'audience' || !canonicalSoftwareRef;
+    if (shouldMaterializeSoftware) {
+      softwareApplicationId = softwareApplicationId ?? `${pageData.canonicalUrl}#software`;
+      const softwareNode = compactSchemaNode({
+        '@type': 'SoftwareApplication',
+        '@id': softwareApplicationId,
+        'name': softwareApplication.name,
+        'description': softwareApplication.description ?? pageData.description,
+        'url': softwareApplication.url ?? pageData.canonicalUrl,
+        'applicationCategory': softwareApplication.applicationCategory,
+        'operatingSystem': softwareApplication.operatingSystem,
+        'featureList': softwareApplication.featureList,
+        'audience': audienceNode(softwareApplication.audience?.audienceType ?? semantics.pageAudience?.audienceType),
+        'offers': softwareApplication.offer
+          ? compactSchemaNode({
+            '@type': 'Offer',
+            'url': softwareApplication.offer.url,
+            'availability': softwareApplication.offer.availability,
+          })
+          : undefined,
+      });
+      if (existingSoftware) {
+        mergeMissingSchemaFields(existingSoftware, softwareNode);
+      } else {
+        graph.push(softwareNode);
+      }
+    } else {
+      softwareApplicationId = canonicalSoftwareRef;
+    }
+  }
+
+  const webPageLike = graph.find(node => {
+    const types = nodeTypeList(node);
+    return types.some(type => ['WebPage', 'CollectionPage', 'AboutPage', 'ContactPage', 'ProfilePage'].includes(type));
+  });
+  const audience = audienceNode(semantics.pageAudience?.audienceType ?? softwareApplication?.audience?.audienceType);
+  if (webPageLike && audience && !webPageLike.audience) {
+    webPageLike.audience = audience;
+  }
+  if (webPageLike && softwareApplicationId) {
+    if (role === 'audience' && !webPageLike.about) {
+      webPageLike.about = schemaIdRef(softwareApplicationId);
+    } else {
+      addCanonicalReferencesToNode(webPageLike, [softwareApplicationId]);
+    }
+  }
+
+  const serviceNode = graphNodeByType(schema, 'Service');
+  const reviewTargetId = softwareApplicationId
+    ?? (typeof serviceNode?.['@id'] === 'string' ? serviceNode['@id'] : undefined)
+    ?? (typeof webPageLike?.['@id'] === 'string' ? webPageLike['@id'] : undefined);
+  const existingReviewCount = graph.filter(node => node['@type'] === 'Review').length;
+  const validReviews = (semantics.reviews ?? []).filter(review =>
+    !!review.author && !!review.reviewBody && Number.isFinite(review.ratingValue));
+  if (reviewTargetId && validReviews.length > 0) {
+    validReviews.slice(0, 3).forEach((review, idx) => {
+      graph.push(compactSchemaNode({
+        '@type': 'Review',
+        '@id': `${pageData.canonicalUrl}#review-existing-${existingReviewCount + idx}`,
+        'itemReviewed': schemaIdRef(reviewTargetId),
+        'reviewRating': {
+          '@type': 'Rating',
+          'ratingValue': review.ratingValue,
+          'bestRating': 5,
+          'worstRating': 1,
+        },
+        'author': { '@type': 'Person', 'name': review.author },
+        'reviewBody': review.reviewBody,
+      }));
+    });
+  }
 }
 
 function isCollectionIndexKind(kind: PageKind): boolean {
@@ -526,6 +742,11 @@ function semanticFieldEvidence(semantics: PageElementCatalog['semantics'] | unde
   if (semantics.email) push('email', 'email resolved from existing local business JSON-LD when no stronger source is present.');
   if (semantics.primaryImage) push('image', 'image resolved from existing local business JSON-LD.');
   if (semantics.hours?.length) push('openingHoursSpecification', 'openingHoursSpecification normalized from existing local business JSON-LD.');
+  if (semantics.softwareApplication) push('softwareApplication', 'SoftwareApplication evidence resolved from existing JSON-LD.');
+  if (semantics.softwareApplication?.featureList?.length) push('featureList', 'SoftwareApplication featureList resolved from existing JSON-LD.');
+  if (semantics.pageAudience) push('audienceType', 'Audience evidence resolved from existing JSON-LD.');
+  if (semantics.existingFaq?.length) push('schemaJsonLd', 'FAQPage evidence resolved from existing JSON-LD.');
+  if (semantics.reviews?.length) push('schemaJsonLd', 'Review evidence resolved from existing JSON-LD.');
   return evidence;
 }
 
@@ -609,9 +830,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let catalog: PageElementCatalog | undefined;
   if (workspaceId && pagePath) {
     const stored = getPageElements(workspaceId, pagePath);
-    const shouldRefreshForJsonLdEvidence = !!stored
-      && hasLocalBusinessJsonLdEvidence(input.html ?? '')
-      && (!stored.catalog.semantics?.businessType || !stored.catalog.semantics?.address);
+    const shouldRefreshForJsonLdEvidence = !!stored && shouldRefreshStoredCatalogForJsonLdEvidence(stored.catalog, input.html ?? '');
     if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null) || shouldRefreshForJsonLdEvidence) {
       try {
         const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
@@ -652,22 +871,26 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.warn({ err, pageId: input.pageId }, 'page-element extraction failed; planned rich role will fall back conservatively');
     }
   }
-  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile, pageData.fieldEvidence);
+  const semanticData = catalog?.semantics ?? input.pageMeta.elements?.semantics;
+  const businessProfileForPage = mergeSemanticBusinessProfile(semanticData, input.workspace.businessProfile, pageData.fieldEvidence);
   pageData = {
     ...pageData,
-    elements: catalog,
+    elements: catalog ?? pageData.elements,
     areaServed: formatAreaServed(businessProfileForPage?.address) ?? pageData.areaServed,
     fieldEvidence: [
       ...(pageData.fieldEvidence ?? []),
-      ...semanticFieldEvidence(catalog?.semantics),
+      ...semanticFieldEvidence(semanticData),
     ],
     evidenceSources: {
       ...(pageData.evidenceSources ?? {}),
-      ...(catalog?.semantics?.businessName ? { locationName: 'existing-json-ld' as const } : {}),
-      ...(catalog?.semantics?.businessType ? { businessType: 'existing-json-ld' as const } : {}),
-      ...(catalog?.semantics?.address ? { address: 'existing-json-ld' as const } : {}),
-      ...(catalog?.semantics?.geo ? { geo: 'existing-json-ld' as const } : {}),
-      ...(catalog?.semantics?.hours?.length ? { openingHoursSpecification: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.businessName ? { locationName: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.businessType ? { businessType: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.address ? { address: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.geo ? { geo: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.hours?.length ? { openingHoursSpecification: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.softwareApplication ? { softwareApplication: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.softwareApplication?.featureList?.length ? { featureList: 'existing-json-ld' as const } : {}),
+      ...(semanticData?.pageAudience ? { audienceType: 'existing-json-ld' as const } : {}),
     },
   };
   const businessKind: BusinessKind = businessProfileForPage?.address ? 'local' : 'unknown';
@@ -695,7 +918,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   // Build template by explicit role first, then deterministic PageKind.
   let schema: Record<string, unknown>;
   let reason: string;
-  const offers = extractVisibleOffers(input.html, pageData.cleanTitle || pageData.title);
+  const offers = extractVisibleOffers(input.html);
   const serviceOffers = pageData.offers && pageData.offers.length > 0 ? pageData.offers : offers;
 
   if (role === 'product') {
@@ -809,11 +1032,11 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
+      schema = buildAboutPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, semantics: semanticData });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: catalog?.semantics });
+      schema = buildContactPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: semanticData });
       reason = 'Contact page — ContactPage with canonical business identity mainEntity.';
       break;
     case 'BlogIndex': {
@@ -877,6 +1100,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     canonicalEntities,
     entityRefs: canonicalEntityRefs,
   });
+  applyTrustedJsonLdEvidence({
+    schema,
+    pageData,
+    semantics: semanticData,
+    role,
+    canonicalEntityRefs,
+  });
 
   // Validate the base schema BEFORE FAQ enrichment so we can distinguish FAQ-specific
   // errors from pre-existing base errors (e.g. a BlogPosting missing datePublished
@@ -885,8 +1115,11 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
 
   // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
   const requireDedicatedFaq = isCollectionIndexKind(classified.kind);
-  const faqPairs = await extractFaq(input.html || '', { requireDedicatedSection: requireDedicatedFaq });
-  if (faqPairs.length >= 2) {
+  const extractedFaqPairs = await extractFaq(input.html || '', { requireDedicatedSection: requireDedicatedFaq });
+  const faqPairs = extractedFaqPairs.length >= 2
+    ? extractedFaqPairs
+    : (semanticData?.existingFaq ?? []);
+  if (!hasGraphType(schema, 'FAQPage') && faqPairs.length >= 2) {
     const faqNode = {
       '@type': 'FAQPage',
       '@id': `${pageData.canonicalUrl}#faq`,

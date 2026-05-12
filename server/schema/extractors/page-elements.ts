@@ -98,6 +98,56 @@ function cleanHttpUrl(value: unknown): string | undefined {
   }
 }
 
+function safePageOrigin(pageUrl: string | undefined): string | undefined {
+  if (!pageUrl) return undefined;
+  try {
+    const parsed = new URL(pageUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return parsed.origin;
+  } catch { // catch-ok: malformed URL evidence cannot produce a safe origin
+    return undefined;
+  }
+}
+
+function resolveSafeUrl(value: unknown, pageUrl: string | undefined): string | undefined {
+  const cleaned = cleanSemanticText(value);
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  if (/^(?:data|javascript|file):/i.test(cleaned)) return undefined;
+
+  const pageOrigin = safePageOrigin(pageUrl);
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return parsed.toString();
+  } catch { /* relative path or malformed URL */ } // catch-ok
+
+  if (!pageOrigin || !cleaned.startsWith('/')) return undefined;
+  try {
+    const resolved = new URL(cleaned, pageOrigin);
+    if (resolved.origin !== pageOrigin) return undefined;
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return undefined;
+    return resolved.toString();
+  } catch { // catch-ok: malformed relative URL should be dropped
+    return undefined;
+  }
+}
+
+function firstResolvedSafeUrl(value: unknown, pageUrl: string | undefined): string | undefined {
+  if (typeof value === 'string') return resolveSafeUrl(value, pageUrl);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = firstResolvedSafeUrl(item, pageUrl);
+      if (url) return url;
+    }
+    return undefined;
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return resolveSafeUrl(obj.url, pageUrl) ?? resolveSafeUrl(obj.contentUrl, pageUrl);
+  }
+  return undefined;
+}
+
 function comparablePageUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
@@ -334,6 +384,105 @@ function extractJsonLdObjects($: cheerio.CheerioAPI): Record<string, unknown>[] 
   return nodes;
 }
 
+function schemaNodeHasType(node: Record<string, unknown>, expected: string): boolean {
+  return schemaTypes(node).some(type => type.toLowerCase() === expected.toLowerCase());
+}
+
+function firstAudienceType(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const audience = firstAudienceType(item);
+      if (audience) return audience;
+    }
+    return undefined;
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return cleanPublicText(obj.audienceType) ?? cleanPublicText(obj.name);
+  }
+  return cleanPublicText(value);
+}
+
+function cleanStringList(value: unknown, limit: number): string[] | undefined {
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/\r?\n|[;,]/).map(v => v.trim()).filter(Boolean)
+      : [];
+  const cleaned = rawItems
+    .map(item => cleanPublicText(item))
+    .filter((item): item is string => !!item)
+    .slice(0, limit);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function normalizeVisibleText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function visibleTextContains(visibleText: string, value: string): boolean {
+  const normalizedValue = normalizeVisibleText(value);
+  return normalizedValue.length > 0 && visibleText.includes(normalizedValue);
+}
+
+function normalizeFaqPairs(
+  node: Record<string, unknown>,
+  opts: { pageUrl?: string; visibleText: string },
+): Array<{ question: string; answer: string }> | undefined {
+  if (!schemaNodeHasType(node, 'FAQPage')) return undefined;
+  const matchesCurrentPage = nodeMatchesPage(node, opts.pageUrl);
+  const entities = Array.isArray(node.mainEntity) ? node.mainEntity : [node.mainEntity];
+  const pairs = entities.flatMap(entity => {
+    if (!entity || typeof entity !== 'object' || Array.isArray(entity)) return [];
+    const questionNode = entity as Record<string, unknown>;
+    if (!schemaNodeHasType(questionNode, 'Question')) return [];
+    const question = cleanPublicText(questionNode.name);
+    const acceptedAnswer = questionNode.acceptedAnswer;
+    if (!acceptedAnswer || typeof acceptedAnswer !== 'object' || Array.isArray(acceptedAnswer)) return [];
+    const answer = cleanPublicText((acceptedAnswer as Record<string, unknown>).text);
+    if (!matchesCurrentPage && (!question || !answer || !visibleTextContains(opts.visibleText, question) || !visibleTextContains(opts.visibleText, answer))) return [];
+    return question && answer ? [{ question, answer }] : [];
+  });
+  return pairs.length >= 2 ? pairs : undefined;
+}
+
+function normalizeReviewRating(rating: Record<string, unknown>): number | undefined {
+  const ratingRaw = Number(rating.ratingValue);
+  if (!Number.isFinite(ratingRaw) || ratingRaw < 1 || ratingRaw > 5) return undefined;
+
+  const bestRating = rating.bestRating === undefined ? undefined : Number(rating.bestRating);
+  const worstRating = rating.worstRating === undefined ? undefined : Number(rating.worstRating);
+  if (bestRating !== undefined && (!Number.isFinite(bestRating) || bestRating !== 5)) return undefined;
+  if (worstRating !== undefined && (!Number.isFinite(worstRating) || worstRating !== 1)) return undefined;
+
+  return ratingRaw;
+}
+
+function normalizeReviewEvidence(
+  nodes: Record<string, unknown>[],
+  opts: { pageUrl?: string; visibleText: string },
+): SemanticPageData['reviews'] | undefined {
+  const reviews = nodes.flatMap(node => {
+    if (!schemaNodeHasType(node, 'Review')) return [];
+    const matchesCurrentPage = nodeMatchesPage(node, opts.pageUrl);
+    const authorValue = node.author;
+    const author = cleanPublicText(
+      typeof authorValue === 'object' && authorValue && !Array.isArray(authorValue)
+        ? (authorValue as Record<string, unknown>).name
+        : authorValue,
+    );
+    const reviewBody = cleanPublicText(node.reviewBody);
+    if (!author || !reviewBody) return [];
+    if (!matchesCurrentPage && !visibleTextContains(opts.visibleText, reviewBody)) return [];
+    const ratingValue = typeof node.reviewRating === 'object' && node.reviewRating && !Array.isArray(node.reviewRating)
+      ? normalizeReviewRating(node.reviewRating as Record<string, unknown>)
+      : undefined;
+    return [{ author, reviewBody, ...(ratingValue !== undefined ? { ratingValue } : {}) }];
+  });
+  return reviews.length > 0 ? reviews : undefined;
+}
+
 function semanticAddressFromObject(value: unknown): SemanticPageData['address'] | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const obj = value as Record<string, unknown>;
@@ -376,6 +525,9 @@ function nodeMatchesPage(node: Record<string, unknown>, pageUrl: string | undefi
 function extractSemantics($: cheerio.CheerioAPI, opts: ExtractPageElementsOpts): SemanticPageData | undefined {
   const jsonLdNodes = extractJsonLdObjects($);
   const pageUrl = currentPageUrl($, opts);
+  const visibleBody = $('body').clone();
+  visibleBody.find('script,style,noscript').remove();
+  const visibleText = normalizeVisibleText(visibleBody.text());
   const localBusinessNodes = jsonLdNodes.filter(node => schemaTypes(node).some(t => LOCAL_BUSINESS_TYPES.has(t)));
   const localBusinessNode = localBusinessNodes.find(node => nodeMatchesPage(node, pageUrl)) ?? localBusinessNodes[0];
   const businessNode = localBusinessNode ?? jsonLdNodes.find(node => schemaTypes(node).some(t => BUSINESS_FALLBACK_TYPES.has(t)));
@@ -402,6 +554,51 @@ function extractSemantics($: cheerio.CheerioAPI, opts: ExtractPageElementsOpts):
   const priceRange = cleanPublicText(businessNode?.priceRange);
   const hours = normalizeHoursSpecification(businessNode?.openingHoursSpecification)
     ?? parseOpeningHours(businessNode?.openingHours);
+  const softwareApplicationNodes = jsonLdNodes.filter(node => schemaNodeHasType(node, 'SoftwareApplication'));
+  const softwareApplicationNode = softwareApplicationNodes.find(node => nodeMatchesPage(node, pageUrl))
+    ?? softwareApplicationNodes[0];
+  const softwareApplicationName = cleanPublicText(softwareApplicationNode?.name);
+  const softwareApplicationDescription = cleanPublicText(softwareApplicationNode?.description);
+  const softwareApplicationUrl = resolveSafeUrl(softwareApplicationNode?.url, pageUrl)
+    ?? resolveSafeUrl(softwareApplicationNode?.['@id'], pageUrl);
+  const softwareApplicationCategory = cleanPublicText(softwareApplicationNode?.applicationCategory);
+  const softwareApplicationOs = cleanPublicText(softwareApplicationNode?.operatingSystem);
+  const softwareApplicationFeatureList = cleanStringList(softwareApplicationNode?.featureList, 8);
+  const softwareApplicationAudienceType = firstAudienceType(softwareApplicationNode?.audience);
+  const softwareApplicationOfferValue = softwareApplicationNode?.offers;
+  const softwareApplicationOfferUrl = firstResolvedSafeUrl(softwareApplicationOfferValue, pageUrl);
+  const softwareApplicationOfferAvailability = cleanPublicText(
+    typeof softwareApplicationOfferValue === 'object' && softwareApplicationOfferValue && !Array.isArray(softwareApplicationOfferValue)
+      ? (softwareApplicationOfferValue as Record<string, unknown>).availability
+      : undefined,
+  );
+  const softwareApplication = softwareApplicationName
+    ? {
+      name: softwareApplicationName,
+      ...(softwareApplicationDescription ? { description: softwareApplicationDescription } : {}),
+      ...(softwareApplicationUrl ? { url: softwareApplicationUrl } : {}),
+      ...(softwareApplicationCategory ? { applicationCategory: softwareApplicationCategory } : {}),
+      ...(softwareApplicationOs ? { operatingSystem: softwareApplicationOs } : {}),
+      ...(softwareApplicationFeatureList ? { featureList: softwareApplicationFeatureList } : {}),
+      ...(softwareApplicationAudienceType ? { audience: { audienceType: softwareApplicationAudienceType } } : {}),
+      ...(softwareApplicationOfferUrl || softwareApplicationOfferAvailability
+        ? {
+          offer: {
+            ...(softwareApplicationOfferUrl ? { url: softwareApplicationOfferUrl } : {}),
+            ...(softwareApplicationOfferAvailability ? { availability: softwareApplicationOfferAvailability } : {}),
+          },
+        }
+        : {}),
+    }
+    : undefined;
+
+  const audienceNodes = jsonLdNodes.filter(node => schemaNodeHasType(node, 'Audience'));
+  const pageAudienceType = firstAudienceType(audienceNodes[0]) ?? softwareApplicationAudienceType;
+  const pageAudience = pageAudienceType ? { audienceType: pageAudienceType } : undefined;
+  const existingFaq = jsonLdNodes
+    .map(node => normalizeFaqPairs(node, { pageUrl, visibleText }))
+    .find((faq): faq is Array<{ question: string; answer: string }> => !!faq);
+  const reviews = normalizeReviewEvidence(jsonLdNodes, { pageUrl, visibleText });
 
   const semantics: SemanticPageData = {
     ...(businessName ? { businessName } : {}),
@@ -414,6 +611,10 @@ function extractSemantics($: cheerio.CheerioAPI, opts: ExtractPageElementsOpts):
     ...(sameAs && sameAs.length > 0 ? { sameAs } : {}),
     ...(primaryImage ? { primaryImage } : {}),
     ...(priceRange ? { priceRange } : {}),
+    ...(softwareApplication ? { softwareApplication } : {}),
+    ...(pageAudience ? { pageAudience } : {}),
+    ...(existingFaq ? { existingFaq } : {}),
+    ...(reviews ? { reviews } : {}),
   };
   return Object.keys(semantics).length > 0 ? semantics : undefined;
 }

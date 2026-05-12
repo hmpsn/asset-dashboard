@@ -40,9 +40,34 @@ interface Props {
   workspaceId?: string;
   fixContext?: FixContext | null;
   businessProfile?: BusinessProfileContact | null;
+  intelligenceProfile?: {
+    industry?: string;
+    targetAudience?: string;
+  } | null;
 }
 
-export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
+type LocalBusinessIntent = 'unknown' | 'local' | 'non-local-saas';
+
+function inferLocalBusinessIntent(
+  businessProfile: BusinessProfileContact | null | undefined,
+  intelligenceProfile: Props['intelligenceProfile'],
+): LocalBusinessIntent {
+  if (businessProfile?.address?.street || businessProfile?.address?.city) return 'local';
+  const profileText = [
+    intelligenceProfile?.industry,
+    intelligenceProfile?.targetAudience,
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (!profileText) return 'unknown';
+  if (/\b(?:dental|dentist|clinic|medical|healthcare|restaurant|retail|salon|spa|law firm|real estate|local)\b/.test(profileText)) {
+    return 'local';
+  }
+  if (/\b(?:saas|software|platform|developer|engineering|b2b|cloud|ai|artificial intelligence)\b/.test(profileText)) {
+    return 'non-local-saas';
+  }
+  return 'unknown';
+}
+
+export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile, intelligenceProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -95,6 +120,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     if (dismissedKey) localStorage.setItem(dismissedKey, '1');
     setCalloutDismissed(true);
   };
+  const localBusinessIntent = inferLocalBusinessIntent(businessProfile, intelligenceProfile);
 
   const {
     cmsMappingError,
@@ -204,6 +230,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         <SchemaBusinessProfileCallout
           businessProfile={businessProfile}
+          localBusinessIntent={localBusinessIntent}
           dismissed={calloutDismissed}
           workspaceId={workspaceId}
           onDismiss={dismissBpCallout}
@@ -303,6 +330,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       <SchemaBusinessProfileCallout
         businessProfile={businessProfile}
+        localBusinessIntent={localBusinessIntent}
         dismissed={calloutDismissed}
         workspaceId={workspaceId}
         onDismiss={dismissBpCallout}
