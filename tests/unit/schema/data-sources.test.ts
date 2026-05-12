@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { extractPageData } from '../../../server/schema/data-sources.js';
 
 const baseUrl = 'https://example.com';
@@ -8,6 +8,16 @@ const baseInput = {
   html: '<html><head></head><body></body></html>',
   baseUrl: 'https://acme.com',
   workspace: { name: 'Acme Co', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
+};
+
+const articleBaseInput = {
+  baseUrl: 'https://example.com',
+  workspace: {
+    name: 'Acme Studio',
+    publisherLogoUrl: null,
+    businessProfile: null,
+    defaultLocale: 'en',
+  },
 };
 
 describe('extractPageData — paid-grade fields', () => {
@@ -160,7 +170,7 @@ describe('extractPageData', () => {
     expect(data.dateModified).toBe('2026-04-01T12:00:00Z');
   });
 
-  it('exposes workspace name as default author/publisher', () => {
+  it('exposes workspace name as default publisher', () => {
     const data = extractPageData({
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/blog/x' },
       html: '<html></html>',
@@ -168,5 +178,101 @@ describe('extractPageData', () => {
       workspace: { name: 'Acme Studio', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.publisher).toEqual({ name: 'Acme Studio', logoUrl: undefined });
+  });
+});
+
+describe('extractPageData — article quality hardening', () => {
+  it('preserves visible editorial title casing and punctuation ahead of title-cased CMS names', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'How I Built A Six Figure Studio',
+        slug: 'how-i-built-a-six-figure-studio',
+        publishedPath: '/blog/how-i-built-a-six-figure-studio',
+        seo: {},
+      },
+      html: '<article><h1>How I built a six-figure studio in 18 months</h1><p>Body.</p></article>',
+    });
+
+    expect(data.cleanTitle).toBe('How I built a six-figure studio in 18 months');
+  });
+
+  it('still strips only a matching brand suffix from article titles', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Fallback',
+        slug: 'privacy-policy',
+        publishedPath: '/blog/privacy-policy',
+        seo: { title: 'Privacy Policy | Acme Studio' },
+      },
+      html: '<article><h1>Different H1</h1><p>Body.</p></article>',
+    });
+
+    expect(data.cleanTitle).toBe('Privacy Policy');
+  });
+
+  it('computes wordCount from visible content and excludes nav footer scripts and styles', () => {
+    const data = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Word Count',
+        slug: 'word-count',
+        publishedPath: '/blog/word-count',
+        seo: {},
+      },
+      html: `
+        <nav>Navigation words should vanish</nav>
+        <article>
+          <h1>Visible Title</h1>
+          <p>First visible paragraph has five words.</p>
+          <script>hidden script words</script>
+          <style>.hidden { content: "hidden style words"; }</style>
+          <p>Second paragraph counts too.</p>
+        </article>
+        <footer>Footer words should vanish</footer>
+      `,
+    });
+
+    expect(data.wordCount).toBe(12);
+  });
+
+  it('uses CMS author first, then visible byline, then leaves author undefined for Organization fallback', () => {
+    const visible = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'Visible Author',
+        slug: 'visible-author',
+        publishedPath: '/blog/visible-author',
+        seo: {},
+      },
+      html: '<article><p class="byline">By Jane Doe on May 1, 2026</p><p>Body.</p></article>',
+    });
+    expect(visible.author).toBe('Jane Doe');
+
+    const cms = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'CMS Author',
+        slug: 'cms-author',
+        publishedPath: '/blog/cms-author',
+        seo: {},
+        cmsFieldData: { author: 'CMS Person' },
+      },
+      html: '<article><p class="byline">By Jane Doe</p><p>Body.</p></article>',
+    });
+    expect(cms.author).toBe('CMS Person');
+
+    const fallback = extractPageData({
+      ...articleBaseInput,
+      pageMeta: {
+        title: 'No Author',
+        slug: 'no-author',
+        publishedPath: '/blog/no-author',
+        seo: {},
+      },
+      html: '<article><p>Body.</p></article>',
+    });
+    expect(fallback.author).toBeUndefined();
   });
 });

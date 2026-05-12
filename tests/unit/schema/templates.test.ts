@@ -843,8 +843,8 @@ describe('Article + BlogPosting — ImageGallery enrichment (PR2)', () => {
     const elements = {
       ...baseElementCatalog,
       images: [
-        { src: 'https://x/i1.jpg', alt: 'one', role: 'informative' as const, roleSource: 'rule' as const },
-        { src: 'https://x/i2.jpg', alt: 'two', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i1.jpg', alt: 'Editorial workflow diagram with approval stages', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i2.jpg', alt: 'Content model diagram showing article reference fields', role: 'informative' as const, roleSource: 'rule' as const },
       ],
     };
     const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
