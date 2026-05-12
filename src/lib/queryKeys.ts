@@ -58,6 +58,8 @@ export const queryKeys = {
       wsId ? ['admin-schema-snapshot', siteId, wsId] as const : ['admin-schema-snapshot', siteId] as const,
     schemaValidations: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-validations', siteId, wsId] as const : ['admin-schema-validations', siteId] as const,
+    schemaGraphValidation: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-graph-validation', siteId, wsId] as const : ['admin-schema-graph-validation', siteId] as const,
     schemaCmsFieldMappings: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-cms-field-mappings', siteId, wsId] as const : ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,

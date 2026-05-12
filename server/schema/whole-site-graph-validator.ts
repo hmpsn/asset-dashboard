@@ -1,36 +1,16 @@
 import type { SchemaPageSuggestion } from '../schema-suggester.js';
 import type { SchemaSiteTemplate } from '../schema-store.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
-import type { ValidationFinding } from '../../shared/types/schema-validation.js';
+import type {
+  WholeSiteSchemaGraphFinding,
+  WholeSiteSchemaGraphNode,
+  WholeSiteSchemaGraphValidationResult,
+} from '../../shared/types/schema-validation.js';
 
 export interface WholeSiteSchemaGraphInput {
   pages: SchemaPageSuggestion[];
   siteTemplate?: SchemaSiteTemplate | null;
   activePlan?: SchemaSitePlan | null;
-}
-
-export interface WholeSiteSchemaGraphNode {
-  id: string;
-  type: string;
-  pageId: string;
-  pagePath: string;
-  source: 'site-template' | 'page-schema';
-}
-
-export interface WholeSiteSchemaGraphFinding extends ValidationFinding {
-  pageId?: string;
-  pagePath?: string;
-  sourceId?: string;
-  targetId?: string;
-}
-
-export interface WholeSiteSchemaGraphValidationResult {
-  status: 'valid' | 'warnings' | 'errors';
-  checkedPageCount: number;
-  nodeCount: number;
-  referenceCount: number;
-  findings: WholeSiteSchemaGraphFinding[];
-  nodes: WholeSiteSchemaGraphNode[];
 }
 
 interface InternalNode extends WholeSiteSchemaGraphNode {
@@ -146,6 +126,32 @@ function isCompatibleType(expected: string, emittedTypes: Set<string>): boolean 
   if (emittedTypes.has(expected)) return true;
   const compatible = COMPATIBLE_TYPES[expected];
   return compatible ? [...emittedTypes].some(type => compatible.has(type)) : false;
+}
+
+function siteIdentityGroup(node: InternalNode): string | null {
+  let idPath = '';
+  try {
+    idPath = new URL(node.id).pathname.replace(/\/+$/, '') || '/';
+  } catch { // catch-ok: non-URL @ids cannot be confidently grouped as site identity
+    return null;
+  }
+  if (idPath !== '/') return null;
+  if (node.type === 'Organization') return 'Organization';
+  if (
+    node.type === 'LocalBusiness' || node.type === 'MedicalOrganization' || node.type === 'FinancialService'
+  ) return 'LocalBusiness';
+  return null;
+}
+
+function isHubChildReference(ref: IdReference): boolean {
+  return ref.propertyPath.includes('blogPost')
+    || ref.propertyPath.includes('itemListElement')
+    || ref.propertyPath.includes('hasOfferCatalog');
+}
+
+function isNestedChildPath(parentPath: string, childPath: string): boolean {
+  if (parentPath === '/') return childPath !== '/';
+  return childPath.startsWith(`${parentPath.replace(/\/+$/, '')}/`);
 }
 
 function addFinding(
@@ -275,6 +281,45 @@ export function validateWholeSiteSchemaGraph(
     }
   }
 
+  const siteIdentityIdsByGroup = new Map<string, Set<string>>();
+  for (const node of nodes) {
+    const group = siteIdentityGroup(node);
+    if (!group) continue;
+    const idsForGroup = siteIdentityIdsByGroup.get(group) ?? new Set<string>();
+    idsForGroup.add(node.id);
+    siteIdentityIdsByGroup.set(group, idsForGroup);
+  }
+  for (const [group, groupIds] of siteIdentityIdsByGroup.entries()) {
+    if (groupIds.size < 2) continue;
+    addFinding(findings, {
+      severity: 'error',
+      type: group,
+      ruleId: 'schema-graph-duplicate-site-identity',
+      message: `The site graph emits multiple ${group} identity node ids (${[...groupIds].join(', ')}).`,
+    });
+  }
+
+  for (const ref of references) {
+    if (!ref.sourceId || !isHubChildReference(ref)) continue;
+    const source = byId.get(ref.sourceId)?.[0];
+    const target = byId.get(ref.targetId)?.[0];
+    if (!source || !target) continue;
+    if (source.pagePath === target.pagePath) continue;
+    if (!isNestedChildPath(source.pagePath, target.pagePath)) {
+      addFinding(findings, {
+        severity: 'error',
+        type: source.type,
+        field: ref.propertyPath,
+        ruleId: 'schema-graph-broken-hub-child',
+        message: `Hub page "${source.pagePath}" references "${target.pagePath}", but that page is not a child URL of the hub.`,
+        pageId: source.pageId,
+        pagePath: source.pagePath,
+        sourceId: ref.sourceId,
+        targetId: ref.targetId,
+      });
+    }
+  }
+
   const hasWebsite = nodes.some(node => node.type === 'WebSite');
   const hasSitewideOrg = nodes.some(node => SITEWIDE_ORG_TYPES.has(node.type));
   if (!hasWebsite) {
@@ -299,7 +344,7 @@ export function validateWholeSiteSchemaGraph(
     for (const entity of activePlan.canonicalEntities) {
       if (entity.id && !ids.has(entity.id)) {
         addFinding(findings, {
-          severity: 'warning',
+          severity: 'error',
           type: entity.type || 'Thing',
           ruleId: 'schema-graph-planned-entity-missing',
           message: `Active schema plan canonical entity "${entity.name}" is not emitted in the site graph.`,

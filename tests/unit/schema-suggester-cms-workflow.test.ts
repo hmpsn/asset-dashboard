@@ -58,4 +58,17 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(source).toContain("schemaRoleOverride: { role, source: 'ui' as const");
     expect(source).toContain("schemaRoleOverride: { role, source: 'saved-page-type' as const");
   });
+
+  it('threads active plan canonical entities into CMS single-page generation context', () => {
+    const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — CMS authority contract guard
+    const cmsBranchStart = source.indexOf('if (cmsItem) {');
+    const cmsBranchEnd = source.indexOf('const meta = await fetchPageMeta(pageId, tokenOverride);');
+    const cmsBranch = source.slice(cmsBranchStart, cmsBranchEnd);
+
+    expect(cmsBranch).toContain('const activePlan = latestPlan?.status ===');
+    expect(cmsBranch).toContain('buildSiteContextPages(allPages, siteInventory?.cmsItems, activePlan)');
+    expect(cmsBranch).toContain('assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])');
+    expect(cmsBranch).toContain('siteContext: siteContextForCms');
+    expect(cmsBranch).toContain('canonicalEntityRefs: roleOverride.canonicalEntityRefs');
+  });
 });

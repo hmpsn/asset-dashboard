@@ -97,6 +97,7 @@ export function useSchemaSuggesterGeneration({
         setData(job.result as SchemaPageSuggestion[]);
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       setShowNextSteps(true);
       setProgressMsg(null);
       jobIdRef.current = null;
@@ -174,13 +175,14 @@ export function useSchemaSuggesterGeneration({
         return next;
       });
       onPageGenerated(pageId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       setScanError('Single page generation failed');
     } finally {
       setGeneratingSingle(null);
     }
-  }, [onPageGenerated, singlePageTypeOverrides, siteId, workspaceId]);
+  }, [onPageGenerated, queryClient, singlePageTypeOverrides, siteId, workspaceId]);
 
   useEffect(() => {
     if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
@@ -204,6 +206,7 @@ export function useSchemaSuggesterGeneration({
         } : page);
       });
       onPageGenerated(pageId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
     } finally {
@@ -213,7 +216,7 @@ export function useSchemaSuggesterGeneration({
         return next;
       });
     }
-  }, [onPageGenerated, siteId, workspaceId]);
+  }, [onPageGenerated, queryClient, siteId, workspaceId]);
 
   const filteredInitialPages = useMemo(() => availablePages.filter(
     page => !pageSearch || page.title.toLowerCase().includes(pageSearch.toLowerCase()) || page.slug.toLowerCase().includes(pageSearch.toLowerCase()),

@@ -136,6 +136,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (siteId) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId) });
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       }
     },
     [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {

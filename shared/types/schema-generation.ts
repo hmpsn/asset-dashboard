@@ -56,6 +56,7 @@ export interface SchemaGenerationDiagnostics {
   plannedRole?: SchemaPageRole;
   effectiveRole?: SchemaPageRole;
   roleSource: SchemaRoleSource;
+  canonicalEntityReferences?: string[];
   collection?: SchemaCollectionIdentity;
   emittedTypes: string[];
   skippedSchemaTypes: SkippedSchemaType[];

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
+import { useSchemaGraphValidation } from '../hooks/admin/useSchemaValidation';
 import { Icon, cn } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
@@ -81,6 +82,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       clearManualDeliveryForPage(pageId);
     },
   });
+  const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
+  const graphValidation = graphValidationQuery.data ?? null;
+  const bulkPublishBlocked = graphValidation?.status === 'errors';
 
   // Business-profile callout dismiss state
   const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
@@ -140,7 +144,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
-  } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData });
+  } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData, bulkPublishBlocked });
   const impactData = useSchemaImpactData(workspaceId);
 
   const toggleExpand = (id: string) => {
@@ -351,6 +355,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               loading={loading}
               onPublishAll={publishAllToWebflow}
               onSendToClient={sendSchemasToClient}
+              graphValidation={graphValidation}
+              graphValidationLoading={graphValidationQuery.isFetching}
             />
           )}
           <div className="relative">

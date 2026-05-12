@@ -3,8 +3,9 @@
  * Extracted from SchemaSuggester.tsx bulk publish rendering.
  */
 import { useState } from 'react';
-import { Loader2, Upload, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Send, Upload } from 'lucide-react';
 import { Icon, Button } from '../ui';
+import type { WholeSiteSchemaGraphValidationResult } from '../../../shared/types/schema-validation';
 
 export interface BulkPublishPanelProps {
   dataCount: number;
@@ -16,23 +17,53 @@ export interface BulkPublishPanelProps {
   loading: boolean;
   onPublishAll: () => void;
   onSendToClient: (note?: string) => void;
+  graphValidation?: WholeSiteSchemaGraphValidationResult | null;
+  graphValidationLoading?: boolean;
 }
 
 export function BulkPublishPanel({
   unpublishedCount, bulkPublishing, bulkProgress,
   sendingToClient, sentToClient, loading,
   onPublishAll, onSendToClient,
+  graphValidation, graphValidationLoading,
 }: BulkPublishPanelProps) {
   const [note, setNote] = useState('');
+  const graphErrors = graphValidation?.findings.filter(finding => finding.severity === 'error') ?? [];
+  const graphWarnings = graphValidation?.findings.filter(finding => finding.severity === 'warning') ?? [];
+  const blockBulkPublish = graphErrors.length > 0;
 
   if (loading) return null;
 
   return (
     <>
+      {graphValidation && (
+        <div className={`flex items-start gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 t-caption-sm ${
+          graphValidation.status === 'errors'
+            ? 'border-red-500/20 bg-red-500/8 text-red-300'
+            : graphValidation.status === 'warnings'
+              ? 'border-amber-500/20 bg-amber-500/8 text-amber-300'
+              : 'border-emerald-500/20 bg-emerald-500/8 text-emerald-300'
+        }`}>
+          <Icon as={graphValidation.status === 'valid' ? CheckCircle2 : AlertTriangle} size="sm" className="mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-medium">
+              Site graph {graphValidation.status}
+              {graphValidationLoading ? ' · refreshing' : ''}
+            </div>
+            <div className="text-[var(--brand-text-muted)]">
+              {graphErrors.length > 0
+                ? `${graphErrors.length} graph error${graphErrors.length === 1 ? '' : 's'} must be fixed before bulk publish.`
+                : graphWarnings.length > 0
+                  ? `${graphWarnings.length} warning${graphWarnings.length === 1 ? '' : 's'}. Individual and bulk publish remain available.`
+                  : `${graphValidation.nodeCount} nodes · ${graphValidation.referenceCount} references checked.`}
+            </div>
+          </div>
+        </div>
+      )}
       {unpublishedCount > 0 && (
         <Button
           onClick={onPublishAll}
-          disabled={bulkPublishing}
+          disabled={bulkPublishing || blockBulkPublish}
           variant="primary"
           size="sm"
           icon={bulkPublishing ? Loader2 : Upload}

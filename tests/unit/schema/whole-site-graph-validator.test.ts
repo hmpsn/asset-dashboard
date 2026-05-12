@@ -167,10 +167,10 @@ describe('validateWholeSiteSchemaGraph', () => {
       pages: [servicePage],
     });
 
-    expect(result.status).toBe('warnings');
+    expect(result.status).toBe('errors');
     expect(result.findings).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        severity: 'warning',
+        severity: 'error',
         ruleId: 'schema-graph-planned-entity-missing',
         targetId: `${baseUrl}/services/seo#service`,
       }),
@@ -185,5 +185,104 @@ describe('validateWholeSiteSchemaGraph', () => {
         pagePath: '/services/seo',
       }),
     ]));
+  });
+
+  it('reports duplicate site identity nodes with competing ids', () => {
+    const result = validateWholeSiteSchemaGraph({
+      pages: [page('/', graph([
+        {
+          '@type': 'Organization',
+          '@id': `${baseUrl}/#organization`,
+          name: 'Example Co',
+          url: baseUrl,
+        },
+        {
+          '@type': 'Organization',
+          '@id': `${baseUrl}/#org`,
+          name: 'Example Co',
+          url: baseUrl,
+        },
+        {
+          '@type': 'WebSite',
+          '@id': `${baseUrl}/#website`,
+          publisher: { '@id': `${baseUrl}/#organization` },
+        },
+      ]))],
+    });
+
+    expect(result.status).toBe('errors');
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      ruleId: 'schema-graph-duplicate-site-identity',
+      type: 'Organization',
+    }));
+  });
+
+  it('reports hub pages that reference non-child pages', () => {
+    const result = validateWholeSiteSchemaGraph({
+      siteTemplate,
+      pages: [
+        page('/services', graph([
+          {
+            '@type': 'CollectionPage',
+            '@id': `${baseUrl}/services#collection`,
+            name: 'Services',
+            mainEntity: {
+              '@type': 'ItemList',
+              itemListElement: [{
+                '@type': 'ListItem',
+                position: 1,
+                item: { '@id': `${baseUrl}/blog/post#article` },
+              }],
+            },
+          },
+        ])),
+        page('/blog/post', graph([
+          {
+            '@type': 'Article',
+            '@id': `${baseUrl}/blog/post#article`,
+            headline: 'Post',
+          },
+        ])),
+      ],
+    });
+
+    expect(result.status).toBe('errors');
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      ruleId: 'schema-graph-broken-hub-child',
+      pagePath: '/services',
+      targetId: `${baseUrl}/blog/post#article`,
+    }));
+  });
+
+  it('allows same-page ItemList references for offer and pricing-style graphs', () => {
+    const result = validateWholeSiteSchemaGraph({
+      siteTemplate,
+      pages: [page('/pricing', graph([
+        {
+          '@type': 'WebPage',
+          '@id': `${baseUrl}/pricing#webpage`,
+          name: 'Pricing',
+          mainEntity: {
+            '@type': 'ItemList',
+            itemListElement: [{
+              '@type': 'ListItem',
+              position: 1,
+              item: { '@id': `${baseUrl}/pricing#offer-1` },
+            }],
+          },
+          isPartOf: { '@id': `${baseUrl}/#website` },
+        },
+        {
+          '@type': 'Offer',
+          '@id': `${baseUrl}/pricing#offer-1`,
+          name: 'Growth Plan',
+        },
+      ]))],
+    });
+
+    expect(result.status).toBe('valid');
+    expect(result.findings.find(finding => finding.ruleId === 'schema-graph-broken-hub-child')).toBeUndefined();
   });
 });

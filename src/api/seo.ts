@@ -1,6 +1,7 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
+import type { WholeSiteSchemaGraphValidationResult } from '../../shared/types/schema-validation';
 import type { LatestRank, RankHistoryEntry } from '../components/client/types';
 import { readNdjsonStream } from './streamUtils';
 
@@ -103,7 +104,7 @@ export const schemaValidation = {
     getOptional<SchemaValidationRecord>(appendWorkspaceQuery(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`, workspaceId)),
 
   getGraph: (siteId: string, workspaceId?: string) =>
-    getOptional<unknown>(`/api/webflow/schema-graph-validation/${siteId}${workspaceQuery(workspaceId)}`),
+    getOptional<WholeSiteSchemaGraphValidationResult>(`/api/webflow/schema-graph-validation/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── Schema Site Plan ────────────────────────────────────────────
