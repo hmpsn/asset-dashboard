@@ -70,35 +70,8 @@ export const reports = {
 
 // ── Schema ──────────────────────────────────────────────────────
 export const schema = {
-  suggestions: (wsId: string) =>
-    get<unknown>(`/api/schema/${wsId}`),
-
-  generate: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/schema/${wsId}/generate`, body),
-
-  save: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/schema/${wsId}/save`, body),
-
-  apply: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/schema/${wsId}/apply`, body),
-
-  validate: (wsId: string) =>
-    get<unknown>(`/api/schema/${wsId}/validate`),
-
-  pagePreview: (wsId: string, pageId: string) =>
-    get<unknown>(`/api/schema/${wsId}/page/${pageId}`),
-
-  remove: (wsId: string, pageId: string) =>
-    del(`/api/schema/${wsId}/${pageId}`),
-
   retract: (siteId: string, pageId: string, workspaceId?: string) =>
     del(appendWorkspaceQuery(`/api/webflow/schema-retract/${siteId}/${pageId}`, workspaceId)),
-
-  bulkGenerate: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/schema/${wsId}/bulk-generate`, body),
-
-  deployHistory: (wsId: string) =>
-    getSafe<unknown[]>(`/api/schema/${wsId}/deploy-history`, []),
 };
 
 // ── Schema Validation ───────────────────────────────────────────
@@ -128,6 +101,9 @@ export const schemaValidation = {
 
   get: (siteId: string, pageId: string, workspaceId?: string) =>
     getOptional<SchemaValidationRecord>(appendWorkspaceQuery(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`, workspaceId)),
+
+  getGraph: (siteId: string, workspaceId?: string) =>
+    getOptional<unknown>(`/api/webflow/schema-graph-validation/${siteId}${workspaceQuery(workspaceId)}`),
 };
 
 // ── Schema Site Plan ────────────────────────────────────────────

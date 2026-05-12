@@ -33,6 +33,7 @@ export function useSchemaSuggesterGeneration({
   const [loadingPages, setLoadingPages] = useState(false);
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const [pageTypes, setPageTypes] = useState<Record<string, string>>({});
+  const [singlePageTypeOverrides, setSinglePageTypeOverrides] = useState<Record<string, string>>({});
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -158,13 +159,19 @@ export function useSchemaSuggesterGeneration({
     setShowPagePicker(false);
     setStarted(true);
     try {
-      const pt = pageTypes[pageId];
+      const pt = singlePageTypeOverrides[pageId];
       const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
       setData(prev => {
         if (!prev) return [result];
         const exists = prev.findIndex(page => page.pageId === pageId);
         if (exists >= 0) return prev.map(page => page.pageId === pageId ? result : page);
         return [...prev, result];
+      });
+      setSinglePageTypeOverrides(prev => {
+        if (!prev[pageId]) return prev;
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
       });
       onPageGenerated(pageId);
     } catch (err) {
@@ -173,7 +180,7 @@ export function useSchemaSuggesterGeneration({
     } finally {
       setGeneratingSingle(null);
     }
-  }, [onPageGenerated, pageTypes, siteId, workspaceId]);
+  }, [onPageGenerated, singlePageTypeOverrides, siteId, workspaceId]);
 
   useEffect(() => {
     if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
@@ -231,6 +238,7 @@ export function useSchemaSuggesterGeneration({
     generatingSingle,
     pageTypes,
     setPageTypes,
+    setSinglePageTypeOverrides,
     snapshotDate,
     filteredInitialPages,
     runScan,

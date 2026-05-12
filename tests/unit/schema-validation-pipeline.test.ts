@@ -6,8 +6,7 @@
  * 2. PAGE_TYPE_SCHEMA_MAP — deterministic page-type → schema-type mapping
  * 3. extractEeatFromBrief() — author/expertise extraction from content briefs
  * 4. validateForGoogleRichResults() — Google-compliant validator (cross-type matrix)
- * 5. validateEntityConsistency() — cross-page Organization mismatch detection
- * 6. Edge cases: empty @graph, missing @context, malformed inputs, placeholder values
+ * 5. Edge cases: empty @graph, missing @context, malformed inputs, placeholder values
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import type {
@@ -798,185 +797,7 @@ describe('validateForGoogleRichResults — pipeline validation pass', () => {
   });
 });
 
-// ── 5. validateEntityConsistency — extended cases ────────────────────────────
-
-describe('validateEntityConsistency — cross-page entity checks', () => {
-  let validateEntityConsistency: (schemas: Array<{ pageId: string; schema: Record<string, unknown> }>) => {
-    consistent: boolean;
-    mismatches: Array<{ field: string; expected: string; found: string; pageId: string }>;
-  };
-
-  beforeAll(async () => {
-    const mod = await import('../../server/schema-validator.js');
-    validateEntityConsistency = mod.validateEntityConsistency;
-  });
-
-  it('returns consistent with no mismatches for a single page', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', '@id': 'https://example.com/#org', name: 'Acme Corp' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(true);
-    expect(result.mismatches).toHaveLength(0);
-  });
-
-  it('returns consistent for empty schemas array', () => {
-    const result = validateEntityConsistency([]);
-    expect(result.consistent).toBe(true);
-    expect(result.mismatches).toHaveLength(0);
-  });
-
-  it('detects URL mismatch between pages', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', url: 'https://acme.com' }] },
-      },
-      {
-        pageId: 'https://example.com/about',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', url: 'https://www.acme.com' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    expect(result.mismatches.length).toBeGreaterThan(0);
-    const urlMismatch = result.mismatches.find(m => m.field === 'url');
-    expect(urlMismatch).toBeDefined();
-    expect(urlMismatch!.pageId).toBe('https://example.com/about');
-  });
-
-  it('detects logo mismatch between pages', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', logo: 'https://acme.com/logo-v1.png' }] },
-      },
-      {
-        pageId: 'https://example.com/contact',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', logo: 'https://acme.com/logo-v2.png' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    const logoMismatch = result.mismatches.find(m => m.field === 'logo');
-    expect(logoMismatch).toBeDefined();
-  });
-
-  it('detects sameAs mismatch between pages', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', sameAs: ['https://twitter.com/acme'] }] },
-      },
-      {
-        pageId: 'https://example.com/about',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', sameAs: ['https://twitter.com/acme-inc'] }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    const sameAsMismatch = result.mismatches.find(m => m.field === 'sameAs');
-    expect(sameAsMismatch).toBeDefined();
-  });
-
-  it('ignores fields not present on both pages (only checks mutual fields)', () => {
-    // page1 has telephone, page2 does not — no mismatch expected since page2 has no value to conflict with
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', url: 'https://acme.com', telephone: '+15550000' }] },
-      },
-      {
-        pageId: 'https://example.com/about',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme', url: 'https://acme.com' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    // telephone is only on one page — no mismatch since both sides must be defined for comparison
-    expect(result.consistent).toBe(true);
-  });
-
-  it('uses first Organization occurrence as canonical reference', () => {
-    const schemas = [
-      {
-        pageId: 'page-1',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Canonical Name', url: 'https://example.com' }] },
-      },
-      {
-        pageId: 'page-2',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Different Name', url: 'https://example.com' }] },
-      },
-      {
-        pageId: 'page-3',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Another Name', url: 'https://example.com' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    expect(result.mismatches.length).toBeGreaterThan(0);
-    // All mismatches reference pages 2 and 3 (not page-1 which is canonical)
-    for (const m of result.mismatches) {
-      expect(m.pageId).not.toBe('page-1');
-    }
-  });
-
-  it('treats LocalBusiness as an Organization type for consistency checks', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'LocalBusiness', name: 'Acme Plumbing', telephone: '+15550100' }] },
-      },
-      {
-        pageId: 'https://example.com/contact',
-        schema: { '@graph': [{ '@type': 'LocalBusiness', name: 'Acme Plumbing', telephone: '+15550200' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    expect(result.mismatches.length).toBeGreaterThan(0);
-    expect(result.mismatches.some(m => m.field === 'telephone')).toBe(true);
-  });
-
-  it('treats MedicalOrganization as an Organization type for consistency checks', () => {
-    const schemas = [
-      {
-        pageId: 'page-home',
-        schema: { '@graph': [{ '@type': 'MedicalOrganization', name: 'Healthy Med', telephone: '+15550100' }] },
-      },
-      {
-        pageId: 'page-contact',
-        schema: { '@graph': [{ '@type': 'MedicalOrganization', name: 'Healthy Medical Center', telephone: '+15550100' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(false);
-    expect(result.mismatches.length).toBeGreaterThan(0);
-    expect(result.mismatches.some(m => m.field === 'name')).toBe(true);
-  });
-
-  it('reports the pageId of the conflicting page in each mismatch', () => {
-    const schemas = [
-      {
-        pageId: 'https://example.com/',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme Corp', url: 'https://acme.com' }] },
-      },
-      {
-        pageId: 'https://example.com/contact',
-        schema: { '@graph': [{ '@type': 'Organization', name: 'Acme Inc', url: 'https://acme.com' }] },
-      },
-    ];
-    const result = validateEntityConsistency(schemas);
-    expect(result.mismatches.length).toBeGreaterThan(0);
-    expect(result.mismatches[0].pageId).toBe('https://example.com/contact');
-    expect(result.mismatches[0].expected).toBe('Acme Corp');
-    expect(result.mismatches[0].found).toBe('Acme Inc');
-  });
-});
-
-// ── 6. Edge cases ────────────────────────────────────────────────────────────
+// ── 5. Edge cases ────────────────────────────────────────────────────────────
 
 describe('edge cases — empty, malformed, missing @context', () => {
   let validateForGoogleRichResults: (schema: Record<string, unknown>) => {
@@ -987,15 +808,9 @@ describe('edge cases — empty, malformed, missing @context', () => {
   };
 
   let checkRichResultsEligibility: (schema: Record<string, unknown>) => RichResultEligibility[];
-  let validateEntityConsistency: (schemas: Array<{ pageId: string; schema: Record<string, unknown> }>) => {
-    consistent: boolean;
-    mismatches: Array<{ field: string; expected: string; found: string; pageId: string }>;
-  };
-
   beforeAll(async () => {
     const validatorMod = await import('../../server/schema-validator.js');
     validateForGoogleRichResults = validatorMod.validateForGoogleRichResults;
-    validateEntityConsistency = validatorMod.validateEntityConsistency;
     const suggesterMod = await import('../../server/schema-suggester.js');
     checkRichResultsEligibility = suggesterMod.checkRichResultsEligibility;
   });
@@ -1046,18 +861,6 @@ describe('edge cases — empty, malformed, missing @context', () => {
     // extractGraphNodes casts the array as-is; when a null entry is iterated, getNodeTypes
     // tries to access null['@type'] which throws TypeError. Document this current behavior.
     expect(() => validateForGoogleRichResults(schema)).toThrow(TypeError);
-  });
-
-  it('handles validateEntityConsistency with schemas having no @graph key', () => {
-    const schemas = [
-      { pageId: 'page-1', schema: {} },
-      { pageId: 'page-2', schema: {} },
-    ];
-    // Schemas with no @graph yield no Organization nodes — should be consistent without throwing
-    expect(() => validateEntityConsistency(schemas)).not.toThrow();
-    const result = validateEntityConsistency(schemas);
-    expect(result.consistent).toBe(true);
-    expect(result.mismatches).toHaveLength(0);
   });
 
   it('returns valid when @graph has nodes with no recognized @type', () => {

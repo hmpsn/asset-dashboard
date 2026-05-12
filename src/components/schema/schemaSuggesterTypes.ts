@@ -37,23 +37,6 @@ export interface SchemaPageOption {
   slug: string;
 }
 
-export interface CmsTemplatePage {
-  pageId: string;
-  pageTitle: string;
-  slug: string;
-  collectionId: string;
-  collectionName: string;
-  collectionSlug: string;
-}
-
-export interface CmsTemplateResult {
-  templateString: string;
-  schemaTypes: string[];
-  fieldsUsed: string[];
-  collectionName: string;
-  collectionSlug: string;
-}
-
 export interface CmsMappingField {
   slug: string;
   displayName: string;

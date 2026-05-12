@@ -3,7 +3,13 @@
  * Saves per-site schema snapshots to SQLite.
  */
 import type { SchemaPageSuggestion } from './schema-suggester.js';
-import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment } from '../shared/types/schema-plan.ts';
+import {
+  SCHEMA_ROLE_PRIMARY_TYPE,
+  SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES,
+  type SchemaSitePlan,
+  type CanonicalEntity,
+  type PageRoleAssignment,
+} from '../shared/types/schema-plan.ts';
 import type { CmsSchemaFieldMapping } from '../shared/types/site-inventory.ts';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -366,8 +372,23 @@ export function updateSchemaPlanRoles(
 ): SchemaSitePlan | null {
   const plan = getSchemaPlan(siteId);
   if (!plan) return null;
-  plan.pageRoles = pageRoles;
   if (canonicalEntities) plan.canonicalEntities = canonicalEntities;
+  const validEntityIds = plan.canonicalEntities.map(entity => entity.id).filter(Boolean);
+  const validEntityIdSet = new Set(validEntityIds);
+  plan.pageRoles = pageRoles.map(role => {
+    const validExistingRefs = (role.entityRefs ?? []).filter(ref => validEntityIdSet.has(ref));
+    let entityRefs: string[] = [];
+    if (role.role === 'homepage') {
+      entityRefs = validEntityIds;
+    } else if (SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES.has(role.role)) {
+      entityRefs = validExistingRefs.length > 0 ? validExistingRefs : (validEntityIds.length === 1 ? validEntityIds : []);
+    }
+    return {
+      ...role,
+      primaryType: SCHEMA_ROLE_PRIMARY_TYPE[role.role] ?? 'WebPage',
+      entityRefs,
+    };
+  });
   plan.updatedAt = new Date().toISOString();
   return saveSchemaPlan(plan);
 }

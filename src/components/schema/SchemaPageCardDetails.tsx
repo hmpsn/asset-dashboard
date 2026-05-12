@@ -205,7 +205,9 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
                 ? 'Collection map'
                 : diagnostics.roleSource === 'collection-inferred'
                   ? 'Collection inferred'
-                  : 'UI override'}
+                  : diagnostics.roleSource === 'saved-page-type'
+                    ? 'Saved page type'
+                    : 'UI override'}
           {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
         </span>
         <span className={cn(
