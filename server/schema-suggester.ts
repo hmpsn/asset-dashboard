@@ -1,10 +1,8 @@
-import { discoverSitemapUrls, getCollectionSchema, listCollections, resolveStaticPagePathsFromSitemap } from './webflow.js';
+import { discoverSitemapUrls, resolveStaticPagePathsFromSitemap } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { callAI } from './ai.js';
-import { createLogger } from './logger.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
@@ -15,14 +13,13 @@ import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { assembleSiteContext } from './schema/site-context.js';
 import type { SiteContext } from './schema/site-context.js';
-import { getSchemaPlan } from './schema-store.js';
+import { getPageTypes, getSchemaPlan } from './schema-store.js';
 import type { PageKind } from './schema/classifier.js';
 import type { SchemaPageRole } from '../shared/types/schema-plan.js';
 import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
 import { buildSiteInventory, isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
-
-const log = createLogger('schema');
+import type { WebflowPage } from './webflow-pages.js';
 
 /**
  * AI budget allocation for the page-element AI extractors.
@@ -196,6 +193,7 @@ function resolveRoleOverride(opts: {
   siteId: string;
   pagePath: string;
   ctxPageType?: SchemaPageType;
+  persistedPageType?: SchemaPageType;
   collectionRole?: SchemaPageRole;
   collectionRoleSource?: 'mapped' | 'inferred' | 'none';
   isCmsItem?: boolean;
@@ -215,6 +213,7 @@ function resolveRoleOverride(opts: {
     return {
       pageKindOverride: pageKindForRole(role, opts.pagePath),
       schemaRoleOverride: { role, source: 'ui' as const, industrySubtype: planRole?.industrySubtype },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? role,
       inactivePlanStatus: activePlan ? undefined : latestPlan?.status,
       activePlan,
@@ -228,6 +227,7 @@ function resolveRoleOverride(opts: {
         source: 'site-plan' as const,
         industrySubtype: planRole.industrySubtype,
       },
+      canonicalEntityRefs: planRole.entityRefs,
       plannedRole: planRole.role,
       inactivePlanStatus: undefined,
       activePlan,
@@ -240,6 +240,7 @@ function resolveRoleOverride(opts: {
         role: opts.collectionRole,
         source: 'collection-map' as const,
       },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? opts.collectionRole,
       roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
         type: 'SchemaSitePlan',
@@ -256,6 +257,7 @@ function resolveRoleOverride(opts: {
         role: opts.collectionRole,
         source: 'collection-inferred' as const,
       },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
       plannedRole: planRole?.role ?? opts.collectionRole,
       roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
         type: 'SchemaSitePlan',
@@ -265,9 +267,21 @@ function resolveRoleOverride(opts: {
       activePlan,
     };
   }
+  if (opts.persistedPageType && opts.persistedPageType !== 'auto') {
+    const role = opts.persistedPageType as SchemaPageRole;
+    return {
+      pageKindOverride: pageKindForRole(role, opts.pagePath),
+      schemaRoleOverride: { role, source: 'saved-page-type' as const, industrySubtype: planRole?.industrySubtype },
+      canonicalEntityRefs: planRole?.entityRefs ?? [],
+      plannedRole: planRole?.role ?? role,
+      inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
+      activePlan,
+    };
+  }
   return {
     pageKindOverride: undefined,
     schemaRoleOverride: undefined,
+    canonicalEntityRefs: planRole?.entityRefs ?? [],
     plannedRole: planRole?.role,
     inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
     activePlan,
@@ -521,6 +535,34 @@ function recordSkippedUtility(skippedUtilities: Map<string, number>, path: strin
   skippedUtilities.set(reason, (skippedUtilities.get(reason) ?? 0) + 1);
 }
 
+function cmsItemToSiteContextPage(item: SiteInventoryCmsItem): WebflowPage {
+  const slug = item.path.replace(/^\/|\/$/g, '').split('/').pop() || item.path.replace(/^\//, '');
+  return {
+    id: item.pageId,
+    title: item.title,
+    slug,
+    publishedPath: item.path,
+    lastPublished: item.lastPublished,
+  };
+}
+
+export function buildSiteContextPages(
+  staticPages: WebflowPage[],
+  cmsItems: SiteInventoryCmsItem[] = [],
+  activePlan: ReturnType<typeof getSchemaPlan> | null = null,
+): WebflowPage[] {
+  const byPath = new Map<string, WebflowPage>();
+  for (const page of staticPages) {
+    byPath.set(resolvePagePath(page).replace(/\/$/, '').toLowerCase() || '/', page);
+  }
+  for (const item of cmsItems) {
+    if (shouldSkipBulkPage(item.path, findPlanRole(activePlan, item.path)?.role)) continue;
+    const key = item.path.replace(/\/$/, '').toLowerCase() || '/';
+    if (!byPath.has(key)) byPath.set(key, cmsItemToSiteContextPage(item));
+  }
+  return Array.from(byPath.values());
+}
+
 export async function generateSchemaForPage(
   siteId: string,
   pageId: string,
@@ -551,11 +593,18 @@ export async function generateSchemaForPage(
 
   const cmsItem = siteInventory?.cmsItems.find(item => item.pageId === pageId);
   if (cmsItem) {
+    const latestPlan = getSchemaPlan(siteId);
+    const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+    const contextPages = buildSiteContextPages(allPages, siteInventory?.cmsItems, activePlan);
+    const siteContextForCms = contextPages.length > 0
+      ? assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])
+      : undefined;
     const itemHtml = await fetchPublishedHtml(cmsItem.url);
     const roleOverride = resolveRoleOverride({
       siteId,
       pagePath: cmsItem.path,
       ctxPageType: ctx.pageType,
+      persistedPageType: getPageTypes(siteId)[cmsItem.pageId] as SchemaPageType | undefined,
       collectionRole: cmsItem.effectiveRole,
       collectionRoleSource: cmsItem.roleSource,
       isCmsItem: true,
@@ -602,15 +651,20 @@ export async function generateSchemaForPage(
         industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
       aiBudget,
+      siteContext: siteContextForCms,
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      canonicalEntityRefs: roleOverride.canonicalEntityRefs,
       plannedSchemaRole: roleOverride.plannedRole,
       roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
       collectionIdentity: collectionIdentity(cmsItem),
       cmsDeliveryStatus: cmsDeliveryStatus(cmsItem),
     });
-    return leanToSuggestion(lean);
+    return {
+      ...leanToSuggestion(lean),
+      savedPageType: getPageTypes(siteId)[cmsItem.pageId],
+    };
   }
 
   const meta = await fetchPageMeta(pageId, tokenOverride);
@@ -631,11 +685,13 @@ export async function generateSchemaForPage(
       if (matched?.publishedPath) {
         publishedPath = matched.publishedPath;
       }
-      const activePlan = getSchemaPlan(siteId);
+      const latestPlan = getSchemaPlan(siteId);
+      const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+      const contextPages = buildSiteContextPages(allPages, siteInventory?.cmsItems, activePlan);
       siteContextForPage = assembleSiteContext(
-        allPages,
+        contextPages,
         baseUrl,
-        activePlan?.status === 'active' ? activePlan.canonicalEntities : [],
+        activePlan?.canonicalEntities ?? [],
       );
     }
   } catch { /* page list failure — fall back to derived path */ } // catch-ok
@@ -646,6 +702,7 @@ export async function generateSchemaForPage(
     siteId,
     pagePath: publishedPath,
     ctxPageType: ctx.pageType,
+    persistedPageType: getPageTypes(siteId)[pageId] as SchemaPageType | undefined,
   });
 
   // Per-page slice fetch for pageKeywords (Audit Correction 4: pageKeywords is a PageKeywordMap
@@ -698,6 +755,7 @@ export async function generateSchemaForPage(
     siteContext: siteContextForPage, // cross-page hub enrichment
     pageKindOverride: roleOverride.pageKindOverride,
     schemaRoleOverride: roleOverride.schemaRoleOverride,
+    canonicalEntityRefs: roleOverride.canonicalEntityRefs,
     plannedSchemaRole: roleOverride.plannedRole,
     roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
     inactivePlanStatus: roleOverride.inactivePlanStatus,
@@ -708,7 +766,10 @@ export async function generateSchemaForPage(
   // intelligence wiring; the lean generator does not use them in MVP scope.
   void gscMap; void ga4Map; void queryPageData; void insightsMap;
 
-  return leanToSuggestion(lean);
+  return {
+    ...leanToSuggestion(lean),
+    savedPageType: getPageTypes(siteId)[pageId],
+  };
 }
 
 export async function generateSchemaSuggestions(
@@ -743,9 +804,11 @@ export async function generateSchemaSuggestions(
         businessProfile: ctx._businessProfile ?? null,
       })
     : undefined;
+  const savedPageTypes = getPageTypes(siteId);
 
-  let siteContext: SiteContext | undefined = pages.length > 0
-    ? assembleSiteContext(pages, baseUrl, activePlan?.canonicalEntities ?? [])
+  const contextPages = buildSiteContextPages(pages, siteInventory?.cmsItems, activePlan);
+  let siteContext: SiteContext | undefined = contextPages.length > 0
+    ? assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])
     : undefined;
 
   // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
@@ -771,6 +834,7 @@ export async function generateSchemaSuggestions(
       siteId,
       pagePath: publishedPath,
       ctxPageType: undefined,
+      persistedPageType: savedPageTypes[page.id] as SchemaPageType | undefined,
     });
 
     // Per-page slice fetch for pageKeywords (5-min LRU + single-flight dedup — cheap).
@@ -822,11 +886,15 @@ export async function generateSchemaSuggestions(
       siteContext, // cross-page hub enrichment
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      canonicalEntityRefs: roleOverride.canonicalEntityRefs,
       plannedSchemaRole: roleOverride.plannedRole,
       roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
     });
-    results.push(leanToSuggestion(lean));
+    results.push({
+      ...leanToSuggestion(lean),
+      savedPageType: savedPageTypes[page.id],
+    });
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages${utilitySkipMessage(skippedUtilities)}...`);
   }
 
@@ -844,6 +912,7 @@ export async function generateSchemaSuggestions(
         siteId,
         pagePath: item.path,
         ctxPageType: undefined,
+        persistedPageType: savedPageTypes[item.pageId] as SchemaPageType | undefined,
         collectionRole: item.effectiveRole,
         collectionRoleSource: item.roleSource,
         isCmsItem: true,
@@ -891,248 +960,23 @@ export async function generateSchemaSuggestions(
           industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
         },
         aiBudget, // PR2: same shared budget — drains across CMS pages in same run
+        siteContext,
         pageKindOverride: roleOverride.pageKindOverride,
         schemaRoleOverride: roleOverride.schemaRoleOverride,
+        canonicalEntityRefs: roleOverride.canonicalEntityRefs,
         plannedSchemaRole: roleOverride.plannedRole,
         roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
         inactivePlanStatus: roleOverride.inactivePlanStatus,
         collectionIdentity: collectionIdentity(item),
         cmsDeliveryStatus: cmsDeliveryStatus(item),
       });
-      results.push(leanToSuggestion(itemLean));
+      results.push({
+        ...leanToSuggestion(itemLean),
+        savedPageType: savedPageTypes[item.pageId],
+      });
     }
   }
 
   onProgress?.(results, true, `Done${utilitySkipMessage(skippedUtilities)}`);
   return results;
-}
-
-// ── CMS Template Schema Generator ──
-// Generates a schema template for a CMS collection page using Webflow's
-// {{wf ...}} template tags so each collection item gets dynamic schema.
-
-export interface CmsTemplateSchemaResult {
-  templateString: string;           // Raw JSON-LD with {{wf}} tags (ready for custom code)
-  schemaTypes: string[];            // Schema.org types generated
-  fieldsUsed: string[];             // CMS field slugs referenced
-  collectionName: string;
-  collectionSlug: string;
-}
-
-// Convert placeholder __WF:path:Type__ to Webflow template tag
-function wfTag(fieldPath: string, fieldType: string): string {
-  return `{{wf {&quot;path&quot;:&quot;${fieldPath}&quot;,&quot;type&quot;:&quot;${fieldType}&quot;\\} }}`;
-}
-
-// Build a readable field list for the AI prompt
-function describeFields(fields: Array<{ slug: string; displayName: string; type: string }>): string {
-  return fields.map(f => `- ${f.slug} (${f.type}): "${f.displayName}"`).join('\n');
-}
-
-export async function generateCmsTemplateSchema(
-  siteId: string,
-  collectionId: string,
-  tokenOverride?: string,
-  ctx: SchemaContext = {},
-): Promise<CmsTemplateSchemaResult | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  // Fetch collection info
-  const [collections, collSchema] = await Promise.all([
-    listCollections(siteId, tokenOverride),
-    getCollectionSchema(collectionId, tokenOverride),
-  ]);
-  const collection = collections.find(c => c.id === collectionId);
-  if (!collection || collSchema.fields.length === 0) return null;
-
-  const siteUrl = ctx.liveDomain
-    ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`)
-    : '';
-  const companyName = ctx.companyName || '(company name)';
-
-  // Build the field descriptions for the AI
-  const fieldDescriptions = describeFields(collSchema.fields);
-
-  // If no AI, build a basic template
-  if (!apiKey) {
-    return buildFallbackCmsTemplate(collection, collSchema.fields, siteUrl, companyName);
-  }
-
-  const prompt = `You are a Google Structured Data expert. Generate a JSON-LD schema template for a Webflow CMS collection page.
-
-This schema will be injected into every page of the "${collection.displayName}" collection (slug: "${collection.slug}"). Instead of static values, use PLACEHOLDER tags for CMS field data.
-
-PLACEHOLDER FORMAT: Use exactly this syntax for dynamic CMS values:
-  __WF:field-slug:FieldType__
-
-For reference fields (fields from a linked collection), use:
-  __WF:ref-field-slug:sub-field-slug:FieldType__
-
-SITE INFO:
-- Company: ${companyName}
-- Site URL: ${siteUrl || '(not available)'}
-- Logo: ${ctx.logoUrl || '(not available)'}
-- Collection: ${collection.displayName} (slug: ${collection.slug})
-${ctx.businessContext ? `- Business Context: ${ctx.businessContext}` : ''}
-
-AVAILABLE CMS FIELDS:
-${fieldDescriptions}
-
-REQUIREMENTS:
-1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
-2. Map CMS fields to the most appropriate schema.org properties based on field names and types
-3. Use __WF:slug:PlainText__ for the item slug in URLs: "${siteUrl}/${collection.slug}/__WF:slug:PlainText__"
-4. Use __WF:name:PlainText__ for the item name
-5. For Phone fields use __WF:field-slug:Phone__
-6. For ImageRef fields use __WF:field-slug:ImageRef__
-7. For Email fields use __WF:field-slug:Email__
-8. For Date fields use __WF:field-slug:Date__
-9. For Link fields use __WF:field-slug:Link__
-10. For reference fields pointing to another collection's field, use __WF:ref-field:sub-field:PlainText__
-11. Include Organization node with static company data (not dynamic)
-12. Include BreadcrumbList: Home → ${collection.displayName} → __WF:name:PlainText__
-13. Choose the most appropriate @type for collection items (Dentist, Article, BlogPosting, Product, Service, Event, Person, Place, etc.) based on the collection name and fields
-14. ONLY use fields that exist in the AVAILABLE CMS FIELDS list above
-15. If a field doesn't exist for a schema property, OMIT that property entirely — do not guess field names
-16. NEVER include empty arrays, empty strings, or empty objects
-17. Use consistent @id naming: "${siteUrl}/${collection.slug}/__WF:slug:PlainText__/#typename"
-
-Return ONLY the raw JSON-LD. No markdown, no explanation.`;
-
-  try {
-    const aiResult = await callAI({
-      model: 'gpt-5.4',
-      messages: [{ role: 'user', content: prompt }],
-      maxTokens: 3000,
-      temperature: 0.2,
-      responseFormat: { type: 'json_object' },
-      feature: 'cms-schema-template',
-      maxRetries: 3,
-    });
-
-    const content = aiResult.text;
-    if (!content) return null;
-
-    let jsonStr = content;
-    const mdMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (mdMatch) jsonStr = mdMatch[1].trim();
-
-    // Validate it's parseable JSON (with placeholders as strings)
-    try { JSON.parse(jsonStr); } catch (err) {
-      log.debug({ err }, 'schema-suggester: expected error — degrading gracefully');
-      log.error('AI returned invalid JSON');
-      return null;
-    }
-
-    // Convert placeholders to Webflow template tags
-    const templateString = convertPlaceholders(jsonStr);
-
-    // Extract which fields were used
-    const fieldsUsed = extractUsedFields(jsonStr, collSchema.fields);
-
-    // Extract schema types
-    const typeMatches = jsonStr.match(/"@type"\s*:\s*"([^"]+)"/g) || [];
-    const schemaTypes = typeMatches
-      .map(m => m.match(/"@type"\s*:\s*"([^"]+)"/)?.[1])
-      .filter(Boolean) as string[];
-
-    return {
-      templateString,
-      schemaTypes: [...new Set(schemaTypes)],
-      fieldsUsed,
-      collectionName: collection.displayName,
-      collectionSlug: collection.slug,
-    };
-  } catch (err) {
-    log.error({ err: err }, 'AI generation failed');
-    return null;
-  }
-}
-
-// Convert __WF:path:Type__ placeholders to {{wf {&quot;...&quot;} }} tags
-function convertPlaceholders(jsonStr: string): string {
-  // Match __WF:path:Type__ and __WF:ref:subfield:Type__
-  return jsonStr.replace(/__WF:([^_]+)__/g, (_match, inner: string) => {
-    const parts = inner.split(':');
-    if (parts.length === 3) {
-      // Reference field: __WF:ref-field:sub-field:Type__
-      const [refField, subField, type] = parts;
-      return wfTag(`${refField}:${subField}`, type);
-    } else if (parts.length === 2) {
-      // Direct field: __WF:field-slug:Type__
-      const [fieldSlug, type] = parts;
-      return wfTag(fieldSlug, type);
-    }
-    return _match; // leave unrecognized patterns as-is
-  });
-}
-
-// Figure out which CMS fields were referenced
-function extractUsedFields(jsonStr: string, allFields: Array<{ slug: string }>): string[] {
-  const used = new Set<string>();
-  const matches = jsonStr.matchAll(/__WF:([^:_]+)/g);
-  for (const m of matches) {
-    if (allFields.some(f => f.slug === m[1])) {
-      used.add(m[1]);
-    }
-  }
-  return [...used];
-}
-
-// Fallback template without AI
-function buildFallbackCmsTemplate(
-  collection: { displayName: string; slug: string },
-  fields: Array<{ slug: string; displayName: string; type: string }>,
-  siteUrl: string,
-  companyName: string,
-): CmsTemplateSchemaResult {
-  const baseItemUrl = `${siteUrl}/${collection.slug}/${wfTag('slug', 'PlainText')}`;
-  const nameTag = wfTag('name', 'PlainText');
-
-  const graph: string[] = [];
-
-  // Organization
-  graph.push(`    {
-      "@type": "Organization",
-      "@id": "${siteUrl}/#organization",
-      "name": "${companyName}",
-      "url": "${siteUrl}"
-    }`);
-
-  // WebPage
-  graph.push(`    {
-      "@type": "WebPage",
-      "@id": "${baseItemUrl}/#webpage",
-      "url": "${baseItemUrl}",
-      "name": "${nameTag}",
-      "inLanguage": "en"
-    }`);
-
-  // BreadcrumbList
-  graph.push(`    {
-      "@type": "BreadcrumbList",
-      "@id": "${baseItemUrl}/#breadcrumb",
-      "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Home", "item": "${siteUrl}/"},
-        {"@type": "ListItem", "position": 2, "name": "${collection.displayName}", "item": "${siteUrl}/${collection.slug}"},
-        {"@type": "ListItem", "position": 3, "name": "${nameTag}", "item": "${baseItemUrl}"}
-      ]
-    }`);
-
-  const templateString = `{
-  "@context": "https://schema.org",
-  "@graph": [
-${graph.join(',\n')}
-  ]
-}`;
-
-  const fieldsUsed = ['name', 'slug'].filter(s => fields.some(f => f.slug === s));
-
-  return {
-    templateString,
-    schemaTypes: ['Organization', 'WebPage', 'BreadcrumbList'],
-    fieldsUsed,
-    collectionName: collection.displayName,
-    collectionSlug: collection.slug,
-  };
 }

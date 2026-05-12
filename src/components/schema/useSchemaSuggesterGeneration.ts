@@ -33,6 +33,7 @@ export function useSchemaSuggesterGeneration({
   const [loadingPages, setLoadingPages] = useState(false);
   const [generatingSingle, setGeneratingSingle] = useState<string | null>(null);
   const [pageTypes, setPageTypes] = useState<Record<string, string>>({});
+  const [singlePageTypeOverrides, setSinglePageTypeOverrides] = useState<Record<string, string>>({});
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -96,6 +97,7 @@ export function useSchemaSuggesterGeneration({
         setData(job.result as SchemaPageSuggestion[]);
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       setShowNextSteps(true);
       setProgressMsg(null);
       jobIdRef.current = null;
@@ -158,7 +160,7 @@ export function useSchemaSuggesterGeneration({
     setShowPagePicker(false);
     setStarted(true);
     try {
-      const pt = pageTypes[pageId];
+      const pt = singlePageTypeOverrides[pageId];
       const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, pageType: pt && pt !== 'auto' ? pt : undefined });
       setData(prev => {
         if (!prev) return [result];
@@ -166,14 +168,21 @@ export function useSchemaSuggesterGeneration({
         if (exists >= 0) return prev.map(page => page.pageId === pageId ? result : page);
         return [...prev, result];
       });
+      setSinglePageTypeOverrides(prev => {
+        if (!prev[pageId]) return prev;
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      });
       onPageGenerated(pageId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       setScanError('Single page generation failed');
     } finally {
       setGeneratingSingle(null);
     }
-  }, [onPageGenerated, pageTypes, siteId, workspaceId]);
+  }, [onPageGenerated, queryClient, singlePageTypeOverrides, siteId, workspaceId]);
 
   useEffect(() => {
     if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
@@ -197,6 +206,7 @@ export function useSchemaSuggesterGeneration({
         } : page);
       });
       onPageGenerated(pageId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
     } finally {
@@ -206,7 +216,7 @@ export function useSchemaSuggesterGeneration({
         return next;
       });
     }
-  }, [onPageGenerated, siteId, workspaceId]);
+  }, [onPageGenerated, queryClient, siteId, workspaceId]);
 
   const filteredInitialPages = useMemo(() => availablePages.filter(
     page => !pageSearch || page.title.toLowerCase().includes(pageSearch.toLowerCase()) || page.slug.toLowerCase().includes(pageSearch.toLowerCase()),
@@ -231,6 +241,7 @@ export function useSchemaSuggesterGeneration({
     generatingSingle,
     pageTypes,
     setPageTypes,
+    setSinglePageTypeOverrides,
     snapshotDate,
     filteredInitialPages,
     runScan,

@@ -4629,6 +4629,11 @@ describe('Meta: customCheck rule name registry', () => {
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
     'schema-context-direct-read-not-on-allowlist',
+    // 2026-05-08 inbox redesign — retired InboxFilter literals
+    'inbox-legacy-filter-literal',
+    // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
+    'feedback-module-reintroduction',
+    'prediction-showcase-ungated',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -6646,5 +6651,504 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     const hits = runRule(RULE, [file]);
     expect(hits.length).toBeGreaterThanOrEqual(1);
     expect(hits[0].text).toContain('ws.businessProfile');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: inbox-legacy-filter-literal
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: inbox-legacy-filter-literal', () => {
+  const RULE = 'inbox-legacy-filter-literal';
+
+  it('flags ?tab=approvals in a string literal', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadLink.tsx'),
+      lines(
+        'export function BadLink() {',
+        '  return <a href={`/client/${id}/inbox?tab=approvals`}>Go</a>;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags ?tab=requests in a navigate call', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadNav.tsx'),
+      lines(
+        'export function BadNav() {',
+        "  navigate(`/inbox?tab=requests`);",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags &tab=copy in a query string concatenation', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/badHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/client/${id}/inbox?section=all&tab=copy`;",
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags ?tab=content-plan in a navigate call', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContentPlan.tsx'),
+      lines(
+        'export function BadContentPlan() {',
+        '  navigate(`/inbox?tab=content-plan`);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags ?tab=seo-changes (retired in PR 1.2)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadSeoChanges.tsx'),
+      lines(
+        'export function BadSeoChanges() {',
+        '  return <a href={`/inbox?tab=seo-changes`}>Go</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags ?tab=needs-action (retired in PR 1.2)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/badNeedsAction.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/inbox?tab=needs-action`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags ?tab=content (retired in PR 1.2)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/BadContent.tsx'),
+      lines(
+        'export function BadContent() {',
+        '  navigate(`/client/${id}/inbox?tab=content`);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+    expect(runRule(RULE, [file])[0].line).toBe(2);
+  });
+
+  it('does NOT flag ?tab=decisions (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/NewGoodLink.tsx'),
+      lines(
+        'export function NewGoodLink() {',
+        '  return <a href={`/inbox?tab=decisions`}>Go</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=reviews (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/hooks/newGoodHook.ts'),
+      lines(
+        'export function buildUrl() {',
+        "  return `/inbox?tab=reviews`;",
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag ?tab=conversations (new value)', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/NewConversations.tsx'),
+      lines(
+        'export function NewConversations() {',
+        '  return <a href={`/inbox?tab=conversations`}>Go</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag comment-only lines with the old URL format', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/App.tsx'),
+      lines(
+        '// Backward-compat: old URLs like `/client/:id/inbox?tab=approvals` are rewritten.',
+        '// chips that deep-link to `/inbox?tab=requests` get redirected.',
+        'export function App() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline inbox-legacy-filter-literal-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/HatchedInline.tsx'),
+      lines(
+        'export function HatchedInline() {',
+        '  return <a href={`/inbox?tab=approvals`}> {/* inbox-legacy-filter-literal-ok: legacy external link */}',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line inbox-legacy-filter-literal-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-inbox-legacy', 'src/components/HatchedAbove.tsx'),
+      lines(
+        'export function HatchedAbove() {',
+        '  // inbox-legacy-filter-literal-ok: external legacy link',
+        '  return <a href={`/inbox?tab=approvals`}>x</a>;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: feedback-module-reintroduction
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: feedback-module-reintroduction', () => {
+  const RULE = 'feedback-module-reintroduction';
+
+  it('flags an import from a FeedbackWidget module path', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'src/components/BadImport.tsx'),
+      lines(
+        "import { FeedbackWidget } from './FeedbackWidget';",
+        'export function Bad() { return null; }',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('does NOT flag a pure // comment line referencing FeedbackWidget', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'src/components/CommentOnly.tsx'),
+      lines(
+        "// import { FeedbackWidget } from './FeedbackWidget'; — retired in PR 1.1",
+        'export function Good() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline feedback-module-reintroduction-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'src/components/HatchedImport.tsx'),
+      lines(
+        "import { FeedbackWidget } from './FeedbackWidget'; // feedback-module-reintroduction-ok: legacy compat shim",
+        'export function HatchedImport() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line feedback-module-reintroduction-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'src/components/HatchedAbove.tsx'),
+      lines(
+        '// feedback-module-reintroduction-ok: intentional temporary re-import',
+        "import { FeedbackWidget } from './FeedbackWidget';",
+        'export function HatchedAbove() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag an import from an unrelated module (no FeedbackWidget in path)', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'src/components/NegativeImport.tsx'),
+      lines(
+        "import { SomeWidget } from './SomeWidget';",
+        'export function Good() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags a router route registration on /api/feedback', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'server/routes/feedback.ts'),
+      lines(
+        "import express from 'express';",
+        'const router = express.Router();',
+        "router.post('/api/feedback', (req, res) => { res.json({}); });",
+        'export default router;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags a router route registration on /api/public/feedback', () => {
+    const file = write(
+      uniqPath('rule-feedback-module', 'server/routes/public-feedback.ts'),
+      lines(
+        "import express from 'express';",
+        'const router = express.Router();',
+        "router.get('/api/public/feedback', (req, res) => { res.json([]); });",
+        'export default router;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: keyword-strategy-action-type
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: keyword-strategy-action-type', () => {
+  const RULE = 'keyword-strategy-action-type';
+
+  it('flags sourceType: keyword_strategy in a src/ file', () => {
+    const dir = path.join(TMPDIR, 'rule-kw-strategy-trigger/src/hooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'useBadAction.ts'), [
+      "function buildAction() {",
+      "  return { sourceType: 'keyword_strategy', payload: {} };",
+      "}",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-kw-strategy-trigger'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(1);
+  });
+
+  it('does NOT flag the same string in a shared/types/ path (excluded)', () => {
+    const dir = path.join(TMPDIR, 'rule-kw-strategy-types/src/shared/types');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'client-actions.ts'), [
+      "// Historic sourceType for keyword_strategy (retired PR 1.2)",
+      "type RetiredSourceType = 'keyword_strategy';",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-kw-strategy-types'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag a different sourceType value', () => {
+    const dir = path.join(TMPDIR, 'rule-kw-strategy-negative/src/hooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'useGoodAction.ts'), [
+      "function buildAction() {",
+      "  return { sourceType: 'seo_audit', payload: {} };",
+      "}",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-kw-strategy-negative'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+
+  it('allows with inline keyword-strategy-action-type-ok hatch', () => {
+    const dir = path.join(TMPDIR, 'rule-kw-strategy-hatch/src/hooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'useLegacyAction.ts'), [
+      "function buildLegacyAction() {",
+      "  return { sourceType: 'keyword_strategy', payload: {} }; // keyword-strategy-action-type-ok: legacy migration",
+      "}",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-kw-strategy-hatch'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: send-for-review-anti-pattern
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: send-for-review-anti-pattern', () => {
+  const RULE = 'send-for-review-anti-pattern';
+
+  it('flags a tsx file containing "Send for Review"', () => {
+    const dir = path.join(TMPDIR, 'rule-send-review-trigger/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'BadButton.tsx'), [
+      'export function BadButton() {',
+      '  return <button>Send for Review</button>;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-send-review-trigger'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(1);
+  });
+
+  it('flags a tsx file containing "Flag for Client"', () => {
+    const dir = path.join(TMPDIR, 'rule-send-review-flag/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'BadFlag.tsx'), [
+      'export function BadFlag() {',
+      '  return <button>Flag for Client</button>;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-send-review-flag'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(1);
+  });
+
+  it('allows with inline send-for-review-anti-pattern-ok hatch', () => {
+    const dir = path.join(TMPDIR, 'rule-send-review-hatch/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'LegacyButton.tsx'), [
+      'export function LegacyButton() {',
+      '  return <button>Send for Review</button>; // send-for-review-anti-pattern-ok: matrix component predates convention',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-send-review-hatch'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag "Send to client" (the correct new pattern)', () => {
+    const dir = path.join(TMPDIR, 'rule-send-review-negative/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'GoodButton.tsx'), [
+      'export function GoodButton() {',
+      '  return <button>Send to client</button>;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-send-review-negative'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: prediction-showcase-ungated
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: prediction-showcase-ungated', () => {
+  const RULE = 'prediction-showcase-ungated';
+
+  it('flags a bare <PredictionShowcaseCard without winsEnabled guard', () => {
+    const file = write(
+      uniqPath('rule-prediction-showcase', 'src/components/client/BadCard.tsx'),
+      lines(
+        'export function BadCard({ intel }: any) {',
+        '  return (',
+        '    <div>',
+        '      <PredictionShowcaseCard predictions={intel.weCalledIt} />',
+        '    </div>',
+        '  );',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does NOT flag when !winsEnabled appears on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-prediction-showcase', 'src/components/client/GatedCard.tsx'),
+      lines(
+        'export function GatedCard({ intel, winsEnabled }: any) {',
+        '  return (',
+        '    <div>',
+        '      {!winsEnabled &&',
+        '        <PredictionShowcaseCard predictions={intel.weCalledIt} />}',
+        '    </div>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag a pure // comment line referencing PredictionShowcaseCard', () => {
+    const file = write(
+      uniqPath('rule-prediction-showcase', 'src/components/client/CommentOnly.tsx'),
+      lines(
+        '// <PredictionShowcaseCard> must be guarded by winsEnabled',
+        'export function Placeholder() { return null; }',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline prediction-showcase-ungated-ok hatch on the flagged line', () => {
+    const file = write(
+      uniqPath('rule-prediction-showcase', 'src/components/client/HatchedInline.tsx'),
+      lines(
+        'export function HatchedInline({ intel }: any) {',
+        '  return <PredictionShowcaseCard predictions={intel.weCalledIt} />; // prediction-showcase-ungated-ok: legacy compat',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line prediction-showcase-ungated-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-prediction-showcase', 'src/components/client/HatchedAbove.tsx'),
+      lines(
+        'export function HatchedAbove({ intel }: any) {',
+        '  // prediction-showcase-ungated-ok: server only populates weCalledIt for growth+',
+        '  return <PredictionShowcaseCard predictions={intel.weCalledIt} />;',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: inbox-action-queue-strip
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: inbox-action-queue-strip', () => {
+  const RULE = 'inbox-action-queue-strip';
+
+  it('flags ActionQueueStrip in a file named InboxTab.tsx', () => {
+    const dir = path.join(TMPDIR, 'rule-inbox-aq-strip-trigger/src/components/client');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'InboxTab.tsx'), [
+      "import { ActionQueueStrip } from './Briefing/ActionQueueStrip';",
+      "export function InboxTab() { return <ActionQueueStrip />; }",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-inbox-aq-strip-trigger'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it('does NOT flag ActionQueueStrip in a file NOT named InboxTab.tsx (wrong filename)', () => {
+    const dir = path.join(TMPDIR, 'rule-inbox-aq-strip-negative/src/components/client/Briefing');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'ActionQueueStrip.tsx'), [
+      "interface ActionQueueStripProps { count: number; }",
+      "export function ActionQueueStrip({ count }: ActionQueueStripProps) { return null; }",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-inbox-aq-strip-negative'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
+  });
+
+  it('allows with inline inbox-action-queue-strip-ok hatch in InboxTab.tsx', () => {
+    const dir = path.join(TMPDIR, 'rule-inbox-aq-strip-hatch/src/components/client');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'InboxTab.tsx'), [
+      "// Allows backward-compat with ActionQueueStrip inbox-action-queue-strip-ok",
+      "export function InboxTab() { return null; }",
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'rule-inbox-aq-strip-hatch'), CHECKS.find(c => c.name === RULE)!);
+    expect(hits.length).toBe(0);
   });
 });

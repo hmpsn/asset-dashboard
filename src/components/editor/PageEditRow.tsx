@@ -8,41 +8,17 @@ import {
 } from 'lucide-react';
 import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
-
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  publishedPath?: string | null;
-  seo?: { title?: string | null; description?: string | null };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
-  source?: 'static' | 'cms';
-  collectionId?: string;
-}
-
-interface EditState {
-  seoTitle: string;
-  seoDescription: string;
-  dirty: boolean;
-}
-
-interface Recommendation {
-  id: string;
-  type: string;
-  title: string;
-  insight: string;
-  trafficAtRisk: number;
-  estimatedGain: string;
-  priority: string;
-}
-
-interface PageState {
-  status?: string;
-}
+import type {
+  SeoEditState,
+  SeoEditorPage,
+  SeoPageState,
+  SeoRecommendation,
+  SeoVariationSet,
+} from './seoEditorTypes';
 
 export interface PageEditRowProps {
-  page: PageMeta;
-  edit: EditState | undefined;
+  page: SeoEditorPage;
+  edit: SeoEditState | undefined;
   expanded: boolean;
   isSaving: boolean;
   isSaved: boolean;
@@ -50,9 +26,9 @@ export interface PageEditRowProps {
   isDraftSaving?: boolean;
   isDraftSaved?: boolean;
   isSelected: boolean;
-  pageRecs: Recommendation[];
-  pageState: PageState | undefined;
-  variations: { field: string; options: string[]; descOptions?: string[] } | undefined;
+  pageRecs: SeoRecommendation[];
+  pageState: SeoPageState | undefined;
+  variations: SeoVariationSet | undefined;
   showApprovalCheckbox: boolean;
   isSendingToClient: boolean;
   isSentToClient: boolean;
@@ -120,12 +96,12 @@ export function PageEditRow({
           {(primaryKeyword || (secondaryKeywords?.length ?? 0) > 0) && (
             <div className="flex items-center gap-1 flex-wrap mt-0.5">
               {primaryKeyword && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 font-medium" /* arbitrary-text-ok */ title={primaryKeyword}>
+                <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 font-medium" title={primaryKeyword}>
                   {primaryKeyword}
                 </span>
               )}
               {secondaryKeywords?.slice(0, 3).map(kw => (
-                <span key={kw} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-3)]/60 border border-[var(--brand-border)] text-[var(--brand-text)]" title={kw}>
+                <span key={kw} className="t-micro px-1.5 py-0.5 rounded bg-[var(--surface-3)]/60 border border-[var(--brand-border)] text-[var(--brand-text)]" title={kw}>
                   {kw}
                 </span>
               ))}
@@ -395,7 +371,7 @@ export function PageEditRow({
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed' /* raw-zinc-ok: light button on dark UI */
+                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               <Icon as={isSaving ? Loader2 : isSaved ? Check : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />

@@ -4,6 +4,7 @@ import { createLogger } from '../logger.js';
 import { findPageMapEntry } from '../helpers.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import db from '../db/index.js';
+import { normalizeSocialProfiles } from '../social-profiles.js';
 import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, getRawKnowledge } from './seo-context-source.js';
 
 const log = createLogger('workspace-intelligence/seo-context');
@@ -31,9 +32,24 @@ export async function assembleSeoContext(
     log.warn({ err: pkErr, workspaceId }, 'assembleSeoContext: listPageKeywords failed, falling back to stored pageMap');
   }
 
+  // contentGaps now live in the content_gaps table (post-#365 normalization).
+  // The stored keyword_strategy blob has them stripped, so always reassemble
+  // from the table here.
+  let liveContentGaps: Awaited<ReturnType<typeof import('../content-gaps.js').listContentGaps>> = [];
+  try {
+    const { listContentGaps } = await import('../content-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    liveContentGaps = listContentGaps(workspaceId);
+  } catch (cgErr) {
+    log.warn({ err: cgErr, workspaceId }, 'assembleSeoContext: listContentGaps failed, content gaps unavailable');
+  }
+
   const base: SeoContextSlice = {
     strategy: workspace?.keywordStrategy
-      ? { ...workspace.keywordStrategy, pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap }
+      ? {
+          ...workspace.keywordStrategy,
+          pageMap: livePageMap.length > 0 ? livePageMap : workspace.keywordStrategy.pageMap,
+          contentGaps: liveContentGaps,
+        }
       : workspace?.keywordStrategy,
     // Store RAW brand voice value (no headers) for legacy read-only consumers that need
     // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST
@@ -130,8 +146,9 @@ export async function assembleSeoContext(
         .filter(Boolean)
         .join(', ');
     }
-    if (contactProfile!.socialProfiles?.length) {
-      base.businessProfile.socialProfiles = contactProfile!.socialProfiles;
+    const normalizedSocialProfiles = normalizeSocialProfiles(contactProfile!.socialProfiles);
+    if (normalizedSocialProfiles?.length) {
+      base.businessProfile.socialProfiles = normalizedSocialProfiles;
     }
     if (contactProfile!.openingHours) {
       base.businessProfile.openingHours = contactProfile!.openingHours;

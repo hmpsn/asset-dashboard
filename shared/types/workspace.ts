@@ -124,8 +124,11 @@ export interface KeywordStrategy {
   /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
   pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  /** Stored separately in the content_gaps table; omitted in the workspace JSON blob. */
   contentGaps?: ContentGap[];    // specific content pieces that should be created
+  /** Stored separately in the quick_wins table; omitted in the workspace JSON blob. */
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
+  /** Stored separately in the keyword_gaps table; omitted in the workspace JSON blob. */
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
   /**
    * Competitor domain keywords used to enrich keyword pool.
@@ -142,7 +145,9 @@ export interface KeywordStrategy {
     position: number;
     serpFeatures?: string;
   }[];
+  /** Stored separately in the topic_clusters table; omitted in the workspace JSON blob. */
   topicClusters?: TopicCluster[];         // topical authority clusters
+  /** Stored separately in the cannibalization_issues table; omitted in the workspace JSON blob. */
   cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)

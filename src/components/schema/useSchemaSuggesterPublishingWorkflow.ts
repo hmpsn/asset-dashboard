@@ -10,6 +10,7 @@ interface UseSchemaSuggesterPublishingWorkflowOptions {
   workspaceId?: string;
   data: SchemaPageSuggestion[] | null;
   setData: Dispatch<SetStateAction<SchemaPageSuggestion[] | null>>;
+  bulkPublishBlocked?: boolean;
 }
 
 export function useSchemaSuggesterPublishingWorkflow({
@@ -17,6 +18,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   workspaceId,
   data,
   setData,
+  bulkPublishBlocked = false,
 }: UseSchemaSuggesterPublishingWorkflowOptions) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
@@ -49,7 +51,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     return original;
   }, [editedSchemaJson]);
 
-  const sendSchemasToClient = useCallback(async () => {
+  const sendSchemasToClient = useCallback(async (note?: string) => {
     if (!data || !workspaceId) return;
     setSendingToClient(true);
     try {
@@ -61,7 +63,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }));
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: 'Schema Review', items, ...(note ? { note } : {}) });
       setSentToClient(true);
       refreshStates();
       setApprovalRefreshKey(k => k + 1);
@@ -147,7 +149,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     setTimeout(() => setCopiedId(null), 2000);
   }, [getEffectiveSchema, manualDelivery]);
 
-  const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion) => {
+  const sendSingleSchemaToClient = useCallback(async (page: SchemaPageSuggestion, note?: string) => {
     if (!workspaceId) return;
     setSendingPage(prev => new Set(prev).add(page.pageId));
     try {
@@ -159,7 +161,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
       }];
-      await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items });
+      await post(`/api/approvals/${workspaceId}`, { siteId, name: `Schema: ${page.pageTitle}`, items, ...(note ? { note } : {}) });
       setSentPages(prev => new Set(prev).add(page.pageId));
       setApprovalRefreshKey(k => k + 1);
     } catch (err) {
@@ -196,6 +198,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   }, [data, getEffectiveSchema, siteId, workspaceId]);
 
   const publishAllToWebflow = useCallback(async () => {
+    if (bulkPublishBlocked) return;
     if (!data) return;
     const publishable = data.filter(p => !p.pageId.startsWith('cms-') && !published.has(p.pageId) && p.suggestedSchemas[0]?.template);
     if (publishable.length === 0) return;
@@ -208,7 +211,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     }
     setBulkPublishing(false);
     setBulkProgress(null);
-  }, [data, getEffectiveSchema, publishToWebflow, published]);
+  }, [bulkPublishBlocked, data, getEffectiveSchema, publishToWebflow, published]);
 
   const toggleDiff = useCallback((pageId: string) => {
     setShowDiff(prev => {

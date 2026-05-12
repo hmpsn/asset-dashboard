@@ -11,6 +11,7 @@ import { notifyClientTeamResponse, notifyClientStatusChange } from '../email.js'
 import { requestUserCanAccessWorkspace, upload } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
+import { sanitizePlainText } from '../html-sanitize.js';
 import {
   listRequests,
   createRequest,
@@ -99,7 +100,15 @@ router.post('/api/requests', validate(createRequestSchema), (req, res) => {
     pageId?: string;
   };
   if (!canAccessRequest(req, workspaceId, res)) return;
-  const request = createRequest(workspaceId, { title, description, category, priority, pageUrl, pageId, submittedBy: STUDIO_NAME });
+  const request = createRequest(workspaceId, {
+    title: sanitizePlainText(title).trim(),
+    description: sanitizePlainText(description).trim(),
+    category,
+    priority,
+    pageUrl: pageUrl ? sanitizePlainText(pageUrl).trim() : undefined,
+    pageId: pageId ? sanitizePlainText(pageId).trim() : undefined,
+    submittedBy: STUDIO_NAME,
+  });
   broadcast(ADMIN_EVENTS.REQUEST_CREATED, request);
   broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { id: request.id });
   res.json(request);
@@ -113,7 +122,14 @@ router.post('/api/requests/batch', validate(batchCreateRequestSchema), (req, res
   };
   if (!canAccessRequest(req, workspaceId, res)) return;
   const created = items.map(item =>
-    createRequest(workspaceId, { title: item.title, description: item.description, category: item.category, priority: item.priority, pageUrl: item.pageUrl, submittedBy: STUDIO_NAME })
+    createRequest(workspaceId, {
+      title: sanitizePlainText(item.title).trim(),
+      description: sanitizePlainText(item.description).trim(),
+      category: item.category,
+      priority: item.priority,
+      pageUrl: item.pageUrl ? sanitizePlainText(item.pageUrl).trim() : undefined,
+      submittedBy: STUDIO_NAME,
+    })
   );
   broadcast(ADMIN_EVENTS.REQUEST_BATCH_CREATED, { count: created.length });
   broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { ids: created.map(r => r.id), batch: true });
@@ -197,7 +213,7 @@ router.patch('/api/requests/:id', validate(updateRequestSchema), (req, res) => {
 
 // Internal: team adds a note
 router.post('/api/requests/:id/notes', (req, res) => {
-  const { content } = req.body;
+  const content = sanitizePlainText((req.body?.content ?? '').toString()).trim();
   if (!content) return res.status(400).json({ error: 'content required' });
   const existing = getRequest(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
@@ -236,7 +252,7 @@ router.get('/api/request-attachments/:filename', (req, res) => {
 
 // Upload attachments with a note (internal team)
 router.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req, res) => {
-  const content = req.body.content || '';
+  const content = sanitizePlainText((req.body?.content ?? '').toString()).trim();
   const files = req.files as Express.Multer.File[];
   if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
   const atts = files?.length ? processUploadedAttachments(files) : undefined;

@@ -81,16 +81,6 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.activity(workspaceId) });
     },
-    [WS_EVENTS.FEEDBACK_NEW]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-    },
-    [WS_EVENTS.FEEDBACK_UPDATE]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
-      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-    },
     [WS_EVENTS.AUDIT_COMPLETE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.auditSummary(workspaceId) });
@@ -146,6 +136,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (siteId) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId) });
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaSnapshot(siteId, workspaceId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       }
     },
     [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {

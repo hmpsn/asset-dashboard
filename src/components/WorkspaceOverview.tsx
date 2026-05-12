@@ -1,16 +1,13 @@
 import { useState, useCallback } from 'react';
-import { patch, post } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';
 import { useWorkspaceOverviewData } from '../hooks/admin';
-import type { FeedbackItem, PresenceMap, WorkspaceOverviewData } from '../hooks/admin/useWorkspaceOverview';
+import type { PresenceMap } from '../hooks/admin/useWorkspaceOverview';
 import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
-  MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
@@ -26,9 +23,7 @@ export { AIUsageSection } from './AIUsageSection';
 
 export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (id: string) => void }) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: overviewData, isLoading: loading } = useWorkspaceOverviewData();
-  const [feedbackReply, setFeedbackReply] = useState<Record<string, string>>({});
 
   // Real-time presence: WebSocket overrides query data via a state + ref trigger
   const [wsPresence, setWsPresence] = useState<PresenceMap | null>(null);
@@ -40,7 +35,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   // Derive data from query result
   const data = overviewData?.workspaces ?? [];
   const recentActivity = overviewData?.recentActivity ?? [];
-  const feedback = overviewData?.feedback ?? [];
   const timeSaved = overviewData?.timeSaved ?? null;
   // Prefer live WebSocket presence, fall back to query snapshot
   const presence: PresenceMap = wsPresence ?? overviewData?.presence ?? {};
@@ -369,114 +363,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           })}
         </div>
       </div>
-
-      {/* ── Client Feedback ── */}
-      {feedback.length > 0 && (() => {
-        const fbTypeIcon: Record<string, typeof Bug> = { bug: Bug, feature: Lightbulb, general: MessageCircle };
-        const fbTypeColor: Record<string, string> = { bug: 'text-accent-danger', feature: 'text-accent-warning', general: 'text-accent-brand' };
-        const fbTypeBg: Record<string, string> = { bug: 'bg-red-500/10', feature: 'bg-amber-500/10', general: 'bg-teal-500/10' };
-        const fbStatusColor: Record<string, string> = { new: 'text-accent-info bg-blue-500/10', acknowledged: 'text-accent-warning bg-amber-500/10', fixed: 'text-accent-success bg-emerald-500/10', wontfix: 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]' };
-        const fbStatusLabel: Record<string, string> = { new: 'New', acknowledged: 'Acknowledged', fixed: 'Resolved', wontfix: 'Noted' };
-        const newCount = feedback.filter(f => f.status === 'new').length;
-
-        const handleStatusChange = async (wsId: string, id: string, status: string) => {
-          const updated = await patch<FeedbackItem>(`/api/feedback/${wsId}/${id}`, { status });
-          queryClient.setQueryData<WorkspaceOverviewData>(['admin-workspace-overview'], old => {
-            if (!old) return old;
-            return { ...old, feedback: old.feedback.map(f => f.id === updated.id ? updated : f) };
-          });
-        };
-
-        const handleReply = async (wsId: string, id: string) => {
-          const content = feedbackReply[id]?.trim();
-          if (!content) return;
-          const updated = await post<FeedbackItem>(`/api/feedback/${wsId}/${id}/reply`, { content });
-          queryClient.setQueryData<WorkspaceOverviewData>(['admin-workspace-overview'], old => {
-            if (!old) return old;
-            return { ...old, feedback: old.feedback.map(f => f.id === updated.id ? updated : f) };
-          });
-          setFeedbackReply(prev => ({ ...prev, [id]: '' }));
-        };
-
-        return (
-          <SectionCard
-            title={`Client Feedback${newCount > 0 ? ` · ${newCount} new` : ''}`}
-            titleIcon={<Icon as={MessageSquarePlus} size="md" className="text-accent-brand" />}
-            noPadding
-          >
-            <div className="divide-y divide-[var(--brand-border)]">
-              {feedback.slice(0, 20).map(item => {
-                const ItemIcon = fbTypeIcon[item.type] || MessageCircle;
-                const wsName = data.find(w => w.id === item.workspaceId)?.name || item.workspaceId;
-                return (
-                  <div key={item.id} className="px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <div className={cn('w-7 h-7 rounded-[var(--radius-lg)]', fbTypeBg[item.type], 'flex items-center justify-center flex-shrink-0 mt-0.5')}>
-                        <ItemIcon className={cn('w-3.5 h-3.5', fbTypeColor[item.type])} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="t-caption font-medium text-[var(--brand-text-bright)]">{item.title}</span>
-                          <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', fbStatusColor[item.status])}>{fbStatusLabel[item.status]}</span>
-                          <span className="t-micro text-[var(--brand-text-muted)] capitalize">{item.type}</span>
-                        </div>
-                        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 line-clamp-2">{item.description}</p>
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <span className="t-micro text-[var(--brand-text-muted)]">{wsName}</span>
-                          <span className="t-micro text-[var(--brand-text-muted)]">{timeAgo(item.createdAt)}</span>
-                          {item.context?.currentTab && <span className="t-micro text-[var(--brand-text-muted)]">from: {item.context.currentTab}</span>}
-                          {item.submittedBy && <span className="t-micro text-[var(--brand-text-muted)]">by: {item.submittedBy}</span>}
-                        </div>
-
-                        {/* Replies */}
-                        {item.replies.length > 0 && (
-                          <div className="mt-2 space-y-1.5">
-                            {item.replies.map(r => (
-                              <div key={r.id} className={cn('rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm', r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-accent-brand' : 'bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)]')}>
-                                <span className="font-medium">{r.author === 'team' ? 'You' : 'Client'}:</span> {r.content}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 mt-2">
-                          {item.status === 'new' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="t-micro px-2 py-1 rounded bg-amber-500/10 text-accent-warning hover:bg-amber-500/20 transition-colors">Acknowledge</button>
-                          )}
-                          {(item.status === 'new' || item.status === 'acknowledged') && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="t-micro px-2 py-1 rounded bg-emerald-500/10 text-accent-success hover:bg-emerald-500/20 transition-colors">Resolve</button>
-                          )}
-                          {item.status !== 'wontfix' && item.status !== 'fixed' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="t-micro px-2 py-1 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors">Won't Fix</button>
-                          )}
-                        </div>
-
-                        {/* Reply input */}
-                        {item.status !== 'fixed' && item.status !== 'wontfix' && (
-                          <div className="flex gap-1.5 mt-2">
-                            <input
-                              type="text"
-                              value={feedbackReply[item.id] || ''}
-                              onChange={e => setFeedbackReply(prev => ({ ...prev, [item.id]: e.target.value }))}
-                              onKeyDown={e => e.key === 'Enter' && handleReply(item.workspaceId, item.id)}
-                              placeholder="Reply to client..."
-                              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
-                            />
-                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-[var(--radius-lg)] transition-colors">
-                              <Icon as={Send} size="sm" className="text-white" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </SectionCard>
-        );
-      })()}
 
       {/* ── Recent Activity ── */}
       {recentActivity.length > 0 && (

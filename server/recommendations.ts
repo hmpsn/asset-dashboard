@@ -13,7 +13,8 @@
 
 import crypto from 'crypto';
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { recommendationSchema, recommendationSummarySchema } from './schemas/workspace-schemas.js';
 import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
@@ -24,6 +25,8 @@ import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
+import { listContentGaps } from './content-gaps.js';
+import { listQuickWins } from './quick-wins.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -275,12 +278,14 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
   return {
     workspaceId: row.workspace_id,
     generatedAt: row.generated_at,
-    recommendations: parseJsonFallback(row.recommendations, []),
-    summary: parseJsonFallback(row.summary, {
+    recommendations: parseJsonSafeArray(row.recommendations, recommendationSchema, {
+      table: 'recommendation_sets', field: 'recommendations', workspaceId,
+    }) as Recommendation[],
+    summary: parseJsonSafe(row.summary, recommendationSummarySchema, {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
       totalImpactScore: 0, trafficAtRisk: 0,
       estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
-    }),
+    }, { table: 'recommendation_sets', field: 'summary', workspaceId }),
   };
 }
 
@@ -874,8 +879,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   if (strategy) {
     // Quick wins → fix_now or fix_soon
-    if (strategy.quickWins) {
-      for (const qw of strategy.quickWins) {
+    const strategyQuickWins = listQuickWins(workspaceId);
+    const quickWins = strategyQuickWins.length > 0 ? strategyQuickWins : (strategy.quickWins || []);
+    if (quickWins.length > 0) {
+      for (const qw of quickWins) {
         // 2C: skip if the current keyword was declined
         if (qw.currentKeyword && declinedKeywords.has(qw.currentKeyword.toLowerCase())) continue;
 
@@ -915,8 +922,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // Content gaps → ongoing
-    if (strategy.contentGaps) {
-      for (const cg of strategy.contentGaps) {
+    // Sourced from the content_gaps table (post-#365 normalization), not the
+    // strategy blob — the blob no longer carries contentGaps after generation.
+    const strategyContentGaps = listContentGaps(workspaceId);
+    if (strategyContentGaps.length > 0) {
+      for (const cg of strategyContentGaps) {
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 

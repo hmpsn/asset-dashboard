@@ -34,8 +34,8 @@ import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
-import type { SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
-import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity } from '../../shared/types/site-inventory.js';
+import type { CanonicalEntity, SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
+import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SchemaFieldEvidence } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
@@ -103,6 +103,7 @@ export interface LeanGeneratorInput {
     source: Exclude<SchemaRoleSource, 'auto-detect'>;
     industrySubtype?: SchemaIndustrySubtype;
   };
+  canonicalEntityRefs?: string[];
   plannedSchemaRole?: SchemaPageRole;
   roleDecisionDiagnostics?: SkippedSchemaType[];
   inactivePlanStatus?: string;
@@ -113,21 +114,31 @@ export interface LeanGeneratorInput {
 function detectExistingSchemas(html: string): string[] {
   const $ = cheerio.load(html);
   const types: string[] = [];
+  const pushTypes = (rawType: unknown) => {
+    if (typeof rawType === 'string') {
+      types.push(rawType);
+    } else if (Array.isArray(rawType)) {
+      types.push(...rawType.filter((value): value is string => typeof value === 'string'));
+    }
+  };
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
       const json = JSON.parse($(el).html() || '{}') as Record<string, unknown>;
-      const t = json['@type'];
-      if (typeof t === 'string') types.push(t);
-      else if (Array.isArray(t)) types.push(...(t as string[]));
+      pushTypes(json['@type']);
       const graph = json['@graph'] as Array<Record<string, unknown>> | undefined;
       if (Array.isArray(graph)) {
         for (const n of graph) {
-          if (typeof n['@type'] === 'string') types.push(n['@type']);
+          pushTypes(n['@type']);
         }
       }
     } catch { /* ignore unparseable */ } // catch-ok: malformed JSON-LD on third-party pages
   });
   return Array.from(new Set(types));
+}
+
+function hasLocalBusinessJsonLdEvidence(html: string): boolean {
+  const localTypes = new Set(['Dentist', 'MedicalBusiness', 'MedicalOrganization', 'LocalBusiness', 'FinancialService']);
+  return detectExistingSchemas(html).some(type => localTypes.has(type));
 }
 
 function plainText(html: string): string {
@@ -233,6 +244,195 @@ function roleToDiagnosticsType(role: SchemaPageRole): string | null {
   return map[role] ?? null;
 }
 
+function normalizeSchemaUrlPath(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '') || '/';
+    return path;
+  } catch { // catch-ok: malformed plan URLs are ignored by canonical entity enrichment
+    return null;
+  }
+}
+
+function normalizeSchemaNodeId(id: string | undefined): string | null {
+  if (!id) return null;
+  try {
+    const parsed = new URL(id);
+    const path = parsed.pathname.replace(/\/+$/, '') || '/';
+    return `${parsed.origin}${path}${parsed.search}${parsed.hash}`;
+  } catch { // catch-ok: malformed node ids cannot be matched safely
+    return null;
+  }
+}
+
+function isValidHttpUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch { // catch-ok: invalid URL means the entity is not safe to emit
+    return false;
+  }
+}
+
+function canonicalEntityNode(entity: CanonicalEntity): Record<string, unknown> | null {
+  if (!isValidHttpUrl(entity.id) || !entity.type || !entity.name || !isValidHttpUrl(entity.canonicalUrl)) return null;
+  return dropEmptySchemaFields({
+    '@type': entity.type,
+    '@id': entity.id,
+    'name': entity.name,
+    'url': entity.canonicalUrl,
+    'description': entity.description,
+  });
+}
+
+function canonicalEntityNodeEntries(
+  canonicalEntities: CanonicalEntity[],
+): Array<{ entity: CanonicalEntity; node: Record<string, unknown> }> {
+  const seenNormalizedIds = new Set<string>();
+  return canonicalEntities.reduce<Array<{ entity: CanonicalEntity; node: Record<string, unknown> }>>((entries, entity) => {
+    const node = canonicalEntityNode(entity);
+    if (!node) return entries;
+    const normalizedId = normalizeSchemaNodeId(entity.id);
+    if (normalizedId) {
+      if (seenNormalizedIds.has(normalizedId)) return entries;
+      seenNormalizedIds.add(normalizedId);
+    }
+    entries.push({ entity, node });
+    return entries;
+  }, []);
+}
+
+function dropEmptySchemaFields(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  );
+}
+
+function graphArray(schema: Record<string, unknown>): Array<Record<string, unknown>> {
+  const graph = schema['@graph'];
+  if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
+  return [];
+}
+
+function nodeTypeList(node: Record<string, unknown>): string[] {
+  const type = node['@type'];
+  if (typeof type === 'string' && type.trim()) return [type.trim()];
+  if (Array.isArray(type)) return type.filter((item): item is string => typeof item === 'string' && !!item.trim());
+  return [];
+}
+
+function refIds(value: unknown): Set<string> {
+  const ids = new Set<string>();
+  const visit = (item: unknown) => {
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (!item || typeof item !== 'object') return;
+    const record = item as Record<string, unknown>;
+    if (typeof record['@id'] === 'string') ids.add(record['@id']);
+  };
+  visit(value);
+  return ids;
+}
+
+function replaceReferenceIds(value: unknown, oldId: string, newId: string): void {
+  if (!value || oldId === newId) return;
+  if (Array.isArray(value)) {
+    for (const item of value) replaceReferenceIds(item, oldId, newId);
+    return;
+  }
+  if (typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if (record['@id'] === oldId) record['@id'] = newId;
+  for (const nested of Object.values(record)) replaceReferenceIds(nested, oldId, newId);
+}
+
+function addCanonicalReferencesToNode(node: Record<string, unknown>, refs: string[]): void {
+  const normalizedRefs = refs
+    .filter(ref => typeof ref === 'string' && ref.trim())
+    .map(ref => ({ '@id': ref.trim() }));
+  if (normalizedRefs.length === 0) return;
+
+  const existingAbout = refIds(node.about);
+  const existingMentions = refIds(node.mentions);
+  const missingRefs = normalizedRefs.filter(ref => !existingAbout.has(ref['@id']) && !existingMentions.has(ref['@id']));
+  if (missingRefs.length === 0) return;
+
+  if (!node.about) {
+    node.about = missingRefs.length === 1 ? missingRefs[0] : missingRefs;
+    return;
+  }
+  const currentMentions = Array.isArray(node.mentions)
+    ? node.mentions
+    : node.mentions
+      ? [node.mentions]
+      : [];
+  node.mentions = [...currentMentions, ...missingRefs];
+}
+
+function applyCanonicalEntityGraph(input: {
+  schema: Record<string, unknown>;
+  pageCanonicalUrl: string;
+  canonicalEntities: CanonicalEntity[];
+  entityRefs: string[];
+}): void {
+  const graph = graphArray(input.schema);
+  if (graph.length === 0) return;
+
+  const pagePath = normalizeSchemaUrlPath(input.pageCanonicalUrl);
+  const existingById = new Map<string, Record<string, unknown>>();
+  const existingByNormalizedId = new Map<string, Record<string, unknown>>();
+  for (const node of graph) {
+    const id = node['@id'];
+    if (typeof id === 'string' && id.trim()) {
+      existingById.set(id, node);
+      const normalizedId = normalizeSchemaNodeId(id);
+      if (normalizedId) existingByNormalizedId.set(normalizedId, node);
+    }
+  }
+
+  const entityNodes = canonicalEntityNodeEntries(input.canonicalEntities);
+
+  for (const { entity, node } of entityNodes) {
+    const entityPath = normalizeSchemaUrlPath(entity.canonicalUrl);
+    if (!pagePath || !entityPath || pagePath !== entityPath) continue;
+    const normalizedEntityId = normalizeSchemaNodeId(entity.id);
+    const existing = existingById.get(entity.id)
+      ?? (normalizedEntityId ? existingByNormalizedId.get(normalizedEntityId) : undefined);
+    if (existing) {
+      const existingId = typeof existing['@id'] === 'string' ? existing['@id'] : undefined;
+      for (const [key, value] of Object.entries(node)) {
+        if (existing[key] === undefined || existing[key] === null || existing[key] === '') {
+          existing[key] = value;
+        }
+      }
+      if (existingId && normalizedEntityId && existingId !== entity.id && normalizeSchemaNodeId(existingId) === normalizedEntityId) {
+        existing['@id'] = entity.id;
+        for (const graphNode of graph) replaceReferenceIds(graphNode, existingId, entity.id);
+        existingById.delete(existingId);
+        existingById.set(entity.id, existing);
+        existingByNormalizedId.set(normalizedEntityId, existing);
+      }
+    } else {
+      graph.push(node);
+      existingById.set(entity.id, node);
+      if (normalizedEntityId) existingByNormalizedId.set(normalizedEntityId, node);
+    }
+  }
+
+  const validEntityIds = new Set(entityNodes.map(({ entity }) => entity.id));
+  const refs = input.entityRefs.filter(ref => validEntityIds.has(ref));
+  if (refs.length === 0) return;
+  const referenceTarget = graph.find(node => {
+    const types = nodeTypeList(node);
+    return types.some(type => ['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage', 'Blog', 'ProfilePage'].includes(type));
+  }) ?? graph[0];
+  if (referenceTarget) addCanonicalReferencesToNode(referenceTarget, refs);
+}
+
 function isOpaqueIdentifier(value: string): boolean {
   const trimmed = value.trim();
   return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
@@ -252,29 +452,81 @@ function formatAreaServed(address: { city?: string; state?: string } | undefined
   return city || state;
 }
 
+function stripWww(hostname: string): string {
+  return hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function sameSiteOrigin(url: string, baseUrl: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const base = new URL(baseUrl);
+    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    return parsed.origin;
+  } catch { // catch-ok: malformed canonical URL should not block schema generation
+    return undefined;
+  }
+}
+
 function mergeSemanticBusinessProfile(
   semantics: PageElementCatalog['semantics'] | undefined,
   fallback: WorkspaceSchemaInput['businessProfile'],
+  fieldEvidence: SchemaFieldEvidence[] | undefined,
 ): WorkspaceSchemaInput['businessProfile'] {
+  const isFallbackEvidence = (field: string) => (fieldEvidence ?? []).some(e =>
+    e.field === field && e.source === 'business-profile' && e.status === 'fallback-used');
+  const preferSemanticOverFallback = (field: string, fallbackValue: string | undefined, semanticValue: string | undefined) =>
+    isFallbackEvidence(field)
+      ? safePublicText(semanticValue) ?? safePublicText(fallbackValue)
+      : safePublicText(fallbackValue) ?? safePublicText(semanticValue);
   const semanticAddress = semantics?.address;
   const fallbackAddress = fallback?.address;
   const address = {
-    street: safePublicText(semanticAddress?.street) ?? safePublicText(fallbackAddress?.street),
-    city: safePublicText(semanticAddress?.city) ?? safePublicText(fallbackAddress?.city),
-    state: safePublicText(semanticAddress?.state) ?? safePublicText(fallbackAddress?.state),
-    zip: safePublicText(semanticAddress?.postalCode) ?? safePublicText(fallbackAddress?.zip),
-    country: safePublicText(semanticAddress?.country) ?? safePublicText(fallbackAddress?.country),
+    street: preferSemanticOverFallback('streetAddress', fallbackAddress?.street, semanticAddress?.street),
+    city: preferSemanticOverFallback('addressLocality', fallbackAddress?.city, semanticAddress?.city),
+    state: preferSemanticOverFallback('addressRegion', fallbackAddress?.state, semanticAddress?.state),
+    zip: preferSemanticOverFallback('postalCode', fallbackAddress?.zip, semanticAddress?.postalCode),
+    country: preferSemanticOverFallback('addressCountry', fallbackAddress?.country, semanticAddress?.country),
   };
   const hasAddress = Object.values(address).some(Boolean);
-  const phone = safePublicText(semantics?.phone) ?? safePublicText(fallback?.phone);
-  const email = safePublicText(semantics?.email) ?? safePublicText(fallback?.email);
-  if (!fallback && !hasAddress && !phone && !email) return null;
+  const phone = preferSemanticOverFallback('phone', fallback?.phone, semantics?.phone);
+  const email = preferSemanticOverFallback('email', fallback?.email, semantics?.email);
+  const openingHours = safePublicText(fallback?.openingHours);
+  const socialProfiles = fallback?.socialProfiles?.length
+    ? fallback.socialProfiles
+    : semantics?.sameAs;
+  if (!fallback && !hasAddress && !phone && !email && !openingHours && !socialProfiles?.length) return null;
   return {
     ...(fallback ?? {}),
     phone,
     email,
+    openingHours,
+    socialProfiles,
     address: hasAddress ? address : fallback?.address,
   };
+}
+
+function semanticFieldEvidence(semantics: PageElementCatalog['semantics'] | undefined): SchemaFieldEvidence[] {
+  if (!semantics) return [];
+  const evidence: SchemaFieldEvidence[] = [];
+  const push = (field: string, message: string) => evidence.push({
+    field,
+    source: 'existing-json-ld',
+    status: 'resolved',
+    message,
+  });
+  if (semantics.businessName) push('locationName', 'locationName resolved from existing local business JSON-LD.');
+  if (semantics.businessType) push('businessType', 'businessType resolved from existing local business JSON-LD.');
+  if (semantics.address?.street) push('streetAddress', 'streetAddress resolved from existing local business JSON-LD.');
+  if (semantics.address?.city) push('addressLocality', 'addressLocality resolved from existing local business JSON-LD.');
+  if (semantics.address?.state) push('addressRegion', 'addressRegion resolved from existing local business JSON-LD.');
+  if (semantics.address?.postalCode) push('postalCode', 'postalCode resolved from existing local business JSON-LD.');
+  if (semantics.address?.country) push('addressCountry', 'addressCountry resolved from existing local business JSON-LD.');
+  if (semantics.geo) push('geo', 'geo resolved from existing local business JSON-LD.');
+  if (semantics.phone) push('phone', 'phone resolved from existing local business JSON-LD when no stronger source is present.');
+  if (semantics.email) push('email', 'email resolved from existing local business JSON-LD when no stronger source is present.');
+  if (semantics.primaryImage) push('image', 'image resolved from existing local business JSON-LD.');
+  if (semantics.hours?.length) push('openingHoursSpecification', 'openingHoursSpecification normalized from existing local business JSON-LD.');
+  return evidence;
 }
 
 function buildGenerationDiagnostics(input: {
@@ -291,6 +543,7 @@ function buildGenerationDiagnostics(input: {
   cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
   evidenceSources?: SchemaGenerationDiagnostics['evidenceSources'];
   fieldEvidence?: SchemaGenerationDiagnostics['fieldEvidence'];
+  canonicalEntityReferences?: string[];
 }): SchemaGenerationDiagnostics {
   const skippedSchemaTypes = [...input.skippedSchemaTypes];
   if (input.inactivePlanStatus && input.roleSource === 'auto-detect') {
@@ -303,6 +556,7 @@ function buildGenerationDiagnostics(input: {
     plannedRole: input.plannedRole ?? input.role,
     effectiveRole: input.role,
     roleSource: input.roleSource,
+    canonicalEntityReferences: input.canonicalEntityReferences?.length ? input.canonicalEntityReferences : undefined,
     collection: input.collection,
     emittedTypes: input.emittedTypes,
     skippedSchemaTypes,
@@ -344,6 +598,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     baseUrl,
     workspace: input.workspace,
   });
+  const schemaBaseUrl = sameSiteOrigin(pageData.canonicalUrl, baseUrl) ?? baseUrl;
 
   // Lazy-refresh element catalog: read from store; if missing or
   // stale-vs-Webflow-lastPublished, extract from current HTML + persist.
@@ -354,11 +609,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let catalog: PageElementCatalog | undefined;
   if (workspaceId && pagePath) {
     const stored = getPageElements(workspaceId, pagePath);
-    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null)) {
+    const shouldRefreshForJsonLdEvidence = !!stored
+      && hasLocalBusinessJsonLdEvidence(input.html ?? '')
+      && (!stored.catalog.semantics?.businessType || !stored.catalog.semantics?.address);
+    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null) || shouldRefreshForJsonLdEvidence) {
       try {
         const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
         catalog = await extractPageElements(input.html ?? '', {
-          pageBaseUrl: baseUrl,
+          pageBaseUrl: pageData.canonicalUrl,
           sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
           aiBudget,
           workspaceId,
@@ -385,7 +643,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   if (!catalog && (role === 'howto' || role === 'video')) {
     try {
       catalog = await extractPageElements(input.html ?? '', {
-        pageBaseUrl: baseUrl,
+        pageBaseUrl: pageData.canonicalUrl,
         sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
         aiBudget: input.aiBudget ?? createAiBudget(0),
         workspaceId: workspaceId ?? 'schema-preview',
@@ -394,11 +652,23 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.warn({ err, pageId: input.pageId }, 'page-element extraction failed; planned rich role will fall back conservatively');
     }
   }
-  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile);
+  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile, pageData.fieldEvidence);
   pageData = {
     ...pageData,
     elements: catalog,
     areaServed: formatAreaServed(businessProfileForPage?.address) ?? pageData.areaServed,
+    fieldEvidence: [
+      ...(pageData.fieldEvidence ?? []),
+      ...semanticFieldEvidence(catalog?.semantics),
+    ],
+    evidenceSources: {
+      ...(pageData.evidenceSources ?? {}),
+      ...(catalog?.semantics?.businessName ? { locationName: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.businessType ? { businessType: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.address ? { address: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.geo ? { geo: 'existing-json-ld' as const } : {}),
+      ...(catalog?.semantics?.hours?.length ? { openingHoursSpecification: 'existing-json-ld' as const } : {}),
+    },
   };
   const businessKind: BusinessKind = businessProfileForPage?.address ? 'local' : 'unknown';
   const classified: ClassifiedPage = input.pageKindOverride
@@ -407,7 +677,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
         pagePath: input.pageMeta.publishedPath,
       }
-    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
+    : classifyPage(`${schemaBaseUrl}${input.pageMeta.publishedPath}`, schemaBaseUrl, { businessKind });
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {
@@ -429,7 +699,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const serviceOffers = pageData.offers && pageData.offers.length > 0 ? pageData.offers : offers;
 
   if (role === 'product') {
-    schema = buildProductSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers });
+    schema = buildProductSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, offers });
     reason = offers.length > 0
       ? 'Product page — Product with visible price-backed Offer data.'
       : 'Product page — Product without Offer because no visible price/currency was verified.';
@@ -441,7 +711,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       });
     }
   } else if (role === 'pricing') {
-    schema = buildPricingPageSchema({ baseUrl, pageData, offers });
+    schema = buildPricingPageSchema({ baseUrl: schemaBaseUrl, pageData, offers });
     reason = offers.length > 0
       ? 'Pricing page — WebPage with visible price-backed Offer nodes.'
       : 'Pricing page — WebPage only because no visible price/currency was verified.';
@@ -453,19 +723,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       });
     }
   } else if (role === 'author') {
-    schema = buildProfilePageSchema({ baseUrl, pageData });
+    schema = buildProfilePageSchema({ baseUrl: schemaBaseUrl, pageData });
     reason = 'Author/profile page — ProfilePage with Person mainEntity from visible page data.';
   } else if (role === 'faq') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     reason = 'FAQ role — WebPage base; FAQPage is emitted only when valid Q&A pairs are visible.';
   } else if (role === 'howto') {
-    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
     reason = 'How-to role — Article base; HowTo is emitted only when visible step lists are extracted.';
   } else if (role === 'video') {
-    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
     reason = 'Video role — Article base; VideoObject is emitted only when required video fields are verified.';
   } else if (role === 'job-posting' || role === 'course' || role === 'event') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     const type = roleToDiagnosticsType(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
@@ -473,7 +743,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason: `${type} skipped: required fields were not fully verified from visible or workspace data.`,
     });
   } else if (role === 'review' || role === 'recipe') {
-    schema = buildWebPageSchema({ baseUrl, pageData });
+    schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
     const type = roleToDiagnosticsType(role)!;
     reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
     skippedSchemaTypes.push({
@@ -485,7 +755,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'Homepage':
       if (classified.primaryType === 'LocalBusiness') {
         schema = buildLocalBusinessSchema({
-          baseUrl,
+          baseUrl: schemaBaseUrl,
           pageData,
           businessProfile: businessProfileForPage,
           siteHasSearch: input.workspace.siteHasSearch,
@@ -493,7 +763,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
+        schema = buildHomepageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
         skippedSchemaTypes.push({
           type: 'LocalBusiness',
@@ -503,15 +773,15 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'BlogPosting':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'BlogPosting');
+      schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'BlogPosting');
       reason = 'Blog post — BlogPosting with author/publisher/dates.';
       break;
     case 'CaseStudy':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+      schema = buildArticleSchema({ baseUrl: schemaBaseUrl, pageData }, 'Article');
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
+      schema = buildServiceSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
       reason = 'Service detail page — Service with provider reference.';
       if (serviceOffers.length === 0) {
         skippedSchemaTypes.push({
@@ -523,7 +793,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     case 'Location':
         schema = buildLocalBusinessSchema({
-          baseUrl,
+          baseUrl: schemaBaseUrl,
           pageData,
           businessProfile: businessProfileForPage,
           siteHasSearch: input.workspace.siteHasSearch,
@@ -539,20 +809,20 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       }
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
+      schema = buildAboutPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: businessProfileForPage, semantics: catalog?.semantics });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
-      reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
+      schema = buildContactPageSchema({ baseUrl: schemaBaseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics: catalog?.semantics });
+      reason = 'Contact page — ContactPage with canonical business identity mainEntity.';
       break;
     case 'BlogIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildBlogIndexSchema({ baseUrl, pageData, children });
+        schema = buildBlogIndexSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Blog index — Blog with cross-page child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Blog index — CollectionPage (no child context available).';
       }
       break;
@@ -560,10 +830,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'ServiceIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildServiceHubSchema({ baseUrl, pageData, children });
+        schema = buildServiceHubSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Service index — Service + OfferCatalog with child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Service index — CollectionPage (no child context available).';
       }
       break;
@@ -571,17 +841,17 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'CaseStudyIndex': {
       const children = resolveHubChildren(input);
       if (children) {
-        schema = buildCollectionPageSchema({ baseUrl, pageData, children });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData, children });
         reason = 'Case study index — CollectionPage + ItemList with child @id references.';
       } else {
-        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        schema = buildCollectionPageSchema({ baseUrl: schemaBaseUrl, pageData });
         reason = 'Case study index — CollectionPage (no child context available).';
       }
       break;
     }
     case 'Legal':
     case 'WebPage':
-      schema = buildWebPageSchema({ baseUrl, pageData });
+      schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
       reason = 'Generic page — WebPage with breadcrumb.';
       break;
     default: {
@@ -589,12 +859,24 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       // without a corresponding case above.
       const _exhaustive: never = classified.kind;
       void _exhaustive;
-      schema = buildWebPageSchema({ baseUrl, pageData });
+      schema = buildWebPageSchema({ baseUrl: schemaBaseUrl, pageData });
       reason = 'Generic page — WebPage (unreachable fallback).';
       break;
     }
     }
   }
+
+  const canonicalEntities = input.siteContext?.canonicalEntities ?? [];
+  const validCanonicalEntityIds = new Set(
+    canonicalEntityNodeEntries(canonicalEntities).map(({ entity }) => entity.id),
+  );
+  const canonicalEntityRefs = (input.canonicalEntityRefs ?? []).filter(ref => validCanonicalEntityIds.has(ref));
+  applyCanonicalEntityGraph({
+    schema,
+    pageCanonicalUrl: pageData.canonicalUrl,
+    canonicalEntities,
+    entityRefs: canonicalEntityRefs,
+  });
 
   // Validate the base schema BEFORE FAQ enrichment so we can distinguish FAQ-specific
   // errors from pre-existing base errors (e.g. a BlogPosting missing datePublished
@@ -685,6 +967,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     cmsDeliveryStatus: input.cmsDeliveryStatus,
     evidenceSources: pageData.evidenceSources,
     fieldEvidence: pageData.fieldEvidence,
+    canonicalEntityReferences: canonicalEntityRefs,
   });
 
   return {

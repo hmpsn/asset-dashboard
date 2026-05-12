@@ -12,7 +12,7 @@ import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callAI } from './ai.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
-import { resolvePagePath, stripHtmlToText, stripCodeFences } from './helpers.js';
+import { resolvePagePath, stripHtmlToText, stripCodeFences, decodeEntities } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
@@ -106,7 +106,7 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
 
     // Extract <title> for better page naming (sitemap doesn't include titles)
     const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const pageTitle = titleMatch ? titleMatch[1].replace(/\s*[|–—]\s*.*$/, '').trim() : undefined;
+    const pageTitle = titleMatch ? decodeEntities(titleMatch[1].replace(/\s*[|–—]\s*.*$/, '').trim()) : undefined;
 
     // Extract body text — strip nav/header/footer so we only see page content
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);

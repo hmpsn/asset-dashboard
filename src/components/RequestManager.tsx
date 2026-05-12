@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { patch, post, del, getSafe, postForm } from '../api/client';
 import { Icon, cn } from './ui';
+import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -9,10 +10,10 @@ import {
 } from 'lucide-react';
 
 function SimpleMarkdown({ text }: { text: string }) {
-  const inlineMd = (s: string) =>
-    s.replace(/\*\*(.+?)\*\*/g, '<b class="text-[var(--brand-text-bright)]">$1</b>')
-     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-[var(--brand-text-bright)]">$1</em>')
-     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text-bright)] t-caption">$1</code>');
+  const inlineMd = (s: string) => inlineMarkdownToHtml(s, {
+    em: 'text-[var(--brand-text-bright)]',
+    code: 'bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text-bright)] t-caption',
+  });
   return (
     <div className="space-y-1">
       {text.split('\n').map((line, i) => {

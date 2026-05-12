@@ -14,9 +14,9 @@
  *   - GET /api/public/intelligence/:workspaceId   — response shape gated by tier
  *
  * Tier limits reference (from server/usage-tracking.ts):
- *   free:    { ai_chats: 3, strategy_generations: 0 }
- *   growth:  { ai_chats: 50, strategy_generations: 3 }
- *   premium: { ai_chats: Infinity, strategy_generations: Infinity }
+ *   free:    { ai_chats: 3, strategy_generations: 0, alt_text_generations: 0, workspace_context_generations: 0 }
+ *   growth:  { ai_chats: 50, strategy_generations: 3, alt_text_generations: 3, workspace_context_generations: 3 }
+ *   premium: { ai_chats: Infinity, strategy_generations: Infinity, alt_text_generations: Infinity, workspace_context_generations: Infinity }
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -88,6 +88,8 @@ describe('GET /api/public/usage/:workspaceId — tier-differentiated limits', ()
     expect(body.usage.strategy_generations).toBeDefined();
     expect(body.usage.strategy_generations.limit).toBe(0);
     expect(body.usage.strategy_generations.remaining).toBe(0);
+    expect(body.usage.alt_text_generations.limit).toBe(0);
+    expect(body.usage.workspace_context_generations.limit).toBe(0);
   });
 
   it('growth tier: ai_chats limit is 50, strategy_generations limit is 3', async () => {
@@ -99,6 +101,8 @@ describe('GET /api/public/usage/:workspaceId — tier-differentiated limits', ()
     expect(body.usage.ai_chats.remaining).toBe(50);
     expect(body.usage.strategy_generations.limit).toBe(3);
     expect(body.usage.strategy_generations.remaining).toBe(3);
+    expect(body.usage.alt_text_generations.limit).toBe(3);
+    expect(body.usage.workspace_context_generations.limit).toBe(3);
   });
 
   it('trial workspace: free base tier resolves to growth limits', async () => {
@@ -110,6 +114,8 @@ describe('GET /api/public/usage/:workspaceId — tier-differentiated limits', ()
     expect(body.usage.ai_chats.remaining).toBe(50);
     expect(body.usage.strategy_generations.limit).toBe(3);
     expect(body.usage.strategy_generations.remaining).toBe(3);
+    expect(body.usage.alt_text_generations.limit).toBe(3);
+    expect(body.usage.workspace_context_generations.limit).toBe(3);
   });
 
   it('premium tier: ai_chats and strategy_generations are unlimited (Infinity)', async () => {
@@ -122,6 +128,8 @@ describe('GET /api/public/usage/:workspaceId — tier-differentiated limits', ()
     expect(body.usage.ai_chats.remaining).toBeNull();
     expect(body.usage.strategy_generations.limit).toBeNull();
     expect(body.usage.strategy_generations.remaining).toBeNull();
+    expect(body.usage.alt_text_generations.limit).toBeNull();
+    expect(body.usage.workspace_context_generations.limit).toBeNull();
   });
 
   it('nonexistent workspace returns 404', async () => {

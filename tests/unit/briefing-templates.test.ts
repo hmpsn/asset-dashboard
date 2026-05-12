@@ -49,7 +49,7 @@ function baseInsight<T extends string>(type: T, overrides: Record<string, unknow
 }
 
 const VALID_CATEGORIES: ReadonlyArray<string> = ['win', 'risk', 'opportunity', 'competitive', 'period_change'];
-const VALID_DRILL_PAGES: ReadonlyArray<string> = ['performance', 'health', 'strategy', 'content-plan', 'schema-review', 'roi', 'brand'];
+const VALID_DRILL_PAGES: ReadonlyArray<string> = ['performance', 'health', 'strategy', 'content-plan', 'roi', 'brand'];
 
 function expectStoryShape(story: ReturnType<typeof rankingMover> | null) {
   expect(story).not.toBeNull();

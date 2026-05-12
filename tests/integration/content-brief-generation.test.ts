@@ -310,6 +310,23 @@ describe('generateBrief — happy path', () => {
     expect(found).toBeDefined();
   });
 
+  it('supports non-persistent generation for context-only callers', async () => {
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+
+    const beforeCount = db.prepare('SELECT COUNT(*) as count FROM content_briefs WHERE workspace_id = ?')
+      .get(TEST_WS_ID) as { count: number };
+
+    const brief = await generateBrief(TEST_WS_ID, 'context only keyword', {}, { persist: false });
+    expect(brief.id).toMatch(/^brief_/);
+
+    const fetched = getBrief(TEST_WS_ID, brief.id);
+    expect(fetched).toBeUndefined();
+
+    const afterCount = db.prepare('SELECT COUNT(*) as count FROM content_briefs WHERE workspace_id = ?')
+      .get(TEST_WS_ID) as { count: number };
+    expect(afterCount.count).toBe(beforeCount.count);
+  });
+
   it('passes the correct feature name to callOpenAI', async () => {
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 
@@ -888,6 +905,32 @@ describe('regenerateOutline — outline-only regeneration', () => {
     await expect(
       regenerateOutline(TEST_WS_ID, existingBriefId),
     ).rejects.toThrow('Failed to parse regenerated outline');
+  });
+
+  it('rejects malformed outline items and preserves the existing outline', async () => {
+    const before = getBrief(TEST_WS_ID, existingBriefId);
+    expect(before).toBeDefined();
+
+    mockOpenAIJsonResponse('content-brief-outline-regen', [
+      {
+        heading: 'Valid item',
+        subheadings: ['A'],
+        notes: 'Has all required fields.',
+        wordCount: 250,
+        keywords: ['keyword'],
+      },
+      {
+        heading: '',
+        notes: '',
+      },
+    ]);
+
+    await expect(
+      regenerateOutline(TEST_WS_ID, existingBriefId),
+    ).rejects.toThrow('Invalid outline section at index 2');
+
+    const after = getBrief(TEST_WS_ID, existingBriefId);
+    expect(after?.outline).toEqual(before?.outline);
   });
 });
 

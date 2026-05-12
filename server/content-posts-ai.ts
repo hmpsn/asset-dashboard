@@ -6,6 +6,7 @@
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
 import { callAI } from './ai.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -329,7 +330,10 @@ ${WRITING_QUALITY_RULES}
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = role;
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    `${role} Return only clean HTML for the introduction field requested by the user prompt. No markdown.`,
+  );
   return callCreativeAI({
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
@@ -418,7 +422,10 @@ ${WRITING_QUALITY_RULES}
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = role;
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    `${role} Return only clean HTML for the section field requested by the user prompt. No markdown.`,
+  );
   return callCreativeAI({
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
@@ -475,7 +482,10 @@ ${WRITING_QUALITY_RULES}
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = role;
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    `${role} Return only clean HTML for the conclusion field requested by the user prompt. No markdown.`,
+  );
   return callCreativeAI({
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
@@ -549,8 +559,13 @@ Return valid JSON only:
 }`;
 
   try {
+    const systemPrompt = buildSystemPrompt(
+      workspaceId,
+      'You are an expert SEO copywriter. Return only valid JSON with seoTitle and seoMetaDescription.',
+    );
     const result = await callAI({
       model: CONTENT_MODEL,
+      system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
       temperature: 0.5,
@@ -653,7 +668,10 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
   log.info(`Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
   const rawResult = await callCreativeAI({
-    systemPrompt: 'You are a senior editor performing a cohesion and word-count review.',
+    systemPrompt: buildSystemPrompt(
+      workspaceId,
+      'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
+    ),
     userPrompt: prompt,
     maxTokens,
     temperature: 0.4,
@@ -735,8 +753,14 @@ Return ONLY valid JSON in this exact format:
   "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
 }`;
 
+  const systemPrompt = buildSystemPrompt(
+    workspaceId,
+    'You are a brand voice analyst. Return only valid JSON with voiceScore and voiceFeedback.',
+  );
+
   const result = await callAI({
     model: CONTENT_MODEL,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.3,
@@ -750,9 +774,16 @@ Return ONLY valid JSON in this exact format:
       log.warn('Voice scoring: no JSON object found in response');
       return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
     }
-    const parsed = JSON.parse(jsonMatch[0]) as { voiceScore: number; voiceFeedback: string };
-    const score = Math.max(0, Math.min(100, Math.round(parsed.voiceScore)));
-    const feedback = parsed.voiceFeedback || 'No feedback provided.';
+    const parsed = JSON.parse(jsonMatch[0]) as { voiceScore?: unknown; voiceFeedback?: unknown };
+    const rawScore = typeof parsed.voiceScore === 'number' ? parsed.voiceScore : Number.NaN;
+    if (!Number.isFinite(rawScore)) {
+      log.warn({ voiceScore: parsed.voiceScore }, 'Voice scoring: invalid non-finite score from AI');
+      return { voiceScore: null, voiceFeedback: 'Voice scoring failed — invalid score returned by AI.' };
+    }
+    const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+    const feedback = typeof parsed.voiceFeedback === 'string' && parsed.voiceFeedback.trim()
+      ? parsed.voiceFeedback
+      : 'No feedback provided.';
     log.info(`Voice score for post ${post.id}: ${score}/100`);
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {

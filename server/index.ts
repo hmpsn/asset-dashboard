@@ -46,6 +46,27 @@ runMigrations();
 import { migrateFromJsonBlob } from './page-keywords.js';
 migrateFromJsonBlob();
 
+// Migrate keywordStrategy.contentGaps from workspace JSON blobs into the content_gaps table (idempotent)
+import { migrateFromJsonBlob as migrateContentGapsFromJsonBlob } from './content-gaps.js';
+migrateContentGapsFromJsonBlob();
+
+// Migrate keywordStrategy.quickWins from workspace JSON blobs into the quick_wins table (idempotent)
+import { migrateFromJsonBlob as migrateQuickWinsFromJsonBlob } from './quick-wins.js';
+migrateQuickWinsFromJsonBlob();
+
+// Migrate keywordStrategy.keywordGaps from workspace JSON blobs into the keyword_gaps table (idempotent)
+import { migrateFromJsonBlob as migrateKeywordGapsFromJsonBlob } from './keyword-gaps.js';
+migrateKeywordGapsFromJsonBlob();
+
+// Migrate keywordStrategy.topicClusters from workspace JSON blobs into the topic_clusters table (idempotent)
+import { migrateFromJsonBlob as migrateTopicClustersFromJsonBlob } from './topic-clusters.js';
+migrateTopicClustersFromJsonBlob();
+
+// Migrate keywordStrategy.cannibalization from workspace JSON blobs into the
+// cannibalization_issues table (idempotent)
+import { migrateFromJsonBlob as migrateCannibalizationFromJsonBlob } from './cannibalization-issues.js';
+migrateCannibalizationFromJsonBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

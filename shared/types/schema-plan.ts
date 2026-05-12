@@ -184,6 +184,40 @@ export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; ex
   },
 };
 
+export const SCHEMA_ROLE_PRIMARY_TYPE: Record<SchemaPageRole, string> = {
+  homepage: 'Organization',
+  pillar: 'SoftwareApplication',
+  service: 'Service',
+  audience: 'WebPage',
+  'lead-gen': 'WebPage',
+  blog: 'Article',
+  about: 'AboutPage',
+  contact: 'ContactPage',
+  location: 'LocalBusiness',
+  product: 'Product',
+  partnership: 'WebPage',
+  faq: 'FAQPage',
+  'case-study': 'Article',
+  comparison: 'WebPage',
+  howto: 'HowTo',
+  video: 'VideoObject',
+  'job-posting': 'JobPosting',
+  course: 'Course',
+  event: 'Event',
+  author: 'ProfilePage',
+  review: 'Review',
+  pricing: 'WebPage',
+  recipe: 'Recipe',
+  generic: 'WebPage',
+};
+
+export const SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES = new Set<SchemaPageRole>([
+  'homepage',
+  'audience',
+  'partnership',
+  'comparison',
+]);
+
 export interface CanonicalEntity {
   type: string;           // 'SoftwareApplication' | 'Service' | 'LocalBusiness' etc.
   name: string;           // 'Faros AI Platform'

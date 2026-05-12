@@ -55,6 +55,7 @@ describe('email throttle', () => {
     expect(getThrottleCategory('anomaly_alert')).toBe('alert');
     expect(getThrottleCategory('password_reset')).toBe('transactional');
     expect(getThrottleCategory('request_new')).toBe('internal');
+    expect(getThrottleCategory('action_approved')).toBe('internal');
     expect(getThrottleCategory('client_briefing_ready')).toBe('action');
     expect(getThrottleCategory('unknown_type' as EmailEventType)).toBe('action');
   });

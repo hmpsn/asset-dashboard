@@ -41,6 +41,7 @@ vi.mock('../../../server/ai.js', () => ({
 
 import { generateLeanSchema } from '../../../server/schema/generator.js';
 import { getPageElements } from '../../../server/page-elements-store.js';
+import type { SiteInventoryCmsItem } from '../../../shared/types/site-inventory.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -252,6 +253,75 @@ describe('pageKindOverride', () => {
     expect(lbNode.areaServed).toEqual({ '@type': 'Place', name: 'Kyle' });
     expect(JSON.stringify(output.suggestedSchemas[0].template)).not.toContain('65d25be3772349200f0af0ab');
   });
+
+  it('does not let page-only semantic contact data create a dangling root LocalBusiness reference', async () => {
+    vi.mocked(getPageElements).mockReturnValueOnce({
+      workspaceId: 'ws-test',
+      pagePath: '/contact',
+      sourcePublishedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      catalog: {
+        extractedAt: '2026-01-01T00:00:00.000Z',
+        sourcePublishedAt: null,
+        headings: [],
+        tables: [],
+        images: [],
+        videos: [],
+        lists: [],
+        testimonials: [],
+        codeBlocks: [],
+        citations: [],
+        diagnostics: {
+          aiClassificationCalls: 0,
+          hitAiBudgetCap: false,
+          rawCounts: {},
+        },
+        semantics: {
+          phone: '512-555-1212',
+          email: 'hello@example.com',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            postalCode: '78701',
+            country: 'US',
+          },
+        },
+      },
+    });
+    const output = await generateLeanSchema(
+      makeInput('/contact', {
+        pageKindOverride: 'ContactPage',
+      }),
+    );
+
+    const graph = getGraph(output);
+    const contactNode = graph.find(n => n['@type'] === 'ContactPage') as Record<string, unknown> | undefined;
+    const contactEntity = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
+    expect(contactNode?.mainEntity).toEqual({ '@id': 'https://example.com/#organization' });
+    expect(contactEntity).toBeUndefined();
+  });
+
+  it('threads verified workspace business identity into ContactPage without duplicating the identity body', async () => {
+    const output = await generateLeanSchema(
+      makeInput('/contact', {
+        pageKindOverride: 'ContactPage',
+        workspace: {
+          ...minimalWorkspace,
+          businessProfile: {
+            address: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+          },
+        },
+      }),
+    );
+
+    const graph = getGraph(output);
+    const contactNode = graph.find(n => n['@type'] === 'ContactPage') as Record<string, unknown> | undefined;
+    const contactEntity = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
+    expect(contactNode?.mainEntity).toEqual({ '@id': 'https://example.com/#localbusiness' });
+    expect(contactEntity).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -282,6 +352,236 @@ describe('per-location @id uniqueness', () => {
     expect(lbNode).toBeDefined();
     expect(lbNode!['@id']).toBe('https://example.com/location/downtown#localbusiness');
     expect(lbNode!['@id']).not.toBe('https://example.com/#localbusiness');
+  });
+
+  it('uses existing local-business JSON-LD as evidence for rich location output', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <link rel="canonical" href="https://www.example.com/location/alamo-heights-san-antonio" />
+  <title>Alamo Heights San Antonio, TX Dental Office | Swish Dental</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "image": "https://cdn.example.com/alamo.avif",
+      "telephone": "210-764-6787",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX",
+        "postalCode": "78209",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "29.48221",
+        "longitude": "-98.46608"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Swish Dental Alamo Heights San Antonio, TX</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/alamo-heights-san-antonio', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: { ...minimalWorkspace, name: 'Swish' },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist).toMatchObject({
+      '@id': 'https://www.example.com/location/alamo-heights-san-antonio#localbusiness',
+      name: 'Swish Dental - Alamo Heights',
+      url: 'https://www.example.com/location/alamo-heights-san-antonio',
+      telephone: '210-764-6787',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '6011 Broadway, STE 100',
+        addressLocality: 'San Antonio',
+        addressRegion: 'TX',
+        postalCode: '78209',
+        addressCountry: 'US',
+      },
+      geo: { '@type': 'GeoCoordinates', latitude: 29.48221, longitude: -98.46608 },
+    });
+    expect(output.url).toBe('https://www.example.com/location/alamo-heights-san-antonio');
+    const breadcrumb = graph.find(n => n['@type'] === 'BreadcrumbList') as Record<string, unknown> | undefined;
+    const crumbItems = breadcrumb?.itemListElement as Array<Record<string, unknown>> | undefined;
+    expect(crumbItems?.at(-1)?.item).toBe('https://www.example.com/location/alamo-heights-san-antonio');
+    expect(output.generationDiagnostics?.validationStatus).not.toBe('errors');
+    expect(output.generationDiagnostics?.missingRequiredFields ?? []).not.toContain('streetAddress');
+    expect(output.richResultsEligibility?.find(e => e.type === 'Dentist')?.eligible).toBe(true);
+  });
+
+  it('uses page-local JSON-LD over workspace fallback evidence for CMS location gaps', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "telephone": "210-764-6787",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX",
+        "postalCode": "78209",
+        "addressCountry": "US"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Alamo Heights</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/alamo-heights-san-antonio', {
+      html,
+      pageKindOverride: 'Location',
+      pageMeta: {
+        slug: 'alamo-heights-san-antonio',
+        title: 'Alamo Heights',
+        publishedPath: '/location/alamo-heights-san-antonio',
+        sourcePublishedAt: null,
+        fieldEvidence: [
+          { field: 'streetAddress', source: 'business-profile', status: 'fallback-used' },
+          { field: 'addressLocality', source: 'business-profile', status: 'fallback-used' },
+          { field: 'addressRegion', source: 'business-profile', status: 'fallback-used' },
+          { field: 'postalCode', source: 'business-profile', status: 'fallback-used' },
+          { field: 'phone', source: 'business-profile', status: 'fallback-used' },
+        ],
+      },
+      workspace: {
+        ...minimalWorkspace,
+        businessProfile: {
+          phone: '512-555-1111',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+          },
+        },
+      },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.telephone).toBe('210-764-6787');
+    expect(dentist?.address).toMatchObject({
+      streetAddress: '6011 Broadway, STE 100',
+      addressLocality: 'San Antonio',
+      addressRegion: 'TX',
+      postalCode: '78209',
+    });
+  });
+
+  it('keeps explicit CMS/workspace location mappings above existing JSON-LD evidence', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Existing Page Name",
+      "telephone": "210-000-0000",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Old Street",
+        "addressLocality": "Old City",
+        "addressRegion": "TX",
+        "postalCode": "00000"
+      }
+    }
+  </script>
+</head>
+<body><main><h1>Mapped Location</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/mapped', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: {
+        ...minimalWorkspace,
+        businessProfile: {
+          phone: '512-555-1111',
+          address: {
+            street: '100 Main St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+          },
+        },
+      },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.telephone).toBe('512-555-1111');
+    expect(dentist?.address).toMatchObject({
+      streetAddress: '100 Main St',
+      addressLocality: 'Austin',
+      addressRegion: 'TX',
+      postalCode: '78701',
+    });
+  });
+
+  it('refreshes old cached element catalogs when JSON-LD @graph uses array @type values', async () => {
+    vi.mocked(getPageElements).mockReturnValueOnce({
+      workspaceId: 'ws-test',
+      pagePath: '/location/graph-array-type',
+      sourcePublishedAt: null,
+      createdAt: '2026-05-12T00:00:00.000Z',
+      updatedAt: '2026-05-12T00:00:00.000Z',
+      catalog: {
+        extractedAt: '2026-05-12T00:00:00.000Z',
+        sourcePublishedAt: null,
+        headings: [],
+        tables: [],
+        images: [],
+        videos: [],
+        lists: [],
+        testimonials: [],
+        codeBlocks: [],
+        citations: [],
+        diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+      },
+    });
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [{
+        "@type": ["LocalBusiness", "Dentist"],
+        "name": "Swish Dental - Graph",
+        "telephone": "210-764-6787",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "6011 Broadway, STE 100",
+          "addressLocality": "San Antonio",
+          "addressRegion": "TX",
+          "postalCode": "78209"
+        }
+      }]
+    }
+  </script>
+</head>
+<body><main><h1>Graph Location</h1></main></body>
+</html>`;
+    const output = await generateLeanSchema(makeInput('/location/graph-array-type', {
+      html,
+      pageKindOverride: 'Location',
+      workspace: { ...minimalWorkspace, id: 'ws-test' },
+    }));
+    const graph = getGraph(output);
+    const dentist = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown> | undefined;
+    expect(dentist?.name).toBe('Swish Dental - Graph');
   });
 });
 
@@ -379,5 +679,37 @@ describe('static sitemap path resolution', () => {
     ], BASE_URL);
 
     expect(pages[0].publishedPath).toBe('/services/veneers');
+  });
+
+  it('adds CMS item pages to site context so hubs can reference collection children', async () => {
+    const { buildSiteContextPages } = await import('../../../server/schema-suggester.js');
+    const { assembleSiteContext } = await import('../../../server/schema/site-context.js');
+    const cmsItem: SiteInventoryCmsItem = {
+      pageId: 'cms-blog-example-post',
+      title: 'Example Post',
+      path: '/blog/example-post',
+      url: 'https://example.com/blog/example-post',
+      collectionId: 'collection-blog',
+      collectionName: 'Blog Posts',
+      collectionSlug: 'blog',
+      itemId: 'item-example',
+      lastPublished: '2026-01-02T00:00:00.000Z',
+      createdOn: '2026-01-01T00:00:00.000Z',
+      fieldData: null,
+      effectiveRole: 'blog',
+      roleSource: 'inferred',
+      schemaFieldAvailable: false,
+      isUtility: false,
+      fieldTargets: {},
+    };
+
+    const contextPages = buildSiteContextPages([
+      { id: 'page-blog', title: 'Blog', slug: 'blog', publishedPath: '/blog' },
+    ], [cmsItem]);
+    const ctx = assembleSiteContext(contextPages, BASE_URL);
+    const blogHub = ctx.pages.find(p => p.path === '/blog');
+
+    expect(blogHub?.childPaths).toContain('/blog/example-post');
+    expect(ctx.pages.find(p => p.path === '/blog/example-post')?.id).toBe('https://example.com/blog/example-post#article');
   });
 });

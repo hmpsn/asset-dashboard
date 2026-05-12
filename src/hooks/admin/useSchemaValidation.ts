@@ -3,6 +3,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { schemaValidation, type SchemaValidationRecord } from '../../api/seo';
+import type { WholeSiteSchemaGraphValidationResult } from '../../../shared/types/schema-validation';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 
@@ -19,6 +20,16 @@ export function useSchemaValidations(siteId: string | undefined, workspaceId?: s
   });
 }
 
+/** Whole-site JSON-LD graph validation for the latest generated snapshot */
+export function useSchemaGraphValidation(siteId: string | undefined, workspaceId?: string, enabled = true) {
+  return useQuery<WholeSiteSchemaGraphValidationResult | null>({
+    queryKey: queryKeys.admin.schemaGraphValidation(siteId ?? '', workspaceId),
+    queryFn: async () => schemaValidation.getGraph(siteId!, workspaceId),
+    enabled: !!siteId && enabled,
+    staleTime: STALE_TIMES.STABLE,
+  });
+}
+
 /** Validate a single page's schema and invalidate the validations list */
 export function useValidateSchema(siteId: string | undefined, workspaceId?: string) {
   const qc = useQueryClient();
@@ -28,6 +39,7 @@ export function useValidateSchema(siteId: string | undefined, workspaceId?: stri
     onSuccess: () => {
       if (siteId) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.schemaValidations(siteId, workspaceId) });
+        qc.invalidateQueries({ queryKey: queryKeys.admin.schemaGraphValidation(siteId, workspaceId) });
       }
     },
   });

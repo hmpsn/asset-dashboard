@@ -5,6 +5,7 @@ import {
   getLatestCompetitorSnapshot,
   linkAlertToInsight,
   listUnlinkedCompetitorAlerts,
+  saveCompetitorAlerts,
   saveCompetitorSnapshot,
   snapshotExistsForDate,
 } from '../../server/competitor-snapshot-store.js';
@@ -48,6 +49,9 @@ describe('competitor-snapshot-store', () => {
     expect(alerts.find(a => a.keyword === 'ranking gain')).toMatchObject({ positionChange: 11, severity: 'critical' });
     expect(alerts.find(a => a.keyword === 'new winner')).toMatchObject({ alertType: 'new_keyword', severity: 'critical' });
     expect(alerts.find(a => a.keyword === 'small volume')).toBeUndefined();
+    expect(listUnlinkedCompetitorAlerts(WS_ID)).toHaveLength(0);
+
+    saveCompetitorAlerts(alerts);
     expect(listUnlinkedCompetitorAlerts(WS_ID)).toHaveLength(3);
   });
 
@@ -59,6 +63,7 @@ describe('competitor-snapshot-store', () => {
       { keyword: 'ranking gain', position: 10, volume: 1000 },
     ]);
     const [alert] = detectCompetitorAlerts(WS_ID, DOMAIN, current, previous);
+    saveCompetitorAlerts([alert]);
 
     linkAlertToInsight(alert.id, 'insight-1', WS_ID);
 

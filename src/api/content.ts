@@ -1,6 +1,16 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
 import { get, post, patch, put, del, getSafe, getOptional } from './client';
-import type { ContentBrief, GeneratedPost, ContentTopicRequest, ContentTemplate, ContentMatrix, KeywordCandidate, AiFixResult, IssueKey } from '../../shared/types/content';
+import type {
+  ContentBrief,
+  GeneratedPost,
+  ContentTopicRequest,
+  ContentTemplate,
+  ContentMatrix,
+  KeywordCandidate,
+  AiFixResult,
+  IssueKey,
+  BriefTemplateCrossrefMatch,
+} from '../../shared/types/content';
 import type { ClientContentRequest } from '../components/client/types';
 
 export const contentBriefs = {
@@ -24,6 +34,12 @@ export const contentBriefs = {
   validateKeywords: (wsId: string, keywords: string[]) =>
     post<{ results: { keyword: string; valid: boolean; source: string; metrics: { volume: number; difficulty: number; cpc: number; validatedAt: string } | null; warnings?: string[] }[]; message?: string }>(
       `/api/content-briefs/${wsId}/validate-keywords`, { keywords },
+    ),
+
+  templateCrossref: (wsId: string, keyword: string) =>
+    getSafe<BriefTemplateCrossrefMatch | null>(
+      `/api/content-briefs/${wsId}/template-crossref?keyword=${encodeURIComponent(keyword)}`,
+      null,
     ),
 
   regenerateOutline: (wsId: string, briefId: string, feedback?: string) =>

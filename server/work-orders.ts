@@ -1,7 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
 import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js';
+import { z } from 'zod';
 
 // --- Types ---
 
@@ -49,8 +50,18 @@ function rowToOrder(row: OrderRow): WorkOrder {
     paymentId: row.payment_id,
     productType: row.product_type as ProductType,
     status: row.status as WorkOrder['status'],
-    pageIds: parseJsonFallback(row.page_ids, []),
-    issueChecks: parseJsonFallback(row.issue_checks, undefined),
+    pageIds: parseJsonSafeArray(row.page_ids, z.string(), {
+      table: 'work_orders',
+      field: 'page_ids',
+      workspaceId: row.workspace_id,
+    }),
+    issueChecks: row.issue_checks
+      ? parseJsonSafeArray(row.issue_checks, z.string(), {
+        table: 'work_orders',
+        field: 'issue_checks',
+        workspaceId: row.workspace_id,
+      })
+      : undefined,
     quantity: row.quantity,
     assignedTo: row.assigned_to ?? undefined,
     completedAt: row.completed_at ?? undefined,

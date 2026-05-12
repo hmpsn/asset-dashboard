@@ -6,7 +6,7 @@ export { contentBriefs, contentPosts, contentRequests, publicContent, contentDec
 export { audit, auditSchedules, reports, schema, keywords, rankTracking, backlinks, webflow, contentPerformance, aeoReview, competitor, seoChangeTracker, pageWeight } from './seo';
 export {
   requests, publicRequests, approvals, activity, annotations, anomalies, churnSignals,
-  jobs, chat, roadmap, recommendations, feedback, notifications, upload, settings,
+  jobs, chat, roadmap, recommendations, notifications, upload, settings,
   salesReport, redirects, stripe, auth, keywordFeedback, trackedKeywords, businessPriorities,
 } from './misc';
 export { meetingBriefApi } from './meetingBrief';

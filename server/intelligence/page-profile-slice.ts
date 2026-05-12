@@ -263,12 +263,13 @@ export async function assemblePageProfile(
 
   // contentGaps — prefer per-page AI keyword analysis from persisted pageMap data,
   // fall back to strategy content gaps filtered by keyword if page analysis hasn't run yet.
+  // Strategy-level gaps now live in the content_gaps table (post-#365 normalization),
+  // not on `workspace.keywordStrategy.contentGaps`.
   let contentGaps: string[] = pageKw?.contentGaps ?? [];
   if (contentGaps.length === 0) {
     try {
-      const { getWorkspace: getWsForGaps } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const wsForGaps = getWsForGaps(workspaceId);
-      const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
+      const { listContentGaps } = await import('../content-gaps.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const allGaps = listContentGaps(workspaceId);
       if (allGaps.length > 0) {
         const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
         const matched = primaryKwLower

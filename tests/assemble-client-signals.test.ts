@@ -32,9 +32,6 @@ vi.mock('../server/roi.js', () => ({
   computeROI: vi.fn(() => null),
 }));
 
-vi.mock('../server/feedback.js', () => ({
-  listFeedback: vi.fn(() => []),
-}));
 
 vi.mock('../server/client-users.js', () => ({
   listClientUsers: vi.fn(() => []),
@@ -131,7 +128,6 @@ describe('assembleClientSignals', () => {
     expect(cs).toHaveProperty('churnSignals');
     expect(cs).toHaveProperty('roi');
     expect(cs).toHaveProperty('engagement');
-    expect(cs).toHaveProperty('feedbackItems');
     expect(cs).toHaveProperty('serviceRequests');
   });
 
@@ -153,7 +149,6 @@ describe('assembleClientSignals', () => {
     expect(cs.churnRisk).toBeNull();
     expect(cs.churnSignals).toEqual([]);
     expect(cs.roi).toBeNull();
-    expect(cs.feedbackItems).toEqual([]);
     expect(cs.serviceRequests?.pending).toBe(0);
     expect(cs.serviceRequests?.total).toBe(0);
   });
@@ -320,23 +315,6 @@ describe('assembleClientSignals', () => {
     expect(cs.serviceRequests?.total).toBe(3);
   });
 
-  it('populates feedbackItems from listFeedback (capped at 10)', async () => {
-    const { listFeedback } = await import('../server/feedback.js');
-    const manyFeedback = Array.from({ length: 15 }, (_, i) => ({
-      id: `f${i}`,
-      type: 'general',
-      status: 'open',
-      createdAt: '2026-01-01T00:00:00Z',
-    }));
-    vi.mocked(listFeedback).mockReturnValueOnce(manyFeedback as any);
-
-    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
-    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });
-
-    const cs = result.clientSignals as ClientSignalsSlice;
-    expect(cs.feedbackItems?.length).toBe(10);
-  });
-
   it('populates ROI from computeROI', async () => {
     const { computeROI } = await import('../server/roi.js');
     vi.mocked(computeROI).mockReturnValueOnce({ organicTrafficValue: 3500, adSpendEquivalent: 2000, growthPercent: 8.5, pageBreakdown: [], totalClicks: 80, totalImpressions: 800, avgCPC: 1.2, trackedPages: 8, contentROI: null, contentItems: [] } as any);
@@ -437,7 +415,6 @@ describe('assembleClientSignals', () => {
     const { listBatches } = await import('../server/approvals.js');
     const { listClientUsers } = await import('../server/client-users.js');
     const { computeROI } = await import('../server/roi.js');
-    const { listFeedback } = await import('../server/feedback.js');
     const { listRequests } = await import('../server/requests.js');
     const { listSessions } = await import('../server/chat-memory.js');
 
@@ -445,7 +422,6 @@ describe('assembleClientSignals', () => {
     vi.mocked(listBatches).mockImplementationOnce(() => { throw new Error('approvals db down'); });
     vi.mocked(listClientUsers).mockImplementationOnce(() => { throw new Error('users db down'); });
     vi.mocked(computeROI).mockImplementationOnce(() => { throw new Error('roi db down'); });
-    vi.mocked(listFeedback).mockImplementationOnce(() => { throw new Error('feedback db down'); });
     vi.mocked(listRequests).mockImplementationOnce(() => { throw new Error('requests db down'); });
     vi.mocked(listSessions).mockImplementationOnce(() => { throw new Error('chat db down'); });
 

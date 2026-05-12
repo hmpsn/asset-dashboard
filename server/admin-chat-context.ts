@@ -41,6 +41,7 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
 import { isProgrammingError } from './errors.js';
+import { buildSystemPrompt as buildLayeredSystemPrompt } from './prompt-assembly.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -1029,15 +1030,16 @@ export function buildSystemPrompt(
   days: number,
   priorContext: string,
 ): string {
+  let basePrompt: string;
   if (assembled.mode === 'content_reviewer') {
-    return buildContentReviewPrompt(ws, assembled, priorContext);
+    basePrompt = buildContentReviewPrompt(ws, assembled, priorContext);
+  } else if (assembled.mode === 'page_reviewer') {
+    basePrompt = buildPageAnalysisPrompt(ws, assembled, days, priorContext);
+  } else {
+    basePrompt = buildAnalystPrompt(ws, assembled, days, priorContext);
   }
 
-  if (assembled.mode === 'page_reviewer') {
-    return buildPageAnalysisPrompt(ws, assembled, days, priorContext);
-  }
-
-  return buildAnalystPrompt(ws, assembled, days, priorContext);
+  return buildLayeredSystemPrompt(ws.id, basePrompt, undefined, { skipProseRules: true });
 }
 
 function buildAnalystPrompt(

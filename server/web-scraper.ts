@@ -6,6 +6,7 @@
 import { STUDIO_BOT_UA } from './constants.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { decodeEntities } from './helpers.js';
 
 
 const log = createLogger('web-scraper');
@@ -273,14 +274,3 @@ function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
 }
 
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ');
-}

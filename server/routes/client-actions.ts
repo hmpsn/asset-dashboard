@@ -12,14 +12,15 @@ import {
   getActiveClientActionBySource,
 } from '../client-actions.js';
 import { getClientPortalUrl, getWorkspace } from '../workspaces.js';
-import { notifyApprovalReady } from '../email.js';
+import { notifyApprovalReady, notifyTeamActionApproved } from '../email.js';
+import { enqueuePlaybook } from '../playbooks.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { InvalidTransitionError } from '../state-machines.js';
 
 const router = Router();
 
-const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'keyword_strategy', 'redirect_proposal', 'content_decay']);
+const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay']);
 const statusSchema = z.enum(['pending', 'approved', 'changes_requested', 'completed', 'archived']);
 
 const createActionSchema = z.object({
@@ -29,6 +30,7 @@ const createActionSchema = z.object({
   summary: z.string().min(1).max(3000),
   payload: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['high', 'medium', 'low']).optional(),
+  clientNote: z.string().max(2000).optional(),
 }).strict();
 
 const adminUpdateSchema = z.object({
@@ -131,6 +133,21 @@ router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requir
     actor,
   );
   broadcastActionUpdate(req.params.workspaceId, req.params.actionId, 'responded');
+
+  if (req.body.status === 'approved') {
+    const ws = getWorkspace(req.params.workspaceId);
+    notifyTeamActionApproved({
+      workspaceId: req.params.workspaceId,
+      workspaceName: ws?.name || req.params.workspaceId,
+      actionTitle: updated.title,
+      sourceType: updated.sourceType,
+      actionSummary: updated.summary,
+      clientNote: req.body.clientNote,
+      dashboardUrl: ws ? getClientPortalUrl(ws) : undefined,
+    });
+    enqueuePlaybook(req.params.workspaceId, updated);
+  }
+
   res.json(updated);
 });
 

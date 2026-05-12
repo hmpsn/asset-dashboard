@@ -6,31 +6,22 @@ import {
   Loader2, Sparkles, Check, X, Type, ArrowRight, Eye, CheckSquare, Square,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
-
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  publishedPath?: string | null;
-  seo?: { title?: string | null; description?: string | null };
-  source?: 'static' | 'cms';
-  collectionId?: string;
-}
+import type { SeoBulkMode, SeoEditorPage } from './seoEditorTypes';
 
 export interface BulkOperationsProps {
-  filteredPages: PageMeta[];
+  filteredPages: SeoEditorPage[];
   approvalSelected: Set<string>;
-  bulkMode: 'idle' | 'pattern' | 'rewrite-preview' | 'rewriting';
+  bulkMode: SeoBulkMode;
   bulkField: 'title' | 'description';
   patternAction: 'append' | 'prepend';
   patternText: string;
   bulkPreview: Array<{ pageId: string; oldValue: string; newValue: string }>;
   bulkProgress: { done: number; total: number };
   bulkSource: 'pattern' | 'ai';
-  pages: PageMeta[];
+  pages: SeoEditorPage[];
   onSelectAll: () => void;
   onSetBulkField: (field: 'title' | 'description') => void;
-  onSetBulkMode: (mode: 'idle' | 'pattern' | 'rewrite-preview' | 'rewriting') => void;
+  onSetBulkMode: (mode: SeoBulkMode) => void;
   onSetPatternAction: (action: 'append' | 'prepend') => void;
   onSetPatternText: (text: string) => void;
   onPreviewPattern: () => void;
@@ -173,8 +164,8 @@ export function BulkOperations({
               {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
             </div>
             {bulkProgress.total > 0 && (
-              <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
+              <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
               </div>
             )}
           </div>

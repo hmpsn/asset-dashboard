@@ -80,37 +80,39 @@ describe('buildAboutPageSchema — businessProfile threading', () => {
 });
 
 describe('buildContactPageSchema — businessProfile threading', () => {
-  it('mainEntity is LocalBusiness @id when businessProfile.address is set', () => {
+  it('mainEntity is LocalBusiness @id when businessProfile.address is set without duplicating the identity body', () => {
     const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData, businessProfile: withAddress });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
+    const businessNode = graph.find((n) => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(contactNode).toBeDefined();
     expect(contactNode['mainEntity']).toEqual({ '@id': 'https://example.com/#localbusiness' });
+    expect(businessNode).toBeUndefined();
   });
 
-  it('mainEntity is absent when businessProfile.address is not set', () => {
+  it('mainEntity falls back to Organization @id when businessProfile.address is not set', () => {
     const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData, businessProfile: withoutAddress });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
-    expect(contactNode['mainEntity']).toBeUndefined();
+    expect(contactNode['mainEntity']).toEqual({ '@id': 'https://example.com/#organization' });
   });
 
-  it('mainEntity is absent when businessProfile is undefined (no breaking change)', () => {
+  it('mainEntity falls back to Organization @id when businessProfile is undefined', () => {
     const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
-    expect(contactNode['mainEntity']).toBeUndefined();
+    expect(contactNode['mainEntity']).toEqual({ '@id': 'https://example.com/#organization' });
   });
 
-  it('mainEntity is absent when address object is empty (no locating fields)', () => {
+  it('mainEntity falls back to Organization @id when address object is empty (no locating fields)', () => {
     const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData, businessProfile: withEmptyAddress });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
-    expect(contactNode['mainEntity']).toBeUndefined();
+    expect(contactNode['mainEntity']).toEqual({ '@id': 'https://example.com/#organization' });
   });
 });
 

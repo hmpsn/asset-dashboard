@@ -3,6 +3,7 @@ import type { PerformanceTrend } from './types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { SectionCard } from '../ui/SectionCard';
 import { chartDotStroke, CHART_SERIES_COLORS, scoreColor } from '../ui/constants';
+import { inlineMarkdownToHtml } from '../../lib/inline-markdown';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; payload?: Array<{ value: number; payload: Record<string, any> }>; label?: string; metrics?: { label: string; key: string; color: string; fmt?: (v: number) => string }[] }) {
@@ -140,14 +141,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
 }
 
 export function RenderMarkdown({ text }: { text: string }) {
-  const inlineMd = (s: string) =>
-    // Strip markdown links [text](url) → text only (CTA buttons handle navigation)
-    s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-     // Strip bare URLs
-     .replace(/https?:\/\/\S+/g, '')
-     .replace(/\*\*(.+?)\*\*/g, '<b class="text-[var(--brand-text-bright)]">$1</b>')
-     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-[var(--brand-text)]">$1</em>')
-     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded-[var(--radius-sm)] text-[var(--brand-text)] t-caption-sm">$1</code>');
+  const inlineMd = (s: string) => inlineMarkdownToHtml(s);
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
   const elements: React.ReactElement[] = [];

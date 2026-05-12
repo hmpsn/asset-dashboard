@@ -141,6 +141,25 @@ export function notifyClientStatusChange(opts: {
   }));
 }
 
+export function notifyTeamActionApproved(opts: {
+  workspaceName: string;
+  workspaceId: string;
+  actionTitle: string;
+  sourceType: string;
+  actionSummary: string;
+  clientNote?: string;
+  dashboardUrl?: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('action_approved', to, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    title: opts.actionTitle,
+    sourceType: opts.sourceType,
+    summary: opts.actionSummary,
+    clientNote: opts.clientNote,
+  }));
+}
+
 export function notifyTeamContentRequest(opts: {
   workspaceName: string;
   workspaceId?: string;
@@ -375,20 +394,6 @@ export function notifyClientContentPublished(opts: {
   if (!isEmailConfigured()) return;
   queueEmail(makeEvent('content_published', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
     topic: opts.topic, targetKeyword: opts.targetKeyword,
-  }));
-}
-
-export function notifyTeamNewFeedback(opts: {
-  workspaceName: string;
-  workspaceId: string;
-  feedbackType: string;
-  title: string;
-  description: string;
-}): void {
-  const to = getNotificationEmail();
-  if (!to || !isEmailConfigured()) return;
-  queueEmail(makeEvent('feedback_new', to, opts.workspaceId, opts.workspaceName, undefined, {
-    feedbackType: opts.feedbackType, title: opts.title, description: opts.description,
   }));
 }
 

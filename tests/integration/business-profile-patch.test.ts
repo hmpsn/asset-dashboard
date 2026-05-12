@@ -111,6 +111,8 @@ describe('PATCH /api/public/workspaces/:id/business-profile', () => {
       socialProfiles: ['https://twitter.com/example', ''],
     });
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.businessProfile.socialProfiles).toEqual(['https://twitter.com/example']);
   });
 
   it('rejects invalid email without mutating the stored business profile', async () => {

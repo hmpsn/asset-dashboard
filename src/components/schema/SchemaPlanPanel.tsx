@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { schemaPlan } from '../../api/seo';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
-import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX } from '../../../shared/types/schema-plan';
+import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
 import { Icon, cn } from '../ui';
 
 interface Props {
@@ -99,8 +99,23 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
 
   const handleRoleChange = (pagePath: string, newRole: SchemaPageRole) => {
     if (!plan) return;
+    const canonicalEntityIds = plan.canonicalEntities.map(entity => entity.id).filter(Boolean);
     const updated = plan.pageRoles.map(pr =>
-      pr.pagePath === pagePath ? { ...pr, role: newRole } : pr
+      pr.pagePath === pagePath ? (() => {
+        const validExistingRefs = pr.entityRefs.filter(ref => canonicalEntityIds.includes(ref));
+        let entityRefs: string[] = [];
+        if (newRole === 'homepage') {
+          entityRefs = canonicalEntityIds;
+        } else if (SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES.has(newRole)) {
+          entityRefs = validExistingRefs.length > 0 ? validExistingRefs : (canonicalEntityIds.length === 1 ? canonicalEntityIds : []);
+        }
+        return {
+          ...pr,
+          role: newRole,
+          primaryType: SCHEMA_ROLE_PRIMARY_TYPE[newRole] ?? 'WebPage',
+          entityRefs,
+        };
+      })() : pr
     );
     setPlan({ ...plan, pageRoles: updated });
     setDirty(true);
@@ -161,7 +176,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
       active: { label: 'Active', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
     };
     const s = map[status] || map.draft;
-    return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full t-caption-sm font-medium border', s.cls)}>{s.label}</span>;
+    return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium border', s.cls)}>{s.label}</span>;
   };
 
   if (loading) {
@@ -175,7 +190,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   // No plan yet — show generate button
   if (!plan) {
     return (
-      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-signature)] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon as={Globe} size="md" className="text-teal-400" />
           <span className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Site Plan</span>
@@ -207,7 +222,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   }, {} as Record<string, number>);
 
   return (
-    <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+    <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -328,7 +343,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             {Object.entries(roleCounts).sort((a, b) => b[1] - a[1]).map(([role, count]) => (
               <span
                 key={role}
-                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-medium border', ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR)}
+                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium border', ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR)}
               >
                 {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({count})
               </span>

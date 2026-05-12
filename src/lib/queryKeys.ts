@@ -40,6 +40,8 @@ export const queryKeys = {
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postsDetailAll: (wsId: string) => ['admin-post', wsId] as const,
     postVersions: (wsId: string, postId: string) => ['admin-post-versions', wsId, postId] as const,
+    briefTemplateCrossref: (wsId: string, normalizedKeyword: string) =>
+      ['admin-brief-template-crossref', wsId, normalizedKeyword] as const,
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,
     contentPipeline: (wsId: string) => ['content-pipeline', wsId] as const,
@@ -56,6 +58,8 @@ export const queryKeys = {
       wsId ? ['admin-schema-snapshot', siteId, wsId] as const : ['admin-schema-snapshot', siteId] as const,
     schemaValidations: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-validations', siteId, wsId] as const : ['admin-schema-validations', siteId] as const,
+    schemaGraphValidation: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-schema-graph-validation', siteId, wsId] as const : ['admin-schema-graph-validation', siteId] as const,
     schemaCmsFieldMappings: (siteId: string, wsId?: string) =>
       wsId ? ['admin-schema-cms-field-mappings', siteId, wsId] as const : ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,

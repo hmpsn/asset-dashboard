@@ -179,6 +179,164 @@ describe('ServiceIndex hub dispatch', () => {
   });
 });
 
+describe('Canonical entity graph compilation', () => {
+  const platformEntity = {
+    type: 'SoftwareApplication',
+    name: 'Acme Platform',
+    canonicalUrl: `${BASE}/platform`,
+    id: `${BASE}/platform#software`,
+    description: 'A platform for growth teams.',
+  };
+
+  it('emits active plan canonical entities on their canonical owner page', async () => {
+    const out = await generateLeanSchema({
+      pageId: 'platform',
+      pageMeta: { title: 'Platform', slug: 'platform', publishedPath: '/platform', seo: { description: 'Platform' } },
+      html: '<html><body>Platform page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [platformEntity],
+      },
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toContainEqual(expect.objectContaining({
+      '@type': 'SoftwareApplication',
+      '@id': `${BASE}/platform#software`,
+      name: 'Acme Platform',
+      url: `${BASE}/platform`,
+    }));
+  });
+
+  it('adds stable @id references to pages assigned canonical entity refs', async () => {
+    const out = await generateLeanSchema({
+      pageId: 'teams',
+      pageMeta: { title: 'For Teams', slug: 'for-teams', publishedPath: '/for-teams', seo: { description: 'For teams' } },
+      html: '<html><body>Audience page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [platformEntity],
+      },
+      schemaRoleOverride: { role: 'audience', source: 'site-plan' },
+      canonicalEntityRefs: [platformEntity.id],
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const webPage = graph.find(node => node['@type'] === 'WebPage');
+    expect(webPage?.about).toEqual({ '@id': `${BASE}/platform#software` });
+    expect(out.generationDiagnostics?.canonicalEntityReferences).toEqual([platformEntity.id]);
+  });
+
+  it('merges trailing-slash canonical entity ids into the owner node without thinning verified fields', async () => {
+    const serviceEntity = {
+      type: 'Service',
+      name: 'Acme Services',
+      canonicalUrl: `${BASE}/services`,
+      id: `${BASE}/services/#service`,
+      description: 'Canonical service entity.',
+    };
+    const out = await generateLeanSchema({
+      pageId: 'services',
+      pageMeta: { title: 'Services', slug: 'services', publishedPath: '/services', seo: { description: 'Services' } },
+      html: '<html><body>Services page</body></html>',
+      baseUrl: BASE,
+      workspace: {
+        ...workspace,
+        businessProfile: {
+          address: { city: 'Austin', state: 'TX' },
+        },
+      },
+      siteContext: {
+        pages: [],
+        canonicalEntities: [serviceEntity],
+      },
+      pageKindOverride: 'Service',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const services = graph.filter(node => node['@type'] === 'Service');
+    expect(services).toHaveLength(1);
+    expect(services[0]).toMatchObject({
+      '@id': serviceEntity.id,
+      name: 'Services',
+      provider: { '@id': `${BASE}/#localbusiness` },
+      areaServed: { '@type': 'Place', name: 'Austin, TX' },
+      serviceType: 'Services',
+    });
+    const webPage = graph.find(node => node['@type'] === 'WebPage') as Record<string, unknown>;
+    expect(webPage.about).toEqual({ '@id': serviceEntity.id });
+  });
+
+  it('dedupes canonical entities that only differ by trailing slash before graph merge', async () => {
+    const preferredEntity = {
+      type: 'Service',
+      name: 'Preferred Services',
+      canonicalUrl: `${BASE}/services`,
+      id: `${BASE}/services/#service`,
+      description: 'Canonical service entity.',
+    };
+    const duplicateEntity = {
+      type: 'Product',
+      name: 'Duplicate Services',
+      canonicalUrl: `${BASE}/services`,
+      id: `${BASE}/services#service`,
+      description: 'Duplicate normalized entity.',
+    };
+    const out = await generateLeanSchema({
+      pageId: 'services',
+      pageMeta: { title: 'Services', slug: 'services', publishedPath: '/services', seo: { description: 'Services' } },
+      html: '<html><body>Services page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [preferredEntity, duplicateEntity],
+      },
+      canonicalEntityRefs: [preferredEntity.id, duplicateEntity.id],
+      pageKindOverride: 'Service',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.filter(node => node['@id'] === preferredEntity.id)).toHaveLength(1);
+    expect(graph).not.toContainEqual(expect.objectContaining({ '@id': duplicateEntity.id }));
+    expect(JSON.stringify(graph)).not.toContain('Duplicate Services');
+    const webPage = graph.find(node => node['@type'] === 'WebPage') as Record<string, unknown>;
+    expect(webPage.about).toEqual({ '@id': preferredEntity.id });
+    expect(out.generationDiagnostics?.canonicalEntityReferences).toEqual([preferredEntity.id]);
+  });
+
+  it('does not emit or reference canonical entities with unstable ids', async () => {
+    const unstableEntity = {
+      ...platformEntity,
+      id: 'platform-software',
+    };
+    const out = await generateLeanSchema({
+      pageId: 'platform',
+      pageMeta: { title: 'Platform', slug: 'platform', publishedPath: '/platform', seo: { description: 'Platform' } },
+      html: '<html><body>Platform page</body></html>',
+      baseUrl: BASE,
+      workspace,
+      siteContext: {
+        pages: [],
+        canonicalEntities: [unstableEntity],
+      },
+      canonicalEntityRefs: [unstableEntity.id],
+      pageKindOverride: 'WebPage',
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).not.toContainEqual(expect.objectContaining({ '@id': unstableEntity.id }));
+    expect(JSON.stringify(graph)).not.toContain(unstableEntity.id);
+    expect(out.generationDiagnostics?.canonicalEntityReferences).toBeUndefined();
+  });
+});
+
 describe('CaseStudyIndex hub dispatch', () => {
   const ctx = buildContext([
     { path: '/our-work' },

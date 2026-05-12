@@ -32,6 +32,7 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { addTrackedKeyword } from '../rank-tracking.js';
+import { listContentGaps } from '../content-gaps.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
@@ -48,6 +49,7 @@ import {
   type KeywordFeedbackBody,
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
+import { normalizeSocialProfiles } from '../social-profiles.js';
 
 const log = createLogger('public-portal');
 
@@ -603,9 +605,11 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
   const existing = getWorkspace(wsId);
   if (!existing) return res.status(404).json({ error: 'Workspace not found' });
   const existingProfile = existing.businessProfile ?? {};
+  const normalizedSocialProfiles = normalizeSocialProfiles(parsed.data.socialProfiles);
   const mergedProfile = {
     ...existingProfile,
     ...parsed.data,
+    ...(normalizedSocialProfiles !== undefined ? { socialProfiles: normalizedSocialProfiles } : {}),
     // Deep-merge address sub-object so partial address PATCHes don't wipe sibling fields
     ...(parsed.data.address !== undefined
       ? { address: { ...(existingProfile.address ?? {}), ...parsed.data.address } }
@@ -868,9 +872,12 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // is workspace-scoped strategy data with no admin-only fields TODAY, but a
   // future field added there must NOT silently leak through `...gap`. Any
   // change to the public projection now requires touching this list.
-  const gaps = ws.keywordStrategy?.contentGaps ?? [];
+  // Source contentGaps from the dedicated table (post-#365 normalization).
+  // The blob no longer carries them — listContentGaps is the only source of truth.
+  const gaps = listContentGaps(ws.id);
+  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number };
   const recommendations: BriefingRecommendation[] = gaps
-    .map((gap) => ({
+    .map((gap): GapMapped => ({
       topic: gap.topic,
       targetKeyword: gap.targetKeyword,
       intent: gap.intent,

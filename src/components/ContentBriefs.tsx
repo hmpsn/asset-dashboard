@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
@@ -11,8 +11,10 @@ import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
-import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
+import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList, useAdminBriefTemplateCrossref } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
  *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
@@ -21,12 +23,17 @@ type BriefRoute = typeof BRIEF_ROUTES[number];
 
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
+  const [keyword, setKeyword] = useState('');
+  const deferredKeyword = useDeferredValue(keyword);
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
   const postsQ = useAdminPostsList(workspaceId);
+  const templateCrossrefQ = useAdminBriefTemplateCrossref(workspaceId, deferredKeyword);
   const briefs = (briefsQ.data ?? []) as ContentBrief[];
   const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
   const posts = (postsQ.data ?? []) as PostSummary[];
+  const templateCrossref = templateCrossrefQ.data ?? null;
   // Include postsQ — RequestList uses posts to decide between "Generate Post" and
   // "Open Post" buttons. If posts hasn't loaded yet we'd mistakenly show "Generate
   // Post" for briefs that already have one, causing duplicate post creation on click.
@@ -40,7 +47,6 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
   const [generating, setGenerating] = useState(false);
   const [generatingBriefFor, setGeneratingBriefFor] = useState<string | null>(null);
-  const [keyword, setKeyword] = useState('');
   const [businessCtx, setBusinessCtx] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
@@ -106,6 +112,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const [pageType, setPageType] = useState('');
   const [refUrls, setRefUrls] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (!templateCrossref?.pageType) return;
+    if (!pageType) {
+      setPageType(templateCrossref.pageType);
+    }
+  }, [templateCrossref?.pageType, pageType]);
 
   const handleRegenerateOutline = async (briefId: string, feedback?: string) => {
     setRegeneratingOutline(briefId);
@@ -259,7 +272,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const handleGeneratePost = async (briefId: string): Promise<boolean> => {
     setGeneratingPostFor(briefId);
     try {
-      const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      if (skeleton.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId });
+      }
       queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
       return true;
@@ -516,6 +532,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         showAdvanced={showAdvanced}
         generating={generating}
         error={error}
+        templateCrossref={templateCrossref}
         onKeywordChange={setKeyword}
         onBusinessCtxChange={setBusinessCtx}
         onPageTypeChange={setPageType}

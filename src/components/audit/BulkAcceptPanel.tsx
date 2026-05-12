@@ -9,6 +9,7 @@ import { seoBulkJobs } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import type { SeoAuditResult } from './types';
+import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 
 interface BulkAcceptPanelProps {
   workspaceId: string;
@@ -38,7 +39,7 @@ export function BulkAcceptPanel({
   onRegisterHandlers,
 }: BulkAcceptPanelProps) {
   const queryClient = useQueryClient();
-  const { cancelJob } = useBackgroundTasks();
+  const { cancelJob, trackJob } = useBackgroundTasks();
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
@@ -139,6 +140,7 @@ export function BulkAcceptPanel({
     setBulkProgress({ done: 0, total: fixes.length });
     try {
       const { jobId } = await seoBulkJobs.bulkAcceptFixes(workspaceId, { siteId, fixes });
+      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ACCEPT_FIXES, jobId, { workspaceId });
       setBulkAcceptJobId(jobId);
     } catch (err) {
       console.error('Failed to start bulk accept:', err);

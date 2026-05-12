@@ -105,6 +105,16 @@ export const GOOGLE_RICH_RESULT_RULES: Record<string, GoogleRichResultRule> = {
     recommended: ['telephone', 'medicalSpecialty', 'availableService', 'openingHours', 'image'],
     feature: 'Medical business panel',
   },
+  MedicalBusiness: {
+    required: ['name', 'address'],
+    recommended: ['telephone', 'openingHours', 'geo', 'url', 'image'],
+    feature: 'Medical business panel',
+  },
+  Dentist: {
+    required: ['name', 'address'],
+    recommended: ['telephone', 'openingHours', 'geo', 'url', 'image'],
+    feature: 'Local business panel',
+  },
   FinancialService: {
     required: ['name', 'address'],
     recommended: ['telephone', 'areaServed', 'serviceType', 'openingHours', 'image'],
@@ -131,6 +141,8 @@ export const GOOGLE_RICH_RESULT_TYPES = new Set([
   'Service',
   'ProfilePage',
   'MedicalOrganization',
+  'MedicalBusiness',
+  'Dentist',
   'FinancialService',
   'HowTo',
   'VideoObject',

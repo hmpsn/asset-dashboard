@@ -62,6 +62,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const [showOrphans, setShowOrphans] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sentToClient, setSentToClient] = useState(false);
+  const [note, setNote] = useState('');
 
   const runAnalysis = async () => {
     setLoading(true);
@@ -130,9 +131,16 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         title: `Internal link recommendations (${filtered.length})`,
         summary: `Review ${filtered.length} internal link recommendation${filtered.length !== 1 ? 's' : ''}. ${high} high-priority link${high !== 1 ? 's' : ''} ${high === 1 ? 'needs' : 'need'} attention first.`,
         priority: high > 0 ? 'high' : 'medium',
+        clientNote: note.trim() || undefined,
         payload: {
           analyzedAt: data.analyzedAt,
-          suggestions: filtered,
+          suggestions: filtered.map(s => ({
+            anchorText: s.anchorText,
+            targetUrl: s.toPage,
+            targetTitle: s.toTitle,
+            sourcePage: s.fromPage,
+            contextSnippet: s.reason,
+          })),
           summary: {
             pageCount: data.pageCount,
             existingLinkCount: data.existingLinkCount,
@@ -204,6 +212,19 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           </div>
         }
       />
+
+      {/* Send to Client Note */}
+      {workspaceId && data.suggestions.length > 0 && !sentToClient && (
+        <textarea
+          rows={2}
+          disabled={sendingToClient}
+          maxLength={2000}
+          placeholder="Add a note for your client (optional)"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">

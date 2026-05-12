@@ -59,7 +59,7 @@ export interface SchemaPageCardProps {
   onCopyJsonLd: (suggestion: SchemaSuggestion, pageId: string) => void;
   onPublish: (pageId: string, schema: Record<string, unknown>) => void;
   onConfirmPublish: (pageId: string | null) => void;
-  onSendToClient: (page: SchemaPageSuggestion) => void;
+  onSendToClient: (page: SchemaPageSuggestion, note?: string) => void;
   onSaveAsTemplate: (pageId: string) => void;
   onRetract: (pageId: string) => void;
   retracting: boolean;
@@ -83,6 +83,7 @@ export function SchemaPageCard({
   getEffectiveSchema, siteId, onRestore, validationStatus,
 }: SchemaPageCardProps) {
   const [showHistory, setShowHistory] = useState(false);
+  const [pageNote, setPageNote] = useState('');
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
@@ -416,17 +417,28 @@ export function SchemaPageCard({
                     <Icon as={CheckCircle} size="md" /> Sent for Approval
                   </span>
                 ) : (
-                  <button
-                    onClick={() => onSendToClient(page)}
-                    disabled={sendingPage}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
-                  >
-                    {sendingPage ? (
-                      <><Icon as={Loader2} size="md" className="animate-spin" /> Sending...</>
-                    ) : (
-                      <><Icon as={Send} size="md" /> Send to Client</>
-                    )}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => onSendToClient(page, pageNote.trim() || undefined)}
+                      disabled={sendingPage}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                    >
+                      {sendingPage ? (
+                        <><Icon as={Loader2} size="md" className="animate-spin" /> Sending...</>
+                      ) : (
+                        <><Icon as={Send} size="md" /> Send to Client</>
+                      )}
+                    </button>
+                    <textarea
+                      value={pageNote}
+                      onChange={e => setPageNote(e.target.value)}
+                      disabled={sendingPage}
+                      maxLength={2000}
+                      placeholder="Add a note for your client (optional)"
+                      rows={2}
+                      className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </>
                 )
               )}
               {/* Version History toggle */}

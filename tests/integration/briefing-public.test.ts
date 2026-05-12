@@ -21,6 +21,7 @@ import {
   markSkipped,
 } from '../../server/briefing-store.js';
 import { updateWorkspace } from '../../server/workspaces.js';
+import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/content-gaps.js';
 import { randomUUID } from 'crypto';
 import type { BriefingStory, BriefingSourceMetadata } from '../../shared/types/briefing.js';
 
@@ -340,21 +341,16 @@ describe('GET /api/public/briefing/:workspaceId — Phase 2.5b serve-time fields
 
   it('recommendations is sorted by opportunityScore desc and capped at 5', async () => {
     // Inject 7 content gaps; 2 should be dropped from the response.
-    updateWorkspace(summaryWsId, {
-      keywordStrategy: {
-        siteKeywords: [],
-        opportunities: [],
-        contentGaps: [
-          { topic: 'Topic A', targetKeyword: 'kw a', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 10 },
-          { topic: 'Topic B', targetKeyword: 'kw b', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 90 },
-          { topic: 'Topic C', targetKeyword: 'kw c', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 50 },
-          { topic: 'Topic D', targetKeyword: 'kw d', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 70 },
-          { topic: 'Topic E', targetKeyword: 'kw e', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 30 },
-          { topic: 'Topic F', targetKeyword: 'kw f', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 80 },
-          { topic: 'Topic G', targetKeyword: 'kw g', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 20 },
-        ],
-      },
-    });
+    // contentGaps live in the content_gaps table (post-#365 normalization).
+    replaceAllContentGaps(summaryWsId, [
+      { topic: 'Topic A', targetKeyword: 'kw a', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 10 },
+      { topic: 'Topic B', targetKeyword: 'kw b', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 90 },
+      { topic: 'Topic C', targetKeyword: 'kw c', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 50 },
+      { topic: 'Topic D', targetKeyword: 'kw d', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 70 },
+      { topic: 'Topic E', targetKeyword: 'kw e', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 30 },
+      { topic: 'Topic F', targetKeyword: 'kw f', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 80 },
+      { topic: 'Topic G', targetKeyword: 'kw g', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 20 },
+    ]);
 
     const res = await api(`/api/public/briefing/${summaryWsId}`);
     expect(res.status).toBe(200);

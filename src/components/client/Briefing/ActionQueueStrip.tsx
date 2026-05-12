@@ -67,18 +67,17 @@ export function computeStaleness(
   };
 }
 
-/**
- * The `section` value MUST be a real `InboxFilter` value — see
- * `src/components/client/InboxTab.tsx` `type InboxFilter`. Briefs and posts
- * both land on the `content` filter (the Inbox doesn't separate the two);
- * replies land on `requests` (where team-note replies surface). Drift here
- * silently sends users to the default 'all' filter — covered by the
- * tab-deep-link-wiring contract test.
- */
 interface Chip {
   count: number;
   label: string;
-  section: 'approvals' | 'content' | 'requests' | 'content-plan';
+  /**
+   * Must be a valid InboxFilter value — see INBOX_FILTER_VALUES in InboxTab.tsx.
+   * Clicking a chip navigates to `?tab=${section}` on the inbox route.
+   * approvals/contentPlan → decisions, briefs/posts → reviews, replies → conversations.
+   * Drift here silently sends users to the default 'all' filter — covered by the
+   * tab-deep-link-wiring contract test.
+   */
+  section: 'decisions' | 'reviews' | 'conversations';
 }
 
 /**
@@ -102,35 +101,35 @@ export function ActionQueueStrip({
     chips.push({
       count: counts.approvals,
       label: counts.approvals === 1 ? 'approval' : 'approvals',
-      section: 'approvals',
+      section: 'decisions',
     });
   }
   if (counts.briefs > 0) {
     chips.push({
       count: counts.briefs,
       label: counts.briefs === 1 ? 'brief' : 'briefs',
-      section: 'content',
+      section: 'reviews',
     });
   }
   if (counts.posts > 0) {
     chips.push({
       count: counts.posts,
       label: counts.posts === 1 ? 'post' : 'posts',
-      section: 'content',
+      section: 'reviews',
     });
   }
   if (counts.replies > 0) {
     chips.push({
       count: counts.replies,
       label: counts.replies === 1 ? 'reply' : 'replies',
-      section: 'requests',
+      section: 'conversations',
     });
   }
   if (counts.contentPlan > 0) {
     chips.push({
       count: counts.contentPlan,
       label: counts.contentPlan === 1 ? 'page' : 'pages',
-      section: 'content-plan',
+      section: 'decisions',
     });
   }
 
@@ -150,7 +149,7 @@ export function ActionQueueStrip({
       <Clipboard className="w-4 h-4 text-accent-warning flex-shrink-0" aria-hidden="true" />
       {chips.map((chip, idx) => (
         <button
-          // index-based key because briefs/posts both target section='content'
+          // index-based key because briefs/posts both target section='reviews'
           // — section alone is not unique once those two chips coexist.
           key={`${chip.section}-${idx}`}
           type="button"
@@ -163,7 +162,7 @@ export function ActionQueueStrip({
       {showEscalation && escalationLabel && (
         <button
           type="button"
-          onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=approvals`)}
+          onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=decisions`)}
           className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
           aria-label={`${staleCount} urgent items pending`}
         >

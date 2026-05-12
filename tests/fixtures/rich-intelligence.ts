@@ -230,9 +230,6 @@ export const RICH_CLIENT_SIGNALS: ClientSignalsSlice = {
   roi: { organicValue: 15000, growth: 12, period: '30d' },
   engagement: { lastLoginAt: '2026-03-30T00:00:00Z', loginFrequency: 'daily', chatSessionCount: 15, portalUsage: null },
   compositeHealthScore: 82,
-  feedbackItems: [
-    { id: 'f1', type: 'feature_request', status: 'new', createdAt: '2026-03-28T00:00:00Z' },
-  ],
   serviceRequests: { pending: 1, total: 4 },
 };
 

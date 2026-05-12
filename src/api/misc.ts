@@ -43,7 +43,7 @@ export const publicRequests = {
 
 // ── Approvals ───────────────────────────────────────────────────
 export const approvals = {
-  create: (wsId: string, body: Record<string, unknown>) =>
+  create: (wsId: string, body: Record<string, unknown> & { note?: string }) =>
     post<unknown>(`/api/approvals/${wsId}`, body),
 
   list: (wsId: string) =>
@@ -196,15 +196,6 @@ export const recommendations = {
     del(`/api/public/recommendations/${wsId}/${recId}`),
 };
 
-// ── Feedback ────────────────────────────────────────────────────
-export const feedback = {
-  submit: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/feedback/${wsId}`, body),
-
-  list: (wsId: string) =>
-    getSafe<unknown[]>(`/api/feedback/${wsId}`, []),
-};
-
 // ── Notifications ───────────────────────────────────────────────
 export const notifications = {
   list: () => getSafe<unknown[]>('/api/notifications', []),
@@ -263,6 +254,13 @@ export interface WorkspaceHomeData {
   ga4Data: { totalUsers: number; totalSessions: number; totalPageviews: number; newUserPercentage: number } | null;
   comparison: { users?: { current: number; previous: number }; sessions?: { current: number; previous: number } } | null;
   contentPipeline?: { templateCount: number; matrixCount: number; totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number };
+  contentVelocity?: {
+    monthly: Array<{ month: string; published: number }>;
+    currentMonthPublished: number;
+    trailingThreeMonthAvg: number;
+    previousThreeMonthAvg: number;
+    trendPct: number | null;
+  } | null;
   contentDecay?: { critical: number; warning: number; watch: number; totalDecaying: number; avgDeclinePct: number } | null;
   weeklySummary?: { seoUpdates: number; auditsRun: number; contentGenerated: number; contentPublished: number; requestsResolved: number } | null;
 }

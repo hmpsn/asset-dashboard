@@ -6,6 +6,7 @@ import { buildLocalBusinessSchema } from '../../../server/schema/templates/local
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from '../../../server/schema/templates/static.js';
 import { buildHomepageSchema } from '../../../server/schema/templates/homepage.js';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
+import { validateForGoogleRichResults } from '../../../server/schema-validator.js';
 
 const baseInput = {
   baseUrl: 'https://example.com',
@@ -128,6 +129,57 @@ describe('buildArticleSchema (BlogPosting)', () => {
     };
     const node = (buildArticleSchema(noKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.keywords).toBeUndefined();
+  });
+
+  it('sanitizes citations at template emission time', () => {
+    const withCitations = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          citations: [
+            { url: 'https://example.com/internal', text: 'Internal cite', isExternal: true },
+            { url: 'https://calendly.grsm.io/acme', text: 'Calendly', isExternal: true },
+            { url: 'javascript:void(0)', text: 'Bad scheme', isExternal: true },
+            { url: 'https://developers.google.com/search/docs/appearance/structured-data/article#guidelines', text: 'Google Article structured data guidelines', isExternal: true },
+            { url: 'https://developer.mozilla.org/en-US/docs/Web/API/Performance_API', text: 'MDN Performance API guide', isExternal: true },
+            { url: 'https://web.dev/articles/vitals', text: 'Web Vitals research', isExternal: true },
+            { url: 'https://example.edu/research', text: 'Research report', isExternal: true },
+            { url: 'https://example.org/report', text: 'Industry report', isExternal: true },
+            { url: 'https://example.net/report', text: 'Overflow report', isExternal: true },
+          ],
+        },
+      },
+    };
+
+    const node = (buildArticleSchema(withCitations, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.citation).toEqual([
+      {
+        '@type': 'WebPage',
+        url: 'https://developers.google.com/search/docs/appearance/structured-data/article',
+        name: 'Google Article structured data guidelines',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://developer.mozilla.org/en-US/docs/Web/API/Performance_API',
+        name: 'MDN Performance API guide',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://web.dev/articles/vitals',
+        name: 'Web Vitals research',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://example.edu/research',
+        name: 'Research report',
+      },
+      {
+        '@type': 'WebPage',
+        url: 'https://example.org/report',
+        name: 'Industry report',
+      },
+    ]);
   });
 });
 
@@ -324,6 +376,108 @@ describe('buildLocalBusinessSchema', () => {
     expect(node.sameAs).toEqual(['https://twitter.com/acme']);
   });
 
+  it('uses verified location JSON-LD semantics for specific business type, name, geo, image, and hours', () => {
+    const schema = buildLocalBusinessSchema({
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        cleanTitle: 'Alamo Heights',
+        canonicalUrl: 'https://www.acme.dental/location/alamo-heights',
+        elements: {
+          extractedAt: '2026-05-12T00:00:00.000Z',
+          sourcePublishedAt: null,
+          headings: [],
+          tables: [],
+          images: [],
+          videos: [],
+          lists: [],
+          testimonials: [],
+          codeBlocks: [],
+          citations: [],
+          semantics: {
+            businessName: 'Acme Dental - Alamo Heights',
+            businessType: 'Dentist',
+            primaryImage: 'https://cdn.example.com/alamo.avif',
+            geo: { latitude: 29.48221, longitude: -98.46608 },
+            hours: [{ dayOfWeek: ['Monday', 'Tuesday'], opens: '09:00', closes: '18:00' }],
+            priceRange: '$$',
+          },
+          diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+        },
+      },
+    });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'Dentist') as Record<string, unknown>;
+    expect(node).toMatchObject({
+      '@id': 'https://www.acme.dental/location/alamo-heights#localbusiness',
+      name: 'Acme Dental - Alamo Heights',
+      image: 'https://cdn.example.com/alamo.avif',
+      geo: { '@type': 'GeoCoordinates', latitude: 29.48221, longitude: -98.46608 },
+      priceRange: '$$',
+      parentOrganization: { '@id': 'https://acme.dental/#organization' },
+    });
+    expect(node.openingHoursSpecification).toEqual([{
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday'],
+      opens: '09:00',
+      closes: '18:00',
+    }]);
+    expect(node.openingHours).toBeUndefined();
+    expect(validateLeanSchema(schema, 'Dentist').some(f => f.field === 'openingHours')).toBe(false);
+  });
+
+  it('does not emit raw HTML openingHours', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        openingHours: '<ul><li>MON: 9am - 6pm</li></ul>',
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.openingHours).toBeUndefined();
+    expect(node.openingHoursSpecification).toBeUndefined();
+  });
+
+  it('filters empty sameAs entries before schema emission', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        socialProfiles: ['https://twitter.com/acme', '   ', ''],
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.sameAs).toEqual(['https://twitter.com/acme']);
+  });
+
+  it('deduplicates sameAs entries from business profile and verified page evidence', () => {
+    const graph = buildLocalBusinessSchema({
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        elements: {
+          extractedAt: '2026-05-12T00:00:00.000Z',
+          sourcePublishedAt: null,
+          headings: [],
+          tables: [],
+          images: [],
+          videos: [],
+          lists: [],
+          testimonials: [],
+          codeBlocks: [],
+          citations: [],
+          semantics: {
+            sameAs: ['https://twitter.com/acme', 'https://www.linkedin.com/company/acme-dental'],
+          },
+          diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+        },
+      },
+    })['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.sameAs).toEqual(['https://twitter.com/acme', 'https://www.linkedin.com/company/acme-dental']);
+  });
+
   it('omits all contact fields when business profile is null (no fabrication)', () => {
     const input = { ...localInput, businessProfile: null };
     const graph = buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>;
@@ -337,6 +491,21 @@ describe('buildLocalBusinessSchema', () => {
 
   it('passes validator with full profile', () => {
     expect(validateLeanSchema(buildLocalBusinessSchema(localInput), 'LocalBusiness')).toEqual([]);
+  });
+
+  it('does not mark partial PostalAddress as rich-result eligible', () => {
+    const schema = buildLocalBusinessSchema({
+      ...localInput,
+      businessProfile: {
+        ...localInput.businessProfile,
+        address: { city: 'Austin', state: 'TX' },
+      },
+    });
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).not.toContain('LocalBusiness');
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'LocalBusiness', field: 'address' }),
+    ]));
   });
 
   it('emits sibling WebSite node — local-business homepages still need site-name + publisher reference', () => {
@@ -742,6 +911,15 @@ describe('buildHomepageSchema', () => {
     expect(org.foundingDate).toBe('2020-01-01');
   });
 
+  it('Organization omits empty sameAs values from business profile', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      businessProfile: { socialProfiles: ['https://twitter.com/acme', '', '   '] },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
+  });
+
   it('WebSite emits inLanguage but NOT potentialAction (no site-search guarantee)', () => {
     // Pillar 2.1: SearchAction misrepresents capability when the site has no
     // search endpoint. Re-add when a workspace flag (siteHasSearch) confirms.
@@ -822,8 +1000,8 @@ describe('Article + BlogPosting — ImageGallery enrichment (PR2)', () => {
     const elements = {
       ...baseElementCatalog,
       images: [
-        { src: 'https://x/i1.jpg', alt: 'one', role: 'informative' as const, roleSource: 'rule' as const },
-        { src: 'https://x/i2.jpg', alt: 'two', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i1.jpg', alt: 'Editorial workflow diagram with approval stages', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i2.jpg', alt: 'Content model diagram showing article reference fields', role: 'informative' as const, roleSource: 'rule' as const },
       ],
     };
     const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };

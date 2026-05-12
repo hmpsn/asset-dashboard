@@ -22,13 +22,13 @@ export type Page =
   | 'outcomes-overview'
   | 'diagnostics';
 
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'brand';
 export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
 
-export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, ClientInboxAlias> = {
-  approvals: 'approvals',
-  requests: 'requests',
-  content: 'content',
+export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, string> = {
+  approvals: 'decisions',     // legacy /approvals → Decisions section (PR 1.2)
+  requests: 'conversations',  // legacy /requests → Conversations section (PR 1.2)
+  content: 'reviews',         // legacy /content → Reviews section (PR 1.2)
 };
 
 export function isClientInboxAlias(tab: string | undefined): tab is ClientInboxAlias {

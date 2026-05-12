@@ -113,14 +113,20 @@ function layout(opts: {
 function itemRow(opts: {
   title: string;
   detail?: string;
+  /** Pre-composed HTML for the detail line. Bypasses esc() — caller is responsible for
+   *  escaping any user-supplied substrings before composing this string. Use when the
+   *  detail needs inline HTML (e.g. <br>, <em>). Mutually exclusive with `detail`. */
+  detailHtml?: string;
   badge?: { label: string; color: string; bg: string };
   isLast?: boolean;
 }): string {
   const border = opts.isLast ? '' : 'border-bottom:1px solid #f3f4f6;';
+  // detailHtml takes precedence over detail; detail is HTML-escaped automatically.
+  const detailContent = opts.detailHtml ?? (opts.detail ? esc(opts.detail) : null);
   return `
     <div style="padding:12px 0;${border}">
       <div class="text-primary" style="font-size:13px;font-weight:500;color:#1f2937;line-height:1.4;">${esc(opts.title)}</div>
-      ${opts.detail ? `<div class="text-secondary" style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">${esc(opts.detail)}</div>` : ''}
+      ${detailContent ? `<div class="text-secondary" style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">${detailContent}</div>` : ''}
       ${opts.badge ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;color:${opts.badge.color};background:${opts.badge.bg};">${esc(opts.badge.label)}</span>` : ''}
     </div>`;
 }
@@ -177,11 +183,11 @@ export type EmailEventType =
   | 'audit_improved'
   | 'anomaly_alert'
   | 'content_published'
-  | 'feedback_new'
   | 'audit_complete'
   | 'client_signal'
   | 'client_briefing_ready'
-  | 'content_changes_requested';
+  | 'content_changes_requested'
+  | 'action_approved';
 
 // ── Template renderers ──
 
@@ -251,8 +257,6 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderAnomalyAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'content_published':
       result = renderContentPublished(events, count, ws, dashUrl, logoUrl); break;
-    case 'feedback_new':
-      result = renderFeedbackNew(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_complete':
       result = renderAuditComplete(events[0], logoUrl); break;
     case 'client_signal':
@@ -261,6 +265,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderClientBriefingReady(events, count, ws, dashUrl, logoUrl); break;
     case 'content_changes_requested':
       result = renderContentChangesRequested(events, count, ws, dashUrl, logoUrl); break;
+    case 'action_approved':
+      result = renderActionApproved(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -270,25 +276,40 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
 
 // ── Individual template renderers ──
 
-function renderFeedbackNew(events: EmailEvent[], count: number, ws: string, _dashUrl?: string, logoUrl?: string) {
-  const items = events.map((e, i) => itemRow({
-    title: (e.data.title as string) || 'Feedback',
-    detail: (e.data.description as string) || '',
-    badge: { label: (e.data.feedbackType as string) || 'general', color: '#6366f1', bg: '#eef2ff' },
-    isLast: i === events.length - 1,
-  })).join('');
+function renderActionApproved(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => {
+    const sourceLabel = (e.data.sourceType as string)
+      ? `${(e.data.sourceType as string).replace(/_/g, ' ')} — ${(e.data.summary as string) || ''}`
+      : (e.data.summary as string) || '';
+    const clientNote = e.data.clientNote as string | undefined;
+    // detailHtml is used (bypassing itemRow's esc()) so we can include <br> and <em>.
+    // Every user-supplied substring is individually esc()-ed before composition.
+    const detailHtml = clientNote
+      ? `${esc(sourceLabel)}<br><em style="color:#6b7280">Client note: &#8220;${esc(clientNote)}&#8221;</em>`
+      : esc(sourceLabel);
+    return itemRow({
+      title: (e.data.title as string) || 'Client Action',
+      detailHtml,
+      badge: { label: 'approved', color: '#059669', bg: '#d1fae5' },
+      isLast: i === events.length - 1,
+    });
+  }).join('');
 
   return {
-    subject: `${count} new feedback submission${count !== 1 ? 's' : ''} — ${ws}`,
+    subject: count === 1
+      ? `Client approved: ${(events[0].data.title as string) || 'action'} — ${ws}`
+      : `${count} client approvals — ${ws}`,
     html: layout({
-      preheader: `New client feedback from ${ws}`,
-      headline: 'Client Feedback Received',
+      preheader: `${ws} client approved ${count} action${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'Client Approved an Action' : 'Client Approvals',
       subtitle: ws,
-      body: countPill(count, 'feedback item') + items,
+      body: count > 1 ? countPill(count, 'approval') + items : items,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
       logoUrl,
     }),
   };
 }
+
 
 function renderApprovalReady(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const totalItems = events.reduce((sum, e) => sum + ((e.data.itemCount as number) || 1), 0);

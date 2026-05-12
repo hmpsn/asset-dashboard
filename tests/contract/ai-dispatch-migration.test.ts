@@ -32,7 +32,6 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'" },
   { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/schema-plan.ts', aiImport: "from './ai.js'" },
-  { path: 'server/schema-suggester.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/content-posts.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
 ];

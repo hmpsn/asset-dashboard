@@ -34,27 +34,22 @@ describe('SchemaGeneratorSetup', () => {
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
-  it('wires generator hero actions to scan and CMS template handlers', () => {
+  it('wires generator hero action to scan', () => {
     const onRunScan = vi.fn();
-    const onFetchCmsTemplatePages = vi.fn();
 
     render(
       <SchemaGeneratorHero
-        loadingCmsPages={false}
         onRunScan={onRunScan}
-        onFetchCmsTemplatePages={onFetchCmsTemplatePages}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /generate all pages/i }));
     expect(onRunScan).toHaveBeenCalledOnce();
-
-    fireEvent.click(screen.getByRole('button', { name: /cms templates/i }));
-    expect(onFetchCmsTemplatePages).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: /cms templates/i })).not.toBeInTheDocument();
   });
 
   it('keeps initial page type selection and single-page generation wired through props', () => {
-    const onPageTypesChange = vi.fn();
+    const onPageTypeSelect = vi.fn();
     const onGenerateSinglePage = vi.fn();
 
     render(
@@ -66,7 +61,7 @@ describe('SchemaGeneratorSetup', () => {
         loadingPages={false}
         generatingSingle={null}
         onPageSearchChange={vi.fn()}
-        onPageTypesChange={onPageTypesChange}
+        onPageTypeSelect={onPageTypeSelect}
         onGenerateSinglePage={onGenerateSinglePage}
       />,
     );
@@ -75,8 +70,7 @@ describe('SchemaGeneratorSetup', () => {
     expect(screen.getByText(/Google knowledge panel/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'service' } });
-    expect(onPageTypesChange).toHaveBeenCalledOnce();
-    expect(onPageTypesChange.mock.calls[0]?.[0]({})).toEqual({ 'page-1': 'service' });
+    expect(onPageTypeSelect).toHaveBeenCalledWith('page-1', 'service');
 
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
     expect(onGenerateSinglePage).toHaveBeenCalledWith('page-1');

@@ -128,4 +128,29 @@ describe('InsightCards', () => {
 
     expect(screen.getByText(/no quick wins/i)).toBeInTheDocument();
   });
+
+  it('keeps tier-2 cards mounted with empty states when growth has no tier-2 data', () => {
+    const withoutTier2 = mockInsights.filter((i) => (
+      i.insightType !== 'competitor_alert'
+      && i.insightType !== 'emerging_keyword'
+      && i.insightType !== 'freshness_alert'
+    ));
+
+    render(
+      <InsightCards
+        workspaceId="ws_test"
+        insights={withoutTier2}
+        tier="growth"
+        loading={false}
+      />
+    );
+
+    expect(screen.getByText('Competitor Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Rising Search Trends')).toBeInTheDocument();
+    expect(screen.getByText('Content Freshness')).toBeInTheDocument();
+
+    expect(screen.getByText(/No competitor movements detected yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No rising trends detected yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/All analyzed pages are up to date/i)).toBeInTheDocument();
+  });
 });

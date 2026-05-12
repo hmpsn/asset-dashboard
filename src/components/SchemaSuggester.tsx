@@ -8,9 +8,9 @@ import {
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
+import { useSchemaGraphValidation } from '../hooks/admin/useSchemaValidation';
 import { Icon, cn } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
-import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
@@ -65,6 +65,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     generatingSingle,
     pageTypes,
     setPageTypes,
+    setSinglePageTypeOverrides,
     snapshotDate,
     filteredInitialPages,
     runScan,
@@ -81,6 +82,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       clearManualDeliveryForPage(pageId);
     },
   });
+  const graphValidationQuery = useSchemaGraphValidation(siteId, workspaceId, started && !!data && data.length > 0 && !loading);
+  const graphValidation = graphValidationQuery.data ?? null;
+  const bulkPublishBlocked = graphValidation?.status === 'errors';
 
   // Business-profile callout dismiss state
   const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
@@ -93,24 +97,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   };
 
   const {
-    showCmsPanel,
-    setShowCmsPanel,
-    cmsTemplatePages,
-    loadingCmsPages,
-    generatingCmsTemplate,
-    cmsTemplateResult,
-    publishingCmsTemplate,
-    cmsPublished,
-    cmsCopied,
-    cmsError,
     cmsMappingError,
     savingCmsMapping,
     fieldMappingTargets,
     schemaMappingCollections,
-    fetchCmsTemplatePages,
-    generateCmsTemplate,
-    publishCmsTemplate,
-    copyCmsTemplate,
     saveCmsFieldMapping,
   } = useSchemaSuggesterCmsWorkflow({ siteId, workspaceId });
   const {
@@ -154,7 +144,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     retractSchema,
     restoreSchema,
     clearManualDeliveryForPage,
-  } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData });
+  } = useSchemaSuggesterPublishingWorkflow({ siteId, workspaceId, data, setData, bulkPublishBlocked });
   const impactData = useSchemaImpactData(workspaceId);
 
   const toggleExpand = (id: string) => {
@@ -209,9 +199,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           />
         )}
         <SchemaGeneratorHero
-          loadingCmsPages={loadingCmsPages}
           onRunScan={runScan}
-          onFetchCmsTemplatePages={fetchCmsTemplatePages}
         />
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         <SchemaBusinessProfileCallout
@@ -219,20 +207,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           dismissed={calloutDismissed}
           workspaceId={workspaceId}
           onDismiss={dismissBpCallout}
-        />
-        <CmsTemplatePanel
-          showCmsPanel={showCmsPanel}
-          cmsTemplatePages={cmsTemplatePages}
-          generatingCmsTemplate={generatingCmsTemplate}
-          cmsTemplateResult={cmsTemplateResult}
-          publishingCmsTemplate={publishingCmsTemplate}
-          cmsPublished={cmsPublished}
-          cmsCopied={cmsCopied}
-          cmsError={cmsError}
-          onClose={() => setShowCmsPanel(false)}
-          onGenerateCmsTemplate={generateCmsTemplate}
-          onCopyCmsTemplate={copyCmsTemplate}
-          onPublishCmsTemplate={publishCmsTemplate}
         />
         <SchemaCmsFieldMappingPanel
           collections={schemaMappingCollections}
@@ -256,7 +230,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           loadingPages={loadingPages}
           generatingSingle={generatingSingle}
           onPageSearchChange={setPageSearch}
-          onPageTypesChange={setPageTypes}
+          onPageTypeSelect={(pageId, pageType) => {
+            setPageTypes(prev => ({ ...prev, [pageId]: pageType }));
+            setSinglePageTypeOverrides(prev => ({ ...prev, [pageId]: pageType }));
+          }}
           onGenerateSinglePage={generateSinglePage}
         />
       </div>
@@ -378,6 +355,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               loading={loading}
               onPublishAll={publishAllToWebflow}
               onSendToClient={sendSchemasToClient}
+              graphValidation={graphValidation}
+              graphValidationLoading={graphValidationQuery.isFetching}
             />
           )}
           <div className="relative">

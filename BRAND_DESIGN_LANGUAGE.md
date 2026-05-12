@@ -146,8 +146,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Label** | `ui/typography/Label.tsx` | Inherits muted text; uppercase DIN Pro via `.t-label` | Phase 5. Form labels, uppercase section markers. forwardRef. |
 | **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
 | **Icon** | `ui/Icon.tsx` | Inherits `currentColor`; consumer supplies hue via `className` (e.g. `text-teal-400`). Inner SVG `aria-hidden="true"` by default — pass `aria-label` for semantic icons. | Phase 5. Wraps any Lucide component. Strict size enum: `xs\|sm\|md\|lg\|xl\|2xl` (8/12/16/20/24/32px). Inline-flex `<span>` wrapper so it is safe inside `<p>`, `<li>`, flex rows. forwardRef. |
-| **FormField** | `ui/forms/FormField.tsx` | Label text: `text-zinc-300`; error message: `text-red-400`; hint: `text-zinc-500`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. forwardRef. |
-| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Default border: `border-zinc-700`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Placeholder: `text-zinc-500`. | Phase 5. Dark-theme inputs, mint focus ring. Consume error state + id from FormFieldContext. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
+| **FormField** | `ui/forms/FormField.tsx` | Label text: `text-[var(--brand-text-bright)]`; error message: `text-red-400`; success message: `text-emerald-400`; hint: `text-[var(--brand-text-muted)]`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/success/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. Errors are authoritative over valid state. forwardRef. |
+| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Surface: `bg-[var(--surface-3)]`; default border: `border-[var(--brand-border)]`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Valid border: `border-emerald-500/50`. Placeholder: `text-[var(--brand-text-muted)]`. | Phase 5. Tokenized theme-aware inputs, mint focus ring. Consume error/valid state + id from FormFieldContext and wire `aria-invalid` / `aria-describedby`. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
 | **Checkbox** | `ui/forms/Checkbox.tsx` | Checked: `bg-[var(--brand-mint)] border-[var(--brand-mint)]` (Law 01). Unchecked: `bg-zinc-800 border-zinc-700`. Check icon: `text-zinc-900`. | Phase 5. Custom visual checkbox over hidden native input (preserves Space-key + a11y). Required `label` string. forwardRef to input. |
 | **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
 | **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Sizes preserve hierarchy: `.t-caption-sm` / `.t-caption` / `.t-body`. Spinner replaces icon while `loading`. `link` variant skips size padding. |
@@ -160,6 +160,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Grid** | `ui/layout/Grid.tsx` | No color — structural only | Responsive CSS grid. Props: `cols` (`{ sm?, md?, lg?, xl? }` with values 1–12), `gap`. Uses static `Record<number, string>` maps per breakpoint so Tailwind's scanner can detect all class strings. `forwardRef`. |
 | **Divider** | `ui/layout/Divider.tsx` | `border-[var(--brand-border)]` | Thin rule. `orientation="horizontal"` (default, `border-b w-full`) or `"vertical"` (`border-r h-full`). Role=separator + aria-orientation. `forwardRef`. |
 | **Modal** | `ui/overlay/Modal.tsx` | Panel: `bg-zinc-900 border-zinc-800`; close ×: `text-zinc-400 hover:text-zinc-200`; focus ring: `focus-visible:ring-teal-500` | Compound: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`. Portals to `document.body`. Focus trap + Escape + backdrop-click to close. Restores focus to trigger on close. Backdrop at `--z-modal-backdrop` (40), panel at `--z-modal` (50). |
+| **SchemaReviewModal** | `client/SchemaReviewModal.tsx` | Shell: `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm`; inner panel fills viewport | Full-screen WAI-ARIA dialog wrapping `SchemaReviewTab`. Opened from InboxTab SEO Changes schema plan card. `autoFocus` on close button, Escape key dismiss. See full-screen modal pattern below. |
+| **ClientActionDetailModal** | `client/ClientActionDetailModal.tsx` | Same full-screen shell as SchemaReviewModal | Full-screen WAI-ARIA dialog for Tier-3 client action cards. Four typed payload renderers: `internal_link`, `redirect_proposal`, `keyword_strategy`, `aeo_change`. Default raw JSON fallback. `respondToClientAction` re-throws on error (retry-safe). |
 | **Popover** | `ui/overlay/Popover.tsx` | Panel: `bg-zinc-900 border-zinc-800`; normal item: `text-zinc-200 hover:bg-zinc-800`; danger item: `text-red-400 hover:bg-red-500/10` | Compound: `<Popover.Item>`, `<Popover.Separator>`. Portals to `document.body`. Arrow key + Home/End navigation. Tab closes (focus moves naturally). Outside-click + Escape to close. |
 | **Tooltip** | `ui/overlay/Tooltip.tsx` | `bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg` | Hover (500 ms delay) + focus (instant). `role="tooltip"`, `aria-describedby` on trigger. Portals to `document.body` — safe under `transform`/`filter` ancestors. |
 
@@ -241,6 +243,21 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+
+#### Client Inbox IA — 3-Section Layout (`new-inbox-ia` flag)
+
+When the `new-inbox-ia` feature flag is on, InboxTab renders three named sections. Section headers use existing design system patterns — no new color families introduced.
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **Section header** ("Decisions", "Reviews", "Conversations") | `t-label text-[var(--brand-text-muted)] tracking-wider uppercase` | Muted label — structural chrome, not a CTA |
+| **Section header divider** | `border-b border-[var(--brand-border)]` | Standard border token |
+| **Approve CTA** (within action cards) | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
+| **Request Changes CTA** | `bg-amber-600/20 border-amber-500/30 text-amber-300 hover:bg-amber-600/30` | Amber = needs attention |
+| **SchemaReviewModal / ClientActionDetailModal** backdrop | `bg-[var(--brand-overlay)]` | Token-only — no raw `bg-black/X` |
+| Modal close ("✕") | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` | Standard muted-to-default step |
+
+**Flag-off:** Legacy single-list InboxTab renders unchanged. No color changes in the flag-off path.
 
 ##### Phase 2.5b — investor-briefing reading rhythm
 
@@ -515,6 +532,15 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | Modal enter | `animate-[scaleIn_0.2s_ease-out]` |
 | Modal overlay | `bg-black/70 backdrop-blur-md` |
 | Modal container | `bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl max-w-md` |
+| Full-screen modal | `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm` | Used for takeover dialogs (SchemaReviewModal, ClientActionDetailModal). `--z-modal-fullscreen: 55` sits between `--z-modal` (50) and `--z-toast` (60). |
+
+**Full-screen modal shell contract** (`SchemaReviewModal`, `ClientActionDetailModal`):
+- `fixed inset-0 z-[var(--z-modal-fullscreen)]` — fills the entire viewport, above standard modals, below toasts
+- `role="dialog"` + `aria-modal="true"` + `aria-labelledby` pointing to the `<h2>` title
+- `autoFocus` on the close button (first focusable element)
+- Escape key handler calls `onClose()`
+- Background: `bg-black/80 backdrop-blur-sm`
+- Token: `--z-modal-fullscreen: 55` (defined in `src/tokens.css`)
 | Page transition | `ScannerReveal` — muted teal beam sweeps top-to-bottom on navigation (850ms, ease-out) |
 | Card entrance | Stagger-fade: `staggerFadeIn` 0.4s + 60ms delay per sibling. Use `staggerIndex` prop on `SectionCard`/`StatCard` |
 | MetricRing entrance | Charge-up: ring sweep → number fade at 0.8s → glow bloom at 2s. Disabled with `noAnimation` prop |
@@ -672,5 +698,7 @@ When shipping UI changes that affect color or design patterns:
 ---
 
 | 2026-05-03 | **Strategy Keywords rebuild** (PRs #430–#434 + task commits): Two-zone flat list (confirmed rows = standard surface, suggestion rows = `bg-blue-950/60 border border-blue-900/50`). Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD difficulty coloring: ≤29=emerald-400, 30–49=amber-400, ≥50=red-400. Trend coloring: rising=emerald-400, declining=red-400, stable/unknown=muted. Drawer: right slide-in on desktop, bottom sheet on mobile. No sort controls. Per-component map section added. |
+| 2026-05-09 | **Client Inbox Redesign** (feat/client-inbox-redesign, 5 phases): `PriorityStrip` urgency component (teal CTA, renders null when nothing pending). `InboxTab` restructured into 3 collapsible sections (SEO Changes / Actions / Needs Your Attention) with Active/Completed mode toggle and 4 filter chips. `schema-review` standalone tab retired — schema plan card moves to InboxTab SEO Changes. New `--z-modal-fullscreen: 55` token in `src/tokens.css` (between `--z-modal: 50` and `--z-toast: 60`). `SchemaReviewModal` + `ClientActionDetailModal`: full-screen WAI-ARIA dialogs following canonical shell contract (`fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-modal`, `aria-labelledby` → `<h2>`, `autoFocus` on close, Escape key dismiss). `ClientActionDetailModal` has four typed payload renderers (internal_link, redirect_proposal, keyword_strategy, aeo_change) + default JSON fallback. `safeHref()` helper for XSS-safe URL rendering. pr-check rule `inbox-legacy-filter-literal` prevents re-introduction of retired filter literals. |
+| 2026-05-11 | **InboxTab Phase 3.5 — Action Playbooks Resolution** (client-inbox-phase35-action-playbooks-resolution): Closes the approval dead-end. Client approves an action → admin team notified via `action_approved` email event. `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`. Other action types (aeo_change, internal_link, keyword_strategy, redirect_proposal) surface in admin UI with "Awaiting implementation" badge (`bg-amber-500/10 text-amber-400 border-amber-500/20`) and teal "Mark complete" CTA button (`bg-teal-600 hover:bg-teal-500`). Badge styling follows Law 2 (amber for warning/pending state), button follows Law 1 (teal for action CTAs). `ClientActionsTab.tsx` renders approved actions with inline approval acknowledgment and action metadata. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.

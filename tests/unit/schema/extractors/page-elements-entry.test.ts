@@ -86,6 +86,285 @@ describe('extractPageElements entry-point', () => {
     expect(catalog.diagnostics.rawCounts.error).toBeFalsy(); // happy path = no error marker
   });
 
+  it('extracts conservative semantic contact data from explicit links and microdata', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<body>
+  <main>
+    <a href="tel:+15125551212">Call</a>
+    <a href="mailto:hello@example.com?subject=Hi">Email</a>
+    <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+      <span itemprop="streetAddress">100 Main St</span>
+      <span itemprop="addressLocality">Austin</span>
+      <span itemprop="addressRegion">TX</span>
+      <span itemprop="postalCode">78701</span>
+      <span itemprop="addressCountry">US</span>
+    </div>
+  </main>
+</body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.example.com',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics).toMatchObject({
+      phone: '+15125551212',
+      email: 'hello@example.com',
+      address: {
+        street: '100 Main St',
+        city: 'Austin',
+        state: 'TX',
+        postalCode: '78701',
+        country: 'US',
+      },
+    });
+  });
+
+  it('extracts trusted local business evidence from existing Dentist JSON-LD', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "image": "https://cdn.example.com/alamo.avif",
+      "telephone": "210-764-6787",
+      "email": "alamoheights@swishsmiles.com",
+      "priceRange": "$$",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX",
+        "postalCode": "78209",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "29.48221",
+        "longitude": "-98.46608"
+      },
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday"],
+        "opens": "09:00",
+        "closes": "18:00"
+      }]
+    }
+  </script>
+</head>
+<body><main><h1>Alamo Heights San Antonio</h1></main></body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.swishsmiles.com',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics).toMatchObject({
+      businessName: 'Swish Dental - Alamo Heights',
+      businessType: 'Dentist',
+      phone: '210-764-6787',
+      email: 'alamoheights@swishsmiles.com',
+      primaryImage: 'https://cdn.example.com/alamo.avif',
+      priceRange: '$$',
+      address: {
+        street: '6011 Broadway, STE 100',
+        city: 'San Antonio',
+        state: 'TX',
+        postalCode: '78209',
+        country: 'US',
+      },
+      geo: {
+        latitude: 29.48221,
+        longitude: -98.46608,
+      },
+    });
+    expect(catalog.semantics?.hours).toEqual([{
+      dayOfWeek: ['Monday', 'Tuesday'],
+      opens: '09:00',
+      closes: '18:00',
+    }]);
+  });
+
+  it('prefers the local business JSON-LD node that matches the current location page', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <link rel="canonical" href="https://www.swishsmiles.com/location/alamo-heights-san-antonio" />
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Dentist",
+          "@id": "https://www.swishsmiles.com/#localbusiness",
+          "url": "https://www.swishsmiles.com/",
+          "name": "Swish Dental - HQ",
+          "telephone": "512-000-0000",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "1 HQ Way",
+            "addressLocality": "Austin",
+            "addressRegion": "TX"
+          }
+        },
+        {
+          "@type": ["LocalBusiness", "Dentist"],
+          "@id": "https://www.swishsmiles.com/location/alamo-heights-san-antonio#localbusiness",
+          "url": "https://www.swishsmiles.com/location/alamo-heights-san-antonio",
+          "name": "Swish Dental - Alamo Heights",
+          "telephone": "210-764-6787",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "6011 Broadway, STE 100",
+            "addressLocality": "San Antonio",
+            "addressRegion": "TX"
+          }
+        }
+      ]
+    }
+  </script>
+</head>
+<body><main><h1>Alamo Heights San Antonio</h1></main></body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://swishsmiles.com/location/alamo-heights-san-antonio',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics).toMatchObject({
+      businessName: 'Swish Dental - Alamo Heights',
+      businessType: 'Dentist',
+      phone: '210-764-6787',
+      address: {
+        street: '6011 Broadway, STE 100',
+        city: 'San Antonio',
+        state: 'TX',
+      },
+    });
+  });
+
+  it('omits structured hours when dayOfWeek values are not valid schema days', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Swish Dental - Alamo Heights",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "6011 Broadway, STE 100",
+        "addressLocality": "San Antonio",
+        "addressRegion": "TX"
+      },
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": "Weekdays",
+        "opens": "09:00",
+        "closes": "18:00"
+      }]
+    }
+  </script>
+</head>
+<body></body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.swishsmiles.com/location/alamo-heights-san-antonio',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics?.hours).toBeUndefined();
+  });
+
+  it('expands wraparound structured day ranges', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "Weekend Dental",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "100 Main St",
+        "addressLocality": "Austin",
+        "addressRegion": "TX"
+      },
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": "Friday-Monday",
+        "opens": "09:00",
+        "closes": "18:00"
+      }]
+    }
+  </script>
+</head>
+<body></body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://example.com/location/weekend',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics?.hours).toEqual([{
+      dayOfWeek: ['Friday', 'Saturday', 'Sunday', 'Monday'],
+      opens: '09:00',
+      closes: '18:00',
+    }]);
+  });
+
+  it('drops unsafe or malformed local business JSON-LD evidence', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dentist",
+      "name": "7db70641-7c75-4a26-a4d2-c279a07db59f",
+      "image": "javascript:alert(1)",
+      "telephone": "123",
+      "email": "not-an-email",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "64dbe2528747dd074755c3b2",
+        "addressLocality": "Austin",
+        "addressRegion": "TX"
+      },
+      "geo": { "latitude": "999", "longitude": "-98.46608" },
+      "openingHours": "<ul><li>MON: 9am - 6pm</li></ul>"
+    }
+  </script>
+</head>
+<body></body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.swishsmiles.com',
+      sourcePublishedAt: null,
+      aiBudget: createAiBudget(0),
+    });
+
+    expect(catalog.semantics).toMatchObject({ businessType: 'Dentist' });
+    expect(catalog.semantics?.businessName).toBeUndefined();
+    expect(catalog.semantics?.primaryImage).toBeUndefined();
+    expect(catalog.semantics?.phone).toBeUndefined();
+    expect(catalog.semantics?.email).toBeUndefined();
+    expect(catalog.semantics?.address).toBeUndefined();
+    expect(catalog.semantics?.geo).toBeUndefined();
+    expect(catalog.semantics?.hours).toBeUndefined();
+  });
+
   it('PR2: extracts images, tables, testimonials when present', async () => {
     const html = `<!DOCTYPE html>
 <html>

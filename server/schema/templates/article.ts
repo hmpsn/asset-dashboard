@@ -4,6 +4,7 @@
  * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
+import { filterAuthorityCitations } from '../extractors/page-elements/citation.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ArticleInput {
@@ -25,12 +26,21 @@ function stepName(text: string): string {
   return label.length <= 80 ? label : `${label.slice(0, 77).trim()}...`;
 }
 
+function hasMeaningfulImageContext(image: { alt?: string; caption?: string }): boolean {
+  const alt = image.alt?.trim() ?? '';
+  const caption = image.caption?.trim() ?? '';
+  // Short labels like "Logo" or "Team photo" add noise; keep gallery nodes for images
+  // with enough visible context for search engines to understand why they matter.
+  return alt.length >= 20 || caption.length >= 12;
+}
+
 export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Record<string, unknown> {
   const { pageData } = input;
 
   const author = pageData.author
     ? { '@type': 'Person', 'name': pageData.author }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
+  const citations = filterAuthorityCitations(pageData.elements?.citations ?? [], pageData.canonicalUrl);
 
   const primary = dropUndefined({
     '@type': kind,
@@ -54,9 +64,10 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'inLanguage': pageData.inLanguage,
     'articleSection': pageData.articleSection,
     'keywords': pageData.keywords,
+    'wordCount': pageData.wordCount,
     'about': kind === 'Article' ? 'Case study' : undefined,
-    'citation': pageData.elements?.citations && pageData.elements.citations.length > 0
-      ? pageData.elements.citations.map(c => ({
+    'citation': citations.length > 0
+      ? citations.map(c => ({
           '@type': 'WebPage' as const,
           'url': c.url,
           'name': c.text || c.url,
@@ -110,7 +121,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
   // Build optional ImageGallery node from informative images (PR2).
   // Pre-emission gate: name + image[] ≥1; must have ≥2 informative images
   // (single informative image stays on the primary node's `image` field).
-  const informativeImages = (pageData.elements?.images ?? []).filter((i: { role: string }) => i.role === 'informative');
+  const informativeImages = (pageData.elements?.images ?? []).filter((i: { role: string; alt?: string; caption?: string }) =>
+    i.role === 'informative' && hasMeaningfulImageContext(i));
   const galleryName = pageData.cleanTitle || pageData.title;
   // Filter to http(s) URLs only — extracted img.src may be javascript:/data:/relative.
   // Pre-emission gate widened: ≥2 SAFE informative images.

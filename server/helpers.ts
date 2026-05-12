@@ -21,6 +21,35 @@ import { buildWorkspaceIntelligence, formatPersonasForPrompt } from './workspace
 
 
 const log = createLogger('helpers');
+
+// ── HTML Utilities ──
+
+/**
+ * Decode common HTML entities to their plain-text equivalents.
+ * Webflow HTML encodes apostrophes (&#x27;), ampersands (&amp;), etc.
+ * Use this on any string extracted from raw HTML before storing or displaying.
+ *
+ * Handles:
+ *  - Named entities: &amp; &lt; &gt; &quot; &apos; &nbsp;
+ *  - Hex numeric entities: &#x27; &#x2F; and the generic &#xNNNN; pattern
+ *  - Decimal numeric entities: &#39; and the generic &#NNNN; pattern
+ *    (covers curly quotes &#8216;/&#8217;, dashes &#8211;/&#8212;, etc.)
+ */
+export function decodeEntities(text: string): string {
+  return text
+    // Generic hex numeric entities first (&#xNN; or &#xNNNN;) — covers &#x27;, &#x2F;, etc.
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    // Generic decimal numeric entities (&#NN; or &#NNNN;) — covers &#39;, &#8217;, &#8211;, etc.
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    // Named entities
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
 // ── Page Path Utilities ──
 
 /** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */

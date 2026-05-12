@@ -5,6 +5,7 @@
  */
 import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
+import { contentScope } from './extractors/page-elements/content-scope.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import type { SchemaEvidenceSource, SchemaFieldEvidence, SchemaFieldTarget, SchemaServiceOffer, SchemaServiceProfile } from '../../shared/types/site-inventory.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
@@ -76,6 +77,8 @@ export interface PageData {
   dateModified?: string;
   /** Article author name when known (CMS field or workspace name). undefined → template emits Organization fallback. */
   author?: string;
+  /** Visible article/body word count. Additive Article signal; full articleBody is intentionally not emitted. */
+  wordCount?: number;
   /** Section derived from URL path (e.g. "/blog/foo" → "Blog"). undefined for homepage and root pages. */
   articleSection?: string;
   /** BCP-47 language tag for this page. Always populated (workspace.defaultLocale fallback). */
@@ -116,18 +119,45 @@ function capitalize(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: string): BreadcrumbItem[] {
-  const segs = publishedPath.replace(/^\//, '').split('/').filter(Boolean);
+function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: string, canonicalUrl?: string): BreadcrumbItem[] {
+  let pathForCrumbs = publishedPath;
+  let leafUrl = '';
+  if (canonicalUrl) {
+    try {
+      const parsed = new URL(canonicalUrl);
+      pathForCrumbs = parsed.pathname;
+      leafUrl = parsed.href;
+    } catch { // catch-ok: malformed canonical crumbs should fall back to publishedPath
+      leafUrl = '';
+    }
+  }
+  const segs = pathForCrumbs.replace(/^\//, '').split('/').filter(Boolean);
   const items: BreadcrumbItem[] = [{ name: 'Home', url: baseUrl }];
   let acc = baseUrl;
   segs.forEach((s, i) => {
     acc = `${acc}/${s}`;
     items.push({
       name: i === segs.length - 1 ? leafName : capitalize(s.replace(/-/g, ' ')),
-      url: acc,
+      url: i === segs.length - 1 && leafUrl ? leafUrl : acc,
     });
   });
   return items;
+}
+
+function stripWww(hostname: string): string {
+  return hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function sameSiteUrl(candidate: string, baseUrl: string): string | undefined {
+  try {
+    const parsed = new URL(candidate);
+    const base = new URL(baseUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    if (stripWww(parsed.hostname) !== stripWww(base.hostname)) return undefined;
+    return parsed.href.replace(/\/$/, parsed.pathname === '/' ? '/' : '');
+  } catch { // catch-ok: malformed or relative canonical URL falls back to configured base URL
+    return undefined;
+  }
 }
 
 function deriveArticleSection(publishedPath: string): string | undefined {
@@ -143,6 +173,56 @@ function pickCmsFieldWithSlug(fieldData: Record<string, unknown> | null | undefi
     if (typeof v === 'string' && v.trim()) return { value: v.trim(), slug };
   }
   return undefined;
+}
+
+function firstVisibleText($: cheerio.CheerioAPI, selectors: string[]): string | undefined {
+  for (const selector of selectors) {
+    const text = $(selector).first().text().replace(/\s+/g, ' ').trim();
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function cleanAuthorName(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw
+    .replace(/\s+/g, ' ')
+    .replace(/^(?:by|written by|author|posted by|reviewed by)\s*:?\s*/i, '')
+    .replace(/\s+(?:on|updated|published)\s+.+$/i, '')
+    .trim();
+  if (!cleaned || cleaned.length > 80) return undefined;
+  if (/\b(comment|share|subscribe|newsletter|published|updated)\b/i.test(cleaned)) return undefined;
+  return cleaned;
+}
+
+function extractVisibleAuthor($: cheerio.CheerioAPI): string | undefined {
+  const scope = contentScope($);
+  const selectors = [
+    '[rel="author"]',
+    '[itemprop="author"]',
+    '.byline',
+    '[class*="byline"]',
+    '.author',
+    '[class*="author"]',
+  ];
+  const root = scope.length > 0 ? scope : $('body');
+  for (const selector of selectors) {
+    const text = cleanAuthorName(root.find(selector).first().text());
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function countVisibleWords($: cheerio.CheerioAPI): number | undefined {
+  const scope = contentScope($);
+  const root = (scope.length > 0 ? scope : $('body')).clone();
+  // Mostly defensive for body fallback; some CMS exports also nest utility blocks
+  // inside article-rich text, and those should not inflate Article.wordCount.
+  root.find('script,style,noscript,nav,footer,form,aside').remove();
+  const text = root.text().replace(/\s+/g, ' ').trim();
+  if (!text) return undefined;
+  const words = text.match(/[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*/g);
+  return words && words.length > 0 ? words.length : undefined;
 }
 
 /** Capitalize a slug segment for human-readable output. */
@@ -175,8 +255,9 @@ export function extractPageData(input: ExtractInput): PageData {
 
   const seoTitle = input.pageMeta.seo?.title?.trim();
   const metaTitle = input.pageMeta.title?.trim();
+  const h1Title = firstVisibleText($, ['article h1', '.w-richtext h1', 'main h1', 'h1']);
   const htmlTitle = $('head > title').text().trim();
-  const title = seoTitle || metaTitle || htmlTitle || input.pageMeta.slug;
+  const title = seoTitle || h1Title || metaTitle || htmlTitle || input.pageMeta.slug;
   const cleanTitle = scrubBrandSuffix(title, input.workspace.name);
 
   const seoDesc = input.pageMeta.seo?.description?.trim();
@@ -193,8 +274,11 @@ export function extractPageData(input: ExtractInput): PageData {
   const datePublishedCms = pickCmsFieldWithSlug(cmsFieldData, ['published-on', 'published-date', 'date-published']);
   const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
   const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
+  const visibleAuthor = extractVisibleAuthor($);
+  const wordCount = countVisibleWords($);
   const fieldEvidence: SchemaFieldEvidence[] = [...(input.pageMeta.fieldEvidence ?? [])];
   const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
+  if (h1Title && !seoTitle) evidenceSources.title = 'rendered-html';
   if (description) evidenceSources.description = 'rendered-html';
   if (image) evidenceSources.image = 'rendered-html';
 
@@ -208,7 +292,7 @@ export function extractPageData(input: ExtractInput): PageData {
     || input.pageMeta.lastPublished
     || undefined;
 
-  const author = authorCms?.value ?? undefined;
+  const author = authorCms?.value ?? visibleAuthor;
   if (datePublishedCms) {
     evidenceSources.datePublished = `cms-field:${datePublishedCms.slug}`;
     fieldEvidence.push({ field: 'datePublished', source: `cms-field:${datePublishedCms.slug}` });
@@ -220,11 +304,33 @@ export function extractPageData(input: ExtractInput): PageData {
   if (authorCms) {
     evidenceSources.author = `cms-field:${authorCms.slug}`;
     fieldEvidence.push({ field: 'author', source: `cms-field:${authorCms.slug}` });
+  } else if (visibleAuthor) {
+    evidenceSources.author = 'rendered-html';
+    fieldEvidence.push({ field: 'author', source: 'rendered-html' });
   }
 
   const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
   const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
-  const canonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
+  const renderedCanonical = $('link[rel="canonical"]').attr('href')?.trim();
+  const renderedCanonicalUrl = renderedCanonical ? sameSiteUrl(renderedCanonical, input.baseUrl) : undefined;
+  const fallbackCanonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
+  const canonicalUrl = renderedCanonicalUrl || fallbackCanonicalUrl;
+  const canonicalBaseUrl = (() => {
+    try {
+      return new URL(canonicalUrl).origin;
+    } catch { // catch-ok: canonicalUrl was assembled defensively; fallback preserves existing behavior
+      return input.baseUrl;
+    }
+  })();
+  if (renderedCanonicalUrl && renderedCanonicalUrl !== fallbackCanonicalUrl) {
+    evidenceSources.canonicalUrl = 'rendered-html';
+    fieldEvidence.push({
+      field: 'canonicalUrl',
+      source: 'rendered-html',
+      status: 'resolved',
+      message: 'canonicalUrl resolved from same-site rendered canonical link.',
+    });
+  }
 
   // Derive Article.keywords (comma-joined) from per-page keywords.
   const pageKeywords = input.pageMeta.pageKeywords;
@@ -254,9 +360,10 @@ export function extractPageData(input: ExtractInput): PageData {
     datePublished,
     dateModified,
     author,
+    wordCount,
     articleSection,
     inLanguage,
-    breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, input.baseUrl),
+    breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, canonicalBaseUrl, canonicalUrl),
     keywords,
     areaServed: serviceAreaServed || areaServed,
     serviceType,

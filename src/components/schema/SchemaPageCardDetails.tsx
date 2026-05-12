@@ -205,7 +205,9 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
                 ? 'Collection map'
                 : diagnostics.roleSource === 'collection-inferred'
                   ? 'Collection inferred'
-                  : 'UI override'}
+                  : diagnostics.roleSource === 'saved-page-type'
+                    ? 'Saved page type'
+                    : 'UI override'}
           {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
         </span>
         <span className={cn(
@@ -223,6 +225,11 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">
           Collection: <span className="text-[var(--brand-text)]">{diagnostics.collection.collectionName}</span>
           {diagnostics.collection.itemPath ? ` · ${diagnostics.collection.itemPath}` : ''}
+        </div>
+      )}
+      {diagnostics.canonicalEntityReferences && diagnostics.canonicalEntityReferences.length > 0 && (
+        <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1 break-words">
+          Canonical refs: <span className="text-[var(--brand-text)]">{diagnostics.canonicalEntityReferences.join(', ')}</span>
         </div>
       )}
       {diagnostics.cmsDeliveryStatus && diagnostics.cmsDeliveryStatus.mode === 'cms-field' && (

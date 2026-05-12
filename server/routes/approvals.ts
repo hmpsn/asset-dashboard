@@ -38,6 +38,7 @@ import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { WS_EVENTS } from '../ws-events.js';
+import db from '../db/index.js';
 
 const log = createLogger('approvals');
 
@@ -68,6 +69,7 @@ function approvalActivityLabel(field: string): string {
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
   name: z.string().optional().default('SEO Changes'),
+  note: z.string().max(2000).optional(),
   items: z.array(z.object({
     id: z.string().optional(),
     pageId: z.string(),
@@ -88,8 +90,8 @@ const updateItemSchema = z.object({
 
 // --- Approvals (admin, authenticated) ---
 router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBatchSchema), (req, res) => {
-  const { siteId, name, items } = req.body;
-  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items);
+  const { siteId, name, note, items } = req.body;
+  const batch = createBatch(req.params.workspaceId, siteId, name || 'SEO Changes', items, note);
   // Track all pages in this batch as in-review
   for (const item of items) {
     if (item.pageId) updatePageState(req.params.workspaceId, item.pageId, { status: 'in-review', fields: [item.field], approvalBatchId: batch.id, updatedBy: 'admin' });
@@ -181,6 +183,53 @@ router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAut
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
   res.json(batch);
+});
+
+const bulkApproveSchema = z.object({
+  clientNote: z.string().max(2000).optional(),
+}).strict();
+
+// Bulk-approve all pending items in a batch (client submits trust-first approval)
+// MUST precede the /:itemId route so 'approve' is not captured as a param.
+router.patch('/api/public/approvals/:workspaceId/:batchId/approve', requireClientPortalAuth(), validate(bulkApproveSchema), (req, res, next) => {
+  const { workspaceId, batchId } = req.params;
+  const { clientNote } = req.body as { clientNote?: string };
+
+  const batch = getBatch(workspaceId, batchId);
+  if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+  const pendingItems = batch.items.filter(i => i.status === 'pending');
+  if (pendingItems.length === 0) {
+    return res.status(400).json({ error: 'No pending items to approve' });
+  }
+
+  let updatedBatch = batch;
+  try {
+    db.transaction(() => {
+      for (const item of pendingItems) {
+        const result = updateItem(workspaceId, batchId, item.id, {
+          status: 'approved',
+          ...(clientNote ? { clientNote } : {}),
+        });
+        if (result) updatedBatch = result;
+      }
+    })();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+
+  const actorInfo = getClientActor(req, workspaceId);
+  addActivity(workspaceId, 'approval_applied',
+    `${actorInfo?.name || 'Client'} approved all changes in batch "${batch.name}"`,
+    clientNote || undefined,
+    { batchId },
+    actorInfo);
+
+  broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, status: 'approved' });
+  res.json(updatedBatch);
 });
 
 router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {

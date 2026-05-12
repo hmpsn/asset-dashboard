@@ -30,7 +30,36 @@ interface PageSection {
   body: string;     // paragraph text immediately following this heading (up to 800 chars)
 }
 
-function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string; preamble: string } {
+// Matches a nested block-level element (and its content) used to detect whether
+// a <div> has any direct text nodes vs. is a pure wrapper around block children.
+const NESTED_BLOCK_RE = /<(?:h[1-6]|p|ul|ol|li|blockquote|div)\b[^>]*>[\s\S]*?<\/(?:h[1-6]|p|ul|ol|li|blockquote|div)>/gi;
+
+function flattenInlineText(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Finds the matching </tag> for a tag that opens at openEnd (position right
+// after the opening <tag...> tag). Returns the start (inclusive) and end
+// (exclusive of the trailing `>`) of the closing tag, or null if unbalanced.
+// Used for <div> because a non-greedy regex would stop at the first inner
+// </div> and treat nested wrappers as if they were content.
+function findBalancedClose(html: string, openEnd: number, tag: string): { start: number; end: number } | null {
+  const re = new RegExp(`<(/)?${tag}\\b[^>]*>`, 'gi');
+  re.lastIndex = openEnd;
+  let depth = 1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    if (m[1]) {
+      depth--;
+      if (depth === 0) return { start: m.index, end: m.index + m[0].length };
+    } else {
+      depth++;
+    }
+  }
+  return null;
+}
+
+export function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string; preamble: string } {
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '';
 
   // Extract main content area (prefer <main>, <article>, then <body>)
@@ -52,18 +81,41 @@ function extractPageSections(html: string): { title: string; sections: PageSecti
     .replace(/<footer[\s\S]*?<\/footer>/gi, '')
     .replace(/<header[\s\S]*?<\/header>/gi, '');
 
-  // Two-pass tokeniser: heading tokens and paragraph tokens
+  // Two-pass tokeniser: heading tokens and paragraph-like tokens.
+  // <li>, <blockquote>, and <div> (when it has direct text) all produce 'p'
+  // tokens — Webflow CMS templates often render body copy inside <div>
+  // wrappers instead of <p>, so the rewriter needs to see them as section body.
+  // <div> is matched as opening tag only and the close is found via a balanced
+  // counter; the alternation's non-greedy match would otherwise stop at the
+  // first inner </div> and conflate nested wrappers with content.
   type Token = { type: 'h'; level: number; text: string } | { type: 'p'; text: string };
   const tokens: Token[] = [];
-  const tokenRegex = /<(h[1-6])[^>]*>([\s\S]*?)<\/h[1-6]>|<p[^>]*>([\s\S]*?)<\/p>/gi;
+  const tokenRegex = /<(h[1-6])[^>]*>([\s\S]*?)<\/h[1-6]>|<p[^>]*>([\s\S]*?)<\/p>|<li[^>]*>([\s\S]*?)<\/li>|<blockquote[^>]*>([\s\S]*?)<\/blockquote>|<div\b[^>]*>/gi;
   let m: RegExpExecArray | null;
   while ((m = tokenRegex.exec(contentHtml)) !== null) {
     if (m[1]) {
+      // <h1>–<h6>
       const text = m[2].replace(/<[^>]+>/g, '').trim();
       if (text) tokens.push({ type: 'h', level: parseInt(m[1][1]), text });
-    } else if (m[3] !== undefined) {
-      const text = m[3].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    } else if (m[3] !== undefined || m[4] !== undefined || m[5] !== undefined) {
+      // <p>, <li>, or <blockquote> — body text
+      const text = flattenInlineText(m[3] ?? m[4] ?? m[5]);
       if (text) tokens.push({ type: 'p', text });
+    } else {
+      // <div> opening — find balanced </div>, then decide content vs wrapper.
+      const openEnd = m.index + m[0].length;
+      const close = findBalancedClose(contentHtml, openEnd, 'div');
+      if (!close) continue; // unbalanced — let inner tags tokenise on their own
+      const inner = contentHtml.slice(openEnd, close.start);
+      const directOnly = inner.replace(NESTED_BLOCK_RE, ' ');
+      if (flattenInlineText(directOnly).length > 0) {
+        // Content div — emit as a single 'p' token and skip past </div>.
+        const text = flattenInlineText(inner);
+        if (text) tokens.push({ type: 'p', text });
+        tokenRegex.lastIndex = close.end;
+      }
+      // else wrapper div: lastIndex already at openEnd, inner block elements
+      // will be tokenised on subsequent iterations.
     }
   }
 

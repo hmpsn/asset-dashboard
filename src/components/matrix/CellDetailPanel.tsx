@@ -271,7 +271,7 @@ export function CellDetailPanel({
               onClick={() => onSendReview(cell.id)}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
             >
-              <ExternalLink className="w-3 h-3" /> Send for Review
+              <ExternalLink className="w-3 h-3" /> Send for Review {/* send-for-review-anti-pattern-ok: matrix component predates Admin Send Convention */}
             </button>
           )}
 
