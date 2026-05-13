@@ -113,8 +113,9 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "4-6h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Define one fast spine test per major bounded context to prove the core flow still works. Candidate flows: Schema generate/validate/send-or-publish, Inbox admin send/client decision/admin update, Content brief/post lifecycle, Analytics insight hydration, Brand Engine voice context injection, and Background Jobs start/progress/complete/result visibility."
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added `scripts/platform-domain-smoke-matrix.ts`, `docs/testing/platform-domain-smoke-matrix.md`, and `tests/unit/platform-domain-smoke-matrix.test.ts`. The matrix names one fast smoke signal per canonical bounded context with core path, read path, write path, cache/realtime dependency, test command, coverage groups, and known gap. P2 API contract-test expansion remains pending."
         },
         {
           "id": "platform-confidence-integration-surface-map",
@@ -122,8 +123,9 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "2-4h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "For every bounded context, document its integration surfaces: external APIs, DB tables, AI calls, background jobs, WebSocket events, React Query keys, client/admin surfaces, public endpoints, and activity types. This complements file ownership by showing what breaks together."
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added `docs/rules/platform-integration-surfaces.md` covering every canonical bounded context with external APIs, DB/storage, AI calls, background jobs, WebSocket events, React Query keys, admin/client/public surfaces, public endpoints, activity types, and related docs. Linked it from platform organization and planning guidance."
         },
         {
           "id": "platform-confidence-feature-class-dod",
@@ -131,8 +133,9 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "2-3h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Define completion gates by feature class. Examples: UI-only requires visual/mobile verification plus typecheck/build; route writes require integration tests, activity logging, broadcast invalidation, and pr-check; AI generation requires prompt contract, fallback/error tests, and cost tracking; client-facing work requires public endpoint tests, tier/copy review, and actual read-path coverage; background jobs require progress/cancellation/result visibility."
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added `docs/workflows/feature-class-definition-of-done.md` with completion gates for UI-only work, admin CRUD, route writes, client-visible features, AI generation, background jobs, analytics/intelligence, approval/inbox, billing, and integrations. Linked the gates from the new-feature checklist, plan-writing guide, and CLAUDE.md."
         },
         {
           "id": "platform-confidence-api-contract-tests",

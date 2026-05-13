@@ -10,6 +10,8 @@ Run this before opening a PR or marking a phase complete. This checklist is inte
 
 - [ ] The PR names one owning bounded context from `docs/rules/platform-organization.md`
 - [ ] Any secondary integrations are listed explicitly in the PR description or plan
+- [ ] The owning context's surfaces were checked in `docs/rules/platform-integration-surfaces.md`
+- [ ] The applicable feature-class gates from `docs/workflows/feature-class-definition-of-done.md` are satisfied or explicitly not applicable
 - [ ] Shared coordination files touched (`server/app.ts`, `src/routes.ts`, `server/ws-events.ts`, `src/lib/queryKeys.ts`, shared barrels) are necessary, not incidental
 - [ ] If the work is phased, this PR covers exactly one phase and the feature flag/shared contract changes for that phase are complete
 

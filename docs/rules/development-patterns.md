@@ -6,7 +6,7 @@
 
 ## Bounded Context Organization
 
-Before adding a new feature or substantially changing an existing one, identify the owning bounded context in [platform-organization.md](./platform-organization.md). Use that context to decide where server logic, API wrappers, hooks, components, tests, and docs belong.
+Before adding a new feature or substantially changing an existing one, identify the owning bounded context in [platform-organization.md](./platform-organization.md). Use that context to decide where server logic, API wrappers, hooks, components, tests, and docs belong. Then check [platform-integration-surfaces.md](./platform-integration-surfaces.md) for the context's DB/storage, external APIs, AI calls, background jobs, events, query keys, public endpoints, and activity types.
 
 Preferred shape for new or adjacent work:
 

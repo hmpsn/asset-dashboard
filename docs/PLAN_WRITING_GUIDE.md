@@ -69,6 +69,7 @@ Rules for the graph:
 ### 2. Bounded context ownership
 
 Name the owning bounded context from [platform-organization.md](./rules/platform-organization.md). For cross-context work, name the primary owner, secondary integrations, shared contracts, and coordination files.
+Then check [platform-integration-surfaces.md](./rules/platform-integration-surfaces.md) for the context's external APIs, DB/storage, AI calls, background jobs, WebSocket events, React Query keys, public endpoints, and activity types.
 
 Every plan should state:
 
@@ -137,6 +138,7 @@ Every plan must include:
 - **Shared utilities to extract** — if 3+ files do the same fix, extract a helper
 - **pr-check rules to add** — to prevent the same class of bug recurring
 - **Test coverage additions** — what new tests this plan requires
+- **Feature-class gates** — which sections of [feature-class-definition-of-done.md](./workflows/feature-class-definition-of-done.md) apply
 
 ### 7. Verification strategy
 

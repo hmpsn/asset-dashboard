@@ -307,6 +307,9 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/brand-engine.md` | Copy & Brand Engine contracts — voice profile, brandscript, prompt assembly patterns |
 | `docs/rules/workspace-intelligence.md` | Intelligence slice architecture — `assemble*()` functions, slice interfaces, token budget |
 | `docs/rules/platform-organization.md` | Bounded-context ownership, route-to-service extraction, and safe organization/refactor rules |
+| `docs/rules/platform-integration-surfaces.md` | Integration surfaces by bounded context — external APIs, DB/storage, AI calls, jobs, events, query keys, endpoints, activity types |
+| `docs/testing/platform-domain-smoke-matrix.md` | Fast smoke-test matrix by bounded context |
+| `docs/workflows/feature-class-definition-of-done.md` | Completion gates by feature class before PR closeout |
 | `docs/workflows/client-debug.md` | Debugging client-reported bugs — gather context, investigate data/UI/API/CMS issues |
 
 ---
@@ -317,7 +320,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 **Before dispatching subagents:** pre-commit shared contracts (types, function signatures, barrel exports, migrations), assign exclusive file ownership per task, and schedule a diff review checkpoint after every batch (git diff, grep duplicates, tsc, full test suite). Dispatch prompts must include app-level context: rate limiters, React Query caches, WS events, current conditional rendering state.
 
-**Every implementation plan must include:** task dependency graph, platform-appropriate model assignments, file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), and a verification strategy with specific commands. Name the active agent platform in the plan: Codex/OpenAI plans use `GPT-5.4-Mini` for mechanical cleanup, `GPT-5.4` for implementation with local judgment, and `GPT-5.5` for complex cross-context work and review; Claude/Anthropic plans use the corresponding `Haiku`/`Sonnet`/`Opus` ladder. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
+**Every implementation plan must include:** task dependency graph, platform-appropriate model assignments, file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), feature-class definition-of-done gates, and a verification strategy with specific commands. Name the active agent platform in the plan: Codex/OpenAI plans use `GPT-5.4-Mini` for mechanical cleanup, `GPT-5.4` for implementation with local judgment, and `GPT-5.5` for complex cross-context work and review; Claude/Anthropic plans use the corresponding `Haiku`/`Sonnet`/`Opus` ladder. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
 
 ---
 

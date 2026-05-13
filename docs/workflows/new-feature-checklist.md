@@ -10,7 +10,9 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 
 - [ ] **Full-stack scope**: Every backend change needs a matching frontend — new endpoints get UI, new data fields get displayed, new email types get verified, background jobs surface status, webhooks reflect state without hard refresh.
 - [ ] **Bounded-context owner**: Name the owning context from `docs/rules/platform-organization.md` and use it to choose routes, domain modules, API wrappers, hooks, components, tests, and docs.
+- [ ] **Integration surfaces**: Review `docs/rules/platform-integration-surfaces.md` for the owning context's DB/storage, external APIs, AI calls, background jobs, WebSocket events, React Query keys, public endpoints, and activity types.
 - [ ] **Golden-path template**: Pick the closest template from `docs/workflows/platform-golden-paths.md` (admin CRUD, client-visible, background job, AI generation, analytics/intelligence, or approval/inbox) and note any intentional deviations.
+- [ ] **Feature class gates**: Pick every applicable class from `docs/workflows/feature-class-definition-of-done.md` so the PR has the right tests and verification before closeout.
 - [ ] **Narrative placement**: If client-facing, where does this fit in the "why, then how" arc? Data → Diagnosis → Plan → Action. See `feature-integration.md` § 3 tab placement guide.
 - [ ] **Identify all data flow points**: Which endpoints read/write the data? Which components display it?
 - [ ] **Check existing patterns**: Review `wiring-patterns.md` for the relevant pattern (chat, strategy, reports, WebSocket, email, etc.)
