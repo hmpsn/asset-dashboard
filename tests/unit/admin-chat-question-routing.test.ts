@@ -239,6 +239,11 @@ describe('performance question routing', () => {
     expect(cats.has('performance')).toBe(true);
   });
 
+  it('detects PageSpeed/Core Web Vitals summary requests as performance', () => {
+    const cats = classifyQuestion('Summarize this site’s PageSpeed and Core Web Vitals');
+    expect(cats.has('performance')).toBe(true);
+  });
+
   it('detects "load time" as performance', () => {
     const cats = classifyQuestion('Why is the load time so high on mobile?');
     expect(cats.has('performance')).toBe(true);

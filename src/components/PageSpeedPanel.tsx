@@ -117,6 +117,7 @@ interface WebflowPage {
   id: string;
   title: string;
   slug: string;
+  publishedPath?: string | null;
 }
 
 export function PageSpeedPanel({ siteId, workspaceId }: Props) {
@@ -202,7 +203,7 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
     setSingleResult(null);
     setError(null);
 
-    pageWeight.pagespeedSingle(siteId, { pageSlug: page.slug, strategy: strat, pageTitle: page.title }, workspaceId)
+    pageWeight.pagespeedSingle(siteId, { pageId: page.id, pageSlug: page.publishedPath ?? page.slug, strategy: strat, pageTitle: page.title }, workspaceId)
       .then(d => {
         const result = d as PageSpeedResult & { error?: string };
         if (result.error) { setError(result.error); return; }
