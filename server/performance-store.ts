@@ -36,6 +36,8 @@ export interface Snapshot<T> {
   result: T;
 }
 
+export type PageSpeedStrategy = 'mobile' | 'desktop';
+
 function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
   const snapshot: Snapshot<T> = {
     siteId,
@@ -75,11 +77,17 @@ export function getPageWeight(siteId: string) {
 
 // ── PageSpeed Insights ──
 
-export function savePageSpeed(siteId: string, result: unknown) {
-  return save('pagespeed', siteId, result);
+function pageSpeedSub(strategy: PageSpeedStrategy): string {
+  return `pagespeed:${strategy}`;
 }
 
-export function getPageSpeed(siteId: string) {
+export function savePageSpeed(siteId: string, strategy: PageSpeedStrategy, result: unknown) {
+  return save(pageSpeedSub(strategy), siteId, result);
+}
+
+export function getPageSpeed(siteId: string, strategy: PageSpeedStrategy = 'mobile') {
+  const snapshot = load(pageSpeedSub(strategy), siteId);
+  if (snapshot || strategy !== 'mobile') return snapshot;
   return load('pagespeed', siteId);
 }
 

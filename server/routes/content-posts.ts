@@ -55,6 +55,7 @@ const log = createLogger('content-posts');
 const aiReviewResultSchema = z.object({
   pass: z.boolean(),
   reason: z.string(),
+  claimsToVerify: z.array(z.string()).optional(),
 }).strip();
 
 const aiReviewResponseSchema = z.object({
@@ -73,6 +74,7 @@ const aiMetaFixResponseSchema = z.object({
 
 function markProvenanceItemsForHumanReview(
   review: Record<string, AIReviewResult>,
+  claimsToVerify: string[] = [],
 ): Record<string, AIReviewResult> {
   const next = { ...review };
   for (const key of PROVENANCE_SENSITIVE_REVIEW_KEYS) {
@@ -83,9 +85,30 @@ function markProvenanceItemsForHumanReview(
         ? `${existing.reason} Human verification is required before this checklist item can be checked.`
         : 'Human verification is required before this checklist item can be checked.',
       humanReviewRequired: true,
+      claimsToVerify: existing?.claimsToVerify?.length ? existing.claimsToVerify : claimsToVerify,
     };
   }
   return next;
+}
+
+function extractNumericClaims(text: string): string[] {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  const claimPattern = /(?:[$€£]\s?\d|\b\d+(?:[.,]\d+)?\s?%|\b\d+(?:[.,]\d+)?\s?(?:percent|x|times|k|m|million|billion|hours?|days?|weeks?|months?|years?)\b|\b(?:19|20)\d{2}\b)/i;
+  const sentences = normalized.match(/[^.!?]+[.!?]?/g) ?? [];
+  const claims: string[] = [];
+  const seen = new Set<string>();
+  for (const rawSentence of sentences) {
+    const sentence = rawSentence.trim();
+    if (sentence.length < 8 || sentence.length > 260) continue;
+    if (!claimPattern.test(sentence)) continue;
+    const key = sentence.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    claims.push(sentence);
+    if (claims.length >= 8) break;
+  }
+  return claims;
 }
 
 const generatePostSchema = z.object({
@@ -467,6 +490,7 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
 
   // Truncate to ~8000 chars to stay within token limits
   const contentSnippet = allContent.slice(0, 8000);
+  const claimsToVerify = extractNumericClaims(allContent);
 
   const prompt = `You are a content quality reviewer. Analyze this blog post and evaluate each checklist item.
 ${fullContext}
@@ -505,10 +529,11 @@ Return ONLY valid JSON like:
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 1000,
         temperature: 0.3,
-      responseFormat: { type: 'json_object' },
-      feature: 'content-review',
-      workspaceId: req.params.workspaceId,
-    });
+        researchMode: true,
+        responseFormat: { type: 'json_object' },
+        feature: 'content-review',
+        workspaceId: req.params.workspaceId,
+      });
 
     const parsed = parseAIJson<unknown>(result.text);
     const reviewResult = aiReviewResponseSchema.safeParse(parsed);
@@ -518,7 +543,7 @@ Return ONLY valid JSON like:
     }
 
     log.info(`AI review completed for post ${post.id}`);
-    res.json({ review: markProvenanceItemsForHumanReview(reviewResult.data) });
+    res.json({ review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify) });
   } catch (err) {
     log.error({ err }, 'AI review failed');
     const msg = err instanceof Error ? err.message : String(err);
@@ -639,6 +664,7 @@ ${originalText}`;
     }
 
     try {
+      const researchMode = issueKey === 'factual_accuracy' || issueKey === 'no_hallucinations';
       const systemPrompt = buildSystemPrompt(
         req.params.workspaceId,
         'You are an SEO content editor. Follow the requested field constraints exactly and return only the requested output format.',
@@ -650,6 +676,7 @@ ${originalText}`;
         workspaceId: req.params.workspaceId,
         maxTokens: 2000,
         temperature: 0.3,
+        researchMode,
         ...(field === 'meta' ? { responseFormat: { type: 'json_object' as const } } : {}),
       });
 

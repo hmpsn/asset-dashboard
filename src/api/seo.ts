@@ -432,8 +432,8 @@ export const pageWeight = {
   pagespeedSingle: (siteId: string, body: Record<string, unknown>, workspaceId?: string) =>
     post<unknown>(`/api/webflow/pagespeed-single/${siteId}`, { ...body, ...(workspaceId ? { workspaceId } : {}) }),
 
-  pagespeedSnapshot: (siteId: string, workspaceId?: string) =>
-    getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}${workspaceQuery(workspaceId)}`),
+  pagespeedSnapshot: (siteId: string, workspaceId?: string, strategy: 'mobile' | 'desktop' = 'mobile') =>
+    getOptional<unknown>(appendWorkspaceQuery(`/api/webflow/pagespeed-snapshot/${siteId}?strategy=${strategy}`, workspaceId)),
 };
 
 // ── Alt-text generation (single + bulk NDJSON stream) ───────────

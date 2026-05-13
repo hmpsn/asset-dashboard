@@ -150,6 +150,13 @@ export function ReviewChecklist({
                   {aiResults?.[item.key] && (
                     <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded t-caption-sm ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
+                      {aiResults[item.key].claimsToVerify?.length ? (
+                        <ul className="mt-1 space-y-0.5 list-disc pl-4 text-[var(--brand-text-muted)]">
+                          {aiResults[item.key].claimsToVerify!.map(claim => (
+                            <li key={claim}>{claim}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
                   )}
                   {aiResults?.[item.key] && !aiResults[item.key].pass && !aiResults[item.key].humanReviewRequired && onRequestFix && (

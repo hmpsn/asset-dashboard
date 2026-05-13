@@ -218,7 +218,16 @@
           "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
+          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.\n[Hardening 2026-05-13 partial] Added internal callAI researchMode support for OpenAI/Anthropic and applied it to factual content brief, post generation, post review, and provenance-sensitive AI-fix paths. Also threads stored SERP evidence into post context and surfaces numeric claims for reviewer attention. SEO audit recommendations/admin chat remain pending for this broader roadmap item.",
+          "status": "pending"
+        },
+        {
+          "id": 629,
+          "title": "Content Review Evidence Panel — Show SERP provenance for factual claims",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up to the content-quality hardening PR. The bug fix already surfaces numeric/statistical claims in the review checklist, but stored SERP evidence (`realPeopleAlsoAsk`, `realTopResults`) is currently used only as hidden grounding context for generation/review. Add a lightweight reviewer-facing evidence panel or expandable section that shows the source SERP questions/results used for factual grounding, links claims-to-review back to available evidence when possible, and makes clear this is reviewer support, not automated fact-checking. Keep this in the existing post-review/editor surface; no workflow redesign.",
           "status": "pending"
         },
         {

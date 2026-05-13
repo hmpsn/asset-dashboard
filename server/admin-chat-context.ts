@@ -938,7 +938,7 @@ export async function assembleAdminContext(
           } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
           try {
-            const speedSnap = getPageSpeed(ws.webflowSiteId);
+            const speedSnap = getPageSpeed(ws.webflowSiteId, 'mobile');
             if (speedSnap?.result) {
               const siteSpeed = speedSnap.result as { pages?: Array<{ url?: string; score?: number }> };
               const pages = siteSpeed.pages ?? [];

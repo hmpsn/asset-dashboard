@@ -58,6 +58,30 @@ interface PageMeta {
   openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
 }
 
+function pageListMetaFallback(page: {
+  id: string;
+  title?: string;
+  slug?: string;
+  seo?: { title?: string | null; description?: string | null };
+  openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
+}): PageMeta {
+  return {
+    id: page.id,
+    title: page.title || '',
+    slug: page.slug || '',
+    seo: page.seo ? {
+      title: page.seo.title ?? undefined,
+      description: page.seo.description ?? undefined,
+    } : undefined,
+    openGraph: page.openGraph ? {
+      title: page.openGraph.title ?? undefined,
+      description: page.openGraph.description ?? undefined,
+      titleCopied: page.openGraph.titleCopied,
+      descriptionCopied: page.openGraph.descriptionCopied,
+    } : undefined,
+  };
+}
+
 export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
   if (!tokenOverride && !getToken()) return null;
   try {
@@ -145,10 +169,11 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         const pagePath = resolvePagePath(page);
         const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
         const displaySlug = pagePath ? pagePath.replace(/^\//, '') : (page.slug || '');
-        const [meta, html] = await Promise.all([
+        const [apiMeta, html] = await Promise.all([
           fetchPageMeta(page.id, tokenOverride),
           baseUrl ? fetchPublishedHtml(url) : Promise.resolve(null),
         ]);
+        const meta = apiMeta ?? pageListMetaFallback(page);
         // Cache for site-wide duplicate checking
         if (meta) {
           metaCache.push({

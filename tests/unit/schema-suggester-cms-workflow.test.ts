@@ -62,7 +62,7 @@ describe('SchemaSuggester CMS workflow extraction', () => {
   it('threads active plan canonical entities into CMS single-page generation context', () => {
     const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — CMS authority contract guard
     const cmsBranchStart = source.indexOf('if (cmsItem) {');
-    const cmsBranchEnd = source.indexOf('const meta = await fetchPageMeta(pageId, tokenOverride);');
+    const cmsBranchEnd = source.indexOf('const matchedPage = allPages.find(p => p.id === pageId);');
     const cmsBranch = source.slice(cmsBranchStart, cmsBranchEnd);
 
     expect(cmsBranch).toContain('const activePlan = latestPlan?.status ===');
@@ -70,5 +70,18 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(cmsBranch).toContain('assembleSiteContext(contextPages, baseUrl, activePlan?.canonicalEntities ?? [])');
     expect(cmsBranch).toContain('siteContext: siteContextForCms');
     expect(cmsBranch).toContain('canonicalEntityRefs: roleOverride.canonicalEntityRefs');
+  });
+
+  it('single-page static generation uses the resolved page-list record before fetching page metadata', () => {
+    const source = readFileSync('server/schema-suggester.ts', 'utf-8'); // readFile-ok — static page refresh regression guard
+    const matchedPageIndex = source.indexOf('const matchedPage = allPages.find(p => p.id === pageId);');
+    const fetchMetaIndex = source.indexOf('await fetchPageMeta(pageId, tokenOverride)');
+    const singlePageStartIndex = source.indexOf('export async function generateSchemaForPage');
+
+    expect(singlePageStartIndex).toBeGreaterThan(0);
+    expect(matchedPageIndex).toBeGreaterThan(singlePageStartIndex);
+    expect(fetchMetaIndex).toBeGreaterThan(matchedPageIndex);
+    expect(source.slice(matchedPageIndex, fetchMetaIndex + 60)).toContain('matchedPage ?');
+    expect(source).toContain('slug: matchedPage.slug || resolvePagePath(matchedPage)');
   });
 });

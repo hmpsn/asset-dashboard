@@ -673,6 +673,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
+    researchMode: true,
     feature: 'content-brief-regenerate',
     workspaceId,
   });
@@ -822,6 +823,7 @@ Rules:
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
+    researchMode: true,
     feature: 'content-brief-outline-regen',
     workspaceId,
   });
@@ -1264,6 +1266,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
+    researchMode: true,
     feature: 'content-brief',
     workspaceId,
   });
