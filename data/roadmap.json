@@ -102,6 +102,423 @@
       ]
     },
     {
+      "id": "sprint-platform-health-wave1-operating-model",
+      "name": "Platform Health Wave 1 — Operating Model",
+      "hours": "8-12",
+      "rationale": "Create the operating model for future platform work: domains, file placement, feature templates, and PR readiness checks before deeper refactors begin.",
+      "items": [
+        {
+          "id": "platform-org-bounded-context-map",
+          "title": "Bounded Context Ownership Map",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Define canonical product domains for Client Portal, Inbox, Schema, Content Pipeline, Analytics Intelligence, Brand Engine, Outcomes/ROI, Billing, Integrations, and Platform Foundation. For each domain, document owned routes, components, hooks, API wrappers, shared types, WebSocket events, tests, and docs. Output should make it obvious where new work belongs and which files are shared coordination points."
+        },
+        {
+          "id": "platform-org-feature-folder-convention",
+          "title": "Feature Folder Convention Guide",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Add a lightweight convention for new and touched features: shared/types/<domain>.ts, src/api/<domain>.ts, src/hooks/admin|client domain hooks, src/components/<domain>/, server/routes/<domain>.ts, server/domains/<domain>/ for business logic, and matching tests/docs. This is a forward-looking convention, not a mandate to move the whole repo."
+        },
+        {
+          "id": "platform-confidence-golden-path-templates",
+          "title": "Golden Path Feature Templates",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Create implementation templates for common feature classes: admin CRUD feature, client-visible feature, background job feature, AI generation feature, analytics/intelligence feature, and approval/inbox feature. Each template should list expected files, bounded context, shared types, query keys, WebSocket events, activity logging, tests, docs updates, and verification commands."
+        },
+        {
+          "id": "platform-confidence-pr-readiness-checklist",
+          "title": "PR Readiness Checklist",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Create a short PR checklist that asks: owning bounded context, user-visible state changed, query keys invalidated, WebSocket events emitted, public/client endpoint exposure, activity log proof, tests for actual read path, and verification commands run. This should operationalize existing rules rather than introduce new bureaucracy."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-health-wave2-shipping-confidence",
+      "name": "Platform Health Wave 2 — Shipping Confidence Spine",
+      "hours": "12-20",
+      "rationale": "Turn the operating model into repeatable confidence checks: domain smoke tests, integration maps, feature-class completion gates, and high-value API contract tests.",
+      "items": [
+        {
+          "id": "platform-confidence-domain-smoke-tests",
+          "title": "Domain Smoke Test Matrix",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Define one fast spine test per major bounded context to prove the core flow still works. Candidate flows: Schema generate/validate/send-or-publish, Inbox admin send/client decision/admin update, Content brief/post lifecycle, Analytics insight hydration, Brand Engine voice context injection, and Background Jobs start/progress/complete/result visibility."
+        },
+        {
+          "id": "platform-confidence-integration-surface-map",
+          "title": "Integration Surface Map",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "For every bounded context, document its integration surfaces: external APIs, DB tables, AI calls, background jobs, WebSocket events, React Query keys, client/admin surfaces, public endpoints, and activity types. This complements file ownership by showing what breaks together."
+        },
+        {
+          "id": "platform-confidence-feature-class-dod",
+          "title": "Feature-Class Definition of Done",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Define completion gates by feature class. Examples: UI-only requires visual/mobile verification plus typecheck/build; route writes require integration tests, activity logging, broadcast invalidation, and pr-check; AI generation requires prompt contract, fallback/error tests, and cost tracking; client-facing work requires public endpoint tests, tier/copy review, and actual read-path coverage; background jobs require progress/cancellation/result visibility."
+        },
+        {
+          "id": "platform-confidence-api-contract-tests",
+          "title": "High-Value API Response Contract Tests",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Add or expand contract tests for high-value serialization seams: /api/public/workspace/:id, client inbox endpoints, client intelligence endpoints, content plan/review endpoints, schema validation/review surfaces, and other public/client read paths where a server field can exist but fail to serialize to the consuming UI."
+        },
+        {
+          "id": "platform-org-docs-freshness-pass",
+          "title": "Architecture Docs Freshness Pass",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Refresh docs/workflows/codebase-overview.md, ownership maps, and related architecture docs after the bounded-context convention lands. Ensure docs describe the current app shape rather than older route counts, retired helpers, or outdated module ownership."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-health-wave3-silent-failure-rails",
+      "name": "Platform Health Wave 3 — Silent-Failure Reduction Rails",
+      "hours": "18-30",
+      "rationale": "Reduce correct-looking but miswired code by centralizing serializers, events, AI operation contracts, external fetch behavior, and workspace mutation lifecycle rails.",
+      "items": [
+        {
+          "id": "platform-base-client-safe-serializers",
+          "title": "Client-Safe Serializer Layer",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Create explicit serializers for high-value admin/client/public views such as toPublicWorkspaceView(), toClientInboxItem(), toClientSchemaView(), and toAdminSchemaView(). Goal: stop route handlers from hand-picking fields inline and reduce regressions where the backend stores a field but public/client endpoints forget to expose it."
+        },
+        {
+          "id": "platform-base-domain-event-definitions",
+          "title": "Domain Event Definitions",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Layer a richer event registry over WS_EVENTS that documents event name, owning domain, producer routes/services, payload shape, query keys to invalidate, admin/client listeners, and related activity type. This should prevent drift where a broadcast exists but no listener handles it, or a listener expects a payload field that one emitter does not send."
+        },
+        {
+          "id": "platform-base-ai-operation-registry",
+          "title": "AI Operation Registry",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Build a registry for AI operations that declares feature/domain, provider/model, prose vs structured JSON, response schema/parser, research-mode expectations, cost-tracking key, timeout/retry policy, and whether the operation may run synchronously or must use the background job platform. This extends callAI() from a dispatcher into an auditable contract surface."
+        },
+        {
+          "id": "platform-base-external-fetch-helper",
+          "title": "Server External Fetch Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Create shared helpers for external/public web fetches and provider API fetches. Standardize timeouts, redirect behavior, user-agent/headers, safe URL handling, error classification, expected network TypeError handling, and logging. Migrate high-risk sitemap/page/image/provider fetch call sites first."
+        },
+        {
+          "id": "platform-base-workspace-mutation-helper",
+          "title": "Workspace Mutation Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive."
+        },
+        {
+          "id": "platform-org-extraction-pilot",
+          "title": "Route-to-Service Extraction Pilot",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Choose one bounded context, preferably Schema or Inbox, and move business logic out of route files into server/domains/<domain>/ while preserving all existing URLs, response shapes, broadcasts, activity logs, and tests. Treat this as a proof of the organization pattern before expanding it."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-health-wave4-runtime-operability",
+      "name": "Platform Health Wave 4 — Runtime & Operational Confidence",
+      "hours": "18-30",
+      "rationale": "Improve runtime confidence: know when integrations fail, evaluate AI quality, recover data safely, observe operations, and protect tenant boundaries.",
+      "items": [
+        {
+          "id": "platform-reliability-integration-health-center",
+          "title": "Integration Health Center",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-7h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Create a single operational view for Webflow, GSC, GA4, SEMRush/DataForSEO, Stripe, OpenAI, Anthropic, email, and other critical integrations. Track configured/missing state, last success, last error, quota/rate-limit status, token expiry where applicable, and affected platform features."
+        },
+        {
+          "id": "platform-reliability-ai-evals",
+          "title": "AI Reliability & Evaluation Harness",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "5-8h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Create an evaluation harness for high-value AI features: schema generation, content briefs/posts, rewrites, diagnostics, admin/client chat, and brand/voice outputs. Include golden examples, prompt regression fixtures, expected output-shape tests, provenance/hallucination checks where relevant, and cost/quality comparison hooks by model."
+        },
+        {
+          "id": "platform-reliability-data-integrity-recovery",
+          "title": "Data Integrity & Recovery Drills",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Add recovery confidence practices for SQLite-backed customer-visible state: DB integrity check script, backup/restore drill notes, migration rollback notes, orphaned-row detector, cross-table consistency checks, and a map of which generated artifacts can be rebuilt from source vs must be preserved."
+        },
+        {
+          "id": "platform-reliability-observability-layer",
+          "title": "Observability as Product Infrastructure",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Improve the ability to answer 'what happened?' with per-workspace operation traces, failed job/error dashboards, external API failure rates, AI cost and latency by feature, slow route tracking, and last-success timestamps for critical syncs."
+        },
+        {
+          "id": "platform-reliability-release-safety",
+          "title": "Release Safety Checklist & Smoke Flow",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Create a practical release safety layer: feature-class release checklist, staging smoke suite, deploy notes generated from roadmap items where possible, rollback checklist, feature-flag rollout checklist, and a short post-release monitoring window for risky changes."
+        },
+        {
+          "id": "platform-reliability-tenant-boundary-audit",
+          "title": "Recurring Permission & Tenant Boundary Audit",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Run a recurring audit over workspace scoping, client/admin route separation, public serialization, file upload access, billing/webhook trust boundaries, and known-foreign-ID tests. Focus on high-risk surfaces where a workspace A caller could infer or mutate workspace B data."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-health-wave5-product-lifecycle-discipline",
+      "name": "Platform Health Wave 5 — Product & Lifecycle Discipline",
+      "hours": "14-24",
+      "rationale": "Keep the platform understandable as it grows by managing product surface area, feature flags, deprecations, performance budgets, local onboarding, ADRs, and platform-health cadence.",
+      "items": [
+        {
+          "id": "platform-reliability-product-surface-rationalization",
+          "title": "Product Surface Rationalization",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Review major platform capabilities through a product-surface lens: first-class navigation, context-triggered surfaces, internal-only tools, client-facing differentiators, monetizable capabilities, deprecated-but-present areas, and candidates for progressive disclosure. Goal: reduce cognitive load without deleting valuable capability."
+        },
+        {
+          "id": "platform-confidence-feature-flag-lifecycle",
+          "title": "Feature Flag Lifecycle Management",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Add a lifecycle convention for feature flags: owner, created date, rollout target, removal condition, linked roadmap item, and stale-flag audit cadence. Goal: preserve safe rollout while preventing stale flags from becoming hidden architecture debt."
+        },
+        {
+          "id": "platform-reliability-deprecation-discipline",
+          "title": "Deprecation Lifecycle Discipline",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Codify the lifecycle for duplicate or retired capabilities: deprecated, hidden, read-only, migrated, removed, and contract-tested redirects or safe failures for old URLs/bookmarks. This prevents platform bloat from returning after cleanup work ships."
+        },
+        {
+          "id": "platform-reliability-performance-budgets",
+          "title": "Platform Performance Budgets",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Define budgets beyond bundle size: max AI calls per workflow, max external fetches per workflow, expected job duration, route response targets, query count limits, cache expectations, and escalation rules when a feature exceeds budget."
+        },
+        {
+          "id": "platform-reliability-local-dev-onboarding",
+          "title": "Local Dev & Agent Onboarding Confidence",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Improve first-hour confidence for humans and agents: one command to seed demo data, one command to run core smoke tests, documented env tiers, fake provider mode, fixture workspaces, and a concise local setup checklist."
+        },
+        {
+          "id": "platform-org-recurring-health-sprint",
+          "title": "Recurring Platform Health Sprint Cadence",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Define a recurring platform-health checkpoint every 4-6 product sprints. Keep the scope measurable: fewer oversized modules, clearer owners, updated docs, added contract tests, reduced duplication, and closed pr-check warnings. This is a planning/process item, not a code migration."
+        },
+        {
+          "id": "platform-org-adr-log",
+          "title": "Architecture Decision Record Log",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Create a lightweight ADR log for major architecture choices: background jobs, intelligence slices, feature flags, client/admin route splits, AI dispatch, bounded contexts, and service extraction. Keep entries short: decision, context, alternatives considered, consequences."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-health-wave6-deferred-polish",
+      "name": "Platform Health Wave 6 — Deferred Platform Polish",
+      "hours": "16-28",
+      "rationale": "Park useful but less urgent platform-health work behind the first five waves so it stays visible without competing with higher-confidence unlocks.",
+      "items": [
+        {
+          "id": "platform-org-frontend-container-decomposition",
+          "title": "Frontend Container Decomposition Pass",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "4-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Continue behavior-preserving splits of large client/admin page containers into shells, hooks, and section components. Prioritize high-churn views such as ClientDashboard, InboxTab, HealthTab, and remaining large client views. Avoid visual redesign in the same PR unless the item is explicitly scoped as UI work."
+        },
+        {
+          "id": "platform-org-api-wrapper-cleanup",
+          "title": "API Wrapper Domain Cleanup",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Gradually split broad API wrappers such as src/api/misc.ts and src/api/seo.ts into domain-specific API modules as adjacent features are touched. Keep exports backward-compatible during each migration and avoid moving unrelated endpoints purely for tidiness."
+        },
+        {
+          "id": "platform-org-architecture-drift-checks",
+          "title": "Architecture Drift Checks",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Add advisory checks or docs for route/component files that exceed agreed thresholds, new route modules without a bounded-context owner, new public mutations without WebSocket invalidation, and newly created catch-all API wrappers. Start as warnings or manual review guidance before promoting anything to pr-check errors."
+        },
+        {
+          "id": "platform-confidence-demo-workspaces",
+          "title": "Deterministic QA/Demo Workspaces",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Create seeded QA/demo workspaces for repeatable manual and automated checks: empty/new workspace, free-tier client, growth-tier active client, premium client with content/schema/inbox history, broken-integration workspace, and rich CMS/Webflow workspace. Keep data deterministic enough for smoke tests and visual QA."
+        },
+        {
+          "id": "platform-confidence-risky-module-dashboard",
+          "title": "Risky Module Health Dashboard",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Create a script or report that ranks risky modules by line count, churn, import/export fan-in/out, TODO or hatch comments, test coverage presence, route writes without nearby integration tests, and pr-check warning concentration. Use it to prioritize refactors where they reduce real shipping risk."
+        },
+        {
+          "id": "platform-org-context-required-in-specs",
+          "title": "Require Bounded Context in New Feature Specs",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Update planning templates so every new feature spec names its owning bounded context, shared contracts, route/API surface, cache keys, WebSocket events, and test ownership before implementation begins. This can follow the ownership map once domain names are finalized."
+        },
+        {
+          "id": "platform-org-feature-maturity-scorecard",
+          "title": "Feature Maturity Scorecard",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Define a scorecard for major features: shipped, documented, tested, client-visible, monitored, monetizable, owner assigned, and integrated into intelligence/reporting where relevant. Use it to decide which features deserve first-class navigation vs support-system placement."
+        },
+        {
+          "id": "platform-org-product-surface-audit",
+          "title": "Product Surface Area Audit",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Review the 357-feature audit through a product-lens taxonomy: first-class capabilities, support systems, internal-only infrastructure, client-facing differentiators, and candidates to hide behind progressive disclosure. Goal is to reduce cognitive load without deleting valuable capability."
+        },
+        {
+          "id": "platform-base-collaboration-artifact",
+          "title": "Collaboration Artifact Base",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-7h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Unify the deeper base behind send-to-client surfaces: approval batches, client actions, note-bearing conversations, review items, source payloads, inbox routing section, client visibility, activity logging, and broadcast behavior. Keep existing user-facing terminology and routes stable while reducing per-tool send-to-client wiring."
+        },
+        {
+          "id": "platform-base-url-tab-state-helper",
+          "title": "URL/Tab State Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Create a shared helper or hook for ?tab= search-param tab state, including valid-tab guards, legacy aliases, default fallback, and sender/receiver contract tests. This should reduce custom deep-link wiring and prevent default-tab regressions."
+        },
+        {
+          "id": "platform-base-analytics-date-contract",
+          "title": "Analytics Date/Metric Contract",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Define a shared analytics contract for date-range params, comparison windows, percentage vs decimal semantics, metric labels, empty-state fallbacks, and display formatting. Apply first to GSC, GA4, outcomes, ROI, and reports surfaces where date and metric semantics can drift."
+        },
+        {
+          "id": "platform-base-job-helper-polish",
+          "title": "Background Job Helper Polish",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Add or polish golden helpers for starting jobs, surfacing TaskPanel state, subscribing/polling progress, opening results, handling cancellation, and invalidating domain queries on completion. This builds on the existing background job platform rather than changing its architecture."
+        },
+        {
+          "id": "platform-base-test-seed-unification",
+          "title": "Test Factory and Demo Seed Unification",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Unify test factories and deterministic demo seeds so integration tests, visual QA, and local manual checks can share stable workspace shapes. Coordinate with the deterministic QA/demo workspaces item in the Platform Confidence sprint."
+        }
+      ]
+    },
+    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",

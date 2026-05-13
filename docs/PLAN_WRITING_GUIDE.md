@@ -66,7 +66,21 @@ Rules for the graph:
 - Backend services owning different files can be parallel
 - Frontend components modifying different files can be parallel
 
-### 2. Model assignments per task
+### 2. Bounded context ownership
+
+Name the owning bounded context from [platform-organization.md](./rules/platform-organization.md). For cross-context work, name the primary owner, secondary integrations, shared contracts, and coordination files.
+
+Every plan should state:
+
+- owning bounded context,
+- route/API surface,
+- shared type contracts,
+- React Query keys and invalidation events,
+- WebSocket events,
+- test ownership,
+- and whether the work is new behavior, behavior-preserving extraction, or both.
+
+### 3. Model assignments per task
 
 Use the least capable model that can handle the task:
 
@@ -78,7 +92,7 @@ Use the least capable model that can handle the task:
 | Spec compliance reviewer | `opus` | Review quality scales with model capability |
 | Code quality reviewer | `opus` | Never downgrade reviewers |
 
-### 3. File ownership declarations
+### 4. File ownership declarations
 
 Every parallel task must list what it owns and must not touch:
 
@@ -98,7 +112,7 @@ If you need to change a file not on your ownership list, STOP and report
 back with status NEEDS_CONTEXT. Do not modify files outside your ownership.
 ```
 
-### 4. Cross-phase contracts (multi-phase features only)
+### 5. Cross-phase contracts (multi-phase features only)
 
 A companion guardrails doc listing what each phase exports for downstream:
 
@@ -117,14 +131,14 @@ A companion guardrails doc listing what each phase exports for downstream:
 
 This document lives alongside the plans and gets updated as phases complete.
 
-### 5. Systemic improvements section
+### 6. Systemic improvements section
 
 Every plan must include:
 - **Shared utilities to extract** — if 3+ files do the same fix, extract a helper
 - **pr-check rules to add** — to prevent the same class of bug recurring
 - **Test coverage additions** — what new tests this plan requires
 
-### 6. Verification strategy
+### 7. Verification strategy
 
 Specify *how* to verify each phase, not just "manual verification":
 - Preview screenshots for UI changes

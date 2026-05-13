@@ -4,6 +4,45 @@
 
 ---
 
+## Bounded Context Organization
+
+Before adding a new feature or substantially changing an existing one, identify the owning bounded context in [platform-organization.md](./platform-organization.md). Use that context to decide where server logic, API wrappers, hooks, components, tests, and docs belong.
+
+Preferred shape for new or adjacent work:
+
+```txt
+shared/types/<domain>.ts
+src/api/<domain>.ts
+src/hooks/admin/use<Domain>.ts
+src/hooks/client/useClient<Domain>.ts
+src/components/<domain>/
+server/routes/<domain>.ts
+server/domains/<domain>/
+tests/integration/<domain>.test.ts
+tests/contract/<domain>.test.ts
+docs/rules/<domain>.md
+```
+
+This is a forward-looking convention. Do not move unrelated files just to make the tree look symmetrical.
+
+### Route-To-Service Extraction
+
+Route files should stay thin: auth, validation, request parsing, response shaping, activity logging, and broadcasts. Reusable business behavior belongs in `server/domains/<domain>/` or an existing domain module.
+
+When extracting logic from a route:
+
+- Preserve existing URLs and response shapes.
+- Preserve all `broadcastToWorkspace()` and `addActivity()` behavior.
+- Keep compatibility exports while migrating callers.
+- Run the relevant route integration tests and contract tests.
+- Avoid pairing structural extraction with visual redesign or new product behavior in the same PR.
+
+### API Wrapper Ownership
+
+Prefer domain-specific API modules over adding more unrelated methods to `src/api/misc.ts` or oversized wrappers. If a component still imports from the old barrel, keep a backward-compatible export until callers migrate.
+
+---
+
 ## React Query Data Fetching
 
 All frontend data fetching uses React Query. These are the patterns to follow:
