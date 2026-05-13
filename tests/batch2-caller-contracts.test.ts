@@ -126,15 +126,26 @@ describe('webflow-keywords.ts migration contracts', () => {
 
 describe('webflow SEO route N+1 prevention contracts', () => {
   const applySrc = readRoute('webflow-seo-apply.ts');
+  const jobsSrc = readRoute('jobs.ts');
   const rewriteSrc = readRoute('webflow-seo-bulk-rewrite.ts');
 
-  it('bulk-fix loop: seoContext assembled before the for-of loop (not inside it)', () => {
-    // Pre-assembly must appear before `for (const page of pages)`.
+  it('bulk-fix job loop: seoContext assembled before the page loop (not inside it)', () => {
+    // Pre-assembly must appear before the page loop.
     // If seoContext is assembled inside the loop, 300-page sites fire 300 DB round-trips.
-    const loopIdx = applySrc.indexOf('for (const page of pages)');
+    const routeIdx = applySrc.indexOf("supportedJobType: 'bulk-seo-fix'");
+    expect(routeIdx).toBeGreaterThan(-1);
+    const loopIdx = jobsSrc.indexOf('for (let i = 0; i < pages.length');
     expect(loopIdx).toBeGreaterThan(-1);
-    const beforeLoop = applySrc.slice(0, loopIdx);
+    const beforeLoop = jobsSrc.slice(0, loopIdx);
     expect(beforeLoop).toContain("slices: ['seoContext']");
+  });
+
+  it('bulk-fix job preserves the richer SEO copy prompt contract from the retired sync route', () => {
+    expect(jobsSrc).toContain('callCreativeAI({');
+    expect(jobsSrc).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
+    expect(jobsSrc).toContain('formatPersonasForPrompt(pageSeo?.personas');
+    expect(jobsSrc).toContain('formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase)');
+    expect(jobsSrc).toContain('Use specific language from the knowledge base, not generic filler');
   });
 
   it('bulk-rewrite loop: seoContext assembled before the batch for-loop (not inside it)', () => {

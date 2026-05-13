@@ -10,7 +10,7 @@
 //   - pages with slug → live-domain fetch IS issued (control)
 //   - pages with NO slug and NO publishedPath → NO live-domain fetch issued
 //
-// The bulk-fix route still returns 200; the slug-less page is just processed
+// The bulk-fix background job still completes; the slug-less page is processed
 // without a content excerpt. The AI response itself is mocked.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -19,7 +19,6 @@ import type { AddressInfo } from 'net';
 
 import {
   setupOpenAIMocks,
-  mockOpenAIResponse,
   resetOpenAIMocks,
 } from '../mocks/openai.js';
 import {
@@ -27,11 +26,28 @@ import {
   mockAnthropicResponse,
   resetAnthropicMocks,
 } from '../mocks/anthropic.js';
+import {
+  setupWebflowMocks,
+  mockWebflowSuccess,
+  getCapturedRequests,
+  resetWebflowMocks,
+} from '../mocks/webflow.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import db from '../../server/db/index.js';
+import { listActivity } from '../../server/activity-log.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 
 setupOpenAIMocks();
 setupAnthropicMocks();
+setupWebflowMocks();
+
+vi.mock('../../server/broadcast.js', () => ({
+  setBroadcast: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+}));
 
 // ── Test server ──────────────────────────────────────────────────────────────
 
@@ -55,6 +71,40 @@ async function postJson(baseUrl: string, path: string, body: unknown): Promise<{
   });
   const responseBody = await res.json().catch(() => ({}));
   return { status: res.status, body: responseBody };
+}
+
+async function getJson(baseUrl: string, path: string): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${baseUrl}${path}`);
+  const responseBody = await res.json().catch(() => ({}));
+  return { status: res.status, body: responseBody };
+}
+
+async function startBulkSeoFixJob(
+  baseUrl: string,
+  body: {
+    siteId: string;
+    workspaceId?: string;
+    field: 'title' | 'description';
+    pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null }>;
+  },
+): Promise<{ status: number; job: { status?: string; result?: unknown } }> {
+  const started = await postJson(baseUrl, '/api/jobs', {
+    type: 'bulk-seo-fix',
+    params: body,
+  });
+  if (started.status !== 200) return { status: started.status, job: {} };
+  const jobId = (started.body as { jobId?: string }).jobId;
+  expect(typeof jobId).toBe('string');
+
+  for (let i = 0; i < 40; i++) {
+    const jobRes = await getJson(baseUrl, `/api/jobs/${jobId}`);
+    const job = jobRes.body as { status?: string; result?: unknown };
+    if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+      return { status: started.status, job };
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  throw new Error('Timed out waiting for bulk SEO fix job');
 }
 
 // ── Fetch interceptor ────────────────────────────────────────────────────────
@@ -96,11 +146,14 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
   let stopServer: () => void;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     // Route short-circuits with 500 if OPENAI_API_KEY is unset — mocks intercept the SDK
     // but the route only checks env presence. Set a dummy key for the test.
     process.env.OPENAI_API_KEY = 'test-openai-key';
     resetOpenAIMocks();
     resetAnthropicMocks();
+    resetWebflowMocks();
+    mockWebflowSuccess(/^\/pages\//, {});
     capturedLiveFetches = [];
     ws = seedWorkspace();
     const server = await startTestServer();
@@ -110,6 +163,7 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
   });
 
   afterEach(() => {
+    resetWebflowMocks();
     restoreFetch();
     stopServer();
     ws.cleanup();
@@ -117,11 +171,10 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
 
   it('does NOT fetch the homepage for a page with no slug and no publishedPath', async () => {
     // Mock the bulk-fix AI response so the route completes
-    // Route uses feature:'seo-bulk-fix' with callCreativeAI (Anthropic first, OpenAI fallback)
-    mockAnthropicResponse('seo-bulk-fix', 'Mocked SEO Title');
-    mockOpenAIResponse('seo-bulk-fix', 'Mocked SEO Title');
+    mockAnthropicResponse('job-bulk-seo-fix', 'Mocked SEO Title');
 
-    const { status } = await postJson(baseUrl, `/api/webflow/seo-bulk-fix/${ws.webflowSiteId}`, {
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
       workspaceId: ws.workspaceId,
       field: 'title',
       pages: [
@@ -131,6 +184,7 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
     });
 
     expect(status).toBe(200);
+    expect(job.status).toBe('done');
 
     // The only live-domain fetch that would happen is `${baseUrl}/` — the homepage.
     // Guard ensures no fetch is issued at all for this page.
@@ -143,11 +197,10 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
   });
 
   it('DOES fetch the page URL when slug is present (control)', async () => {
-    // Route uses feature:'seo-bulk-fix' with callCreativeAI (Anthropic first, OpenAI fallback)
-    mockAnthropicResponse('seo-bulk-fix', 'Mocked SEO Title');
-    mockOpenAIResponse('seo-bulk-fix', 'Mocked SEO Title');
+    mockAnthropicResponse('job-bulk-seo-fix', 'Mocked SEO Title');
 
-    const { status } = await postJson(baseUrl, `/api/webflow/seo-bulk-fix/${ws.webflowSiteId}`, {
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
       workspaceId: ws.workspaceId,
       field: 'title',
       pages: [
@@ -156,6 +209,7 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
     });
 
     expect(status).toBe(200);
+    expect(job.status).toBe('done');
 
     // Expect at least one live-domain fetch, and it should NOT be the bare homepage
     const pageFetches = capturedLiveFetches.filter(u => {
@@ -166,11 +220,10 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
   });
 
   it('does NOT fetch the homepage for a slug-less page even when mixed with slug-ful pages', async () => {
-    // Route uses feature:'seo-bulk-fix' with callCreativeAI (Anthropic first, OpenAI fallback)
-    mockAnthropicResponse('seo-bulk-fix', 'Mocked SEO Title');
-    mockOpenAIResponse('seo-bulk-fix', 'Mocked SEO Title');
+    mockAnthropicResponse('job-bulk-seo-fix', 'Mocked SEO Title');
 
-    const { status } = await postJson(baseUrl, `/api/webflow/seo-bulk-fix/${ws.webflowSiteId}`, {
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
       workspaceId: ws.workspaceId,
       field: 'title',
       pages: [
@@ -180,6 +233,7 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
     });
 
     expect(status).toBe(200);
+    expect(job.status).toBe('done');
 
     const homepageFetches = capturedLiveFetches.filter(u => {
       const trimmed = u.replace(/^https?:\/\/[^/]+/, '');
@@ -189,5 +243,104 @@ describe('bulk SEO fix — slug-less page fetch guard', () => {
 
     const aboutFetches = capturedLiveFetches.filter(u => u.includes('/about'));
     expect(aboutFetches.length).toBeGreaterThan(0);
+  });
+
+  it('records workspace side effects for successful bulk SEO jobs', async () => {
+    mockAnthropicResponse('job-bulk-seo-fix', 'Mocked SEO Title');
+
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
+      workspaceId: ws.workspaceId,
+      field: 'title',
+      pages: [
+        { pageId: 'page-with-slug', title: 'Services', slug: 'services' },
+      ],
+    });
+
+    expect(status).toBe(200);
+    expect(job.status).toBe('done');
+
+    const pageState = db.prepare(`
+      SELECT status, source, fields FROM page_edit_states
+      WHERE workspace_id = ? AND page_id = ?
+    `).get(ws.workspaceId, 'page-with-slug') as { status: string; source: string; fields: string } | undefined;
+    expect(pageState).toEqual(expect.objectContaining({ status: 'live', source: 'bulk-fix' }));
+    expect(pageState?.fields).toContain('title');
+
+    const seoChange = db.prepare(`
+      SELECT page_slug, page_title, source, fields FROM seo_changes
+      WHERE workspace_id = ? AND page_id = ? AND source = 'bulk-fix'
+    `).get(ws.workspaceId, 'page-with-slug') as { page_slug: string; page_title: string; source: string; fields: string } | undefined;
+    expect(seoChange).toEqual(expect.objectContaining({
+      page_slug: '/services',
+      page_title: 'Services',
+      source: 'bulk-fix',
+    }));
+    expect(seoChange?.fields).toContain('title');
+
+    expect(broadcastToWorkspace).toHaveBeenCalledWith(ws.workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds: ['page-with-slug'],
+      fields: ['title'],
+      source: 'bulk-fix',
+    });
+
+    const activity = listActivity(ws.workspaceId).find(entry => entry.type === 'seo_updated' && entry.title.includes('Bulk title optimization'));
+    expect(activity).toBeDefined();
+    expect(activity?.metadata).toEqual(expect.objectContaining({
+      field: 'title',
+      pagesUpdated: 1,
+      totalPages: 1,
+      pageIds: ['page-with-slug'],
+    }));
+  });
+
+  it('requires explicit workspaceId for bulk SEO jobs', async () => {
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
+      field: 'title',
+      pages: [
+        { pageId: 'page-with-slug', title: 'Services', slug: 'services' },
+      ],
+    });
+
+    expect(status).toBe(400);
+    expect(job).toEqual({});
+  });
+
+  it('strips synthetic CMS page IDs before Webflow writes', async () => {
+    mockAnthropicResponse('job-bulk-seo-fix', 'Mocked SEO Title');
+
+    const { status, job } = await startBulkSeoFixJob(baseUrl, {
+      siteId: ws.webflowSiteId,
+      workspaceId: ws.workspaceId,
+      field: 'title',
+      pages: [
+        { pageId: 'cms-collection-item', title: 'CMS Item', slug: 'cms-item' },
+        { pageId: 'real-page', title: 'Real Page', slug: 'real-page' },
+      ],
+    });
+
+    expect(status).toBe(200);
+    expect(job.status).toBe('done');
+
+    const webflowWrites = getCapturedRequests().filter(req => req.method === 'PUT' && req.endpoint.startsWith('/pages/'));
+    expect(webflowWrites.map(req => req.endpoint)).toEqual(['/pages/real-page']);
+
+    const cmsState = db.prepare(`
+      SELECT page_id FROM page_edit_states
+      WHERE workspace_id = ? AND page_id = ?
+    `).get(ws.workspaceId, 'cms-collection-item');
+    expect(cmsState).toBeUndefined();
+  });
+
+  it('blocks the retired synchronous bulk SEO fix route', async () => {
+    const { status, body } = await postJson(baseUrl, `/api/webflow/seo-bulk-fix/${ws.webflowSiteId}`, {
+      workspaceId: ws.workspaceId,
+      field: 'title',
+      pages: [{ pageId: 'page-with-slug', title: 'Services', slug: 'services' }],
+    });
+
+    expect(status).toBe(409);
+    expect(body).toEqual(expect.objectContaining({ supportedJobType: 'bulk-seo-fix' }));
   });
 });

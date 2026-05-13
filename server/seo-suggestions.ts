@@ -103,6 +103,27 @@ export function listSuggestions(workspaceId: string, field?: 'title' | 'descript
   return rows.map(rowToSuggestion);
 }
 
+/** Read one pending suggestion for mutation context. */
+export function getPendingSuggestion(workspaceId: string, suggestionId: string): SeoSuggestion | null {
+  const row = db.prepare(`
+    SELECT * FROM seo_suggestions
+    WHERE workspace_id = ? AND id = ? AND status = 'pending'
+  `).get(workspaceId, suggestionId) as SuggestionRow | undefined;
+  return row ? rowToSuggestion(row) : null;
+}
+
+/** Read pending suggestions before a bulk status mutation. */
+export function listPendingSuggestionsByIds(workspaceId: string, suggestionIds?: string[]): SeoSuggestion[] {
+  if (!suggestionIds?.length) return listSuggestions(workspaceId);
+  const placeholders = suggestionIds.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT * FROM seo_suggestions
+    WHERE workspace_id = ? AND status = 'pending' AND id IN (${placeholders})
+    ORDER BY created_at DESC
+  `).all(workspaceId, ...suggestionIds) as SuggestionRow[];
+  return rows.map(rowToSuggestion);
+}
+
 /** Select a variation for a suggestion. */
 export function selectVariation(workspaceId: string, suggestionId: string, selectedIndex: number): boolean {
   const result = db.prepare(`

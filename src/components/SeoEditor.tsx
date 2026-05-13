@@ -33,7 +33,7 @@ interface Props {
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
-  const { cancelJob, trackJob } = useBackgroundTasks();
+  const { cancelJob, startJob, trackJob } = useBackgroundTasks();
   const { toast } = useToast();
   
   // React Query hook replaces manual data fetching
@@ -208,6 +208,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     analyzedPages,
     setLocalAnalyzedPages,
     queryClient,
+    startJob,
     trackJob,
     cancelJob,
     refetchSuggestions,

@@ -217,9 +217,6 @@ export const webflow = {
   publish: (siteId: string, workspaceId?: string) =>
     post<unknown>(`/api/webflow/publish/${siteId}${workspaceQuery(workspaceId)}`),
 
-  bulkFix: (siteId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/seo-bulk-fix/${siteId}`, body),
-
   assets: (siteId: string, workspaceId?: string) =>
     get<unknown[]>(`/api/webflow/assets/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 

@@ -2,7 +2,7 @@
  * jobs routes — extracted from server/index.ts
  *
  * @reads jobs, workspaces, snapshots, schema_snapshots, recommendations, workspace_pages, page_keywords, google_analytics, search_console, webflow_api, content_briefs
- * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, seo_changes, usage_tracking, activities, content_posts
+ * @writes jobs, snapshots, schema_snapshots, recommendations, webflow_assets, page_keywords, page_edit_states, seo_changes, usage_tracking, activities, content_posts
  */
 import { Router } from 'express';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -12,9 +12,10 @@ import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
+import { callCreativeAI } from '../content-posts-ai.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
+import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
@@ -28,7 +29,6 @@ import {
 } from '../jobs.js';
 import { APP_PASSWORD, signAdminToken } from '../middleware.js';
 import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
-import { callAI } from '../ai.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
 import { getBrief } from '../content-brief.js';
 import {
@@ -67,12 +67,18 @@ import {
 } from '../workspace-context-generation-job.js';
 import { createLogger } from '../logger.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import {
+  buildWorkspaceIntelligence,
+  formatKeywordsForPrompt,
+  formatKnowledgeBaseForPrompt,
+  formatPersonasForPrompt,
+} from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
 import { isProgrammingError } from '../errors.js';
@@ -472,11 +478,17 @@ router.post('/api/jobs', async (req, res) => {
         // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
         // in routes/webflow-seo-apply.ts accepts publishedPath; any frontend caller of this
         // job type must mirror that contract.
-        const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
-        if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
-        const activeBulkSeo = hasActiveJob('bulk-seo-fix', bwsId);
+        const { siteId: seoSiteId, pages: rawPages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+        const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
+        if (!seoSiteId || !pages.length || !field || !bwsId) return res.status(400).json({ error: 'siteId, workspaceId, pages, field required' });
+        const bulkWs = getWorkspace(bwsId);
+        const bulkSeoWorkspaceId = bwsId;
+        if (!bulkWs || bulkWs.webflowSiteId !== seoSiteId) {
+          return res.status(403).json({ error: 'You do not have access to this workspace' });
+        }
+        const activeBulkSeo = hasActiveJob('bulk-seo-fix', bulkSeoWorkspaceId);
         if (activeBulkSeo) return res.status(409).json({ error: 'A bulk SEO fix is already running', jobId: activeBulkSeo.id });
-        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bwsId });
+        const job = createJob('bulk-seo-fix', { message: `Fixing ${field}s for ${pages.length} pages...`, total: pages.length, workspaceId: bulkSeoWorkspaceId });
         res.json({ jobId: job.id });
         (async () => {
           try {
@@ -486,24 +498,30 @@ router.post('/api/jobs', async (req, res) => {
             if (!openaiKey) { updateJob(job.id, { status: 'error', error: 'OPENAI_API_KEY not configured', message: 'Missing API key' }); return; }
 
             // Resolve base URL for page content fetching
-            const bulkWs = bwsId ? getWorkspace(bwsId) : listWorkspaces().find(w => w.webflowSiteId === seoSiteId);
             const bulkBaseUrl = await resolveBaseUrl({ liveDomain: bulkWs?.liveDomain, webflowSiteId: seoSiteId }, token);
             const bulkBrandName = getBrandName(bulkWs);
+            const bwsIntel = await buildWorkspaceIntelligence(bulkSeoWorkspaceId, { slices: ['seoContext'] });
+            const bwsSeo = bwsIntel.seoContext;
 
             const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
-                const bwsSlices = ['seoContext'] as const;
                 const bulkJobPagePath = tryResolvePagePath(page);
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: bulkJobPagePath });
-                const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
+                const pageSeo = bwsSeo ? { ...bwsSeo } : undefined;
+                if (pageSeo?.strategy?.pageMap?.length) {
+                  const pageKeywords = findPageMapEntryForPage(pageSeo.strategy.pageMap, page);
+                  if (pageKeywords) pageSeo.pageKeywords = pageKeywords;
+                }
+                const kwb = formatKeywordsForPrompt(pageSeo);
                 // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
-                const bvb = bwsIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
+                const bvb = pageSeo?.effectiveBrandVoiceBlock ?? '';
+                const personasBlock = formatPersonasForPrompt(pageSeo?.personas ?? []);
+                const knowledgeBlock = formatKnowledgeBaseForPrompt(pageSeo?.knowledgeBase);
 
                 // Fetch page content for context (best-effort)
-                let contentExcerpt = '';
-                if (bulkBaseUrl && bulkJobPagePath) {
+                let contentExcerpt = page.pageContent || '';
+                if (!contentExcerpt && bulkBaseUrl && bulkJobPagePath) {
                   try {
                     const htmlRes = await fetch(`${bulkBaseUrl}${bulkJobPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
                     if (htmlRes.ok) {
@@ -514,19 +532,20 @@ router.post('/api/jobs', async (req, res) => {
                 }
                 const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
                 const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
+                const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
+                const extraContext = [personasBlock, knowledgeBlock].filter(Boolean).join('');
 
                 const prompt = field === 'description'
-                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided\nReturn ONLY the text.`
-                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided\nReturn ONLY the text.`;
-                const aiResult = await callAI({
-                  model: 'gpt-5.4-mini',
-                  messages: [{ role: 'user', content: prompt }],
-                  maxTokens: 200,
-                  temperature: 0.7,
+                  ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
+                  : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${kwb}${bvb}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
+                const aiText = await callCreativeAI({
+                  systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId, 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.'),
+                  userPrompt: prompt,
+                  maxTokens: 150,
                   feature: 'job-bulk-seo-fix',
-                  workspaceId: bwsId,
+                  workspaceId: bulkSeoWorkspaceId,
                 });
-                let text = aiResult.text;
+                let text = aiText;
                 text = text.replace(/^["']|["']$/g, '');
                 const maxLen = field === 'description' ? 160 : 60;
                 if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }
@@ -536,11 +555,9 @@ router.post('/api/jobs', async (req, res) => {
                   if (!seoResult.success) {
                     results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error ?? 'Webflow API error' });
                   } else {
-                    if (bwsId) {
-                      updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
-                      const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
-                      recordSeoChange(bwsId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
-                    }
+                    updatePageState(bulkSeoWorkspaceId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
+                    const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
+                    recordSeoChange(bulkSeoWorkspaceId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
                     results.push({ pageId: page.pageId, text, applied: true });
                   }
                 } else {
@@ -552,14 +569,21 @@ router.post('/api/jobs', async (req, res) => {
               }
               updateJob(job.id, { progress: i + 1, message: `Fixed ${i + 1}/${pages.length} ${field}s` });
             }
-            updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${results.filter(r => r.applied).length}/${pages.length} ${field}s updated` });
-            if (bwsId) {
-              addActivity(bwsId, 'seo_updated',
-                `Bulk ${field} optimization: ${results.filter(r => r.applied).length} pages updated`,
-                `AI-generated ${field}s applied to ${results.filter(r => r.applied).length}/${pages.length} pages`,
-                { field, pagesUpdated: results.filter(r => r.applied).length, totalPages: pages.length }
-              );
+            const appliedResults = results.filter(r => r.applied);
+            updateJob(job.id, { status: 'done', result: { results, field }, progress: pages.length, message: `Done — ${appliedResults.length}/${pages.length} ${field}s updated` });
+            const appliedPageIds = appliedResults.map(r => r.pageId);
+            if (appliedPageIds.length > 0) {
+              broadcastToWorkspace(bulkSeoWorkspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+                pageIds: appliedPageIds,
+                fields: [field],
+                source: 'bulk-fix',
+              });
             }
+            addActivity(bulkSeoWorkspaceId, 'seo_updated',
+              `Bulk ${field} optimization: ${appliedResults.length} pages updated`,
+              `AI-generated ${field}s applied to ${appliedResults.length}/${pages.length} pages`,
+              { field, pagesUpdated: appliedResults.length, totalPages: pages.length, pageIds: appliedPageIds }
+            );
           } catch (err) {
             if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-seo-fix job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: bulk-seo-fix job failed — degrading gracefully');

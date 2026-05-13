@@ -81,11 +81,14 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
 
   it('broadcasts and logs bulk SEO apply writes', () => {
     const routeSrc = readFileSync('server/routes/webflow-seo-apply.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO mutation data-flow
+    const jobsSrc = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — source contract for background bulk SEO mutation data-flow
 
-    expect(routeSrc).toContain("source: 'bulk-fix'");
+    expect(jobsSrc).toContain("case 'bulk-seo-fix'");
+    expect(jobsSrc).toContain("source: 'bulk-fix'");
     expect(routeSrc).toContain("source: 'pattern-apply'");
-    expect(routeSrc).toContain('broadcastToWorkspace(bulkWsId, WS_EVENTS.PAGE_STATE_UPDATED');
+    expect(jobsSrc).toContain('broadcastToWorkspace(bulkSeoWorkspaceId, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(routeSrc).toContain('broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED');
+    expect(jobsSrc).toContain("addActivity(bulkSeoWorkspaceId, 'seo_updated'");
     expect(routeSrc).toContain("addActivity(ws.id, 'seo_updated'");
     expect(routeSrc).toContain('if (!ws || ws.webflowSiteId !== siteId)');
   });

@@ -1,7 +1,8 @@
 /**
  * React Query hook for SEO editor pages data.
- * Fetches static Webflow pages only. CMS collection items are edited
- * through the separate CmsEditor component which has real item IDs.
+ * Fetches static Webflow pages plus sitemap-discovered CMS pages.
+ * CMS rows use synthetic IDs for review/draft context only; direct Webflow
+ * writes remain guarded by the editor filters and server endpoint checks.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +26,7 @@ export function useSeoEditor(siteId: string, workspaceId?: string) {
   return useQuery({
     queryKey: queryKeys.admin.seoEditor(siteId, workspaceId),
     queryFn: async (): Promise<PageMeta[]> => {
-      const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
+      const response = await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`);
       return Array.isArray(response) ? response : [];
     },
     staleTime: STALE_TIMES.FAST,

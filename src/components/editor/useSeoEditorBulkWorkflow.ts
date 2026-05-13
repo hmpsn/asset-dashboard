@@ -38,6 +38,7 @@ interface UseSeoEditorBulkWorkflowArgs {
   analyzedPages: Set<string>;
   setLocalAnalyzedPages: React.Dispatch<React.SetStateAction<Set<string>>>;
   queryClient: QueryClient;
+  startJob: (type: BackgroundJobType, params: Record<string, unknown>) => Promise<string | null>;
   trackJob: (type: BackgroundJobType, jobId: string, meta: Record<string, unknown>) => void;
   cancelJob: (jobId: string) => Promise<void> | void;
   refetchSuggestions: () => Promise<unknown> | void;
@@ -53,6 +54,7 @@ export function useSeoEditorBulkWorkflow({
   analyzedPages,
   setLocalAnalyzedPages,
   queryClient,
+  startJob,
   trackJob,
   cancelJob,
   refetchSuggestions,
@@ -206,7 +208,8 @@ export function useSeoEditorBulkWorkflow({
     setBulkFixing(true);
     setBulkResults(null);
     try {
-      const data = await post<{ results?: Array<{ applied: boolean }> }>(`/api/webflow/seo-bulk-fix/${siteId}`, {
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.BULK_SEO_FIX, {
+        siteId,
         workspaceId,
         field,
         pages: pagesNeedingFix.map(page => ({
@@ -218,13 +221,15 @@ export function useSeoEditorBulkWorkflow({
           currentDescription: page.seo?.description,
         })),
       });
-      const applied = data.results?.filter((result: { applied: boolean }) => result.applied).length || 0;
-      setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
-      setTimeout(() => setBulkResults(null), 5000);
+      if (jobId) {
+        setBulkResults(`Started background ${field === 'title' ? 'title' : 'description'} fixes for ${pagesNeedingFix.length} pages.`);
+        setTimeout(() => setBulkResults(null), 5000);
+      } else {
+        setBulkResults('Bulk fix could not be started.');
+      }
     } catch (err) {
       console.error('SeoEditor operation failed:', err);
-      setBulkResults('Bulk fix failed.');
+      setBulkResults('Bulk fix could not be started.');
     } finally {
       setBulkFixing(false);
     }
