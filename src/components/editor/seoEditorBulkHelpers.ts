@@ -10,6 +10,7 @@ export interface SeoPatternApplyPagePayload {
   pageId: string;
   title: string;
   slug: string | undefined;
+  publishedPath: string | null | undefined;
   currentValue: string;
 }
 
@@ -68,6 +69,7 @@ export function buildPatternApplyPayload(
       pageId: item.pageId,
       title: page?.title || '',
       slug: page?.slug,
+      publishedPath: page?.publishedPath,
       currentValue: item.oldValue,
     };
   });

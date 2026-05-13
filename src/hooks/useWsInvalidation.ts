@@ -97,6 +97,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
     },
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+    },
     [WS_EVENTS.CONTENT_PUBLISHED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });

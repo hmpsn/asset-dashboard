@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
   updateJob: vi.fn(),
   unregisterAbort: vi.fn(),
   isJobCancelled: vi.fn(() => false),
-  callOpenAI: vi.fn(),
+  callAI: vi.fn(),
+  getConfiguredProvider: vi.fn(() => null),
   getWorkspacePages: vi.fn(),
   getWorkspace: vi.fn(() => ({ id: 'ws_1', liveDomain: 'https://example.com' })),
   resolveBaseUrl: vi.fn(),
@@ -53,7 +54,7 @@ vi.mock('../../server/jobs.js', () => ({
   isJobCancelled: mocks.isJobCancelled,
 }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.logger) }));
-vi.mock('../../server/openai-helpers.js', () => ({ callOpenAI: mocks.callOpenAI }));
+vi.mock('../../server/ai.js', () => ({ callAI: mocks.callAI }));
 vi.mock('../../server/page-keywords.js', () => ({
   clearAnalysisFields: mocks.clearAnalysisFields,
   countAnalyzedPages: mocks.countAnalyzedPages,
@@ -63,7 +64,7 @@ vi.mock('../../server/page-keywords.js', () => ({
   upsertPageKeywordsBatch: mocks.upsertPageKeywordsBatch,
 }));
 vi.mock('../../server/seo-data-provider.js', () => ({
-  getConfiguredProvider: vi.fn(() => null),
+  getConfiguredProvider: mocks.getConfiguredProvider,
   getProviderDisplayName: vi.fn(() => 'Provider'),
 }));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
@@ -96,7 +97,8 @@ describe('page-analysis job hardening', () => {
     mocks.discoverCmsUrls.mockResolvedValue({ cmsUrls: [] });
     mocks.getSiteSubdomain.mockResolvedValue(null);
     mocks.buildWorkspaceIntelligence.mockResolvedValue({ seoContext: {} });
-    mocks.callOpenAI.mockResolvedValue({ text: '{}' });
+    mocks.callAI.mockResolvedValue({ text: '{}' });
+    mocks.getConfiguredProvider.mockReturnValue(null);
     mocks.parseJsonSafe.mockReturnValue({
       primaryKeyword: 'home service',
       secondaryKeywords: [],
@@ -131,7 +133,7 @@ describe('page-analysis job hardening', () => {
       message: 'No pages were discovered for analysis. Sync Webflow pages or check the site connection.',
       result: expect.objectContaining({ analyzed: 0, skipped: 0, skippedFetch: 0, failed: 0, total: 0 }),
     }));
-    expect(mocks.callOpenAI).not.toHaveBeenCalled();
+    expect(mocks.callAI).not.toHaveBeenCalled();
   });
 
   it('finishes with result counters when all discovered pages are already analyzed', async () => {
@@ -145,7 +147,7 @@ describe('page-analysis job hardening', () => {
       message: 'All 1 pages already analyzed',
       result: expect.objectContaining({ analyzed: 0, skipped: 1, skippedFetch: 0, failed: 0, total: 1 }),
     }));
-    expect(mocks.callOpenAI).not.toHaveBeenCalled();
+    expect(mocks.callAI).not.toHaveBeenCalled();
   });
 
   it('sets a user-facing terminal message when OpenAI is not configured', async () => {
@@ -160,7 +162,7 @@ describe('page-analysis job hardening', () => {
       message: 'Page analysis needs an OpenAI API key before it can run.',
       result: expect.objectContaining({ analyzed: 0, skipped: 0, skippedFetch: 0, failed: 0, total: 1 }),
     }));
-    expect(mocks.callOpenAI).not.toHaveBeenCalled();
+    expect(mocks.callAI).not.toHaveBeenCalled();
   });
 
   it('skips AI analysis when all page HTML fetch attempts fail', async () => {
@@ -172,7 +174,7 @@ describe('page-analysis job hardening', () => {
     await runPageAnalysisJob({ jobId: 'job_fetch_fail', siteId: 'site_1', workspaceId: 'ws_1' });
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect(mocks.callOpenAI).not.toHaveBeenCalled();
+    expect(mocks.callAI).not.toHaveBeenCalled();
     expect(mocks.logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ page: '/' }),
       'Page analysis skipped because no usable HTML content was available',
@@ -188,7 +190,7 @@ describe('page-analysis job hardening', () => {
     mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Home', slug: '', path: '/', seo: {} }]);
     mocks.resolveBaseUrl.mockResolvedValue('https://example.com');
     globalThis.fetch = vi.fn(async () => ({ ok: true, text: async () => '<html><title>Home</title><main>Service page</main></html>' })) as typeof fetch;
-    mocks.callOpenAI.mockRejectedValue(new Error('AI unavailable'));
+    mocks.callAI.mockRejectedValue(new Error('AI unavailable'));
 
     await runPageAnalysisJob({ jobId: 'job_ai_fail', siteId: 'site_1', workspaceId: 'ws_1' });
 
@@ -216,5 +218,71 @@ describe('page-analysis job hardening', () => {
       message: 'Cancelled — 1 of 1 pages analyzed',
       result: expect.objectContaining({ analyzed: 1, skipped: 0, skippedFetch: 0, failed: 0, total: 1 }),
     }));
+  });
+
+  it('zeros AI-invented keyword metrics in bulk page analysis when provider has no exact match', async () => {
+    const provider = { name: 'mock', getKeywordMetrics: vi.fn().mockResolvedValue([]) };
+    mocks.getConfiguredProvider.mockReturnValue(provider);
+    mocks.getPageKeyword.mockReturnValue({
+      pagePath: '/',
+      pageTitle: 'Home',
+      primaryKeyword: 'invented keyword',
+      secondaryKeywords: [],
+      keywordDifficulty: 99,
+      monthlyVolume: 9999,
+    });
+    mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Home', slug: '', path: '/', seo: {} }]);
+    mocks.resolveBaseUrl.mockResolvedValue('https://example.com');
+    globalThis.fetch = vi.fn(async () => ({ ok: true, text: async () => '<html><title>Home</title><main>Service page</main></html>' })) as typeof fetch;
+    mocks.parseJsonSafe.mockReturnValue({
+      primaryKeyword: 'invented keyword',
+      secondaryKeywords: [],
+      optimizationIssues: [],
+      recommendations: [],
+      contentGaps: [],
+      optimizationScore: 80,
+      primaryKeywordPresence: { inTitle: true, inMeta: false, inContent: true, inSlug: false },
+      longTailKeywords: [],
+      competitorKeywords: [],
+      estimatedDifficulty: 'high',
+      keywordDifficulty: 99,
+      monthlyVolume: 9999,
+      topicCluster: 'services',
+      searchIntent: 'commercial',
+      searchIntentConfidence: 0.9,
+    });
+
+    await runPageAnalysisJob({ jobId: 'job_zero_metrics', siteId: 'site_1', workspaceId: 'ws_1' });
+
+    expect(mocks.upsertPageKeywordsBatch).toHaveBeenCalledWith('ws_1', [
+      expect.objectContaining({
+        primaryKeyword: 'invented keyword',
+        keywordDifficulty: 0,
+        monthlyVolume: 0,
+      }),
+    ]);
+  });
+
+  it('uses exact provider keyword metrics in bulk page analysis when available', async () => {
+    const provider = {
+      name: 'mock',
+      getKeywordMetrics: vi.fn().mockResolvedValue([
+        { keyword: 'home service', difficulty: 37, volume: 420, cpc: 1, competition: 0.2, results: 0, trend: [] },
+      ]),
+    };
+    mocks.getConfiguredProvider.mockReturnValue(provider);
+    mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Home', slug: '', path: '/', seo: {} }]);
+    mocks.resolveBaseUrl.mockResolvedValue('https://example.com');
+    globalThis.fetch = vi.fn(async () => ({ ok: true, text: async () => '<html><title>Home</title><main>Service page</main></html>' })) as typeof fetch;
+
+    await runPageAnalysisJob({ jobId: 'job_provider_metrics', siteId: 'site_1', workspaceId: 'ws_1' });
+
+    expect(mocks.upsertPageKeywordsBatch).toHaveBeenCalledWith('ws_1', [
+      expect.objectContaining({
+        primaryKeyword: 'home service',
+        keywordDifficulty: 37,
+        monthlyVolume: 420,
+      }),
+    ]);
   });
 });

@@ -8,17 +8,37 @@ import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
-import { stripCodeFences } from '../helpers.js';
+import { applyBulkKeywordGuards, stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { addActivity } from '../activity-log.js';
+import { requireWorkspaceAccessFromBody } from '../auth.js';
 
 const log = createLogger('webflow-keywords');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
+async function getProviderMetricsForKeyword(workspaceId: string, keyword: string): Promise<{ difficulty: number; volume: number } | null> {
+  const trimmedKeyword = keyword.trim();
+  if (!trimmedKeyword) return null;
+  const ws = getWorkspace(workspaceId);
+  const provider = getConfiguredProvider(ws?.seoDataProvider);
+  if (!provider) return null;
+  try {
+    const metrics = await provider.getKeywordMetrics([trimmedKeyword], workspaceId).catch(() => []);
+    const match = metrics.find(m => m.keyword.toLowerCase() === trimmedKeyword.toLowerCase());
+    if (!match) return null;
+    return { difficulty: match.difficulty, volume: match.volume };
+  } catch (err) {
+    log.warn({ err, workspaceId, keyword: trimmedKeyword }, 'keyword provider metrics lookup failed during page analysis persist');
+    return null;
+  }
+}
+
 // --- AI Keyword Analysis ---
-router.post('/api/webflow/keyword-analysis', async (req, res) => {
+router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { pageTitle, seoTitle, metaDescription, pageContent, slug, siteContext, workspaceId } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
 
@@ -109,8 +129,14 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 
     const cleaned = stripCodeFences(aiResult.text);
     const analysis = parseJsonFallback(cleaned, null);
-    if (analysis) {
-      res.json(analysis);
+    if (analysis && typeof analysis === 'object' && !Array.isArray(analysis)) {
+      const guardedAnalysis = analysis as Record<string, unknown>;
+      const responseMetrics = await getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''));
+      applyBulkKeywordGuards(guardedAnalysis, responseMetrics ? kwBlock : '');
+      guardedAnalysis.keywordDifficulty = responseMetrics?.difficulty ?? 0;
+      guardedAnalysis.monthlyVolume = responseMetrics?.volume ?? 0;
+      guardedAnalysis.hasProviderMetrics = !!responseMetrics;
+      res.json(guardedAnalysis);
     } else {
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
@@ -121,10 +147,11 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 });
 
 // --- Persist Page Analysis to Keyword Strategy ---
-router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { workspaceId, pagePath, analysis } = req.body as {
+router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromBody(), async (req, res) => {
+  const { workspaceId, pagePath, pageTitle, analysis } = req.body as {
     workspaceId: string;
     pagePath: string;
+    pageTitle?: string;
     analysis: {
       primaryKeyword?: string;
       secondaryKeywords?: string[];
@@ -157,10 +184,14 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
 
     // Merge with existing entry (preserves GSC/SEMRush enrichment and keyword assignments)
     const existing = getPageKeyword(workspaceId, normalized);
+    const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || '';
+    const providerMetrics = await getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword);
+    const guardedKeywordDifficulty = providerMetrics?.difficulty ?? 0;
+    const guardedMonthlyVolume = providerMetrics?.volume ?? 0;
     upsertPageKeyword(workspaceId, {
       pagePath: normalized,
-      pageTitle: existing?.pageTitle || '',
-      primaryKeyword: analysis.primaryKeyword || existing?.primaryKeyword || '',
+      pageTitle: pageTitle || existing?.pageTitle || '',
+      primaryKeyword: resolvedPrimaryKeyword,
       secondaryKeywords: analysis.secondaryKeywords?.length ? analysis.secondaryKeywords : existing?.secondaryKeywords || [],
       searchIntent: analysis.searchIntent || existing?.searchIntent,
       optimizationIssues: analysis.optimizationIssues || [],
@@ -172,8 +203,8 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       longTailKeywords: analysis.longTailKeywords || [],
       competitorKeywords: analysis.competitorKeywords || [],
       estimatedDifficulty: analysis.estimatedDifficulty,
-      keywordDifficulty: analysis.keywordDifficulty,
-      monthlyVolume: analysis.monthlyVolume,
+      keywordDifficulty: guardedKeywordDifficulty,
+      monthlyVolume: guardedMonthlyVolume,
       topicCluster: analysis.topicCluster,
       searchIntentConfidence: analysis.searchIntentConfidence,
       // Preserve enrichment fields from existing entry
@@ -185,6 +216,14 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
     });
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
+    addActivity(
+      workspaceId,
+      'page_analysis',
+      `Page analysis updated for ${pageTitle || existing?.pageTitle || normalized}`,
+      undefined,
+      { pagePath: normalized },
+    );
+    broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { pagePath: normalized, source: 'page-analysis' });
     // Bridge #5: page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
       invalidateIntelligenceCache(workspaceId);

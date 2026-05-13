@@ -71,6 +71,7 @@ export const queryKeys = {
       wsId ? ['admin-asset-audit', siteId, wsId] as const : ['admin-asset-audit', siteId] as const,
     seoEditor: (siteId: string, wsId?: string) =>
       wsId ? ['seo-editor', siteId, wsId] as const : ['seo-editor', siteId] as const,
+    seoEditorAll: () => ['seo-editor'] as const,
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,

@@ -249,16 +249,18 @@ export async function runSeoBulkRewriteJob({
       return;
     }
 
+    const generatedPages = done - failed;
     updateJob(jobId, {
       status: 'done',
       progress: done,
-      message: `Generated ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
-      result: { suggestions: suggestions.length, failed, total: pages.length, field },
+      message: `Generated ${suggestions.length} ${field} variations for ${generatedPages}/${pages.length} pages`,
+      result: { suggestions: suggestions.length, generatedPages, failed, total: pages.length, field },
     });
     broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
       jobId,
       operation: 'bulk-rewrite',
-      generated: suggestions.length,
+      generated: generatedPages,
+      suggestions: suggestions.length,
       failed,
       total: pages.length,
       field,
@@ -267,9 +269,9 @@ export async function runSeoBulkRewriteJob({
     addActivity(
       workspaceId,
       'seo_updated',
-      `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
+      `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${generatedPages}/${pages.length} pages`,
       `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
-      { generated: suggestions.length, failed, total: pages.length, field },
+      { generated: generatedPages, suggestions: suggestions.length, failed, total: pages.length, field },
     );
   } catch (err) {
     log.error({ err }, 'bulk-rewrite: job failed');

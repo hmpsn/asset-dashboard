@@ -132,7 +132,7 @@ describe('webflow SEO bulk rewrite job', () => {
       'seo_updated',
       'Bulk SEO rewrite: 1 title variations for 1/1 pages',
       'Background job completed',
-      { generated: 1, failed: 0, total: 1, field: 'title' },
+      { generated: 1, suggestions: 1, failed: 0, total: 1, field: 'title' },
     );
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job_1');
   });
@@ -179,7 +179,13 @@ describe('webflow SEO bulk rewrite job', () => {
     }));
     expect(mocks.updateJob).toHaveBeenCalledWith('job_both', expect.objectContaining({
       status: 'done',
-      result: expect.objectContaining({ suggestions: 2, failed: 0, total: 1, field: 'both' }),
+      result: expect.objectContaining({ suggestions: 2, generatedPages: 1, failed: 0, total: 1, field: 'both' }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:complete', expect.objectContaining({
+      generated: 1,
+      suggestions: 2,
+      total: 1,
+      field: 'both',
     }));
   });
 

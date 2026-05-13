@@ -95,11 +95,14 @@ export function useSeoEditorPageWorkflow({
   const savePage = useCallback(async (pageId: string) => {
     const edit = edits[pageId];
     if (!edit) return;
+    const page = pages.find(entry => entry.id === pageId);
     setSaving(prev => new Set(prev).add(pageId));
     try {
       const data = await put<{ success?: boolean; error?: string }>(`/api/webflow/pages/${pageId}/seo`, {
         siteId,
         workspaceId,
+        slug: page ? resolvePagePath(page) : '',
+        pageTitle: page?.title || '',
         seo: { title: edit.seoTitle, description: edit.seoDescription },
         openGraph: { title: edit.seoTitle, description: edit.seoDescription },
       });
@@ -124,6 +127,7 @@ export function useSeoEditorPageWorkflow({
       setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
       setSaved(prev => new Set(prev).add(pageId));
       refreshStates();
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
       setTimeout(() => {
         setSaved(prev => {
@@ -155,7 +159,7 @@ export function useSeoEditorPageWorkflow({
         return next;
       });
     }
-  }, [edits, queryClient, refreshStates, setEdits, siteId, workspaceId]);
+  }, [edits, pages, queryClient, refreshStates, setEdits, siteId, workspaceId]);
 
   const aiRewrite = useCallback(async (pageId: string, field: 'title' | 'description' | 'both') => {
     const page = pages.find(entry => entry.id === pageId);
@@ -224,6 +228,7 @@ export function useSeoEditorPageWorkflow({
         await keywords.persistAnalysis({
           workspaceId,
           pagePath: resolvePagePath(page),
+          pageTitle: page.title,
           analysis,
         });
 

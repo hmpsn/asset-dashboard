@@ -394,6 +394,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       refetchClient('pricing', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
+      refetchClient('activity', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'recommendations:updated': () => refetchClient('recommendations', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'briefing:published': () => refetchClient('briefing', ''),
