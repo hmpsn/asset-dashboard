@@ -33,6 +33,8 @@ vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammi
 vi.mock('../../server/helpers.js', () => ({
   findPageMapEntryForPage: vi.fn(() => ({ pagePath: '/services', primaryKeyword: 'seo services' })),
   matchGscUrlToPath: vi.fn(() => false),
+  sanitizeForPromptInjection: vi.fn((value: string) => `<untrusted_user_content>\n${value}\n</untrusted_user_content>`),
+  sanitizeQueryForPrompt: vi.fn((value: string) => value),
   stripCodeFences: vi.fn((value: string) => value),
   stripHtmlToText: vi.fn(() => 'Clean page copy'),
   tryResolvePagePath: vi.fn((page: { publishedPath?: string | null; slug?: string }) => page.publishedPath ?? (page.slug ? `/${page.slug}` : null)),
@@ -107,7 +109,8 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledWith(expect.objectContaining({
@@ -165,7 +168,8 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite-both',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);

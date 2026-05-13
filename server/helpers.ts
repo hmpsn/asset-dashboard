@@ -277,7 +277,10 @@ export function sanitizeErrorMessage(err: unknown, fallback: string): string {
 export function sanitizeForPromptInjection(untrusted: string): string {
   const cleaned = untrusted
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
-    .replace(/<\|[^|]*\|>/g, '[removed-control-token]');
+    .replace(/<\|[^|]*\|>/g, '[removed-control-token]')
+    .replace(/<\/?untrusted_user_content>/gi, (tag) =>
+      tag.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    );
   return `<untrusted_user_content>\n${cleaned}\n</untrusted_user_content>`;
 }
 
