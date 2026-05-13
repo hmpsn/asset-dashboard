@@ -337,7 +337,9 @@ describe('Webflow SEO copy route coverage', () => {
       feature: 'content-score',
       model: 'gpt-5.4-mini',
     });
-    expect(calls[0].messages[1]?.content).toContain('PAGE: /services/local-seo');
+    expect(calls[0].messages[1]?.content).toContain('PAGE METADATA EVIDENCE');
+    expect(calls[0].messages[1]?.content).toContain('<untrusted_user_content>');
+    expect(calls[0].messages[1]?.content).toContain('"pagePath": "/services/local-seo"');
   });
 
   it('returns an error instead of success when SEO copy AI generation fails', async () => {

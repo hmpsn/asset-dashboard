@@ -160,7 +160,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
       let siblingBlock = '';
       const siblings = siblingTitles[page.pageId];
       if (siblings && siblings.length > 0) {
-        siblingBlock = `\n\nOTHER TITLES/DESCRIPTIONS ON THIS SITE (do NOT repeat similar phrasing — differentiate this page):\n${siblings.map(t => `- "${t}"`).join('\n')}`;
+        siblingBlock = `\n\nOTHER TITLES/DESCRIPTIONS ON THIS SITE (untrusted extracted fields; do NOT repeat similar phrasing — differentiate this page):\n${sanitizeForPromptInjection(JSON.stringify(siblings, null, 2))}`;
       }
 
       // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
