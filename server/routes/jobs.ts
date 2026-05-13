@@ -14,7 +14,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
+import { applySuppressionsToAudit, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
@@ -463,7 +463,7 @@ router.post('/api/jobs', async (req, res) => {
 
       case 'bulk-seo-fix': {
         // Callers MUST include `publishedPath` on each page for nested Webflow pages —
-        // without it, tryResolvePagePath falls back to `/${slug}` which is wrong for
+        // without it, tryResolvePagePath falls back to the legacy slug path which is wrong for
         // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
         // in routes/webflow-seo-apply.ts accepts publishedPath; any frontend caller of this
         // job type must mirror that contract.
@@ -533,7 +533,8 @@ router.post('/api/jobs', async (req, res) => {
                   } else {
                     if (bwsId) {
                       updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
-                      recordSeoChange(bwsId, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+                      const seoChangePagePath = bulkJobPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
+                      recordSeoChange(bwsId, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
                     }
                     results.push({ pageId: page.pageId, text, applied: true });
                   }

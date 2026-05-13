@@ -2,11 +2,31 @@
  * Shared page path utilities — mirrors server/helpers.ts path functions.
  * Used by frontend components that match or display page paths.
  */
+import { PAGE_ADDRESS_SOURCES } from '../../shared/types/page-address';
+import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../../shared/types/page-address';
 
 /** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */
 export function normalizePath(p: string): string {
   const s = p.startsWith('/') ? p : `/${p}`;
   return s.length > 1 && s.endsWith('/') ? s.slice(0, -1) : s;
+}
+
+function normalizePageAddressPath(value: string): string {
+  try {
+    if (value.startsWith('http')) {
+      return normalizePath(new URL(value).pathname);
+    }
+  } catch {
+    // Malformed URL string — fall through to path-only normalization.
+  }
+  return normalizePath(value);
+}
+
+function buildCanonicalUrl(baseUrl: string | null | undefined, canonicalPath: string): string | undefined {
+  if (!baseUrl) return undefined;
+  const normalizedBase = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+  const trimmedBase = normalizedBase.replace(/\/+$/, '');
+  return `${trimmedBase}${canonicalPath === '/' ? '' : canonicalPath}`;
 }
 
 /** Exact path match with trailing-slash normalization (case-insensitive) */
@@ -19,14 +39,7 @@ export function matchPagePath(a: string, b: string): boolean {
  * Strips origin/query/hash for full URLs, then delegates to normalizePath().
  */
 export function normalizePageUrl(url: string): string {
-  try {
-    if (url.startsWith('http')) {
-      return normalizePath(new URL(url).pathname);
-    }
-  } catch {
-    // Malformed URL string — fall through to path-only normalization.
-  }
-  return normalizePath(url);
+  return normalizePageAddressPath(url);
 }
 
 /** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
@@ -49,8 +62,47 @@ export function findPageMapEntryByIdentity<T extends { pagePath: string }>(
 }
 
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
-export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
-  return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
+export function resolvePageAddress(
+  page: PageAddressInput,
+  options: ResolvePageAddressOptions = {},
+): PageAddress {
+  const includeLegacyFallback = options.includeLegacyFallback !== false;
+  let canonicalPath = '/';
+  let source: PageAddress['source'] = PAGE_ADDRESS_SOURCES.fallback;
+
+  if (page.publishedPath !== undefined && page.publishedPath !== null) {
+    canonicalPath = normalizePageAddressPath(page.publishedPath);
+    source = PAGE_ADDRESS_SOURCES.publishedPath;
+  } else if (page.path !== undefined && page.path !== null) {
+    canonicalPath = normalizePageAddressPath(page.path);
+    source = PAGE_ADDRESS_SOURCES.path;
+  } else if (page.url !== undefined && page.url !== null) {
+    canonicalPath = normalizePageAddressPath(page.url);
+    source = PAGE_ADDRESS_SOURCES.url;
+  } else if (page.slug !== undefined && page.slug !== null) {
+    canonicalPath = normalizePageAddressPath(page.slug);
+    source = PAGE_ADDRESS_SOURCES.slug;
+  }
+
+  const address: PageAddress = {
+    canonicalPath,
+    canonicalUrl: buildCanonicalUrl(options.baseUrl, canonicalPath),
+    rawSlug: page.slug ?? null,
+    source,
+  };
+
+  if (includeLegacyFallback && page.slug !== undefined && page.slug !== null) {
+    const legacyFallbackPath = normalizePageAddressPath(page.slug);
+    if (legacyFallbackPath.toLowerCase() !== canonicalPath.toLowerCase()) {
+      address.legacyFallbackPath = legacyFallbackPath;
+    }
+  }
+
+  return address;
+}
+
+export function resolvePagePath(page: PageAddressInput): string {
+  return resolvePageAddress(page).canonicalPath;
 }
 
 /**
@@ -65,10 +117,11 @@ export function findPageMapEntryForPage<T extends { pagePath: string }>(
   pageMap: T[],
   page: { publishedPath?: string | null; slug?: string },
 ): T | undefined {
-  const primary = findPageMapEntry(pageMap, resolvePagePath(page));
+  const address = resolvePageAddress(page);
+  const primary = findPageMapEntry(pageMap, address.canonicalPath);
   if (primary) return primary;
-  if (page.slug && page.publishedPath && page.publishedPath !== `/${page.slug}`) {
-    return findPageMapEntry(pageMap, `/${page.slug}`);
+  if (address.legacyFallbackPath) {
+    return findPageMapEntry(pageMap, address.legacyFallbackPath);
   }
   return undefined;
 }
@@ -95,9 +148,11 @@ export function findPageMapEntryBySlug<T extends { pagePath: string }>(pageMap: 
  * Webflow homepages are marked with `slug: ''` (empty string), NOT undefined. The guard below checks
  * `=== undefined` / `=== null` rather than falsy, so `slug: ''` correctly resolves to `/`.
  */
-export function tryResolvePagePath(page: { publishedPath?: string | null; slug?: string }): string | undefined {
+export function tryResolvePagePath(page: PageAddressInput): string | undefined {
   const hasSlug = page.slug !== undefined && page.slug !== null;
   const hasPublishedPath = page.publishedPath !== undefined && page.publishedPath !== null;
-  if (!hasSlug && !hasPublishedPath) return undefined;
+  const hasPath = page.path !== undefined && page.path !== null;
+  const hasUrl = page.url !== undefined && page.url !== null;
+  if (!hasSlug && !hasPublishedPath && !hasPath && !hasUrl) return undefined;
   return resolvePagePath(page);
 }

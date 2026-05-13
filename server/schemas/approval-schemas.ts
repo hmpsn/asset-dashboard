@@ -8,6 +8,7 @@ export const approvalItemSchema = z.object({
   pageId: z.string(),
   pageTitle: z.string(),
   pageSlug: z.string(),
+  publishedPath: z.string().nullable().optional(),
   field: z.string(),
   collectionId: z.string().optional(),
   currentValue: z.string(),

@@ -33,7 +33,7 @@ import {
   getGA4PeriodComparison,
   getGA4NewVsReturning,
 } from '../google-analytics.js';
-import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from '../helpers.js';
+import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from '../helpers.js';
 import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -304,9 +304,9 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
           const pagesWithTraffic = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
-              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
-              const traffic = trafficMap[slug] || trafficMap[p.slug];
-              return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+              const pagePath = normalizePageUrl(p.slug);
+              const traffic = trafficMap[pagePath] || trafficMap[p.slug];
+              return { page: p.page, slug: pagePath, issues: p.issues.length, score: p.score, traffic };
             })
             .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
             .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))

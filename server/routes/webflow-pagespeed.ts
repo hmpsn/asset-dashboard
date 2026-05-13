@@ -11,7 +11,7 @@ import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance
 import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getWorkspacePages } from '../workspace-data.js';
-import { resolvePagePath } from '../helpers.js';
+import { normalizePageUrl, resolvePagePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
@@ -63,7 +63,7 @@ router.post('/api/webflow/pagespeed-single/:siteId', requireWorkspaceSiteAccess(
     const matchedPage = typeof pageId === 'string' ? published.find(p => p.id === pageId) : undefined;
     const pagePath = matchedPage
       ? resolvePagePath(matchedPage)
-      : (typeof pageSlug === 'string' && pageSlug ? `/${pageSlug.replace(/^\/+/, '')}` : '');
+      : (typeof pageSlug === 'string' && pageSlug ? normalizePageUrl(pageSlug) : '');
 
     const url = pagePath ? `${baseUrl.replace(/\/+$/, '')}${pagePath}` : baseUrl.replace(/\/+$/, '');
     const result = await runSinglePageSpeed(url, resolvedStrategy, matchedPage?.title || pageTitle || '');

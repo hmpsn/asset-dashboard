@@ -69,7 +69,9 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(routeSrc).toContain("const explicitWs = typeof workspaceId === 'string' ? getWorkspace(workspaceId) : undefined");
     expect(routeSrc).toContain("if (typeof workspaceId === 'string' && (!explicitWs || explicitWs.webflowSiteId !== siteId))");
     expect(routeSrc).toContain('if (result.success && siteId)');
-    expect(routeSrc).toContain("recordSeoChange(seoWs.id, req.params.pageId, req.body.slug || '', req.body.pageTitle || title || '', changedFields, 'editor')");
+    expect(routeSrc).toContain("const rawPagePath = req.body.publishedPath || req.body.slug || ''");
+    expect(routeSrc).toContain('const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) :');
+    expect(routeSrc).toContain("recordSeoChange(seoWs.id, req.params.pageId, pagePath, req.body.pageTitle || title || '', changedFields, 'editor')");
     expect(routeSrc).toContain('broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(invalidationSrc).toContain('[WS_EVENTS.PAGE_STATE_UPDATED]');
     expect(invalidationSrc).toContain('queryKeys.admin.seoEditorAll()');
@@ -96,7 +98,9 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
 
     expect(bulkAcceptPanelSrc).toContain('publishedPath: page.publishedPath');
     expect(bulkAcceptSchemaSrc).toContain('publishedPath: z.string().nullable().optional()');
-    expect(bulkAcceptJobSrc).toContain("recordSeoChange(ws.id, fix.pageId, fix.publishedPath || fix.pageSlug || ''");
+    expect(bulkAcceptJobSrc).toContain('const pagePath = fix.publishedPath');
+    expect(bulkAcceptJobSrc).toContain("fix.pageSlug ? normalizePageUrl(fix.pageSlug) : ''");
+    expect(bulkAcceptJobSrc).toContain('recordSeoChange(ws.id, fix.pageId, pagePath');
     expect(suggestionsRouteSrc).toContain('broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(suggestionsRouteSrc).toContain("addActivity(\n      workspaceId,\n      'seo_updated'");
   });

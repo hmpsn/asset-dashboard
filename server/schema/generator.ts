@@ -65,6 +65,7 @@ export interface LeanGeneratorOutput {
   pageId: string;
   pageTitle: string;
   slug: string;
+  publishedPath?: string | null;
   url: string;
   existingSchemas: string[];
   suggestedSchemas: Array<{
@@ -1211,6 +1212,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     pageId: input.pageId,
     pageTitle: pageData.title,
     slug: input.pageMeta.slug,
+    publishedPath: input.pageMeta.publishedPath,
     url: pageData.canonicalUrl,
     existingSchemas: input.existingSchemas ?? detectExistingSchemas(input.html),
     suggestedSchemas: [

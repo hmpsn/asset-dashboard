@@ -37,6 +37,7 @@ import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { normalizePageUrl } from '../helpers.js';
 import { WS_EVENTS } from '../ws-events.js';
 import db from '../db/index.js';
 
@@ -74,6 +75,7 @@ const createBatchSchema = z.object({
     id: z.string().optional(),
     pageId: z.string(),
     pageSlug: z.string().optional(),
+    publishedPath: z.string().nullable().optional(),
     pageTitle: z.string().optional(),
     field: z.string(),
     currentValue: z.string().optional(),
@@ -373,7 +375,9 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         const appliedItem = approved.find(i => i.id === r.itemId);
         if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription')) {
           const fieldName = appliedItem.field === 'seoTitle' ? 'title' : 'description';
-          recordSeoChange(req.params.workspaceId, r.pageId, appliedItem.pageSlug || '', appliedItem.pageTitle || '', [fieldName], 'approval');
+          const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug || '';
+          const pagePath = rawAppliedPagePath ? normalizePageUrl(rawAppliedPagePath) : '';
+          recordSeoChange(req.params.workspaceId, r.pageId, pagePath, appliedItem.pageTitle || '', [fieldName], 'approval');
         }
       }
     }
@@ -392,21 +396,21 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
         if (getActionBySource('approval', item.id)) continue;
+        const rawPagePath = item.publishedPath || item.pageSlug || '';
+        const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) : null;
         const action = recordAction({ // recordAction-ok — workspaceId is from route param, always valid
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',
           sourceId: item.id,
-          pageUrl: item.pageSlug ? `/${item.pageSlug}` : null,
+          pageUrl: pagePath,
           targetKeyword: null,
           baselineSnapshot: {
             captured_at: new Date().toISOString(),
           },
           attribution: 'platform_executed',
         });
-        if (item.pageSlug) {
-          void captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`);
-        }
+        if (pagePath) void captureBaselineFromGsc(action.id, req.params.workspaceId, pagePath);
       }
     }
   } catch (err) {

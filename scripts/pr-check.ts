@@ -3620,6 +3620,48 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── Raw pageSlug URL construction warning ──
+    //
+    // Approval/schema/outcome flows historically stored `pageSlug` as a leaf slug
+    // while newer callers may send a full path. Prefixing with `/${pageSlug}` can
+    // both collapse nested pages (`invisalign` → `/invisalign`) and double-prefix
+    // canonical paths (`/services/invisalign` → `//services/invisalign`). Use the
+    // Page Address helpers (`normalizePageUrl`, `resolvePagePath`, or
+    // `resolvePageAddress`) before crossing route/storage boundaries.
+    name: 'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['tests/**', 'server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['normalizePageUrl', 'resolvePagePath', 'resolvePageAddress', '// page-slug-url-ok'],
+    message:
+      'Avoid `/${pageSlug}` URL construction. pageSlug may already be a canonical path or may be only a leaf slug. ' +
+      'Use normalizePageUrl/resolvePagePath/resolvePageAddress, or add // page-slug-url-ok for display-only strings.',
+    severity: 'warn',
+    rationale:
+      'Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const rawPageSlugRe = /`\/\$\{[^}]*\b(?:pageSlug|slug)\b[^}]*\}`|['"]\/['"]\s*\+\s*[^;\n]*(?:\bpageSlug\b|\.pageSlug\b|\bslug\b|\.slug\b)/;
+      const rawPageSlugSinkRe =
+        /\b(?:recordSeoChange|captureBaselineFromGsc)\([^;\n]*(?:\bpageSlug\b|\.pageSlug\b|\bslug\b|\.slug\b)|\bpageUrl:\s*(?:pageSlug|slug|[^,\n]*(?:\.pageSlug|\.slug))/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.includes('/tests/') || file.startsWith('tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!rawPageSlugRe.test(lines[i]) && !rawPageSlugSinkRe.test(lines[i])) continue;
+          if (lines[i].includes('normalizePageUrl') || lines[i].includes('resolvePagePath') || lines[i].includes('resolvePageAddress')) continue;
+          if (hasHatch(lines, i, '// page-slug-url-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // ── Manual pageMap pairing outside shared helpers ──
     //
     // Three components (SeoEditor, PageIntelligence, ApprovalsTab) independently

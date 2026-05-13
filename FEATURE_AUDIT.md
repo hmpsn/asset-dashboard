@@ -3756,6 +3756,7 @@ Current feature count: **329**. Last updated: May 2026.
 - **applyBulkKeywordGuards** — moved to `server/helpers.ts`; now also called in `webflow-seo.ts` bulk analyze path (BUG-0003: prevents AI-hallucinated keyword metrics from being persisted).
 - **GSC path-boundary matching** — replaced `.includes(page.slug)` substring matching with exact path + prefix matching in `webflow-seo.ts` (BUG-0004: eliminates false-positive query attribution).
 - **bare-slug-pagepath pr-check rule** — new rule flags any future `` `/${page.slug}` `` pagePath constructions across server and frontend files.
+- **Canonical Page Address contract** — added typed `PageAddress` contract (`canonicalPath`, `canonicalUrl`, `rawSlug`, `source`, `legacyFallbackPath`) with mirrored helpers in `server/helpers.ts` and `src/lib/pathUtils.ts`. High-risk live-page fetch, analysis, approval/schema outcome tracking, direct SEO save, PageSpeed fallback, audit traffic join, and fix-context matching paths now normalize through the shared contract instead of reconstructing URLs from leaf slugs.
 
 ---
 

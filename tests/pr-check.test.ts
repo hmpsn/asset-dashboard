@@ -4108,6 +4108,74 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
   });
 });
 
+describe('Rule: Raw pageSlug prefixed as URL — normalize via Page Address helpers', () => {
+  const RULE = 'Raw pageSlug prefixed as URL — normalize via Page Address helpers';
+
+  it('warns on raw pageSlug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/approvals.ts'),
+      lines(
+        'const pageUrl = item.pageSlug ? `/${item.pageSlug}` : null;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('warns on raw slug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/webflow-schema.ts'),
+      lines(
+        "const pageUrl = '/' + slug;",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('allows normalized pageSlug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/approvals.ts'),
+      lines(
+        'const pageUrl = normalizePageUrl(item.publishedPath || item.pageSlug || "");',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('warns on raw page slug values passed to outcome sinks', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/jobs.ts'),
+      lines(
+        "recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('warns on raw pageUrl slug assignment', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/content-posts.ts'),
+      lines(
+        'const action = recordAction({ pageUrl: slug });',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('suppresses display-only uses with hatch', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'src/components/workspace-home/SeoChangeImpact.tsx'),
+      lines(
+        'const label = `/${change.pageSlug}`; // page-slug-url-ok — display-only label',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin', () => {
   const RULE = 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin';
 
@@ -4587,6 +4655,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Slug-path hardening sprint (2026-04-21)
     'Bare slug used in pagePath construction — use resolvePagePath(page)',
     'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
     // Unified page-join hooks sprint (2026-04-21)
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)

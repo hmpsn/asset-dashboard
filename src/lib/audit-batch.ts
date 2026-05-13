@@ -7,6 +7,7 @@
  * regression net for the in-component behavior.
  */
 import type { PageSeoResult, SeoIssue } from '../components/audit/types';
+import { normalizePageUrl } from './pathUtils';
 
 export type BatchMode = 'all' | 'errors' | 'filtered';
 
@@ -28,7 +29,7 @@ export function issueToTaskKey(page: Pick<PageSeoResult, 'pageId'>, issue: Pick<
 
 /** Build the request payload for a single audit issue. */
 export function issueToTaskItem(
-  page: Pick<PageSeoResult, 'pageId' | 'page' | 'slug'>,
+  page: Pick<PageSeoResult, 'pageId' | 'page' | 'slug' | 'url' | 'publishedPath'>,
   issue: SeoIssue,
   editedSuggestions: Readonly<Record<string, string>> = {},
 ): BatchTaskItem {
@@ -41,7 +42,7 @@ export function issueToTaskItem(
     description: `Page: ${page.page}\nSlug: ${page.slug}\n\nIssue: ${issue.message}\n\nRecommendation: ${issue.recommendation}${suggestion ? `\n\nAI Suggestion: ${suggestion}` : ''}${issue.value ? `\n\nCurrent value: ${issue.value}` : ''}`,
     category: 'seo',
     priority: issue.severity === 'error' ? 'high' : 'medium',
-    pageUrl: page.slug,
+    pageUrl: normalizePageUrl(page.publishedPath || page.url || page.slug),
   };
 }
 

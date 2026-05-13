@@ -59,6 +59,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         pageId: page.pageId,
         pageTitle: page.pageTitle,
         pageSlug: page.slug,
+        publishedPath: page.publishedPath,
         field: 'schema',
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),
@@ -82,7 +83,15 @@ export function useSchemaSuggesterPublishingWorkflow({
     try {
       const pageData = data?.find(p => p.pageId === pageId);
       const isHomepage = !pageData?.slug || pageData.slug === '/' || pageData.slug === 'index' || pageData.slug === 'home';
-      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, { pageId, schema, publishAfter: true, isHomepage });
+      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`, {
+        pageId,
+        schema,
+        publishAfter: true,
+        isHomepage,
+        pageSlug: pageData?.slug,
+        publishedPath: pageData?.publishedPath,
+        pageTitle: pageData?.pageTitle,
+      });
       if (result.delivery?.status === 'manual-required') {
         setManualDelivery(prev => ({ ...prev, [pageId]: result.delivery }));
         return;
@@ -157,6 +166,7 @@ export function useSchemaSuggesterPublishingWorkflow({
         pageId: page.pageId,
         pageTitle: page.pageTitle,
         pageSlug: page.slug,
+        publishedPath: page.publishedPath,
         field: 'schema',
         currentValue: page.existingSchemas.length > 0 ? page.existingSchemas.join(', ') : '',
         proposedValue: JSON.stringify(getEffectiveSchema(page.pageId, page.suggestedSchemas[0]?.template || {}), null, 2),

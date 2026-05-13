@@ -103,6 +103,7 @@ export function useSeoEditorPageWorkflow({
         siteId,
         workspaceId,
         slug: page ? resolvePagePath(page) : '',
+        publishedPath: page?.publishedPath,
         pageTitle: page?.title || '',
         seo: { title: edit.seoTitle, description: edit.seoDescription },
         openGraph: { title: edit.seoTitle, description: edit.seoDescription },

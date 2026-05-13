@@ -268,7 +268,7 @@ export async function runPageAnalysisJob({
 Page title: ${page.title}
 SEO title: ${effectiveTitle || '(same as page title)'}
 Meta description: ${effectiveMeta || '(none)'}
-URL slug: /${page.slug || ''}
+URL path: ${normalizedPath}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}${semrushBlock}
 
 Provide your analysis as a JSON object:

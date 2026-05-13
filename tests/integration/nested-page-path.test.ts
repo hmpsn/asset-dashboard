@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { matchPageIdentity, matchPagePath, normalizePageUrl, resolvePagePath, tryResolvePagePath, findPageMapEntry, findPageMapEntryByIdentity, findPageMapEntryForPage } from '../../src/lib/pathUtils.js';
+import { matchPageIdentity, matchPagePath, normalizePageUrl, resolvePageAddress, resolvePagePath, tryResolvePagePath, findPageMapEntry, findPageMapEntryByIdentity, findPageMapEntryForPage } from '../../src/lib/pathUtils.js';
 import {
   matchGscUrlToPath,
   matchPageIdentity as serverMatchPageIdentity,
   normalizePageUrl as serverNormalizePageUrl,
+  resolvePageAddress as serverResolvePageAddress,
   resolvePagePath as serverResolvePagePath,
   tryResolvePagePath as serverTryResolvePagePath,
   findPageMapEntry as serverFindPageMapEntry,
@@ -50,6 +51,40 @@ describe('resolvePagePath', () => {
     ];
     for (const c of cases) {
       expect(resolvePagePath(c)).toBe(serverResolvePagePath(c));
+    }
+  });
+});
+
+describe('resolvePageAddress', () => {
+  it('returns the shared canonical address contract for nested pages', () => {
+    expect(resolvePageAddress(
+      { slug: 'invisalign', publishedPath: '/services/invisalign' },
+      { baseUrl: 'https://example.com/' },
+    )).toEqual({
+      canonicalPath: '/services/invisalign',
+      canonicalUrl: 'https://example.com/services/invisalign',
+      rawSlug: 'invisalign',
+      source: 'publishedPath',
+      legacyFallbackPath: '/invisalign',
+    });
+  });
+
+  it('normalizes full URLs and trailing slash variants', () => {
+    expect(resolvePageAddress({ url: 'https://example.com/services/invisalign/?utm=1' }).canonicalPath)
+      .toBe('/services/invisalign');
+    expect(resolvePageAddress({ publishedPath: '/services/invisalign/' }).canonicalPath)
+      .toBe('/services/invisalign');
+  });
+
+  it('frontend and backend implementations agree', () => {
+    const cases = [
+      { slug: 'invisalign', publishedPath: '/services/invisalign' },
+      { url: 'https://example.com/services/invisalign?utm=1' },
+      { path: 'services/invisalign/' },
+      { slug: '' },
+    ];
+    for (const c of cases) {
+      expect(resolvePageAddress(c)).toEqual(serverResolvePageAddress(c));
     }
   });
 });

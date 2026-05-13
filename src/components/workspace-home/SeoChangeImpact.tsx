@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Clock, Pencil } from 'lucide-react';
+import { ChartLine, Clock, Pencil } from 'lucide-react';
 import { SectionCard, EmptyState, TrendBadge, Icon } from '../ui';
 import { getOptional } from '../../api/client';
+import { normalizePageUrl } from '../../lib/pathUtils';
 
 interface SeoChangeEvent {
   id: string;
@@ -96,7 +97,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
       onClick={loadImpact}
       className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
     >
-      <Icon as={TrendingUp} size="sm" /> Compare GSC Impact
+      <Icon as={ChartLine} size="sm" /> Compare GSC Impact
     </button>
   ) : null;
 
@@ -114,53 +115,56 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
         <div className="space-y-2">
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2 text-[var(--brand-text-muted)] t-caption">
-              <div className="w-4 h-4 border-2 border-[var(--surface-3)] border-t-teal-400 rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-[var(--surface-3)] border-t-teal-400 rounded-[var(--radius-pill)] animate-spin" />
               Fetching GSC data for comparison...
             </div>
           ) : impact && impact.length > 0 ? (
-            impact.map(item => (
-              <div key={item.change.id} className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border)] p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">
-                      {item.change.pageTitle || `/${item.change.pageSlug}`}
+            impact.map(item => {
+              const pagePath = normalizePageUrl(item.change.pageSlug);
+              return (
+                <div key={item.change.id} className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border)] p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">
+                        {item.change.pageTitle || pagePath}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="t-micro text-[var(--brand-text-muted)]">{pagePath}</span>
+                        <span className="t-micro px-1.5 py-0.5 rounded bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text-muted)]">
+                          {item.change.fields.join(', ')}
+                        </span>
+                        <span className="t-micro text-[var(--brand-text-muted)]">
+                          via {SOURCE_LABELS[item.change.source] || item.change.source}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="t-micro text-[var(--brand-text-muted)]">/{item.change.pageSlug}</span>
-                      <span className="t-micro px-1.5 py-0.5 rounded bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text-muted)]">
-                        {item.change.fields.join(', ')}
-                      </span>
-                      <span className="t-micro text-zinc-600">
-                        via {SOURCE_LABELS[item.change.source] || item.change.source}
-                      </span>
+                    <div className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)] flex-shrink-0">
+                      <Icon as={Clock} size="sm" />
+                      {item.daysSinceChange}d ago
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 t-micro text-zinc-600 flex-shrink-0">
-                    <Icon as={Clock} size="sm" />
-                    {item.daysSinceChange}d ago
-                  </div>
-                </div>
 
-                {item.tooRecent ? (
-                  <div className="t-caption-sm text-zinc-600 italic flex items-center gap-1.5 py-1">
-                    <Icon as={Clock} size="sm" /> Too recent for comparison (need 7+ days)
-                  </div>
-                ) : item.before && item.after ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                    <DeltaBadge before={item.before.clicks} after={item.after.clicks} label="Clicks" />
-                    <DeltaBadge before={item.before.impressions} after={item.after.impressions} label="Impr" />
-                    <DeltaBadge before={item.before.ctr} after={item.after.ctr} label="CTR" />
-                    <DeltaBadge before={item.before.position} after={item.after.position} label="Pos" invert />
-                  </div>
-                ) : (
-                  <div className="t-caption-sm text-zinc-600 italic py-1">
-                    {!item.before && !item.after ? 'No GSC data found for this page' : 'Partial data available'}
-                  </div>
-                )}
-              </div>
-            ))
+                  {item.tooRecent ? (
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] italic flex items-center gap-1.5 py-1">
+                      <Icon as={Clock} size="sm" /> Too recent for comparison (need 7+ days)
+                    </div>
+                  ) : item.before && item.after ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                      <DeltaBadge before={item.before.clicks} after={item.after.clicks} label="Clicks" />
+                      <DeltaBadge before={item.before.impressions} after={item.after.impressions} label="Impr" />
+                      <DeltaBadge before={item.before.ctr} after={item.after.ctr} label="CTR" />
+                      <DeltaBadge before={item.before.position} after={item.after.position} label="Pos" invert />
+                    </div>
+                  ) : (
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] italic py-1">
+                      {!item.before && !item.after ? 'No GSC data found for this page' : 'Partial data available'}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : impact && impact.length === 0 ? (
-            <EmptyState icon={TrendingUp} title="No impact data available yet" className="py-6" />
+            <EmptyState icon={Pencil} title="No impact data available yet" className="py-6" />
           ) : null}
         </div>
       )}
@@ -168,22 +172,25 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
       {/* Recent changes list (when impact not loaded) */}
       {!showImpact && (
         <div className="space-y-1">
-          {changes.slice(0, 5).map(c => (
+          {changes.slice(0, 5).map(c => {
+            const pagePath = normalizePageUrl(c.pageSlug);
+            return (
             <div key={c.id} className="flex items-center gap-3 py-1.5">
               <Icon as={Pencil} size="sm" className="text-teal-400/60 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <span className="t-caption-sm text-[var(--brand-text)] truncate block">
-                  {c.pageTitle || `/${c.pageSlug}`}
+                  {c.pageTitle || pagePath}
                 </span>
               </div>
               <span className="t-micro px-1.5 py-0.5 rounded bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text-muted)] flex-shrink-0">
                 {c.fields.join(', ')}
               </span>
-              <span className="t-micro text-zinc-600 flex-shrink-0">
+              <span className="t-micro text-[var(--brand-text-muted)] flex-shrink-0">
                 {new Date(c.changedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
             </div>
-          ))}
+            );
+          })}
           {changes.length > 5 && (
             <div className="t-caption-sm text-[var(--brand-text-muted)] pt-1">
               +{changes.length - 5} more changes

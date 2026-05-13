@@ -9,6 +9,7 @@ describe('single-page PageSpeed route contract', () => {
   it('resolves tested URLs from workspace page metadata', () => {
     expect(routeSource).toContain('getWorkspacePages');
     expect(routeSource).toContain('resolvePagePath');
+    expect(routeSource).toContain('normalizePageUrl(pageSlug)');
     expect(routeSource).toContain('resolveBaseUrl');
     expect(routeSource).toContain('pageId');
     expect(routeSource).toContain('runSinglePageSpeed(url, resolvedStrategy');

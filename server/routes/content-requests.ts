@@ -33,7 +33,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
-import { resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
+import { normalizePageUrl, resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
@@ -181,7 +181,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
   // 1. Keyword strategy pages from page_keywords table (indexed, have keyword context)
   const kwPages = listPageKeywords(ws.id);
   for (const p of kwPages) {
-    const path = p.pagePath.startsWith('/') ? p.pagePath : `/${p.pagePath}`;
+    const path = normalizePageUrl(p.pagePath);
     const label = p.primaryKeyword ? `${path} — targets: "${p.primaryKeyword}"` : path;
     pageMap.set(path.toLowerCase(), label);
   }
@@ -293,7 +293,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     if (request.targetPageSlug) {
       try {
         const decay = loadDecayAnalysis(req.params.workspaceId);
-        const normalizeTarget = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
+        const normalizeTarget = normalizePageUrl(request.targetPageSlug);
         const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
         if (decayPage && ws.gscPropertyUrl && ws.webflowSiteId) {
           // Reuse the 90-day GSC dataset fetched above — avoids a duplicate API call.
@@ -402,7 +402,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
     source?: 'request' | 'matrix';
   }> = published.map(r => {
     const slug = r.targetPageSlug;
-    const path = slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined;
+    const path = slug ? normalizePageUrl(slug) : undefined;
     if (r.targetKeyword) seenKeywords.add(r.targetKeyword.toLowerCase());
 
     // Match GSC data by slug path
@@ -439,7 +439,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
         seenKeywords.add(cell.targetKeyword.toLowerCase());
 
         const slug = cell.plannedUrl;
-        const path = slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined;
+        const path = slug ? normalizePageUrl(slug) : undefined;
         const gsc = path ? (gscPages.get(path) || null) : null;
         const ga4 = path ? (ga4Pages.get(path) || null) : null;
 
@@ -492,8 +492,8 @@ router.get('/api/content-performance/:workspaceId/:requestId/trend', requireWork
     if (siteBase.startsWith('sc-domain:')) {
       siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
     }
-    const slug = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
-    const pageUrl = `${siteBase}${slug}`;
+    const pagePath = normalizePageUrl(request.targetPageSlug);
+    const pageUrl = `${siteBase}${pagePath}`;
 
     // Use publish date as start, or default to 90 days
     const publishDate = request.updatedAt || request.requestedAt;
