@@ -174,6 +174,46 @@ describe('Reports — save snapshot from existing audit data', () => {
     const res = await api('/api/public/report/snap_nonexistent');
     expect(res.status).toBe(404);
   });
+
+  it('GET /report/:id HTML uses the same audit counts as public JSON', async () => {
+    const res = await postJson(`/api/reports/${testSiteId}/snapshot`, {
+      siteName: 'HTML Count Test',
+      audit: {
+        siteScore: 90,
+        totalPages: 1,
+        errors: 0,
+        warnings: 2,
+        infos: 1,
+        pages: [{
+          pageId: 'p-html-count',
+          slug: 'html-count',
+          url: 'https://example.com/html-count',
+          page: 'HTML Count',
+          score: 90,
+          issues: [
+            { check: 'server-response', category: 'performance', severity: 'warning', message: 'Performance warning', recommendation: 'Tune server response.' },
+            { check: 'title-length', category: 'metadata', severity: 'warning', message: 'Technical warning', recommendation: 'Shorten title.' },
+            { check: 'structured-data', category: 'schema', severity: 'info', message: 'Schema info', recommendation: 'Add JSON-LD.' },
+          ],
+        }],
+        siteWideIssues: [],
+      },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const publicJsonRes = await api(`/api/public/report/${body.id}`);
+    expect(publicJsonRes.status).toBe(200);
+    const publicJson = await publicJsonRes.json();
+    expect(publicJson.audit).toEqual(expect.objectContaining({ warnings: 2, infos: 1 }));
+
+    const htmlRes = await api(`/report/${body.id}`);
+    expect(htmlRes.status).toBe(200);
+    const html = await htmlRes.text();
+    expect(html).toMatch(/<div class="stat-value"[^>]*>2<\/div>\s*<div class="stat-label">Warnings/);
+    expect(html).toMatch(/<div class="stat-value"[^>]*>1<\/div>\s*<div class="stat-label">Info/);
+    expect(html).toContain('Problem: Performance warning');
+  });
 });
 
 describe('Reports — suppression-adjusted public audit reads', () => {
