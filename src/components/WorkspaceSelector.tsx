@@ -15,6 +15,10 @@ export interface Workspace {
   createdAt: string;
   tier?: 'free' | 'growth' | 'premium';
   businessProfile?: BusinessProfileContact | null;
+  intelligenceProfile?: {
+    industry?: string;
+    targetAudience?: string;
+  } | null;
 }
 
 interface WebflowSite {

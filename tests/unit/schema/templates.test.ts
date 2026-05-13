@@ -661,6 +661,94 @@ describe('static page templates', () => {
     const node = (buildWebPageSchema(dirty)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.name).toBe('About Us');
   });
+
+  it('omits breadcrumb refs for homepage and shallow standalone pages, keeps nested hierarchies and hubs', () => {
+    const homeInput = {
+      ...staticInput,
+      pageData: {
+        ...staticInput.pageData,
+        cleanTitle: 'Home',
+        canonicalUrl: 'https://example.com/',
+        breadcrumbs: [{ name: 'Home', url: 'https://example.com' }],
+      },
+    };
+    const homeGraph = buildWebPageSchema(homeInput)['@graph'] as Array<Record<string, unknown>>;
+    expect(homeGraph).toHaveLength(1);
+    expect(homeGraph[0].breadcrumb).toBeUndefined();
+
+    const shallowStandaloneInput = {
+      ...staticInput,
+      pageData: {
+        ...staticInput.pageData,
+        cleanTitle: 'Demo',
+        canonicalUrl: 'https://example.com/demo',
+        breadcrumbs: [
+          { name: 'Home', url: 'https://example.com' },
+          { name: 'Demo', url: 'https://example.com/demo' },
+        ],
+      },
+    };
+    const shallowStandaloneGraph = buildWebPageSchema(shallowStandaloneInput)['@graph'] as Array<Record<string, unknown>>;
+    expect(shallowStandaloneGraph).toHaveLength(1);
+    expect(shallowStandaloneGraph[0].breadcrumb).toBeUndefined();
+
+    const serviceHubInput = {
+      ...staticInput,
+      pageData: {
+        ...staticInput.pageData,
+        cleanTitle: 'Services',
+        canonicalUrl: 'https://example.com/services',
+        breadcrumbs: [
+          { name: 'Home', url: 'https://example.com' },
+          { name: 'Services', url: 'https://example.com/services' },
+        ],
+      },
+    };
+    const serviceHubGraph = buildWebPageSchema(serviceHubInput)['@graph'] as Array<Record<string, unknown>>;
+    expect(serviceHubGraph).toHaveLength(2);
+    expect(serviceHubGraph[0].breadcrumb).toEqual({ '@id': 'https://example.com/services#breadcrumb' });
+  });
+});
+
+describe('breadcrumb policy (service/blog/location nested pages)', () => {
+  it('keeps breadcrumb nodes and refs for nested service pages', () => {
+    const graph = buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.some(node => node['@type'] === 'BreadcrumbList')).toBe(true);
+    expect(graph[0].breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
+  });
+
+  it('keeps breadcrumb nodes and refs for nested blog posts', () => {
+    const graph = buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.some(node => node['@type'] === 'BreadcrumbList')).toBe(true);
+    expect(graph[0].breadcrumb).toEqual({ '@id': 'https://example.com/blog/my-post#breadcrumb' });
+  });
+
+  it('keeps breadcrumb nodes and refs for nested location pages', () => {
+    const input = {
+      baseUrl: 'https://acme.dental',
+      pageData: {
+        title: 'Austin',
+        cleanTitle: 'Austin',
+        description: 'Austin location',
+        canonicalUrl: 'https://acme.dental/location/austin',
+        publisher: { name: 'Acme Dental', logoUrl: 'https://acme.dental/logo.png' },
+        inLanguage: 'en',
+        breadcrumbs: [
+          { name: 'Home', url: 'https://acme.dental' },
+          { name: 'Location', url: 'https://acme.dental/location' },
+          { name: 'Austin', url: 'https://acme.dental/location/austin' },
+        ],
+      },
+      businessProfile: {
+        phone: '(512) 555-0199',
+        address: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+      },
+    };
+    const graph = buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>;
+    const locationWebPage = graph.find(node => node['@type'] === 'WebPage');
+    expect(graph.some(node => node['@type'] === 'BreadcrumbList')).toBe(true);
+    expect(locationWebPage?.breadcrumb).toEqual({ '@id': 'https://acme.dental/location/austin#breadcrumb' });
+  });
 });
 
 describe('Article + BlogPosting — VideoObject enrichment (PR1)', () => {

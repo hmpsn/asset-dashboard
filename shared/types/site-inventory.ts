@@ -27,7 +27,12 @@ export type SchemaFieldTarget =
   | 'price'
   | 'priceCurrency'
   | 'videoUrl'
-  | 'schemaJsonLd';
+  | 'schemaJsonLd'
+  | 'breadcrumb'
+  | 'softwareApplication'
+  | 'audienceType'
+  | 'featureList'
+  | 'logo';
 
 export type SchemaEvidenceSource =
   | 'rendered-html'

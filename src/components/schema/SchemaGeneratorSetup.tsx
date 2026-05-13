@@ -15,6 +15,7 @@ export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> =
 
 interface SchemaBusinessProfileCalloutProps {
   businessProfile?: BusinessProfileContact | null;
+  localBusinessIntent?: 'unknown' | 'local' | 'non-local-saas';
   dismissed: boolean;
   workspaceId?: string;
   onDismiss: () => void;
@@ -22,11 +23,15 @@ interface SchemaBusinessProfileCalloutProps {
 
 export function SchemaBusinessProfileCallout({
   businessProfile,
+  localBusinessIntent = 'unknown',
   dismissed,
   workspaceId,
   onDismiss,
 }: SchemaBusinessProfileCalloutProps) {
-  const showCallout = !dismissed && !!workspaceId && !(businessProfile?.address?.street || businessProfile?.address?.city);
+  const showCallout = !dismissed
+    && !!workspaceId
+    && localBusinessIntent !== 'non-local-saas'
+    && !(businessProfile?.address?.street || businessProfile?.address?.city);
 
   if (!showCallout) {
     return null;

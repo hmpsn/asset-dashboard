@@ -320,6 +320,39 @@ describe('validateForGoogleRichResults', () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it('allows Review without reviewRating when datePublished is present', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        '@id': 'https://example.com/reviews/widget/#review',
+        itemReviewed: { '@type': 'Product', name: 'Widget Pro' },
+        author: { '@type': 'Person', name: 'Jane Doe' },
+        datePublished: '2026-05-01',
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('Review');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('flags Review without reviewRating or datePublished', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        '@id': 'https://example.com/reviews/widget/#review',
+        itemReviewed: { '@type': 'Product', name: 'Widget Pro' },
+        author: { '@type': 'Person', name: 'Jane Doe' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('errors');
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'Review', field: 'reviewRating' }),
+    );
+  });
+
   it('validates ProfilePage for author pages', () => {
     const schema = {
       '@context': 'https://schema.org',

@@ -96,6 +96,8 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 **Blog/Article Schema Quality Hardening (May 2026):** BlogPosting/Article output preserves rendered editorial headlines over title-cased CMS fallbacks, emits visible-content `wordCount` instead of bloated `articleBody`, resolves authors from mapped CMS fields or visible bylines before Organization fallback, filters citations to authority-style external references, and gates ImageGallery to meaningful safe body images.
 
+**Service, Persona, Breadcrumb, and Evidence Schema Hardening (May 2026):** Service pages now normalize noisy slugs/titles into clean service names, reject discount copy as service pricing, and only emit offers when a sellable package price is verified. Existing SaaS/product/persona JSON-LD is treated as trusted evidence rather than copied output, enriching canonical graphs with safe SoftwareApplication, Audience, FAQ, and Review nodes where page evidence supports them. Breadcrumbs now emit only for meaningful hierarchy, SaaS workspaces avoid local-business completion pressure unless local intent is present, and Organization logo evidence avoids unsafe or non-logo image fallbacks.
+
 ---
 
 ### 7. SEO Strategy (Keyword Mapping)
