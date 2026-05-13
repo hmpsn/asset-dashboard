@@ -8,7 +8,7 @@ import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
-import { applyBulkKeywordGuards, stripCodeFences } from '../helpers.js';
+import { applyBulkKeywordGuards, normalizePageUrl, stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -31,7 +31,8 @@ router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), a
 
   const slices = ['seoContext', 'learnings'] as const;
   // slug sent by KeywordAnalysis.tsx as resolvePagePath(page) — full path like /services/seo; guard handles legacy bare slugs
-  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId, { slices, pagePath: slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined }) : null;
+  const pagePath = slug ? normalizePageUrl(slug) : undefined;
+  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId, { slices, pagePath }) : null;
   const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) : '';
   // No pagePath filter — show full cross-page keyword map for cannibalization avoidance
   const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
@@ -72,7 +73,7 @@ router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), a
 Page title: ${pageTitle}
 SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
-URL slug: ${slug ? (slug.startsWith('/') ? slug : `/${slug}`) : '/'}
+URL path: ${pagePath ?? '/'}
 Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapContext}${kwBlock}
 

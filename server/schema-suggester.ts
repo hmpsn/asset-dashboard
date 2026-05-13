@@ -44,6 +44,7 @@ export interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
   slug: string;
+  publishedPath?: string | null;
   url: string;
   existingSchemas: string[];
   existingSchemaJson?: Record<string, unknown>[];
@@ -463,6 +464,7 @@ function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput)
     pageId: lean.pageId,
     pageTitle: lean.pageTitle,
     slug: lean.slug,
+    publishedPath: lean.publishedPath,
     url: lean.url,
     existingSchemas: lean.existingSchemas,
     suggestedSchemas: lean.suggestedSchemas,
@@ -690,7 +692,7 @@ export async function generateSchemaForPage(
   // returns the leaf slug, which loses parent folder for nested pages (e.g. the page
   // published at /services/web-design would produce /web-design from slug alone).
   // Fall back to derived path if page list fails or page is not found.
-  let publishedPath = isHomepage ? '/' : `/${slug}`;
+  let publishedPath = isHomepage ? '/' : resolvePagePath({ slug });
   let siteContextForPage: SiteContext | undefined;
   try {
     if (wsId) {

@@ -11,7 +11,7 @@ import { callCreativeAI } from '../content-posts-ai.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
-import { stripHtmlToText, tryResolvePagePath, findPageMapEntryForPage } from '../helpers.js';
+import { stripHtmlToText, tryResolvePagePath, findPageMapEntryForPage, normalizePageUrl } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
@@ -71,7 +71,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
       const bulkPagePath = tryResolvePagePath(page);
       const bulkFixSeo = wsBulkSeo ? { ...wsBulkSeo } : undefined;
       if (bulkFixSeo && bulkPagePath && bulkFixSeo.strategy?.pageMap?.length) {
-        // findPageMapEntryForPage handles legacy `/${slug}` entries for nested pages
+        // findPageMapEntryForPage handles legacy slug-path entries for nested pages
         const kw = findPageMapEntryForPage(bulkFixSeo.strategy.pageMap, page);
         if (kw) bulkFixSeo.pageKeywords = kw;
       }
@@ -127,7 +127,8 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
         } else {
           if (ws) {
             updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
-            recordSeoChange(ws.id, page.pageId, bulkPagePath || page.slug || '', page.title || '', [field], 'bulk-fix');
+            const seoChangePagePath = bulkPagePath || (page.slug ? normalizePageUrl(page.slug) : '');
+            recordSeoChange(ws.id, page.pageId, seoChangePagePath, page.title || '', [field], 'bulk-fix');
           }
           results.push({ pageId: page.pageId, text, applied: true });
         }
@@ -217,7 +218,8 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
 
       if (ws) {
         updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply', fields: [field], updatedBy: 'admin' });
-        recordSeoChange(ws.id, page.pageId, tryResolvePagePath(page) || page.slug || '', page.title || '', [field], 'pattern-apply');
+        const seoChangePagePath = tryResolvePagePath(page) || (page.slug ? normalizePageUrl(page.slug) : '');
+        recordSeoChange(ws.id, page.pageId, seoChangePagePath, page.title || '', [field], 'pattern-apply');
       }
       results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue, applied: true });
     } catch (err) {

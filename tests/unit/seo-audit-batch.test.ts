@@ -120,10 +120,10 @@ describe('issueToTaskItem', () => {
     expect(item.description).toContain('Current value: Old title');
   });
 
-  it('hard-codes category as "seo" and uses page slug as pageUrl', () => {
+  it('hard-codes category as "seo" and uses a canonical path as pageUrl', () => {
     const item = issueToTaskItem(PAGES[1], PAGES[1].issues[0]);
     expect(item.category).toBe('seo');
-    expect(item.pageUrl).toBe('about');
+    expect(item.pageUrl).toBe('/about');
   });
 });
 
@@ -139,8 +139,8 @@ describe('selectIssuesForBatch — mode "all"', () => {
   it('uses `pages` not `filteredPages` in mode "all"', () => {
     const onlyHome = [PAGES[0]];
     const { items } = selectIssuesForBatch(baseInput({ mode: 'all', filteredPages: onlyHome }));
-    // Should still include 'about' issues — filteredPages is ignored in 'all'.
-    expect(items.some(i => i.pageUrl === 'about')).toBe(true);
+    // Should still include '/about' issues — filteredPages is ignored in 'all'.
+    expect(items.some(i => i.pageUrl === '/about')).toBe(true);
   });
 });
 
@@ -168,9 +168,9 @@ describe('selectIssuesForBatch — mode "filtered"', () => {
       mode: 'filtered',
       filteredPages: onlyHome,
     }));
-    // Three issues from home, no 'about'
+    // Three issues from home, no '/about'
     expect(items).toHaveLength(3);
-    expect(items.every(i => i.pageUrl === 'home')).toBe(true); // every-ok — guarded by toHaveLength(3) above
+    expect(items.every(i => i.pageUrl === '/home')).toBe(true); // every-ok — guarded by toHaveLength(3) above
   });
 
   it('applies severityFilter when not "all"', () => {

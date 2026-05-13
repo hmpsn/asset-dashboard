@@ -17,6 +17,7 @@ import { usePageIntelligenceAnalysis } from './page-intelligence/usePageIntellig
 import { usePageIntelligenceKeywordEditing } from './page-intelligence/usePageIntelligenceKeywordEditing';
 import { usePageIntelligenceKeywordTracking } from './page-intelligence/usePageIntelligenceKeywordTracking';
 import { usePageIntelligenceSeoCopy } from './page-intelligence/usePageIntelligenceSeoCopy';
+import { matchPageIdentity } from '../lib/pathUtils';
 
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 
@@ -87,7 +88,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   useEffect(() => {
     if (fixContext?.pageSlug && fixContext.targetRoute === 'page-intelligence' && !fixConsumed.current && unifiedPages.length > 0) {
       const match = unifiedPages.find(p =>
-        p.slug === fixContext.pageSlug || p.path === `/${fixContext.pageSlug}` || p.id === fixContext.pageId
+        p.id === fixContext.pageId ||
+        p.slug === fixContext.pageSlug ||
+        (fixContext.pageSlug ? matchPageIdentity(p.path, fixContext.pageSlug) : false)
       );
       if (match) {
         fixConsumed.current = true;

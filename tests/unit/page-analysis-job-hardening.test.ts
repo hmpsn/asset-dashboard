@@ -186,6 +186,18 @@ describe('page-analysis job hardening', () => {
     }));
   });
 
+  it('uses the canonical nested page path in the AI prompt', async () => {
+    mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Invisalign', slug: 'invisalign', path: '/services/invisalign', seo: {} }]);
+    mocks.resolveBaseUrl.mockResolvedValue('https://example.com');
+    globalThis.fetch = vi.fn(async () => ({ ok: true, text: async () => '<html><title>Invisalign</title><main>Service page</main></html>' })) as typeof fetch;
+
+    await runPageAnalysisJob({ jobId: 'job_nested_path', siteId: 'site_1', workspaceId: 'ws_1' });
+
+    const prompt = mocks.callAI.mock.calls[0]?.[0]?.messages?.[0]?.content ?? '';
+    expect(prompt).toContain('URL path: /services/invisalign');
+    expect(prompt).not.toContain('URL slug: /invisalign');
+  });
+
   it('counts AI failures as skipped in the terminal result', async () => {
     mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Home', slug: '', path: '/', seo: {} }]);
     mocks.resolveBaseUrl.mockResolvedValue('https://example.com');

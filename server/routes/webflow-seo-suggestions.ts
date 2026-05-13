@@ -22,6 +22,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { normalizePageUrl } from '../helpers.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-suggestions');
@@ -84,7 +85,7 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
       const ws = getWorkspace(workspaceId);
       if (ws) {
         updatePageState(ws.id, s.pageId, { status: 'live', source: 'bulk-rewrite', fields: [s.field], updatedBy: 'admin' });
-        recordSeoChange(ws.id, s.pageId, s.pageSlug, s.pageTitle, [s.field], 'bulk-rewrite');
+        recordSeoChange(ws.id, s.pageId, normalizePageUrl(s.pageSlug), s.pageTitle, [s.field], 'bulk-rewrite');
       }
 
       results.push({ pageId: s.pageId, field: s.field, text, applied: true });

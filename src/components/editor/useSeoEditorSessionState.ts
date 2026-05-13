@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FixContext } from '../../App';
 import type { SeoEditState, SeoVariationSet, SeoEditorPage } from './seoEditorTypes';
+import { matchPageIdentity } from '../../lib/pathUtils';
 import {
   buildSeoEditsFromPages,
   persistCachedExpandedPages,
@@ -61,7 +62,11 @@ export function useSeoEditorSessionState({
   // effect-layout-ok -- this sync is intentionally post-paint because it scrolls the target element.
   useEffect(() => {
     if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
-      const match = pages.find(p => p.id === fixContext.pageId || p.slug === fixContext.pageSlug);
+      const match = pages.find(p =>
+        p.id === fixContext.pageId ||
+        p.slug === fixContext.pageSlug ||
+        (fixContext.pageSlug ? matchPageIdentity(p.publishedPath || p.slug || '', fixContext.pageSlug) : false)
+      );
       if (match) {
         fixConsumed.current = true;
         setExpanded(new Set([match.id]));

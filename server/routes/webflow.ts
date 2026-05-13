@@ -25,6 +25,7 @@ import {
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
+import { normalizePageUrl } from '../helpers.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 
@@ -215,7 +216,9 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
         addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });
         updatePageState(seoWs.id, req.params.pageId, { status: 'live', source: 'editor', fields: changedFields, updatedBy: 'admin' });
-        recordSeoChange(seoWs.id, req.params.pageId, req.body.slug || '', req.body.pageTitle || title || '', changedFields, 'editor');
+        const rawPagePath = req.body.publishedPath || req.body.slug || '';
+        const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) : '';
+        recordSeoChange(seoWs.id, req.params.pageId, pagePath, req.body.pageTitle || title || '', changedFields, 'editor');
         broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED, {
           pageId: req.params.pageId,
           fields: changedFields,

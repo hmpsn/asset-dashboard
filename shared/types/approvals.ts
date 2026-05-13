@@ -5,6 +5,8 @@ export interface ApprovalItem {
   pageId: string;
   pageTitle: string;
   pageSlug: string;
+  /** Canonical site-relative path when known; pageSlug is legacy/display fallback only. */
+  publishedPath?: string | null;
   field: string;              // 'seoTitle' | 'seoDescription' for pages, or CMS field slug
   collectionId?: string;      // present for CMS items
   currentValue: string;

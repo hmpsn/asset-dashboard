@@ -1,9 +1,11 @@
 import type { SeoEditState, SeoEditorPage } from './seoEditorTypes';
+import { resolvePagePath } from '../../lib/pathUtils';
 
 export interface SeoApprovalItem {
   pageId: string;
   pageTitle: string;
   pageSlug: string;
+  publishedPath?: string | null;
   field: 'seoTitle' | 'seoDescription';
   currentValue: string;
   proposedValue: string;
@@ -26,6 +28,7 @@ export function buildSeoApprovalItemsForPage(
   const currentTitle = page.seo?.title ?? '';
   const currentDesc = page.seo?.description ?? '';
   const pageSlug = page.slug ?? '';
+  const publishedPath = resolvePagePath(page);
   const items: SeoApprovalItem[] = [];
 
   if (proposedTitle !== currentTitle) {
@@ -33,6 +36,7 @@ export function buildSeoApprovalItemsForPage(
       pageId: page.id,
       pageTitle: page.title,
       pageSlug,
+      publishedPath,
       field: 'seoTitle',
       currentValue: currentTitle,
       proposedValue: proposedTitle,
@@ -43,6 +47,7 @@ export function buildSeoApprovalItemsForPage(
       pageId: page.id,
       pageTitle: page.title,
       pageSlug,
+      publishedPath,
       field: 'seoDescription',
       currentValue: currentDesc,
       proposedValue: proposedDesc,

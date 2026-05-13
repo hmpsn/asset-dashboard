@@ -6,6 +6,7 @@ import { recordSeoChange } from './seo-change-tracker.js';
 import { updatePageSeo } from './webflow.js';
 import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
+import { normalizePageUrl } from './helpers.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');
@@ -65,7 +66,10 @@ export async function runSeoBulkAcceptFixesJob({
                 fields: [changedField],
                 updatedBy: 'admin',
               });
-              recordSeoChange(ws.id, fix.pageId, fix.publishedPath || fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
+              const pagePath = fix.publishedPath
+                ? normalizePageUrl(fix.publishedPath)
+                : fix.pageSlug ? normalizePageUrl(fix.pageSlug) : '';
+              recordSeoChange(ws.id, fix.pageId, pagePath, fix.pageName || '', [changedField], 'audit-fix');
               broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
                 pageId: fix.pageId,
                 fields: [changedField],

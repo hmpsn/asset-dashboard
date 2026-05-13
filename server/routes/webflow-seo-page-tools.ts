@@ -7,7 +7,7 @@ import { Router } from 'express';
 
 import { requireWorkspaceAccessFromBody, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { parseJsonFallback } from '../db/json-validation.js';
-import { stripCodeFences, stripHtmlToText } from '../helpers.js';
+import { normalizePageUrl, stripCodeFences, stripHtmlToText } from '../helpers.js';
 import { createLogger } from '../logger.js';
 import { callAI } from '../ai.js';
 import { getPageKeyword } from '../page-keywords.js';
@@ -40,7 +40,7 @@ interface SeoCopyResponse {
 // --- Fetch page HTML body text (for keyword analysis) ---
 router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   const { siteId } = req.params;
-  const pagePath = req.query.path as string;
+  const pagePath = typeof req.query.path === 'string' ? normalizePageUrl(req.query.path) : '';
   if (!pagePath) return res.status(400).json({ error: 'path query param required' });
   const token = getTokenForSite(siteId) || undefined;
   try {
@@ -50,9 +50,9 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery
     const urls: string[] = [];
     if (ws?.liveDomain) {
       const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      urls.push(`${domain.replace(/\/+$/, '')}${pagePath}`);
+      urls.push(`${domain.replace(/\/+$/, '')}${pagePath === '/' ? '' : pagePath}`);
     }
-    if (subdomain) urls.push(`https://${subdomain}.webflow.io${pagePath}`);
+    if (subdomain) urls.push(`https://${subdomain}.webflow.io${pagePath === '/' ? '' : pagePath}`);
     if (urls.length === 0) return res.status(400).json({ error: 'Could not resolve site URL' });
 
     let html = '';

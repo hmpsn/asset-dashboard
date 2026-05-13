@@ -11,7 +11,7 @@ import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
-import { buildSchemaContext } from '../helpers.js';
+import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
@@ -440,7 +440,9 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         recordSchemaPublish(req.params.siteId, pageId, cmsWs.id || '', schema);
         addActivity(cmsWs.id, 'schema_published', 'Schema written to CMS field', cmsDelivery.message, { pageId });
         updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-        recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-cms-field');
+        const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
+        const cmsPublishedPath = rawCmsPublishedPath ? normalizePageUrl(rawCmsPublishedPath) : '';
+        recordSeoChange(cmsWs.id, pageId, cmsPublishedPath, req.body.pageTitle || '', ['schema'], 'schema-cms-field');
       }
       return res.json({ success: true, published: !!publishAfter, cmsDeliveryStatus: cmsDelivery });
     }
@@ -489,10 +491,12 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
 
     // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const rawPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
+    const publishedPath = rawPublishedPath ? normalizePageUrl(rawPublishedPath) : '';
     if (pubWs) {
       addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${sitePublished ? 'site published' : 'saved as draft'}`, { pageId });
       updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-      recordSeoChange(pubWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema');
+      recordSeoChange(pubWs.id, pageId, publishedPath, req.body.pageTitle || '', ['schema'], 'schema');
     }
 
     res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
@@ -510,7 +514,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         actionType: 'schema_deployed',
         sourceType: 'schema',
         sourceId: pageId,
-        pageUrl: req.body.pageSlug ? `/${req.body.pageSlug}` : null,
+        pageUrl: publishedPath || null,
         targetKeyword: null,
         baselineSnapshot: {
           captured_at: new Date().toISOString(),
@@ -519,9 +523,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         },
         attribution: 'platform_executed',
       });
-      if (req.body.pageSlug) {
-        void captureBaselineFromGsc(schemaAction.id, pubWs.id, `/${req.body.pageSlug}`);
-      }
+      if (publishedPath) void captureBaselineFromGsc(schemaAction.id, pubWs.id, publishedPath);
     } catch (err) {
       log.warn({ err, pageId }, 'Failed to record outcome action for schema deployment');
     }

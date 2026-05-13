@@ -42,6 +42,7 @@ import { parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
 import { hasActiveJob } from '../jobs.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
+import { normalizePageUrl } from '../helpers.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import type { AIReviewResult, AiFixResult, IssueKey, PostSection } from '../../shared/types/content.js';
@@ -379,20 +380,21 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
             // Record for outcome tracking — guard prevents duplicates if .then() fires more than once
             try {
               if (!getActionByWorkspaceAndSource(req.params.workspaceId, 'post', req.params.postId)) {
+                const publishedPagePath = slug ? normalizePageUrl(slug) : null;
                 const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
                   workspaceId: req.params.workspaceId,
                   actionType: 'content_published',
                   sourceType: 'post',
                   sourceId: req.params.postId,
-                  pageUrl: slug ? `/${slug}` : null,
+                  pageUrl: publishedPagePath,
                   targetKeyword: updated.targetKeyword ?? null,
                   baselineSnapshot: {
                     captured_at: new Date().toISOString(),
                   },
                   attribution: 'platform_executed',
                 });
-                if (slug) {
-                  void captureBaselineFromGsc(postAction.id, req.params.workspaceId, `/${slug}`);
+                if (publishedPagePath) {
+                  void captureBaselineFromGsc(postAction.id, req.params.workspaceId, publishedPagePath);
                 }
               }
             } catch (err) {

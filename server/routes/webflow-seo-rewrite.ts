@@ -14,7 +14,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { isProgrammingError } from '../errors.js';
 import {
   matchGscUrlToPath,
-  normalizePath,
+  normalizePageUrl,
   stripCodeFences,
   stripHtmlToText,
 } from '../helpers.js';
@@ -39,12 +39,13 @@ const log = createLogger('webflow-seo');
 router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field, workspaceId, pagePath } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
+  const normalizedPagePath = typeof pagePath === 'string' && pagePath ? normalizePageUrl(pagePath) : undefined;
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Build full context: keyword strategy + brand voice + personas + knowledge base
-  const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: pagePath || undefined });
+  const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: normalizedPagePath });
   const rewriteSeo = rewriteIntel.seoContext;
   const keywordContext = formatKeywordsForPrompt(rewriteSeo);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
@@ -61,12 +62,11 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
   // Fetch GSC search queries for this specific page (best-effort)
   let gscBlock = '';
-  if (workspaceId && pagePath) {
+  if (workspaceId && normalizedPagePath) {
     try {
       const ws = getWorkspace(workspaceId);
       if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
         const queryPageData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
-        const normalizedPagePath = normalizePath(pagePath);
         const pageQueries = queryPageData
           .filter(r => matchGscUrlToPath(r.page, normalizedPagePath))
           .sort((a, b) => b.impressions - a.impressions)
@@ -100,13 +100,13 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
       if (ws?.webflowSiteId) {
         const snapshot = getLatestSnapshot(ws.webflowSiteId);
         if (snapshot) {
-          const pageSlug = pagePath ? pagePath.replace(/^\//, '') : '';
+          const pageSlug = normalizedPagePath ? normalizedPagePath.replace(/^\//, '') : '';
           const matchesAuditPage = (p: { slug?: string; url?: string; page?: string }) => {
             if (p.slug === pageSlug) return true;
-            if (p.url && pagePath) {
-              try { return normalizePath(new URL(p.url).pathname) === normalizePath(pagePath); } catch { /* malformed URL — expected */ } // catch-ok
+            if (p.url && normalizedPagePath) {
+              try { return normalizePageUrl(p.url) === normalizedPagePath; } catch { /* malformed URL — expected */ } // catch-ok
             }
-            return pagePath ? p.page === pagePath : false;
+            return normalizedPagePath ? p.page === normalizedPagePath : false;
           };
           const pageAudit = snapshot.audit.pages.find(matchesAuditPage);
           if (pageAudit && pageAudit.issues.length > 0) {
@@ -125,14 +125,14 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   // Fetch page content server-side if not provided — extract headings + body text
   let resolvedPageContent = pageContent || '';
   let headingsBlock = '';
-  if (!resolvedPageContent && pagePath && workspaceId) {
+  if (!resolvedPageContent && normalizedPagePath && workspaceId) {
     try {
       const ws = getWorkspace(workspaceId);
       const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
       if (baseUrl) {
-        const slug = pagePath.replace(/^\//, '');
-        log.info(`Fetching page content from ${baseUrl}/${slug}`);
-        const htmlRes = await fetch(`${baseUrl}/${slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+        const url = `${baseUrl.replace(/\/+$/, '')}${normalizedPagePath === '/' ? '' : normalizedPagePath}`;
+        log.info(`Fetching page content from ${url}`);
+        const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -162,11 +162,11 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
     // Intelligence context: cannibalization + page health + content decay
     let intelligenceBlock = '';
-    if (workspaceId && pagePath) {
+    if (workspaceId && normalizedPagePath) {
       try {
         const allInsights = getInsights(workspaceId);
         const pageInsights = allInsights.filter(i =>
-          i.pageId === pagePath
+          i.pageId && normalizePageUrl(i.pageId) === normalizedPagePath
         );
 
         const cannibalization = pageInsights
