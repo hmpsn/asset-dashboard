@@ -134,10 +134,10 @@ export interface ClientKeywordStrategy {
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
   keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
   topicClusters?: { topic: string; keywords: string[]; ownedCount: number; totalCount: number; coveragePercent: number; avgPosition?: number; topCompetitor?: string; topCompetitorCoverage?: number; gap: string[] }[];
-  cannibalization?: { keyword: string; pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[]; severity: 'high' | 'medium' | 'low'; recommendation: string }[];
+  cannibalization?: { keyword: string; pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[]; severity: 'high' | 'medium' | 'low'; recommendation: string; canonicalPath?: string; canonicalUrl?: string; action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex' }[];
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[];
   businessContext?: string;
-  generatedAt: string;
+  generatedAt: string | null;
 }
 
 export const SEV = {

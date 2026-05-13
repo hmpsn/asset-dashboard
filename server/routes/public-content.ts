@@ -196,7 +196,13 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
     })),
     cannibalization: cannibalization.map(c => ({
       keyword: c.keyword,
-      pages: c.pages,
+      pages: c.pages.map(page => ({
+        path: page.path,
+        position: page.position,
+        impressions: page.impressions,
+        clicks: page.clicks,
+        source: page.source,
+      })),
       severity: c.severity,
       recommendation: c.recommendation,
       canonicalPath: c.canonicalPath,

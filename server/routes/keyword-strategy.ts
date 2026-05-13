@@ -64,6 +64,7 @@ function serializeKeywordStrategy(
   // against callers that still mutate the blob in-memory.
   const {
     semrushMode,
+    seoDataStatus,
     contentGaps: _staleGaps,
     quickWins: _staleQuickWins,
     keywordGaps: _staleKeywordGaps,
@@ -74,6 +75,13 @@ function serializeKeywordStrategy(
   return {
     ...rest,
     seoDataMode: strategy.seoDataMode ?? semrushMode ?? 'none',
+    seoDataStatus: seoDataStatus ? {
+      mode: seoDataStatus.mode,
+      provider: seoDataStatus.provider,
+      status: seoDataStatus.status,
+      reasons: seoDataStatus.reasons ?? [],
+      fallbackProviderAvailable: seoDataStatus.fallbackProviderAvailable ?? false,
+    } : undefined,
     pageMap,
     contentGaps,
     quickWins,
@@ -175,7 +183,8 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
   const pageMap = listPageKeywords(ws.id);
-  const contentGaps = listContentGaps(ws.id);
+  const contentGapsFromTable = listContentGaps(ws.id);
+  const contentGaps = contentGapsFromTable.length > 0 ? contentGapsFromTable : (strategy?.contentGaps || []);
   const quickWinsFromTable = listQuickWins(ws.id);
   const quickWins = quickWinsFromTable.length > 0 ? quickWinsFromTable : (strategy?.quickWins || []);
   const keywordGapsFromTable = listKeywordGaps(ws.id);

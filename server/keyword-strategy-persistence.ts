@@ -7,7 +7,6 @@ import { listQuickWins, replaceAllQuickWins } from './quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
-import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -24,8 +23,6 @@ import type {
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { StrategyOutput } from './keyword-strategy-ai-synthesis.js';
-
-const log = createLogger('keyword-strategy:persistence');
 
 export interface PersistKeywordStrategyOptions {
   ws: Workspace;
@@ -162,20 +159,16 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
 
     updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
-    try {
-      if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
-        workspaceId: ws.id,
-        actionType: 'strategy_keyword_added',
-        sourceType: 'strategy',
-        sourceId: ws.id,
-        pageUrl: null,
-        targetKeyword: null,
-        baselineSnapshot: { captured_at: new Date().toISOString() },
-        attribution: 'platform_executed',
-      });
-    } catch (err) {
-      log.warn({ err }, 'Failed to record outcome action for strategy generation');
-    }
+    if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
+      workspaceId: ws.id,
+      actionType: 'strategy_keyword_added',
+      sourceType: 'strategy',
+      sourceId: ws.id,
+      pageUrl: null,
+      targetKeyword: null,
+      baselineSnapshot: { captured_at: new Date().toISOString() },
+      attribution: 'platform_executed',
+    });
   });
   writeKeywordStrategy();
 

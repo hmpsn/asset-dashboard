@@ -2,7 +2,7 @@ import { SectionCard } from '../../ui';
 
 interface StrategySnapshotSectionProps {
   healthScore: number;
-  generatedAt: string;
+  generatedAt: string | null;
   contentGapsFound: number;
   totalPageImprovements: number;
   pagesRanking: number;
@@ -35,6 +35,10 @@ export function StrategySnapshotSection({
     : healthScore >= 60
       ? 'text-accent-warning'
       : 'text-accent-brand';
+  const generatedDate = generatedAt ? new Date(generatedAt) : null;
+  const generatedLabel = generatedDate && !Number.isNaN(generatedDate.getTime())
+    ? `Generated ${generatedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+    : 'Strategy data syncing';
 
   return (
     <SectionCard>
@@ -48,7 +52,7 @@ export function StrategySnapshotSection({
             <div className="t-label text-[var(--brand-text-muted)]">Strategy Snapshot</div>
             <div className="t-body font-medium text-[var(--brand-text)]">{readinessLabel}</div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-              Generated {new Date(generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              {generatedLabel}
             </p>
           </div>
         </div>
