@@ -667,7 +667,20 @@ export async function generateSchemaForPage(
     };
   }
 
-  const meta = await fetchPageMeta(pageId, tokenOverride);
+  const matchedPage = allPages.find(p => p.id === pageId);
+  const meta = matchedPage ? {
+    id: matchedPage.id,
+    title: matchedPage.title || '',
+    slug: matchedPage.slug || resolvePagePath(matchedPage).replace(/^\//, ''),
+    seo: matchedPage.seo,
+    openGraph: matchedPage.openGraph,
+    lastPublished: typeof (matchedPage as Record<string, unknown>).lastPublished === 'string'
+      ? ((matchedPage as Record<string, unknown>).lastPublished as string)
+      : undefined,
+    createdOn: typeof (matchedPage as Record<string, unknown>).createdOn === 'string'
+      ? ((matchedPage as Record<string, unknown>).createdOn as string)
+      : undefined,
+  } : await fetchPageMeta(pageId, tokenOverride);
   if (!meta) return null;
 
   const slug = meta.slug || '';
@@ -681,9 +694,8 @@ export async function generateSchemaForPage(
   let siteContextForPage: SiteContext | undefined;
   try {
     if (wsId) {
-      const matched = allPages.find(p => p.id === pageId);
-      if (matched?.publishedPath) {
-        publishedPath = matched.publishedPath;
+      if (matchedPage?.publishedPath) {
+        publishedPath = matchedPage.publishedPath;
       }
       const latestPlan = getSchemaPlan(siteId);
       const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
