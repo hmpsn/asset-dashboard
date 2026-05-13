@@ -45,9 +45,13 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
   it('broadcasts strategy refreshes after page keyword writes', () => {
     const singleSrc = readFileSync('server/routes/webflow-keywords.ts', 'utf-8'); // readFile-ok — source contract for single-page invalidation
     const bulkSrc = readFileSync('server/page-analysis-job.ts', 'utf-8'); // readFile-ok — source contract for bulk invalidation
+    const seoBulkAnalyzeSrc = readFileSync('server/webflow-seo-bulk-analyze-job.ts', 'utf-8'); // readFile-ok — source contract for SEO Editor bulk analyze invalidation
 
     expect(singleSrc).toContain("broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { pagePath: normalized, source: 'page-analysis' })");
     expect(bulkSrc).toContain("broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { analyzed, source: 'page-analysis-job' })");
+    expect(seoBulkAnalyzeSrc).toContain('resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, null)');
+    expect(seoBulkAnalyzeSrc).toContain('broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED');
+    expect(seoBulkAnalyzeSrc).toContain("source: 'seo-bulk-analyze'");
   });
 
   it('preserves page identity and invalidates SEO Editor cache after direct SEO saves', () => {
@@ -81,5 +85,18 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(routeSrc).toContain('broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(routeSrc).toContain("addActivity(ws.id, 'seo_updated'");
     expect(routeSrc).toContain('if (!ws || ws.webflowSiteId !== siteId)');
+  });
+
+  it('carries canonical published paths through audit and suggestion apply writes', () => {
+    const bulkAcceptPanelSrc = readFileSync('src/components/audit/BulkAcceptPanel.tsx', 'utf-8'); // readFile-ok — source contract for audit fix identity
+    const bulkAcceptSchemaSrc = readFileSync('server/schemas/seo-bulk-jobs.ts', 'utf-8'); // readFile-ok — source contract for audit fix identity
+    const bulkAcceptJobSrc = readFileSync('server/webflow-seo-bulk-accept-fixes-job.ts', 'utf-8'); // readFile-ok — source contract for audit fix identity
+    const suggestionsRouteSrc = readFileSync('server/routes/webflow-seo-suggestions.ts', 'utf-8'); // readFile-ok — source contract for suggestion apply data flow
+
+    expect(bulkAcceptPanelSrc).toContain('publishedPath: page.publishedPath');
+    expect(bulkAcceptSchemaSrc).toContain('publishedPath: z.string().nullable().optional()');
+    expect(bulkAcceptJobSrc).toContain("recordSeoChange(ws.id, fix.pageId, fix.publishedPath || fix.pageSlug || ''");
+    expect(suggestionsRouteSrc).toContain('broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED');
+    expect(suggestionsRouteSrc).toContain("addActivity(\n      workspaceId,\n      'seo_updated'");
   });
 });

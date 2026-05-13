@@ -19,11 +19,11 @@ describe('provider keyword metric persistence guard', () => {
     )).toEqual({ keywordDifficulty: 55, monthlyVolume: 900 });
   });
 
-  it('zeros metrics for new keywords without provider confirmation', () => {
+  it('clears metrics for new keywords without provider confirmation', () => {
     expect(resolvePersistedKeywordMetrics(
       { primaryKeyword: 'old keyword', keywordDifficulty: 55, monthlyVolume: 900 },
       'new keyword',
       null,
-    )).toEqual({ keywordDifficulty: 0, monthlyVolume: 0 });
+    )).toEqual({ keywordDifficulty: undefined, monthlyVolume: undefined });
   });
 });

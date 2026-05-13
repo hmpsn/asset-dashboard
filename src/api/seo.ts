@@ -367,7 +367,7 @@ export const seoBulkJobs = {
   bulkRewrite: (wsId: string, body: { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' | 'both' }) =>
     post<{ jobId: string }>(`/api/seo/${wsId}/bulk-rewrite`, body),
 
-  bulkAcceptFixes: (wsId: string, body: { siteId: string; fixes: Array<{ pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; publishedPath?: string; pageName?: string }> }) =>
+  bulkAcceptFixes: (wsId: string, body: { siteId: string; fixes: Array<{ pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; publishedPath?: string | null; pageName?: string }> }) =>
     post<{ jobId: string }>(`/api/seo/${wsId}/bulk-accept-fixes`, body),
 };
 

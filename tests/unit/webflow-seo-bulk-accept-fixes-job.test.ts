@@ -62,6 +62,7 @@ describe('webflow SEO bulk accept fixes job', () => {
         check: 'meta-description',
         suggestedFix: 'A better description',
         pageSlug: '/services',
+        publishedPath: '/services/seo',
         pageName: 'Services',
       }],
     });
@@ -73,7 +74,7 @@ describe('webflow SEO bulk accept fixes job', () => {
       fields: ['description'],
       updatedBy: 'admin',
     });
-    expect(mocks.recordSeoChange).toHaveBeenCalledWith('ws_1', 'page_1', '/services', 'Services', ['description'], 'audit-fix');
+    expect(mocks.recordSeoChange).toHaveBeenCalledWith('ws_1', 'page_1', '/services/seo', 'Services', ['description'], 'audit-fix');
     expect(mocks.updateJob).toHaveBeenCalledWith('job_1', expect.objectContaining({
       status: 'done',
       result: expect.objectContaining({ applied: 1, failed: 0, total: 1, appliedKeys: ['page_1-meta-description'] }),

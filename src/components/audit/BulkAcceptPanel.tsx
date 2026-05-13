@@ -125,13 +125,13 @@ export function BulkAcceptPanel({
 
   const acceptAllSuggestions = async () => {
     if (!data) return;
-    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; pageName?: string }[] = [];
+    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; publishedPath?: string | null; pageName?: string }[] = [];
     for (const page of data.pages) {
       for (const issue of page.issues) {
         const fixKey = `${page.pageId}-${issue.check}`;
         if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
           const text = editedSuggestions[fixKey] || issue.suggestedFix;
-          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, pageName: page.page });
+          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, publishedPath: page.publishedPath, pageName: page.page });
         }
       }
     }

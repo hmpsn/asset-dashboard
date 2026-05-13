@@ -257,8 +257,8 @@ describe('page-analysis job hardening', () => {
     expect(mocks.upsertPageKeywordsBatch).toHaveBeenCalledWith('ws_1', [
       expect.objectContaining({
         primaryKeyword: 'invented keyword',
-        keywordDifficulty: 0,
-        monthlyVolume: 0,
+        keywordDifficulty: undefined,
+        monthlyVolume: undefined,
       }),
     ]);
   });

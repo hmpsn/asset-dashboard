@@ -11,7 +11,9 @@ export interface ProviderKeywordMetric {
 }
 
 export interface PersistedKeywordMetrics {
+  /** Undefined means no provider-confirmed metric is available; store NULL, not an AI estimate. */
   keywordDifficulty: number | undefined;
+  /** Undefined means no provider-confirmed metric is available; store NULL, not an AI estimate. */
   monthlyVolume: number | undefined;
 }
 
@@ -77,7 +79,7 @@ export function resolvePersistedKeywordMetrics(
   }
 
   return {
-    keywordDifficulty: 0,
-    monthlyVolume: 0,
+    keywordDifficulty: undefined,
+    monthlyVolume: undefined,
   };
 }

@@ -14,9 +14,10 @@ const mocks = vi.hoisted(() => ({
     info: vi.fn(),
     warn: vi.fn(),
   },
-  callOpenAI: vi.fn(),
+  callAI: vi.fn(),
   getPageKeyword: vi.fn(),
   upsertPageKeyword: vi.fn(),
+  resolvePersistedKeywordMetrics: vi.fn(() => ({ keywordDifficulty: undefined, monthlyVolume: undefined })),
   resolveBaseUrl: vi.fn(),
   buildWorkspaceIntelligence: vi.fn(),
   formatForPrompt: vi.fn(() => '\nFULL CONTEXT'),
@@ -29,7 +30,6 @@ vi.mock('../../server/activity-log.js', () => ({ addActivity: mocks.addActivity 
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadcastToWorkspace }));
 vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammingError }));
 vi.mock('../../server/helpers.js', () => ({
-  applyBulkKeywordGuards: mocks.applyBulkKeywordGuards,
   stripCodeFences: vi.fn((value: string) => value),
   stripHtmlToText: vi.fn(() => 'Clean page copy'),
   tryResolvePagePath: vi.fn((page: { publishedPath?: string | null; slug?: string }) => page.publishedPath ?? (page.slug ? `/${page.slug}` : null)),
@@ -40,10 +40,13 @@ vi.mock('../../server/jobs.js', () => ({
   updateJob: mocks.updateJob,
 }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.logger) }));
-vi.mock('../../server/openai-helpers.js', () => ({ callOpenAI: mocks.callOpenAI }));
+vi.mock('../../server/ai.js', () => ({ callAI: mocks.callAI }));
 vi.mock('../../server/page-keywords.js', () => ({
   getPageKeyword: mocks.getPageKeyword,
   upsertPageKeyword: mocks.upsertPageKeyword,
+}));
+vi.mock('../../server/provider-keyword-metrics.js', () => ({
+  resolvePersistedKeywordMetrics: mocks.resolvePersistedKeywordMetrics,
 }));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -58,6 +61,7 @@ vi.mock('../../server/ws-events.js', () => ({
     BULK_OPERATION_COMPLETE: 'bulk:complete',
     BULK_OPERATION_FAILED: 'bulk:failed',
     BULK_OPERATION_PROGRESS: 'bulk:progress',
+    STRATEGY_UPDATED: 'strategy:updated',
   },
 }));
 
@@ -88,7 +92,8 @@ describe('webflow SEO bulk analyze job', () => {
       currentPosition: 4,
       impressions: 123,
     });
-    mocks.callOpenAI.mockResolvedValue({
+    mocks.resolvePersistedKeywordMetrics.mockReturnValue({ keywordDifficulty: 45, monthlyVolume: 320 });
+    mocks.callAI.mockResolvedValue({
       text: JSON.stringify({
         primaryKeyword: 'seo services',
         primaryKeywordPresence: { inTitle: true, inMeta: false, inContent: true, inSlug: true },
@@ -120,16 +125,22 @@ describe('webflow SEO bulk analyze job', () => {
       signal: ac.signal,
     });
 
-    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.callAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'bulk-page-analysis',
       workspaceId: 'ws_1',
     }));
-    expect(mocks.applyBulkKeywordGuards).toHaveBeenCalled();
+    expect(mocks.resolvePersistedKeywordMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ primaryKeyword: 'old keyword' }),
+      'seo services',
+      null,
+    );
     expect(mocks.upsertPageKeyword).toHaveBeenCalledWith('ws_1', expect.objectContaining({
       pagePath: '/services',
       pageTitle: 'Existing services page',
       primaryKeyword: 'seo services',
       secondaryKeywords: ['technical seo'],
+      keywordDifficulty: 45,
+      monthlyVolume: 320,
       currentPosition: 4,
       impressions: 123,
     }));
@@ -144,6 +155,11 @@ describe('webflow SEO bulk analyze job', () => {
       analyzed: 1,
       failed: 0,
     }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'strategy:updated', expect.objectContaining({
+      analyzed: 1,
+      persisted: 1,
+      source: 'seo-bulk-analyze',
+    }));
     expect(mocks.addActivity).toHaveBeenCalledWith(
       'ws_1',
       'page_analysis',
@@ -156,7 +172,7 @@ describe('webflow SEO bulk analyze job', () => {
 
   it('counts invalid AI JSON as a failed page and still completes', async () => {
     const ac = new AbortController();
-    mocks.callOpenAI.mockResolvedValueOnce({ text: 'not json' });
+    mocks.callAI.mockResolvedValueOnce({ text: 'not json' });
 
     await runSeoBulkAnalyzeJob({
       jobId: 'job_invalid_json',
@@ -209,7 +225,7 @@ describe('webflow SEO bulk analyze job', () => {
       signal: ac.signal,
     });
 
-    expect(mocks.callOpenAI).not.toHaveBeenCalled();
+    expect(mocks.callAI).not.toHaveBeenCalled();
     expect(mocks.upsertPageKeyword).not.toHaveBeenCalled();
     expect(mocks.updateJob).toHaveBeenCalledWith('job_cancel', expect.objectContaining({
       status: 'cancelled',

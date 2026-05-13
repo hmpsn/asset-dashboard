@@ -149,12 +149,12 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
         fields: [field],
         source: 'bulk-fix',
       });
+      addActivity(bulkWsId, 'seo_updated',
+        `Bulk ${field} optimization: ${appliedPageIds.length} pages updated`,
+        `AI-generated ${field}s applied to ${appliedPageIds.length}/${pages.length} pages`,
+        { field, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
+      );
     }
-    addActivity(bulkWsId, 'seo_updated',
-      `Bulk ${field} optimization: ${results.filter(r => r.applied).length} pages updated`,
-      `AI-generated ${field}s applied to ${appliedPageIds.length}/${pages.length} pages`,
-      { field, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
-    );
   }
 
   res.json({ results, field });

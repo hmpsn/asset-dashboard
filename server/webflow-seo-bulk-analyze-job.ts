@@ -2,11 +2,12 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { applyBulkKeywordGuards, stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
+import { stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { callAI } from './ai.js';
 import { getPageKeyword, upsertPageKeyword } from './page-keywords.js';
+import { resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import {
   buildWorkspaceIntelligence,
@@ -50,6 +51,7 @@ export async function runSeoBulkAnalyzeJob({
 
     let done = 0;
     let failed = 0;
+    let persisted = 0;
 
     for (const page of pages) {
       if (isJobCancelled(jobId) || signal.aborted) break;
@@ -125,16 +127,17 @@ IMPORTANT: Return ONLY valid JSON.`;
         }
 
         const analysis = isJsonObject(parsed) ? parsed : {};
-        applyBulkKeywordGuards(analysis, ''); // no SEMRush data in bulk analyze path
 
         if (!analyzePagePath) {
           log.debug({ pageId: page.pageId }, 'bulk-analyze: skipping persist — no slug or publishedPath');
         } else {
           const existing = getPageKeyword(workspaceId, analyzePagePath);
+          const resolvedPrimaryKeyword = (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
+          const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, null);
           upsertPageKeyword(workspaceId, {
             pagePath: analyzePagePath,
             pageTitle: existing?.pageTitle || page.title,
-            primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
+            primaryKeyword: resolvedPrimaryKeyword,
             secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
             searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
             optimizationIssues: (analysis.optimizationIssues as string[]) || [],
@@ -146,13 +149,14 @@ IMPORTANT: Return ONLY valid JSON.`;
             longTailKeywords: (analysis.longTailKeywords as string[]) || [],
             competitorKeywords: (analysis.competitorKeywords as string[]) || [],
             estimatedDifficulty: analysis.estimatedDifficulty as string | undefined,
-            keywordDifficulty: analysis.keywordDifficulty as number | undefined,
-            monthlyVolume: analysis.monthlyVolume as number | undefined,
+            keywordDifficulty: guardedMetrics.keywordDifficulty,
+            monthlyVolume: guardedMetrics.monthlyVolume,
             topicCluster: analysis.topicCluster as string | undefined,
             searchIntentConfidence: analysis.searchIntentConfidence as number | undefined,
             ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
             ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
           });
+          persisted++;
         }
 
         done++;
@@ -170,6 +174,13 @@ IMPORTANT: Return ONLY valid JSON.`;
     }
 
     invalidateIntelligenceCache(workspaceId);
+    if (persisted > 0) {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, {
+        analyzed: done - failed,
+        persisted,
+        source: 'seo-bulk-analyze',
+      });
+    }
 
     if (signal.aborted) {
       updateJob(jobId, {
