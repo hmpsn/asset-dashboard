@@ -117,6 +117,7 @@ export const queryKeys = {
     copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
 
     // Page join
+    pageJoinPagesAll: () => ['admin-page-join-pages'] as const,
     pageJoinPages: (siteId: string, wsId?: string) =>
       wsId ? ['admin-page-join-pages', siteId, wsId] as const : ['admin-page-join-pages', siteId] as const,
 

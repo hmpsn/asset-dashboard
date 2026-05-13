@@ -203,10 +203,13 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
   }
   try {
     const { siteId, workspaceId, seo, openGraph, title } = req.body;
+    const explicitWs = typeof workspaceId === 'string' ? getWorkspace(workspaceId) : undefined;
+    if (typeof workspaceId === 'string' && (!explicitWs || explicitWs.webflowSiteId !== siteId)) {
+      return res.status(403).json({ error: 'You do not have access to this workspace' });
+    }
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
     const result = await updatePageSeo(req.params.pageId, { seo, openGraph, title }, token);
     if (result.success && siteId) {
-      const explicitWs = typeof workspaceId === 'string' ? getWorkspace(workspaceId) : undefined;
       const seoWs = explicitWs || listWorkspaces().find(w => w.webflowSiteId === siteId);
       if (seoWs) {
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];

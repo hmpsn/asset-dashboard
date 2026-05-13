@@ -63,11 +63,13 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(bulkHookSrc).toContain('publishedPath: page.publishedPath');
     expect(bulkHookSrc).toContain('pageTitle: page.title');
     expect(routeSrc).toContain("const explicitWs = typeof workspaceId === 'string' ? getWorkspace(workspaceId) : undefined");
+    expect(routeSrc).toContain("if (typeof workspaceId === 'string' && (!explicitWs || explicitWs.webflowSiteId !== siteId))");
     expect(routeSrc).toContain('if (result.success && siteId)');
     expect(routeSrc).toContain("recordSeoChange(seoWs.id, req.params.pageId, req.body.slug || '', req.body.pageTitle || title || '', changedFields, 'editor')");
     expect(routeSrc).toContain('broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(invalidationSrc).toContain('[WS_EVENTS.PAGE_STATE_UPDATED]');
     expect(invalidationSrc).toContain('queryKeys.admin.seoEditorAll()');
+    expect(invalidationSrc).toContain('queryKeys.admin.pageJoinPagesAll()');
   });
 
   it('broadcasts and logs bulk SEO apply writes', () => {
