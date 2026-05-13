@@ -480,21 +480,6 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
       </div>`
     : '';
 
-  // For client-facing report, filter out performance category issues (PageSpeed-type flags)
-  const clientPages = audit.pages.map(p => ({
-    ...p,
-    issues: p.issues.filter(i => (i.category || 'technical') !== 'performance'),
-  }));
-  const clientSiteWide = audit.siteWideIssues.filter(i => (i.category || 'technical') !== 'performance');
-
-  // Recalculate counts without performance issues
-  const clientErrors = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'error').length, 0)
-    + clientSiteWide.filter(i => i.severity === 'error').length;
-  const clientWarnings = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'warning').length, 0)
-    + clientSiteWide.filter(i => i.severity === 'warning').length;
-  const clientInfos = clientPages.reduce((s, p) => s + p.issues.filter(i => i.severity === 'info').length, 0)
-    + clientSiteWide.filter(i => i.severity === 'info').length;
-
   // (No category breakdown or executive summary — clean technical audit)
 
   // Action items section
@@ -545,7 +530,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
   // (No category summary — clean technical audit)
 
   // Page rows — structured "Problem → Fix" format for technical audit
-  const pageRows = clientPages.map(p => {
+  const pageRows = audit.pages.map(p => {
     const pColor = p.score >= 80 ? '#22c55e' : p.score >= 60 ? '#eab308' : p.score >= 40 ? '#f97316' : '#ef4444';
     const sevIcon = (s: string) => s === 'error' ? '✗' : s === 'warning' ? '⚠' : 'ℹ';
     const sevColor = (s: string) => s === 'error' ? '#ef4444' : s === 'warning' ? '#eab308' : '#60a5fa';
@@ -578,7 +563,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
   }).join('');
 
   // Site-wide rows — structured "Problem → Fix" format
-  const siteWideRows = clientSiteWide.map(i => {
+  const siteWideRows = audit.siteWideIssues.map(i => {
     const iColor = i.severity === 'error' ? '#ef4444' : i.severity === 'warning' ? '#eab308' : '#60a5fa';
     const iIcon = i.severity === 'error' ? '✗' : i.severity === 'warning' ? '⚠' : 'ℹ';
     const iBg = i.severity === 'error' ? 'rgba(239,68,68,0.08)' : i.severity === 'warning' ? 'rgba(234,179,8,0.06)' : 'rgba(96,165,250,0.06)';
@@ -658,15 +643,15 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
           <div class="stat-label">Pages</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#ef4444">${clientErrors}</div>
+          <div class="stat-value" style="color:#ef4444">${audit.errors}</div>
           <div class="stat-label">Errors</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#eab308">${clientWarnings}</div>
+          <div class="stat-value" style="color:#eab308">${audit.warnings}</div>
           <div class="stat-label">Warnings</div>
         </div>
         <div class="stat">
-          <div class="stat-value" style="color:#60a5fa">${clientInfos}</div>
+          <div class="stat-value" style="color:#60a5fa">${audit.infos}</div>
           <div class="stat-label">Info</div>
         </div>
       </div>
@@ -674,7 +659,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
 
     ${actionItemsHTML}
 
-    ${clientSiteWide.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
+    ${audit.siteWideIssues.length > 0 ? `<div class="section-title">Site-Wide Issues</div>${siteWideRows}` : ''}
     
     <div class="section-title">Page-by-Page Results</div>
     ${pageRows}
