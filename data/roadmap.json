@@ -181,7 +181,7 @@
           "est": "1-2w",
           "priority": "P0",
           "status": "pending",
-          "notes": "Add or expand integration/contract tests for workspace isolation, admin-vs-client auth boundaries, requireWorkspaceAccess behavior, public endpoint serialization, Stripe checkout/webhooks, trial/tier state, and entitlement gates. These tests should hit actual route handlers and public read paths, not only storage helpers, so regressions in validation/auth/serialization fail loudly."
+          "notes": "Focused slice shipped 2026-05-13: added route-contract coverage for workspace-scoped admin reads, HMAC/no-JWT admin pass-through, cross-workspace client-user mutation guards, public workspace client-safe serialization, trial/effective tier fields, protected public billing routes, payment-status scoping, and admin payment workspace isolation. Keep this item pending until the broader route-contract suite also covers the remaining auth, Stripe checkout/webhook, trial/tier, and entitlement seams across the full P0 scope."
         },
         {
           "id": "platform-test-mutation-safety-suite",
