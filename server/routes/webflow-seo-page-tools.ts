@@ -38,9 +38,9 @@ const seoCopyResponseSchema = z.object({
     targetPath: z.string().trim().min(1),
     anchorText: z.string().trim().min(1),
     context: z.string().trim().min(1),
-  }).strict()).optional(),
+  }).strip()).optional(),
   changes: z.array(z.string().trim().min(1)).optional(),
-}).strict();
+}).strip();
 
 type SeoCopyResponse = z.infer<typeof seoCopyResponseSchema>;
 
@@ -49,12 +49,13 @@ function filterSeoCopyInternalLinks(
   currentPath: string,
   allowedPaths: Set<string>,
 ): SeoCopyResponse['internalLinkSuggestions'] {
-  return (suggestions || []).filter((suggestion) => {
+  const normalizedCurrentPath = normalizePageUrl(currentPath).toLowerCase();
+  return (suggestions || []).flatMap((suggestion) => {
     const normalized = normalizePageUrl(suggestion.targetPath);
-    if (normalized === currentPath) return false;
-    if (!allowedPaths.has(normalized)) return false;
-    suggestion.targetPath = normalized;
-    return true;
+    const normalizedKey = normalized.toLowerCase();
+    if (normalizedKey === normalizedCurrentPath) return [];
+    if (!allowedPaths.has(normalizedKey)) return [];
+    return [{ ...suggestion, targetPath: normalized }];
   });
 }
 
@@ -123,10 +124,11 @@ router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (re
     : pageMapEntries.length
       ? `\n\nKNOWN PAGE MAP:\n${pageMapEntries.map(p => `- ${p.pagePath}: ${p.pageTitle || p.primaryKeyword || 'Untitled page'}`).join('\n')}`
       : '';
-  const currentPagePath = normalizePageUrl(pagePath);
+  const currentPagePath = normalizePageUrl(pagePath).toLowerCase();
   const allowedLinkPaths = new Set(
     pageMapEntries
       .map(p => normalizePageUrl(p.pagePath))
+      .map(path => path.toLowerCase())
       .filter(path => path !== currentPagePath),
   );
 

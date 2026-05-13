@@ -14,6 +14,7 @@ describe('factual AI output contracts', () => {
     ]) {
       const text = source(path);
       expect(text, path).toContain('pageAnalysisAiResultSchema');
+      expect(text, path).toContain('sanitizeForPromptInjection');
       expect(text, path).toContain("responseFormat: { type: 'json_object' }");
       expect(text, path).toContain('researchMode: true');
     }

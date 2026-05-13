@@ -30,6 +30,7 @@ vi.mock('../../server/activity-log.js', () => ({ addActivity: mocks.addActivity 
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadcastToWorkspace }));
 vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammingError }));
 vi.mock('../../server/helpers.js', () => ({
+  sanitizeForPromptInjection: vi.fn((value: string) => `<untrusted_user_content>\n${value}\n</untrusted_user_content>`),
   stripCodeFences: vi.fn((value: string) => value),
   stripHtmlToText: vi.fn(() => 'Clean page copy'),
   tryResolvePagePath: vi.fn((page: { publishedPath?: string | null; slug?: string }) => page.publishedPath ?? (page.slug ? `/${page.slug}` : null)),

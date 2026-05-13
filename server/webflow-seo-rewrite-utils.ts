@@ -31,7 +31,7 @@ const seoVariationSchema = z.string().trim().min(1);
 const seoPairSchema = z.object({
   title: seoVariationSchema,
   description: seoVariationSchema,
-}).strict();
+}).strip();
 
 function uniqueSeoTexts(values: string[]): string[] {
   const seen = new Set<string>();
@@ -57,10 +57,14 @@ export function normalizeSeoRewriteVariations(raw: unknown, maxLen: number, expe
       ? raw.variations
       : [];
   if (!values.length) return [];
-  const parsed = z.array(seoVariationSchema).safeParse(values);
-  if (!parsed.success) return [];
-  const normalized = uniqueSeoTexts(parsed.data.map(value => enforceSeoTextLimit(value, maxLen)).filter(Boolean));
-  return normalized.length >= expectedCount ? normalized.slice(0, expectedCount) : [];
+  const parsed = values
+    .map((value) => {
+      const result = seoVariationSchema.safeParse(value);
+      return result.success ? result.data : null;
+    })
+    .filter((value): value is string => value !== null);
+  const normalized = uniqueSeoTexts(parsed.map(value => enforceSeoTextLimit(value, maxLen)).filter(Boolean));
+  return normalized.slice(0, expectedCount);
 }
 
 /**
@@ -75,10 +79,17 @@ export function normalizeSeoRewritePairs(raw: unknown, expectedCount = 3): Array
       : [];
   if (!values.length) return [];
   const parsed = z.array(seoPairSchema).safeParse(values);
-  if (!parsed.success) return [];
+  const sourcePairs = parsed.success
+    ? parsed.data
+    : values
+        .map((value): { title: string; description: string } | null => {
+          const result = seoPairSchema.safeParse(value);
+          return result.success ? result.data : null;
+        })
+        .filter((value): value is { title: string; description: string } => value !== null);
   const seen = new Set<string>();
   const pairs: Array<{ title: string; description: string }> = [];
-  for (const pair of parsed.data) {
+  for (const pair of sourcePairs) {
     const title = enforceSeoTextLimit(pair.title, 60);
     const description = enforceSeoTextLimit(pair.description, 160);
     const key = `${title.toLowerCase()}|${description.toLowerCase()}`;
@@ -86,5 +97,5 @@ export function normalizeSeoRewritePairs(raw: unknown, expectedCount = 3): Array
     seen.add(key);
     pairs.push({ title, description });
   }
-  return pairs.length >= expectedCount ? pairs.slice(0, expectedCount) : [];
+  return pairs.slice(0, expectedCount);
 }

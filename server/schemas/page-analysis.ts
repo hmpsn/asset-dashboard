@@ -23,7 +23,7 @@ export const pageAnalysisAiResultSchema = z.object({
   keywordDifficulty: z.number().min(0).max(100).catch(0),
   monthlyVolume: z.number().min(0).catch(0),
   topicCluster: z.string().trim().optional().catch(undefined),
-}).strict();
+}).strip();
 
 export type PageAnalysisAiResult = z.infer<typeof pageAnalysisAiResultSchema>;
 
@@ -32,4 +32,4 @@ export const keywordAnalysisPersistSchema = z.object({
   pagePath: z.string().trim().min(1),
   pageTitle: z.string().trim().optional(),
   analysis: pageAnalysisAiResultSchema,
-}).strict();
+}).strip();

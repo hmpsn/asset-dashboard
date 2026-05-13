@@ -45,6 +45,7 @@ vi.mock('../../server/helpers.js', () => ({
   applyBulkKeywordGuards: mocks.applyBulkKeywordGuards,
   decodeEntities: (text: string) => text,
   resolvePagePath: (page: { path?: string; slug?: string }) => page.path || `/${page.slug || ''}`,
+  sanitizeForPromptInjection: (text: string) => `<untrusted_user_content>\n${text}\n</untrusted_user_content>`,
   stripCodeFences: (value: string) => value,
   stripHtmlToText: (value: string) => value.replace(/<[^>]+>/g, ' ').trim(),
 }));
@@ -194,7 +195,8 @@ describe('page-analysis job hardening', () => {
     await runPageAnalysisJob({ jobId: 'job_nested_path', siteId: 'site_1', workspaceId: 'ws_1' });
 
     const prompt = mocks.callAI.mock.calls[0]?.[0]?.messages?.[0]?.content ?? '';
-    expect(prompt).toContain('URL path: /services/invisalign');
+    expect(prompt).toContain('"urlPath": "/services/invisalign"');
+    expect(prompt).toContain('<untrusted_user_content>');
     expect(prompt).not.toContain('URL slug: /invisalign');
     expect(mocks.callAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'keyword-analysis',
