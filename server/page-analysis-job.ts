@@ -6,7 +6,6 @@ import { isProgrammingError } from './errors.js';
 import { applyBulkKeywordGuards, decodeEntities, resolvePagePath, stripCodeFences, stripHtmlToText } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
-import { z } from './middleware/validate.js';
 import { callAI } from './ai.js';
 import {
   clearAnalysisFields,
@@ -22,6 +21,7 @@ import { resolveBaseUrl } from './url-helpers.js';
 import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
+import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
 import {
   buildWorkspaceIntelligence,
   formatForPrompt,
@@ -31,7 +31,6 @@ import {
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('page-analysis-job');
-const pageAnalysisJsonSchema = z.record(z.unknown());
 
 interface RunPageAnalysisJobOptions {
   jobId: string;
@@ -294,16 +293,19 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
 
           const aiResult = await callAI({
             model: 'gpt-5.4-mini',
+            system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
             messages: [{ role: 'user', content: prompt }],
             maxTokens: 1000,
             temperature: 0.4,
             feature: 'keyword-analysis',
             workspaceId,
+            responseFormat: { type: 'json_object' },
+            researchMode: true,
           });
 
           const analysis = parseJsonSafe(
             stripCodeFences(aiResult.text),
-            pageAnalysisJsonSchema,
+            pageAnalysisAiResultSchema,
             null,
             { workspaceId, field: 'page_analysis_ai_result', table: 'page_analysis_job' },
           );

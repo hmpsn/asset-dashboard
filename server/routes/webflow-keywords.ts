@@ -16,6 +16,8 @@ import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { requireWorkspaceAccessFromBody } from '../auth.js';
 import { getProviderMetricsForKeyword, resolvePersistedKeywordMetrics } from '../provider-keyword-metrics.js';
+import { validate } from '../middleware/validate.js';
+import { keywordAnalysisPersistSchema, pageAnalysisAiResultSchema, type PageAnalysisAiResult } from '../schemas/page-analysis.js';
 
 const log = createLogger('webflow-keywords');
 
@@ -105,17 +107,21 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 
     const aiResult = await callAI({
       model: 'gpt-5.4-mini',
+      system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       temperature: 0.4,
       feature: 'keyword-analysis',
       workspaceId,
+      responseFormat: { type: 'json_object' },
+      researchMode: true,
     });
 
     const cleaned = stripCodeFences(aiResult.text);
-    const analysis = parseJsonFallback(cleaned, null);
-    if (analysis && typeof analysis === 'object' && !Array.isArray(analysis)) {
-      const guardedAnalysis = analysis as Record<string, unknown>;
+    const parsed = parseJsonFallback<unknown>(cleaned, null);
+    const result = pageAnalysisAiResultSchema.safeParse(parsed);
+    if (result.success) {
+      const guardedAnalysis = result.data as PageAnalysisAiResult & Record<string, unknown>;
       const responseMetrics = await getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''), 'single page analysis response');
       applyBulkKeywordGuards(guardedAnalysis, responseMetrics ? kwBlock : '');
       guardedAnalysis.keywordDifficulty = responseMetrics?.difficulty ?? 0;
@@ -132,28 +138,12 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 });
 
 // --- Persist Page Analysis to Keyword Strategy ---
-router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromBody(), async (req, res) => {
+router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromBody(), validate(keywordAnalysisPersistSchema), async (req, res) => {
   const { workspaceId, pagePath, pageTitle, analysis } = req.body as {
     workspaceId: string;
     pagePath: string;
     pageTitle?: string;
-    analysis: {
-      primaryKeyword?: string;
-      secondaryKeywords?: string[];
-      searchIntent?: string;
-      optimizationIssues?: string[];
-      recommendations?: string[];
-      contentGaps?: string[];
-      optimizationScore?: number;
-      primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
-      longTailKeywords?: string[];
-      competitorKeywords?: string[];
-      estimatedDifficulty?: string;
-      keywordDifficulty?: number;
-      monthlyVolume?: number;
-      topicCluster?: string;
-      searchIntentConfidence?: number;
-    };
+    analysis: PageAnalysisAiResult;
   };
 
   if (!workspaceId || !pagePath || !analysis) {

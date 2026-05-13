@@ -102,6 +102,17 @@ function deleteSeoSuggestions(workspaceId: string): void {
   db.prepare('DELETE FROM seo_suggestions WHERE workspace_id = ?').run(workspaceId);
 }
 
+function seedPageKeyword(workspaceId: string, pagePath: string, pageTitle: string, primaryKeyword: string): void {
+  db.prepare(`
+    INSERT INTO page_keywords (workspace_id, page_path, page_title, primary_keyword, secondary_keywords)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, page_path) DO UPDATE SET
+      page_title = excluded.page_title,
+      primary_keyword = excluded.primary_keyword,
+      secondary_keywords = excluded.secondary_keywords
+  `).run(workspaceId, pagePath, pageTitle, primaryKeyword, JSON.stringify([]));
+}
+
 describe('Webflow SEO suggestions route coverage', () => {
   let ws: SeededFullWorkspace;
   let baseUrl = '';
@@ -286,6 +297,9 @@ describe('Webflow SEO copy route coverage', () => {
   });
 
   it('returns mocked optimized copy from POST /api/webflow/seo-copy', async () => {
+    seedPageKeyword(ws.workspaceId, '/services/local-seo', 'Local SEO', 'local SEO services');
+    seedPageKeyword(ws.workspaceId, '/case-studies', 'Case Studies', 'local SEO case studies');
+
     const mockedCopy: SeoCopyResponse = {
       seoTitle: 'Local SEO Services for Growth',
       metaDescription: 'Improve visibility with practical local SEO services built for teams that need measurable growth.',

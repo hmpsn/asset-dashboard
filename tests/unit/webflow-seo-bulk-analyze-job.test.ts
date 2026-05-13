@@ -127,6 +127,8 @@ describe('webflow SEO bulk analyze job', () => {
 
     expect(mocks.callAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'bulk-page-analysis',
+      responseFormat: { type: 'json_object' },
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.resolvePersistedKeywordMetrics).toHaveBeenCalledWith(

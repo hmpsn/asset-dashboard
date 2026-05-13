@@ -107,7 +107,8 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledWith(expect.objectContaining({
@@ -165,7 +166,8 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite-both',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);

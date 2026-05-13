@@ -196,6 +196,11 @@ describe('page-analysis job hardening', () => {
     const prompt = mocks.callAI.mock.calls[0]?.[0]?.messages?.[0]?.content ?? '';
     expect(prompt).toContain('URL path: /services/invisalign');
     expect(prompt).not.toContain('URL slug: /invisalign');
+    expect(mocks.callAI).toHaveBeenCalledWith(expect.objectContaining({
+      feature: 'keyword-analysis',
+      responseFormat: { type: 'json_object' },
+      researchMode: true,
+    }));
   });
 
   it('counts AI failures as skipped in the terminal result', async () => {

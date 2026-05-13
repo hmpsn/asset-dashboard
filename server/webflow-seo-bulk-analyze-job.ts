@@ -1,6 +1,6 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
@@ -18,6 +18,7 @@ import {
 import { getTokenForSite, type Workspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SeoBulkAnalyzePage } from './schemas/seo-bulk-jobs.js';
+import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
 
 const log = createLogger('webflow-seo-bulk-analyze-job');
 
@@ -113,20 +114,25 @@ IMPORTANT: Return ONLY valid JSON.`;
           temperature: 0.3,
           feature: 'bulk-page-analysis',
           workspaceId,
+          responseFormat: { type: 'json_object' },
+          researchMode: true,
         });
 
         const raw = aiResult.text || '{}';
         const cleaned = stripCodeFences(raw);
-        const parsed = parseJsonFallback<unknown>(cleaned, undefined);
-        if (parsed === undefined) {
+        const analysis = parseJsonSafe(
+          cleaned,
+          pageAnalysisAiResultSchema,
+          null,
+          { workspaceId, field: 'page_analysis_ai_result', table: 'webflow_seo_bulk_analyze_job' },
+        );
+        if (!analysis) {
           log.debug({ pageId: page.pageId }, 'bulk-analyze: expected error — AI returned invalid JSON, skipping');
           failed++;
           done++;
           updateAnalyzeProgress(jobId, workspaceId, done, failed, pages.length);
           continue;
         }
-
-        const analysis = isJsonObject(parsed) ? parsed : {};
 
         if (!analyzePagePath) {
           log.debug({ pageId: page.pageId }, 'bulk-analyze: skipping persist — no slug or publishedPath');
@@ -227,10 +233,6 @@ IMPORTANT: Return ONLY valid JSON.`;
   } finally {
     unregisterAbort(jobId);
   }
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
 }
 
 function updateAnalyzeProgress(
