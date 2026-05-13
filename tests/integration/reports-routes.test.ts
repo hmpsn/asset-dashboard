@@ -301,13 +301,14 @@ describe('Reports — suppression-adjusted public audit reads', () => {
 
     const publicReportsRes = await api(`/api/public/reports/${testWsId}`);
     expect(publicReportsRes.status).toBe(200);
-    const publicReports: Array<{ id: string; type: string; title: string; score?: number }> = await publicReportsRes.json();
+    const publicReports: Array<{ id: string; type: string; title: string; score?: number; previousScore?: number }> = await publicReportsRes.json();
     expect(publicReports).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: currentBody.id,
         type: 'audit',
         title: 'SEO Audit — Score 100',
         score: 100,
+        previousScore: 97,
       }),
     ]));
 

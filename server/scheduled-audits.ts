@@ -3,10 +3,10 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, getTokenForSite, getClientPortalUrl } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
-import { getEffectivePreviousScore } from './audit-snapshot-views.js';
+import { getEffectiveAudit, getEffectivePreviousScore } from './audit-snapshot-views.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
-import { applySuppressionsToAudit, toAuditFindingPageId } from './helpers.js';
+import { toAuditFindingPageId } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -125,9 +125,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
     const snapshot = saveSnapshot(ws.webflowSiteId, ws.name, audit);
 
     // Apply suppressions so all client-facing numbers match the dashboard
-    const effectiveAudit = ws.auditSuppressions?.length
-      ? applySuppressionsToAudit(audit, ws.auditSuppressions)
-      : audit;
+    const effectiveAudit = getEffectiveAudit(audit, ws.auditSuppressions || []);
     const effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
 
     // Update schedule with suppressed score
@@ -325,12 +323,10 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
       // Compare suppressed versions for accurate fixed count
       let fixedCount = 0;
-      if (snapshot.previousScore != null) {
+      if (effectivePreviousScore != null) {
         const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
         if (prev) {
-          const prevAudit = ws.auditSuppressions?.length
-            ? applySuppressionsToAudit(prev.audit, ws.auditSuppressions)
-            : prev.audit;
+          const prevAudit = getEffectiveAudit(prev.audit, ws.auditSuppressions || []);
           const prevKeys = new Set<string>();
           for (const p of prevAudit.pages) for (const iss of p.issues) prevKeys.add(`${p.pageId}:${iss.check}`);
           const curKeys = new Set<string>();

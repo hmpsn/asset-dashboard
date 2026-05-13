@@ -367,6 +367,7 @@ router.get('/api/public/reports/:workspaceId', (req, res) => {
         title: `SEO Audit — Score ${s.siteScore}`,
         createdAt: s.createdAt,
         score: s.siteScore,
+        previousScore: s.previousScore,
         permalink: `/report/${s.id}`,
       });
     }

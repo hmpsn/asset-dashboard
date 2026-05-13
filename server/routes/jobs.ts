@@ -192,7 +192,11 @@ router.post('/api/jobs', async (req, res) => {
               handleOnDemandSeoAuditResult(ws, effectiveResult);
               broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
             }
-            updateJob(job.id, { status: 'done', result: { ...effectiveResult, snapshotId: snapshot.id }, message: `Audit complete — score ${effectiveResult.siteScore}` });
+            updateJob(job.id, {
+              status: 'done',
+              result: { ...effectiveResult, previousScore: effectivePreviousScore, snapshotId: snapshot.id },
+              message: `Audit complete — score ${effectiveResult.siteScore}`,
+            });
             // Auto-regenerate recommendations after audit
             if (ws) {
               try {

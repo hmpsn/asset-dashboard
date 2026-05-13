@@ -77,6 +77,7 @@ export function listEffectiveSnapshotSummaries(
       id: summary.id,
       createdAt: summary.createdAt,
       siteScore: audit.siteScore,
+      previousScore: getEffectivePreviousScore(snapshot, suppressions),
       totalPages: audit.totalPages,
       errors: audit.errors,
       warnings: audit.warnings,
