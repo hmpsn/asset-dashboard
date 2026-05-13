@@ -26,4 +26,12 @@ describe('provider keyword metric persistence guard', () => {
       null,
     )).toEqual({ keywordDifficulty: undefined, monthlyVolume: undefined });
   });
+
+  it('clears metrics without crashing when no existing row is available', () => {
+    expect(resolvePersistedKeywordMetrics(
+      undefined,
+      'new keyword',
+      null,
+    )).toEqual({ keywordDifficulty: undefined, monthlyVolume: undefined });
+  });
 });

@@ -99,7 +99,7 @@ describe('webflow SEO bulk rewrite job', () => {
       jobId: 'job_1',
       workspaceId: 'ws_1',
       siteId: 'site_1',
-      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', currentSeoTitle: 'Old title' }],
+      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', publishedPath: '/services/seo', currentSeoTitle: 'Old title' }],
       field: 'title',
       workspace,
       signal: ac.signal,
@@ -114,6 +114,7 @@ describe('webflow SEO bulk rewrite job', () => {
       workspaceId: 'ws_1',
       siteId: 'site_1',
       pageId: 'page_1',
+      pageSlug: '/services/seo',
       field: 'title',
       variations: ['One improved title', 'Two improved title', 'Three improved title'],
     }));
@@ -153,6 +154,7 @@ describe('webflow SEO bulk rewrite job', () => {
         pageId: 'page_1',
         title: 'Services',
         slug: 'services',
+        publishedPath: '/services/seo',
         currentSeoTitle: 'Old title',
         currentDescription: 'Old description',
       }],
@@ -169,11 +171,13 @@ describe('webflow SEO bulk rewrite job', () => {
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(1, expect.objectContaining({
       field: 'title',
+      pageSlug: '/services/seo',
       currentValue: 'Old title',
       variations: ['First services title', 'Second services title', 'Third services title'],
     }));
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(2, expect.objectContaining({
       field: 'description',
+      pageSlug: '/services/seo',
       currentValue: 'Old description',
       variations: ['First services description', 'Second services description', 'Third services description'],
     }));

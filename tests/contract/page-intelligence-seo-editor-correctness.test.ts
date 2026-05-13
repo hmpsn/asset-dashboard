@@ -73,6 +73,7 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(routeSrc).toContain('broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(invalidationSrc).toContain('[WS_EVENTS.PAGE_STATE_UPDATED]');
     expect(invalidationSrc).toContain('queryKeys.admin.seoEditorAll()');
+    expect(invalidationSrc).toContain('queryKeys.admin.seoSuggestions(workspaceId)');
     expect(invalidationSrc).toContain('queryKeys.admin.pageJoinPagesAll()');
   });
 
@@ -98,5 +99,14 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(bulkAcceptJobSrc).toContain("recordSeoChange(ws.id, fix.pageId, fix.publishedPath || fix.pageSlug || ''");
     expect(suggestionsRouteSrc).toContain('broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(suggestionsRouteSrc).toContain("addActivity(\n      workspaceId,\n      'seo_updated'");
+  });
+
+  it('stores canonical page paths on generated SEO rewrite suggestions', () => {
+    const jobSrc = readFileSync('server/webflow-seo-bulk-rewrite-job.ts', 'utf-8'); // readFile-ok — source contract for suggestion page identity
+    const legacyRouteSrc = readFileSync('server/routes/webflow-seo-bulk-rewrite.ts', 'utf-8'); // readFile-ok — source contract for legacy suggestion page identity
+
+    expect(jobSrc).toContain("pageTitle: page.title, pageSlug: rwPagePath || page.slug || ''");
+    expect(legacyRouteSrc).toContain("pageTitle: page.title, pageSlug: rwPagePath || page.slug || ''");
+    expect(legacyRouteSrc).toContain("pageSlug: rwPagePath || page.slug || ''");
   });
 });

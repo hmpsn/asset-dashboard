@@ -102,6 +102,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
       qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.pageJoinPagesAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },

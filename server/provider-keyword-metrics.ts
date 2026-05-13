@@ -66,7 +66,7 @@ export function resolvePersistedKeywordMetrics(
     };
   }
 
-  const normalizedExistingKeyword = existing?.primaryKeyword.trim().toLowerCase();
+  const normalizedExistingKeyword = existing?.primaryKeyword?.trim().toLowerCase();
   const normalizedResolvedKeyword = resolvedPrimaryKeyword.trim().toLowerCase();
   const isSamePersistedKeyword = !!normalizedExistingKeyword && normalizedExistingKeyword === normalizedResolvedKeyword;
   const hasPersistedMetrics = existing?.keywordDifficulty != null || existing?.monthlyVolume != null;

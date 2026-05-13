@@ -170,12 +170,12 @@ export async function runSeoBulkRewriteJob({
           while (pairs.length < 3) pairs.push(pairs[0]);
           const titleSugg = saveSuggestion({
             workspaceId, siteId, pageId: page.pageId,
-            pageTitle: page.title, pageSlug: page.slug || '',
+            pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
             field: 'title', currentValue: oldTitle, variations: pairs.map(p => p.title),
           });
           const descSugg = saveSuggestion({
             workspaceId, siteId, pageId: page.pageId,
-            pageTitle: page.title, pageSlug: page.slug || '',
+            pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
             field: 'description', currentValue: oldDesc, variations: pairs.map(p => p.description),
           });
           return [titleSugg, descSugg];
@@ -202,7 +202,7 @@ export async function runSeoBulkRewriteJob({
         while (variations.length < 3) variations.push(variations[0]);
         const suggestion = saveSuggestion({
           workspaceId, siteId, pageId: page.pageId,
-          pageTitle: page.title, pageSlug: page.slug || '',
+          pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
           field: field as 'title' | 'description', currentValue: oldValue, variations,
         });
         return [suggestion];
