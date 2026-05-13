@@ -110,9 +110,17 @@ describe('SEO audit background job contract', () => {
     let terminalStatus: string | null = null;
     for (let i = 0; i < 80; i++) {
       const jobRes = await fetch(`${baseUrl}/api/jobs/${startBody.jobId}`);
-      const job = await jobRes.json() as { status: string };
+      const job = await jobRes.json() as { status: string; result?: { previousScore?: number; snapshotId?: string } };
       terminalStatus = job.status;
-      if (terminalStatus === 'done' || terminalStatus === 'error' || terminalStatus === 'cancelled') break;
+      if (terminalStatus === 'done' || terminalStatus === 'error' || terminalStatus === 'cancelled') {
+        if (terminalStatus === 'done') {
+          expect(job.result).toEqual(expect.objectContaining({
+            previousScore: 79,
+            snapshotId: 'snap_contract_1',
+          }));
+        }
+        break;
+      }
       await new Promise(resolve => setTimeout(resolve, 25));
     }
 

@@ -14,7 +14,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
+import { normalizePageUrl, tryResolvePagePath, stripHtmlToText } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import {
   createJob,
@@ -41,6 +41,7 @@ import {
   KeywordStrategyGenerationError,
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
+import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
@@ -181,15 +182,21 @@ router.post('/api/jobs', async (req, res) => {
               : listWorkspaces().find(w => w.webflowSiteId === siteId);
             const siteName = getBrandName(ws) || siteId;
             const snapshot = saveSnapshot(siteId, siteName, result);
-            const effectiveResult = ws?.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
+            const effectiveResult = getEffectiveAudit(result, ws?.auditSuppressions || []);
+            let effectivePreviousScore = snapshot.previousScore;
             if (ws) {
+              effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
               addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
                 `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
-                { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
-              handleOnDemandSeoAuditResult(ws, result);
-              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
+                { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
+              handleOnDemandSeoAuditResult(ws, effectiveResult);
+              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
             }
-            updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${effectiveResult.siteScore}` });
+            updateJob(job.id, {
+              status: 'done',
+              result: { ...effectiveResult, previousScore: effectivePreviousScore, snapshotId: snapshot.id },
+              message: `Audit complete — score ${effectiveResult.siteScore}`,
+            });
             // Auto-regenerate recommendations after audit
             if (ws) {
               try {
@@ -233,12 +240,10 @@ router.post('/api/jobs', async (req, res) => {
 
                 // Compare suppressed versions for accurate fixed count
                 let fixedCount = 0;
-                if (snapshot.previousScore != null) {
+                if (effectivePreviousScore != null) {
                   const prev = getLatestSnapshotBefore(ws.webflowSiteId!, snapshot.id);
                   if (prev) {
-                    const prevAudit = ws.auditSuppressions?.length
-                      ? applySuppressionsToAudit(prev.audit, ws.auditSuppressions)
-                      : prev.audit;
+                    const prevAudit = getEffectiveAudit(prev.audit, ws.auditSuppressions || []);
                     const prevIssueKeys = new Set<string>();
                     for (const p of prevAudit.pages) {
                       for (const iss of p.issues) prevIssueKeys.add(`${p.pageId}:${iss.check}`);
@@ -255,7 +260,7 @@ router.post('/api/jobs', async (req, res) => {
 
                 notifyClientAuditComplete({
                   clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: ws.id,
-                  score: effectiveResult.siteScore, previousScore: snapshot.previousScore,
+                  score: effectiveResult.siteScore, previousScore: effectivePreviousScore,
                   totalPages: effectiveResult.totalPages, errors: effectiveResult.errors, warnings: effectiveResult.warnings,
                   topIssues, fixedCount, dashboardUrl: dashUrl,
                 });

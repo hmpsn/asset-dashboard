@@ -77,13 +77,13 @@ export async function assembleSiteHealth(
   // ── Audit snapshot (reports.ts) ──────────────────────────────────────
   if (siteId) {
     try {
-      const { getLatestSnapshot, listSnapshots } = await import('../reports.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const latest = getLatestSnapshot(siteId);
+      const { getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const latest = getLatestEffectiveSnapshot(siteId, workspace?.auditSuppressions);
       if (latest) {
         auditScore = latest.audit.siteScore ?? null;
         latestAuditCwvSummary = latest.audit.cwvSummary;
         // Delta: compare with previous snapshot
-        const summaries = listSnapshots(siteId);
+        const summaries = listEffectiveSnapshotSummaries(siteId, workspace?.auditSuppressions);
         if (summaries.length >= 2) {
           const prevScore = summaries[1].siteScore;
           auditScoreDelta = auditScore !== null ? auditScore - prevScore : null;

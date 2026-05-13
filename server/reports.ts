@@ -43,6 +43,7 @@ export interface SnapshotSummary {
   id: string;
   createdAt: string;
   siteScore: number;
+  previousScore?: number;
   totalPages: number;
   errors: number;
   warnings: number;
@@ -441,6 +442,7 @@ export function listSnapshots(siteId: string): SnapshotSummary[] {
       id: row.id,
       createdAt: row.created_at,
       siteScore: audit.siteScore,
+      previousScore: row.previous_score ?? undefined,
       totalPages: audit.totalPages,
       errors: audit.errors,
       warnings: audit.warnings,

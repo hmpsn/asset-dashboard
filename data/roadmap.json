@@ -671,6 +671,33 @@
           "status": "pending"
         },
         {
+          "id": 631,
+          "title": "Internal Link Recommendation Source Audit",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from backend hardening PR 5. Audit whether internal link recommendations are fed from one canonical source or multiple sources (internal link scanner, AI recommendations, strategy/content surfaces, approval payloads). Document the owning source of truth, data contracts, and any drift between admin generation, client review, and intelligence/chat context before consolidating implementation.",
+          "status": "pending"
+        },
+        {
+          "id": 632,
+          "title": "Internal Link Client Review Display Model Cleanup",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from backend hardening PR 5. Clean up the internal-link recommendation model and client-review display so Target URL, target title, source page path, and source title are carried as distinct typed fields. Current client review display can show target URL as a page title and source page as a slug, which makes review confusing. Preserve reviewer-support wording and avoid changing the broader approval workflow.",
+          "status": "pending"
+        },
+        {
+          "id": 633,
+          "title": "Audit Snapshot Effective Summary Query Optimization",
+          "source": "PR 5 REVIEW",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from audit intelligence hardening PR 5. listEffectiveSnapshotSummaries now preserves suppression-adjusted score/history correctness by loading full snapshots when suppressions exist, but that can become N+1-heavy for long audit histories and workspace report-list reads. Add an efficient table-backed summary/read model or bounded cached effective-history helper that preserves suppression-adjusted current/history semantics without repeatedly parsing full audit JSON blobs.",
+          "status": "pending"
+        },
+        {
           "id": 356,
           "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
           "source": "USER REQUEST",

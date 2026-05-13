@@ -13,6 +13,8 @@ vi.mock('../server/workspaces.js', () => ({
 
 vi.mock('../server/reports.js', () => ({
   getLatestSnapshot: vi.fn(),
+  getLatestSnapshotBefore: vi.fn(),
+  getSnapshot: vi.fn(),
   listSnapshots: vi.fn(),
 }));
 
@@ -175,6 +177,8 @@ describe('assembleSiteHealth', () => {
   let buildWorkspaceIntelligence: typeof import('../server/workspace-intelligence.js').buildWorkspaceIntelligence;
   let getWorkspace: ReturnType<typeof vi.fn>;
   let getLatestSnapshot: ReturnType<typeof vi.fn>;
+  let getLatestSnapshotBefore: ReturnType<typeof vi.fn>;
+  let getSnapshot: ReturnType<typeof vi.fn>;
   let listSnapshots: ReturnType<typeof vi.fn>;
   let getPageSpeed: ReturnType<typeof vi.fn>;
   let getLinkCheck: ReturnType<typeof vi.fn>;
@@ -193,6 +197,8 @@ describe('assembleSiteHealth', () => {
 
     const reportsMod = await import('../server/reports.js');
     getLatestSnapshot = reportsMod.getLatestSnapshot as ReturnType<typeof vi.fn>;
+    getLatestSnapshotBefore = reportsMod.getLatestSnapshotBefore as ReturnType<typeof vi.fn>;
+    getSnapshot = reportsMod.getSnapshot as ReturnType<typeof vi.fn>;
     listSnapshots = reportsMod.listSnapshots as ReturnType<typeof vi.fn>;
 
     const perfMod = await import('../server/performance-store.js');
@@ -217,6 +223,74 @@ describe('assembleSiteHealth', () => {
 
     const wiMod = await import('../server/workspace-intelligence.js');
     buildWorkspaceIntelligence = wiMod.buildWorkspaceIntelligence;
+  });
+
+  it('uses suppression-filtered audit scores and deltas for siteHealth', async () => {
+    const currentSnapshot = {
+      ...makeMockSnapshot(85, 70),
+      audit: {
+        siteScore: 85,
+        totalPages: 1,
+        errors: 1,
+        warnings: 0,
+        infos: 0,
+        pages: [{
+          pageId: 'p-about',
+          slug: 'about',
+          page: 'About',
+          score: 85,
+          issues: [{ check: 'meta-description', severity: 'error', message: 'Missing meta description' }],
+        }],
+        siteWideIssues: [],
+      },
+    };
+    const previousSnapshot = {
+      ...makeMockSnapshot(70, undefined),
+      id: 'snap-0',
+      audit: {
+        siteScore: 70,
+        totalPages: 1,
+        errors: 1,
+        warnings: 1,
+        infos: 0,
+        pages: [{
+          pageId: 'p-about',
+          slug: 'about',
+          page: 'About',
+          score: 70,
+          issues: [
+            { check: 'meta-description', severity: 'error', message: 'Missing meta description' },
+            { check: 'content-length', severity: 'warning', message: 'Thin content' },
+          ],
+        }],
+        siteWideIssues: [],
+      },
+    };
+
+    getWorkspace.mockReturnValue(makeMockWorkspace({
+      auditSuppressions: [{ check: 'meta-description', pageSlug: 'about', createdAt: new Date().toISOString() }],
+    }));
+    getLatestSnapshot.mockReturnValue(currentSnapshot);
+    getLatestSnapshotBefore.mockReturnValue(previousSnapshot);
+    getSnapshot.mockImplementation((id: string) => id === 'snap-1' ? currentSnapshot : previousSnapshot);
+    listSnapshots.mockReturnValue([
+      { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 85, totalPages: 1, errors: 1, warnings: 0, infos: 0 },
+      { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 70, totalPages: 1, errors: 1, warnings: 1, infos: 0 },
+    ]);
+    getPageSpeed.mockReturnValue(null);
+    getLinkCheck.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue({ ...makeMockArchitecture(), orphanPaths: [] });
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const intel = await buildWorkspaceIntelligence('ws-1', { slices: ['siteHealth'] });
+    const health = intel.siteHealth as SiteHealthSlice;
+
+    expect(health.auditScore).toBe(100);
+    expect(health.auditScoreDelta).toBe(3);
   });
 
   // ── Test 1: Shape completeness ───────────────────────────────────────────
