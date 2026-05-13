@@ -122,6 +122,7 @@ describe('generateLeanSchema', () => {
     });
     const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
     const service = graph.find(n => n['@type'] === 'Service')!;
+    expect(service.name).toBe('Invisalign');
     expect(service.serviceType).toBe('Invisalign');
     const offers = (service.offers as Array<Record<string, unknown>> | undefined) ?? [];
     expect(offers.some(offer => offer.price === '1250')).toBe(false);

@@ -331,6 +331,36 @@ describe('extractPageData — serviceType hardening', () => {
     expect(out.serviceType).toBe('Invisalign');
   });
 
+  it('strips provider and SEO location context from service labels', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Invisalign at Swish Dental | Austin, Houston & San Antonio',
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+      },
+      workspace: { ...baseInput.workspace, name: 'Swish Dental' },
+    });
+    expect(out.serviceType).toBe('Invisalign');
+    expect(out.serviceName).toBe('Invisalign');
+  });
+
+  it('derives clean serviceName from service detail titles when no CMS mapping exists', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Preventative Dentistry at Swish Dental | Austin, Houston & San Antonio',
+        slug: 'preventative-dentistry',
+        publishedPath: '/services/preventative-dentistry',
+      },
+      workspace: { ...baseInput.workspace, name: 'Swish Dental' },
+    });
+    expect(out.serviceType).toBe('Preventative Dentistry');
+    expect(out.serviceName).toBe('Preventative Dentistry');
+  });
+
   it('cleans service slug prefixes when title candidates are unavailable', () => {
     const out = extractPageData({
       ...baseInput,
