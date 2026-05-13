@@ -66,6 +66,11 @@ export async function runSeoBulkAcceptFixesJob({
                 updatedBy: 'admin',
               });
               recordSeoChange(ws.id, fix.pageId, fix.publishedPath || fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
+              broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
+                pageId: fix.pageId,
+                fields: [changedField],
+                source: 'audit-fix',
+              });
             } else {
               log.debug({ workspaceId, pageId: fix.pageId }, 'bulk-accept-fixes: workspace missing during local state tracking');
             }

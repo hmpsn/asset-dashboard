@@ -36,6 +36,7 @@ vi.mock('../../server/ws-events.js', () => ({
     BULK_OPERATION_COMPLETE: 'bulk:complete',
     BULK_OPERATION_FAILED: 'bulk:failed',
     BULK_OPERATION_PROGRESS: 'bulk:progress',
+    PAGE_STATE_UPDATED: 'page-state:updated',
   },
 }));
 
@@ -75,6 +76,11 @@ describe('webflow SEO bulk accept fixes job', () => {
       updatedBy: 'admin',
     });
     expect(mocks.recordSeoChange).toHaveBeenCalledWith('ws_1', 'page_1', '/services/seo', 'Services', ['description'], 'audit-fix');
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'page-state:updated', {
+      pageId: 'page_1',
+      fields: ['description'],
+      source: 'audit-fix',
+    });
     expect(mocks.updateJob).toHaveBeenCalledWith('job_1', expect.objectContaining({
       status: 'done',
       result: expect.objectContaining({ applied: 1, failed: 0, total: 1, appliedKeys: ['page_1-meta-description'] }),
@@ -110,6 +116,7 @@ describe('webflow SEO bulk accept fixes job', () => {
     expect(mocks.updatePageState).not.toHaveBeenCalled();
     expect(mocks.recordSeoChange).not.toHaveBeenCalled();
     expect(mocks.addActivity).not.toHaveBeenCalled();
+    expect(mocks.broadcastToWorkspace).not.toHaveBeenCalledWith('ws_1', 'page-state:updated', expect.anything());
     expect(mocks.updateJob).toHaveBeenCalledWith('job_fail', expect.objectContaining({
       status: 'done',
       message: 'Applied 0/1 fixes (1 failed)',
@@ -136,6 +143,11 @@ describe('webflow SEO bulk accept fixes job', () => {
     });
 
     expect(mocks.updatePageSeo).toHaveBeenCalledTimes(1);
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'page-state:updated', {
+      pageId: 'page_1',
+      fields: ['title'],
+      source: 'audit-fix',
+    });
     expect(mocks.updateJob).toHaveBeenCalledWith('job_cancel', expect.objectContaining({
       status: 'cancelled',
       message: 'Cancelled after 1 fixes',
