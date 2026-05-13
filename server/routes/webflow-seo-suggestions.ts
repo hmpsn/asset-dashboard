@@ -6,7 +6,9 @@
  */
 import { Router } from 'express';
 
+import { addActivity } from '../activity-log.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { createLogger } from '../logger.js';
 import {
   dismissSuggestions,
@@ -19,6 +21,7 @@ import {
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import { getTokenForSite, getWorkspace, updatePageState } from '../workspaces.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-suggestions');
@@ -96,6 +99,23 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
     .map((result, index) => result.applied ? toApply[index]?.id : undefined)
     .filter(Boolean) as string[];
   if (appliedIds.length) markApplied(workspaceId, appliedIds);
+  if (appliedIds.length) {
+    const appliedResults = results.filter(result => result.applied);
+    const pageIds = Array.from(new Set(appliedResults.map(result => result.pageId)));
+    const fields = Array.from(new Set(appliedResults.map(result => result.field)));
+    broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds,
+      fields,
+      source: 'seo-suggestions',
+    });
+    addActivity(
+      workspaceId,
+      'seo_updated',
+      `Applied ${appliedIds.length} SEO ${appliedIds.length === 1 ? 'suggestion' : 'suggestions'}`,
+      `Updated ${pageIds.length} ${pageIds.length === 1 ? 'page' : 'pages'} from selected SEO suggestions`,
+      { applied: appliedIds.length, total: toApply.length, pageIds, fields },
+    );
+  }
 
   log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
   res.json({ results, applied: appliedIds.length, total: toApply.length });

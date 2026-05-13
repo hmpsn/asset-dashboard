@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { requireWorkspaceSiteAccess } from '../auth.js';
 import { callCreativeAI } from '../content-posts-ai.js';
 import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { stripHtmlToText, tryResolvePagePath, findPageMapEntryForPage } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
@@ -27,6 +28,7 @@ import {
   listWorkspaces,
   updatePageState,
 } from '../workspaces.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const router = Router();
 
@@ -48,6 +50,9 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
 
   // Try to fetch page content for pages that don't have it (best-effort)
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  if (!ws || ws.webflowSiteId !== siteId) {
+    return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
   const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
@@ -122,7 +127,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
         } else {
           if (ws) {
             updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
-            recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+            recordSeoChange(ws.id, page.pageId, bulkPagePath || page.slug || '', page.title || '', [field], 'bulk-fix');
           }
           results.push({ pageId: page.pageId, text, applied: true });
         }
@@ -137,11 +142,19 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
   // Log activity for bulk SEO fix
   const bulkWsId = workspaceId || ws?.id;
   if (bulkWsId) {
-    addActivity(bulkWsId, 'seo_updated',
-      `Bulk ${field} optimization: ${results.filter(r => r.applied).length} pages updated`,
-      `AI-generated ${field}s applied to ${results.filter(r => r.applied).length}/${pages.length} pages`,
-      { field, pagesUpdated: results.filter(r => r.applied).length, totalPages: pages.length }
-    );
+    const appliedPageIds = results.filter(r => r.applied).map(r => r.pageId);
+    if (appliedPageIds.length > 0) {
+      broadcastToWorkspace(bulkWsId, WS_EVENTS.PAGE_STATE_UPDATED, {
+        pageIds: appliedPageIds,
+        fields: [field],
+        source: 'bulk-fix',
+      });
+      addActivity(bulkWsId, 'seo_updated',
+        `Bulk ${field} optimization: ${appliedPageIds.length} pages updated`,
+        `AI-generated ${field}s applied to ${appliedPageIds.length}/${pages.length} pages`,
+        { field, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
+      );
+    }
   }
 
   res.json({ results, field });
@@ -152,11 +165,12 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
   workspace: { source: 'body', name: 'workspaceId' },
   site: { source: 'params', name: 'siteId' },
 }), async (req, res) => {
-  const { pages: rawPages, field, action, text: patternText } = req.body as {
-    pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
+  const { pages: rawPages, field, action, text: patternText, workspaceId } = req.body as {
+    pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentValue: string }>;
     field: 'title' | 'description';
     action: 'append' | 'prepend' | 'replace';
     text: string;
+    workspaceId?: string;
   };
   // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
   const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
@@ -166,7 +180,10 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
 
   const siteId = req.params.siteId;
   const token = getTokenForSite(siteId) || undefined;
-  const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  if (!ws || ws.webflowSiteId !== siteId) {
+    return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
   const maxLen = field === 'description' ? 160 : 60;
 
   const results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean; error?: string }> = [];
@@ -200,11 +217,27 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
 
       if (ws) {
         updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply', fields: [field], updatedBy: 'admin' });
-        recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'pattern-apply');
+        recordSeoChange(ws.id, page.pageId, tryResolvePagePath(page) || page.slug || '', page.title || '', [field], 'pattern-apply');
       }
       results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue, applied: true });
     } catch (err) {
       results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue: '', applied: false, error: String(err) });
+    }
+  }
+
+  if (ws) {
+    const appliedPageIds = results.filter(r => r.applied).map(r => r.pageId);
+    if (appliedPageIds.length > 0) {
+      broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
+        pageIds: appliedPageIds,
+        fields: [field],
+        source: 'pattern-apply',
+      });
+      addActivity(ws.id, 'seo_updated',
+        `Bulk ${field} pattern applied: ${appliedPageIds.length} pages updated`,
+        `Pattern ${action} applied to ${appliedPageIds.length}/${pages.length} pages`,
+        { field, action, pagesUpdated: appliedPageIds.length, totalPages: pages.length }
+      );
     }
   }
 

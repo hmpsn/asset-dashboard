@@ -116,13 +116,14 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
       // Run keyword analysis and content score in parallel
       const [kwData, csData] = await Promise.all([
-        post<KeywordData & { error?: string }>('/api/webflow/keyword-analysis', {
+        keywords.analyze({
+          workspaceId,
           pageTitle: page.title,
           seoTitle: page.seo?.title,
           metaDescription: page.seo?.description,
           slug,
           pageContent,
-        }),
+        }) as Promise<KeywordData & { error?: string }>,
         post<ContentScore & { error?: string }>('/api/webflow/content-score', {
           pageTitle: page.title,
           seoTitle: page.seo?.title,
@@ -139,6 +140,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
             await keywords.persistAnalysis({
               workspaceId,
               pagePath: resolvePagePath(page),
+              pageTitle: page.title,
               analysis: {
                 primaryKeyword: kwData.primaryKeyword,
                 secondaryKeywords: kwData.secondaryKeywords,

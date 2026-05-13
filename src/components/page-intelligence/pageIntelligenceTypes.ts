@@ -24,6 +24,7 @@ export interface KeywordData {
   monthlyVolume: number;
   topicCluster: string;
   metricsSource?: MetricsSource;
+  hasProviderMetrics?: boolean;
 }
 
 export interface ContentScore {

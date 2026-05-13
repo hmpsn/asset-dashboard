@@ -19,11 +19,14 @@ import {
 } from '../webflow.js';
 import {
   listWorkspaces,
+  getWorkspace,
   getTokenForSite,
   updatePageState,
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('webflow');
 
@@ -199,16 +202,25 @@ router.put('/api/webflow/pages/:pageId/seo', requireWorkspaceSiteAccess({
     return res.status(400).json({ error: 'Cannot update SEO for CMS pages via this endpoint — update directly in Webflow' });
   }
   try {
-    const { siteId, seo, openGraph, title } = req.body;
+    const { siteId, workspaceId, seo, openGraph, title } = req.body;
+    const explicitWs = typeof workspaceId === 'string' ? getWorkspace(workspaceId) : undefined;
+    if (typeof workspaceId === 'string' && (!explicitWs || explicitWs.webflowSiteId !== siteId)) {
+      return res.status(403).json({ error: 'You do not have access to this workspace' });
+    }
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
     const result = await updatePageSeo(req.params.pageId, { seo, openGraph, title }, token);
-    if (siteId) {
-      const seoWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (result.success && siteId) {
+      const seoWs = explicitWs || listWorkspaces().find(w => w.webflowSiteId === siteId);
       if (seoWs) {
         const changedFields = [seo?.title && 'title', seo?.description && 'description', openGraph && 'OG'].filter(Boolean) as string[];
         addActivity(seoWs.id, 'seo_updated', `Updated SEO ${changedFields.join(', ')} for a page`, undefined, { pageId: req.params.pageId });
         updatePageState(seoWs.id, req.params.pageId, { status: 'live', source: 'editor', fields: changedFields, updatedBy: 'admin' });
         recordSeoChange(seoWs.id, req.params.pageId, req.body.slug || '', req.body.pageTitle || title || '', changedFields, 'editor');
+        broadcastToWorkspace(seoWs.id, WS_EVENTS.PAGE_STATE_UPDATED, {
+          pageId: req.params.pageId,
+          fields: changedFields,
+          source: 'editor',
+        });
       }
     }
     res.json(result);

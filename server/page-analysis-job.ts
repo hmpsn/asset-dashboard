@@ -1,4 +1,5 @@
 import { addActivity } from './activity-log.js';
+import { broadcastToWorkspace } from './broadcast.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
@@ -15,6 +16,7 @@ import {
   listPageKeywords,
   upsertPageKeywordsBatch,
 } from './page-keywords.js';
+import { getProviderMetricsForKeywords, resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { getConfiguredProvider, getProviderDisplayName } from './seo-data-provider.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } from './webflow.js';
@@ -26,6 +28,7 @@ import {
   formatPageMapForPrompt,
   invalidateIntelligenceCache,
 } from './workspace-intelligence.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('page-analysis-job');
 const pageAnalysisJsonSchema = z.record(z.unknown());
@@ -316,14 +319,25 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
       // Persist ALL batch results via page_keywords table (single transaction)
       if (batchResults.length > 0) {
         const now = new Date().toISOString();
+        const existingByPath = new Map<string, ReturnType<typeof getPageKeyword>>();
+        const resolvedKeywords = batchResults.map(({ page, analysis }) => {
+          const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
+          const existing = getPageKeyword(workspaceId, normalized);
+          existingByPath.set(normalized, existing);
+          return (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
+        });
+        const providerMetrics = await getProviderMetricsForKeywords(workspaceId, resolvedKeywords, 'bulk page analysis persist');
         const entries = batchResults.map(({ page, analysis }) => {
           const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
           // Merge with existing entry if present (preserves keyword assignments)
-          const existing = getPageKeyword(workspaceId, normalized);
+          const existing = existingByPath.get(normalized);
+          const resolvedPrimaryKeyword = (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
+          const keywordMetrics = providerMetrics.get(resolvedPrimaryKeyword.toLowerCase());
+          const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, keywordMetrics);
           return {
             pagePath: normalized,
             pageTitle: page.title,
-            primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
+            primaryKeyword: resolvedPrimaryKeyword,
             secondaryKeywords: (analysis.secondaryKeywords as string[])?.length ? (analysis.secondaryKeywords as string[]) : existing?.secondaryKeywords || [],
             searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
             optimizationIssues: (analysis.optimizationIssues as string[]) || [],
@@ -335,8 +349,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             longTailKeywords: (analysis.longTailKeywords as string[]) || [],
             competitorKeywords: (analysis.competitorKeywords as string[]) || [],
             estimatedDifficulty: analysis.estimatedDifficulty as string,
-            keywordDifficulty: analysis.keywordDifficulty as number,
-            monthlyVolume: analysis.monthlyVolume as number,
+            keywordDifficulty: guardedMetrics.keywordDifficulty,
+            monthlyVolume: guardedMetrics.monthlyVolume,
             topicCluster: analysis.topicCluster as string,
             searchIntentConfidence: analysis.searchIntentConfidence as number,
             // Preserve enrichment fields from existing entry
@@ -382,6 +396,9 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
       });
     }
     addActivity(workspaceId, 'page_analysis', `Bulk page analysis completed — ${analyzed} pages`, `${pages.length} total pages, ${total} queued, ${skippedFetch + failed} skipped`);
+    if (analyzed > 0) {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, { analyzed, source: 'page-analysis-job' });
+    }
     // Bridge #5: bulk page analysis complete — clear caches
     debouncedPageAnalysisInvalidate(workspaceId, () => {
       invalidateIntelligenceCache(workspaceId);

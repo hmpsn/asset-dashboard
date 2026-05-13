@@ -53,6 +53,12 @@ setupWebflowMocks();
 setupOpenAIMocks();
 setupAnthropicMocks();
 
+vi.mock('../../server/broadcast.js', () => ({
+  setBroadcast: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // HTTP helper — POST/GET against a live http.Server wrapping createApp()
 // ---------------------------------------------------------------------------

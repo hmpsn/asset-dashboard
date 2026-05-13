@@ -11,6 +11,7 @@
 // --- Workspace-scoped events (sent via broadcastToWorkspace) ---
 export const WS_EVENTS = {
   WORKSPACE_UPDATED: 'workspace:updated',
+  PAGE_STATE_UPDATED: 'page-state:updated',
   APPROVAL_UPDATE: 'approval:update',
   APPROVAL_APPLIED: 'approval:applied',
   REQUEST_CREATED: 'request:created',

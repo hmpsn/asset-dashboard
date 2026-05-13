@@ -73,8 +73,8 @@ describe('seoEditorBulkHelpers pattern preview + payloads', () => {
     );
 
     expect(payload).toEqual([
-      { pageId: staticPage.id, title: 'Services', slug: 'services', currentValue: 'Old' },
-      { pageId: 'missing', title: '', slug: undefined, currentValue: 'Missing Old' },
+      { pageId: staticPage.id, title: 'Services', slug: 'services', publishedPath: '/services', currentValue: 'Old' },
+      { pageId: 'missing', title: '', slug: undefined, publishedPath: undefined, currentValue: 'Missing Old' },
     ]);
   });
 });

@@ -198,13 +198,13 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
         // Save two aligned rows: one for title, one for description
         const titleSugg = saveSuggestion({
           workspaceId: resolvedWsId, siteId, pageId: page.pageId,
-          pageTitle: page.title, pageSlug: page.slug || '',
+          pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
           field: 'title', currentValue: oldTitle,
           variations: pairs.map(p => p.title),
         });
         const descSugg = saveSuggestion({
           workspaceId: resolvedWsId, siteId, pageId: page.pageId,
-          pageTitle: page.title, pageSlug: page.slug || '',
+          pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
           field: 'description', currentValue: oldDesc,
           variations: pairs.map(p => p.description),
         });
@@ -250,7 +250,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
         siteId,
         pageId: page.pageId,
         pageTitle: page.title,
-        pageSlug: page.slug || '',
+        pageSlug: rwPagePath || page.slug || '',
         field: field as 'title' | 'description',
         currentValue: oldValue,
         variations,

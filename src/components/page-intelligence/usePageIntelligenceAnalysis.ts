@@ -74,13 +74,14 @@ export function usePageIntelligenceAnalysis({
       const effectiveMeta = page.seo?.description || htmlMetaDesc;
 
       const [kwData, csData] = await Promise.all([
-        post<KeywordData & { error?: string }>('/api/webflow/keyword-analysis', {
+        keywords.analyze({
+          workspaceId,
           pageTitle: page.title,
           seoTitle: effectiveTitle,
           metaDescription: effectiveMeta,
           slug: resolvePagePath(page),
           pageContent,
-        }),
+        }) as Promise<KeywordData & { error?: string }>,
         post<ContentScore & { error?: string }>('/api/webflow/content-score', {
           pageTitle: page.title,
           seoTitle: effectiveTitle,
@@ -95,7 +96,8 @@ export function usePageIntelligenceAnalysis({
         try {
           await keywords.persistAnalysis({
             workspaceId,
-            pagePath: page.path,
+            pagePath: resolvePagePath(page),
+            pageTitle: page.title,
             analysis: {
               primaryKeyword: kwData.primaryKeyword,
               secondaryKeywords: kwData.secondaryKeywords,
@@ -112,6 +114,7 @@ export function usePageIntelligenceAnalysis({
               monthlyVolume: kwData.monthlyVolume,
               topicCluster: kwData.topicCluster,
               searchIntentConfidence: kwData.searchIntentConfidence,
+              hasProviderMetrics: kwData.hasProviderMetrics,
             },
           });
           // Invalidate strategy cache so persisted data shows up

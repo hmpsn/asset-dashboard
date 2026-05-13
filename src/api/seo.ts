@@ -133,7 +133,7 @@ export const keywords = {
   analyze: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/keyword-analysis', body),
 
-  persistAnalysis: (body: { workspaceId: string; pagePath: string; analysis: Record<string, unknown> }) =>
+  persistAnalysis: (body: { workspaceId: string; pagePath: string; pageTitle?: string; analysis: Record<string, unknown> }) =>
     post<{ success: boolean; pagePath: string; hasAnalysis: boolean }>('/api/webflow/keyword-analysis/persist', body),
 
   strategy: (wsId: string) =>
@@ -367,7 +367,7 @@ export const seoBulkJobs = {
   bulkRewrite: (wsId: string, body: { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' | 'both' }) =>
     post<{ jobId: string }>(`/api/seo/${wsId}/bulk-rewrite`, body),
 
-  bulkAcceptFixes: (wsId: string, body: { siteId: string; fixes: Array<{ pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; pageName?: string }> }) =>
+  bulkAcceptFixes: (wsId: string, body: { siteId: string; fixes: Array<{ pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; publishedPath?: string | null; pageName?: string }> }) =>
     post<{ jobId: string }>(`/api/seo/${wsId}/bulk-accept-fixes`, body),
 };
 

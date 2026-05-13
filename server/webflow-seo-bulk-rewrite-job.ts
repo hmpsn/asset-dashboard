@@ -170,12 +170,12 @@ export async function runSeoBulkRewriteJob({
           while (pairs.length < 3) pairs.push(pairs[0]);
           const titleSugg = saveSuggestion({
             workspaceId, siteId, pageId: page.pageId,
-            pageTitle: page.title, pageSlug: page.slug || '',
+            pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
             field: 'title', currentValue: oldTitle, variations: pairs.map(p => p.title),
           });
           const descSugg = saveSuggestion({
             workspaceId, siteId, pageId: page.pageId,
-            pageTitle: page.title, pageSlug: page.slug || '',
+            pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
             field: 'description', currentValue: oldDesc, variations: pairs.map(p => p.description),
           });
           return [titleSugg, descSugg];
@@ -202,7 +202,7 @@ export async function runSeoBulkRewriteJob({
         while (variations.length < 3) variations.push(variations[0]);
         const suggestion = saveSuggestion({
           workspaceId, siteId, pageId: page.pageId,
-          pageTitle: page.title, pageSlug: page.slug || '',
+          pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
           field: field as 'title' | 'description', currentValue: oldValue, variations,
         });
         return [suggestion];
@@ -249,16 +249,19 @@ export async function runSeoBulkRewriteJob({
       return;
     }
 
+    const generatedPages = done - failed;
     updateJob(jobId, {
       status: 'done',
       progress: done,
-      message: `Generated ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
-      result: { suggestions: suggestions.length, failed, total: pages.length, field },
+      message: `Generated ${suggestions.length} ${field} variations for ${generatedPages}/${pages.length} pages`,
+      result: { suggestions: suggestions.length, generatedPages, failed, total: pages.length, field },
     });
     broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
       jobId,
       operation: 'bulk-rewrite',
       generated: suggestions.length,
+      generatedPages,
+      suggestions: suggestions.length,
       failed,
       total: pages.length,
       field,
@@ -267,9 +270,9 @@ export async function runSeoBulkRewriteJob({
     addActivity(
       workspaceId,
       'seo_updated',
-      `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
+      `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${generatedPages}/${pages.length} pages`,
       `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
-      { generated: suggestions.length, failed, total: pages.length, field },
+      { generated: generatedPages, suggestions: suggestions.length, failed, total: pages.length, field },
     );
   } catch (err) {
     log.error({ err }, 'bulk-rewrite: job failed');
