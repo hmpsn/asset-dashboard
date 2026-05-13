@@ -14,12 +14,13 @@
  * - GET /api/public/reports/:workspaceId (unified report list)
  * - GET /api/public/report/:id (public report JSON)
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import { saveSnapshot } from '../../server/reports.js';
+import { listActivity } from '../../server/activity-log.js';
 import type { SeoAuditResult } from '../../server/seo-audit.js';
 
 const ctx = createTestContext(13211);
@@ -172,6 +173,96 @@ describe('Reports — save snapshot from existing audit data', () => {
   it('GET /api/public/report/:id with bad id returns 404', async () => {
     const res = await api('/api/public/report/snap_nonexistent');
     expect(res.status).toBe(404);
+  });
+});
+
+describe('Reports — suppression-adjusted public audit reads', () => {
+  afterEach(() => {
+    updateWorkspace(testWsId, { auditSuppressions: [] });
+  });
+
+  it('filters current score, previous score, score history, and logs snapshot saves', async () => {
+    updateWorkspace(testWsId, {
+      auditSuppressions: [{
+        check: 'meta-description',
+        pageSlug: 'about',
+        createdAt: new Date().toISOString(),
+      }],
+    });
+
+    const previousRes = await postJson(`/api/reports/${testSiteId}/snapshot`, {
+      siteName: 'Suppression History Test',
+      audit: {
+        siteScore: 70,
+        totalPages: 1,
+        errors: 1,
+        warnings: 1,
+        infos: 0,
+        pages: [{
+          pageId: 'p-about',
+          slug: 'about',
+          url: 'https://example.com/about',
+          page: 'About',
+          score: 70,
+          issues: [
+            { check: 'meta-description', severity: 'error', message: 'Suppressed meta issue' },
+            { check: 'content-length', severity: 'warning', message: 'Visible content warning' },
+          ],
+        }],
+        siteWideIssues: [],
+      },
+    });
+    expect(previousRes.status).toBe(200);
+    const previousBody = await previousRes.json();
+    expect(previousBody.siteScore).toBe(97);
+
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    const currentRes = await postJson(`/api/reports/${testSiteId}/snapshot`, {
+      siteName: 'Suppression Current Test',
+      audit: {
+        siteScore: 85,
+        totalPages: 1,
+        errors: 1,
+        warnings: 0,
+        infos: 0,
+        pages: [{
+          pageId: 'p-about',
+          slug: 'about',
+          url: 'https://example.com/about',
+          page: 'About',
+          score: 85,
+          issues: [
+            { check: 'meta-description', severity: 'error', message: 'Suppressed meta issue' },
+          ],
+        }],
+        siteWideIssues: [],
+      },
+    });
+    expect(currentRes.status).toBe(200);
+    const currentBody = await currentRes.json();
+    expect(currentBody.siteScore).toBe(100);
+
+    const detailRes = await api(`/api/public/audit-detail/${testWsId}`);
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+
+    expect(detail.id).toBe(currentBody.id);
+    expect(detail.audit.siteScore).toBe(100);
+    expect(detail.audit.errors).toBe(0);
+    expect(detail.audit.pages[0].issues).toHaveLength(0);
+    expect(detail.previousScore).toBe(97);
+    expect(detail.scoreHistory).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: currentBody.id, siteScore: 100, errors: 0, warnings: 0 }),
+      expect.objectContaining({ id: previousBody.id, siteScore: 97, errors: 0, warnings: 1 }),
+    ]));
+
+    const activities = listActivity(testWsId, 20);
+    expect(activities.some(a =>
+      a.type === 'audit_completed'
+      && a.metadata?.snapshotOnly === true
+      && a.metadata?.score === 100
+    )).toBe(true);
   });
 });
 

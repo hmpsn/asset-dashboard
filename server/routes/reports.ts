@@ -14,6 +14,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { getDataDir } from '../data-dir.js';
 import { applySuppressionsToAudit } from '../helpers.js';
+import { getEffectivePreviousScore, toEffectiveAuditSnapshot } from '../audit-snapshot-views.js';
 import { triggerMonthlyReport } from '../monthly-report.js';
 import {
   saveSnapshot,
@@ -33,6 +34,7 @@ import { getMonthlyReportHTML, listMonthlyReports } from '../monthly-report.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
+import { handleOnDemandSeoAuditResult } from '../webflow-seo-audit-bridges.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
@@ -175,14 +177,19 @@ router.post('/api/reports/:siteId/save', requireWorkspaceSiteAccess({
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
     // Log activity — use suppression-adjusted score so it matches client dashboard stat card
     const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    let responseScore = audit.siteScore;
+    let responsePreviousScore = snapshot.previousScore;
     if (auditWs) {
       const effectiveAudit = auditWs.auditSuppressions?.length ? applySuppressionsToAudit(audit, auditWs.auditSuppressions) : audit;
+      const effectivePreviousScore = getEffectivePreviousScore(snapshot, auditWs.auditSuppressions || []);
+      responseScore = effectiveAudit.siteScore;
+      responsePreviousScore = effectivePreviousScore;
       addActivity(auditWs.id, 'audit_completed', `Site audit completed — score ${effectiveAudit.siteScore}`,
         `${effectiveAudit.totalPages} pages scanned, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
-        { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
-      broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore });
+        { score: effectiveAudit.siteScore, previousScore: effectivePreviousScore });
+      broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveAudit.siteScore, previousScore: effectivePreviousScore });
     }
-    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore, previousScore: snapshot.previousScore });
+    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: responseScore, previousScore: responsePreviousScore });
   } catch (err) {
     log.error({ err: err }, 'Report save error');
     res.status(500).json({ error: 'Failed to save report' });
@@ -199,7 +206,18 @@ router.post('/api/reports/:siteId/snapshot', requireWorkspaceSiteAccess({
     const { siteName, audit } = req.body;
     if (!audit) return res.status(400).json({ error: 'Missing audit data' });
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
-    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: audit.siteScore });
+    const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const effectiveSnapshot = auditWs
+      ? toEffectiveAuditSnapshot(snapshot, auditWs.auditSuppressions || [])
+      : snapshot;
+    if (auditWs) {
+      addActivity(auditWs.id, 'audit_completed', `Site audit snapshot saved — score ${effectiveSnapshot.audit.siteScore}`,
+        `${effectiveSnapshot.audit.totalPages} pages scanned, ${effectiveSnapshot.audit.errors} errors, ${effectiveSnapshot.audit.warnings} warnings`,
+        { score: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore, snapshotOnly: true });
+      handleOnDemandSeoAuditResult(auditWs, audit);
+      broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore, snapshotOnly: true });
+    }
+    res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore });
   } catch (err) {
     log.error({ err: err }, 'Snapshot save error');
     res.status(500).json({ error: 'Failed to save snapshot' });
@@ -213,8 +231,7 @@ router.get('/api/reports/:siteId/latest', requireWorkspaceSiteAccessFromQuery(),
   // Apply suppressions so admin sees filtered scores matching client view
   const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
   if (ws && ws.auditSuppressions && ws.auditSuppressions.length > 0) {
-    const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions);
-    return res.json({ ...latest, audit: filtered });
+    return res.json(toEffectiveAuditSnapshot(latest, ws.auditSuppressions));
   }
   res.json(latest);
 });

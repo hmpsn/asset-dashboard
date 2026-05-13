@@ -17,6 +17,7 @@ export function initActivityBroadcast(fn: WorkspaceBroadcastFn) {
 
 export type ActivityType =
   | 'audit_completed'
+  | 'audit_suppression_updated'
   | 'request_resolved'
   | 'approval_applied'
   | 'approval_reverted'

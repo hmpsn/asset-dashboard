@@ -41,6 +41,7 @@ import {
   KeywordStrategyGenerationError,
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
+import { getEffectivePreviousScore } from '../audit-snapshot-views.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { runSchemaGenerationJob } from '../schema-generation-job.js';
 import { runSeoAudit } from '../seo-audit.js';
@@ -183,11 +184,12 @@ router.post('/api/jobs', async (req, res) => {
             const snapshot = saveSnapshot(siteId, siteName, result);
             const effectiveResult = ws?.auditSuppressions?.length ? applySuppressionsToAudit(result, ws.auditSuppressions) : result;
             if (ws) {
+              const effectivePreviousScore = getEffectivePreviousScore(snapshot, ws.auditSuppressions || []);
               addActivity(ws.id, 'audit_completed', `Site audit completed — score ${effectiveResult.siteScore}`,
                 `${effectiveResult.totalPages} pages scanned, ${effectiveResult.errors} errors, ${effectiveResult.warnings} warnings`,
-                { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
+                { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
               handleOnDemandSeoAuditResult(ws, result);
-              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: snapshot.previousScore });
+              broadcastToWorkspace(ws.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveResult.siteScore, previousScore: effectivePreviousScore });
             }
             updateJob(job.id, { status: 'done', result: { ...result, snapshotId: snapshot.id }, message: `Audit complete — score ${effectiveResult.siteScore}` });
             // Auto-regenerate recommendations after audit

@@ -106,8 +106,8 @@ export async function assemblePageProfile(
   let auditIssues: string[] = [];
   try {
     if (ws?.webflowSiteId) {
-      const { getLatestSnapshot } = await import('../reports.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const snap = getLatestSnapshot(ws.webflowSiteId);
+      const { getLatestEffectiveSnapshot } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions);
       if (snap?.audit?.pages) {
         const pagData = (snap.audit.pages as PageSeoResult[]).find(p =>
           matchPageIdentity(toAuditFindingPageId(p), pagePath)

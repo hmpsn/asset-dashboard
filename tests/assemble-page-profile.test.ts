@@ -54,6 +54,7 @@ vi.mock('../server/schema-store.js', () => ({
 }));
 vi.mock('../server/reports.js', () => ({
   getLatestSnapshot: vi.fn(() => null),
+  getLatestSnapshotBefore: vi.fn(() => null),
 }));
 vi.mock('../server/performance-store.js', () => ({
   getInternalLinks: vi.fn(() => null),
@@ -197,6 +198,54 @@ describe('assemblePageProfile', () => {
 
     expect(result.pageProfile!.auditIssues).toContain('Nested page audit issue');
     expect(result.pageProfile!.cwvStatus).toBe('good');
+  });
+
+  it('omits suppressed audit issues from pageProfile auditIssues', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    const reports = await import('../server/reports.js');
+
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      webflowSiteId: 'site-1',
+      personas: [],
+      auditSuppressions: [{ check: 'meta-description', pageSlug: 'about', createdAt: new Date().toISOString() }],
+    } as ReturnType<typeof workspaces.getWorkspace>);
+    vi.mocked(reports.getLatestSnapshot).mockReturnValueOnce({
+      id: 'snap-1',
+      siteId: 'site-1',
+      siteName: 'Example',
+      createdAt: new Date().toISOString(),
+      audit: {
+        siteScore: 80,
+        totalPages: 1,
+        errors: 1,
+        warnings: 1,
+        infos: 0,
+        pages: [
+          {
+            pageId: 'p-about',
+            slug: 'about',
+            url: 'https://example.com/about',
+            page: 'About',
+            score: 80,
+            issues: [
+              { check: 'meta-description', severity: 'error', message: 'Suppressed meta issue' },
+              { check: 'content-length', severity: 'warning', message: 'Visible content issue' },
+            ],
+          },
+        ],
+        siteWideIssues: [],
+      },
+    } as ReturnType<typeof reports.getLatestSnapshot>);
+
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/about',
+    });
+
+    expect(result.pageProfile!.auditIssues).toContain('Visible content issue');
+    expect(result.pageProfile!.auditIssues).not.toContain('Suppressed meta issue');
   });
 
   it('does not let nested leaf slugs overmatch top-level audit/CWV page data', async () => {
