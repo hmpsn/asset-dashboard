@@ -26,9 +26,10 @@ export function getEffectiveAudit(
   audit: SeoAuditResult,
   suppressions: AuditSuppression[] | undefined,
 ): SeoAuditResult {
+  const normalized = normalizeAuditShape(audit);
   return hasSuppressions(suppressions)
-    ? applySuppressionsToAudit(normalizeAuditShape(audit), suppressions)
-    : audit;
+    ? applySuppressionsToAudit(normalized, suppressions)
+    : normalized;
 }
 
 export function getEffectivePreviousScore(

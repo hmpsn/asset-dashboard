@@ -2,15 +2,35 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('audit intelligence consistency contracts', () => {
+  function eventHandlerSource(src: string, eventName: string): string {
+    const marker = `[WS_EVENTS.${eventName}]: () => {`;
+    const start = src.indexOf(marker);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const afterMarker = start + marker.length;
+    const nextEvent = src.indexOf('\n    [WS_EVENTS.', afterMarker);
+    return nextEvent === -1 ? src.slice(afterMarker) : src.slice(afterMarker, nextEvent);
+  }
+
   it('AUDIT_COMPLETE invalidates full audit detail and intelligence readers', () => {
     const src = readFileSync('src/hooks/useWsInvalidation.ts', 'utf-8'); // readFile-ok — source contract for audit cache freshness
-    const handler = src.match(/\[WS_EVENTS\.AUDIT_COMPLETE\]:\s*\(\)\s*=>\s*\{([\s\S]*?)\},\s*\[WS_EVENTS\./)?.[1] ?? '';
+    const handler = eventHandlerSource(src, 'AUDIT_COMPLETE');
 
     expect(handler).toContain('queryKeys.client.auditSummary(workspaceId)');
     expect(handler).toContain('queryKeys.client.auditDetail(workspaceId)');
     expect(handler).toContain('queryKeys.admin.auditAll()');
     expect(handler).toContain('queryKeys.admin.intelligenceAll(workspaceId)');
     expect(handler).toContain('queryKeys.client.intelligence(workspaceId)');
+    expect(handler).toContain('queryKeys.admin.workspaceOverview()');
+  });
+
+  it('WORKSPACE_UPDATED refreshes workspace overview and audit suppression readers', () => {
+    const src = readFileSync('src/hooks/useWsInvalidation.ts', 'utf-8'); // readFile-ok — source contract for suppression cache freshness
+    const handler = eventHandlerSource(src, 'WORKSPACE_UPDATED');
+
+    expect(handler).toContain('queryKeys.admin.workspaceHome(workspaceId)');
+    expect(handler).toContain('queryKeys.admin.workspaceDetail(workspaceId)');
+    expect(handler).toContain('queryKeys.admin.workspaceOverview()');
+    expect(handler).toContain('queryKeys.admin.auditSuppressions(workspaceId)');
   });
 
   it('audit suppression mutations broadcast and invalidate audit intelligence slices', () => {
@@ -31,5 +51,17 @@ describe('audit intelligence consistency contracts', () => {
     expect(siteHealthSrc).toContain('getLatestEffectiveSnapshot(siteId, workspace?.auditSuppressions)');
     expect(siteHealthSrc).toContain('listEffectiveSnapshotSummaries(siteId, workspace?.auditSuppressions)');
     expect(pageProfileSrc).toContain('getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions)');
+  });
+
+  it('report read paths use suppression-adjusted snapshots and summaries', () => {
+    const reportsSrc = readFileSync('server/routes/reports.ts', 'utf-8'); // readFile-ok — source contract for audit report consistency
+    const publicPortalSrc = readFileSync('server/routes/public-portal.ts', 'utf-8'); // readFile-ok — source contract for public audit consistency
+
+    expect(reportsSrc).toContain('listEffectiveSnapshotSummaries(req.params.siteId');
+    expect(reportsSrc).toContain('getEffectiveSnapshotForRead(snapshot)');
+    expect(reportsSrc).toContain('getLatestEffectiveSnapshot(req.params.siteId');
+    expect(publicPortalSrc).toContain('getLatestEffectiveSnapshot(ws.webflowSiteId');
+    expect(publicPortalSrc).toContain('listEffectiveSnapshotSummaries(ws.webflowSiteId');
+    expect(publicPortalSrc).toContain('getEffectiveAudit(prev.audit');
   });
 });

@@ -24,10 +24,8 @@ import {
 } from '../client-users.js';
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
-import { applySuppressionsToAudit } from '../helpers.js';
 import { callAI } from '../ai.js';
 import { parseAIJson } from '../openai-helpers.js';
-import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import { invalidatePageCache } from '../workspace-data.js';
 import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
@@ -103,9 +101,9 @@ router.get('/api/workspace-overview', (req, res) => {
     // Audit
     let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
     if (ws.webflowSiteId) {
-      const snap = getLatestSnapshot(ws.webflowSiteId);
+      const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
       if (snap) {
-        const filtered = applySuppressionsToAudit(snap.audit, ws.auditSuppressions || []);
+        const filtered = snap.audit;
         audit = {
           score: filtered.siteScore,
           totalPages: filtered.totalPages,

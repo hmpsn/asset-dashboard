@@ -257,6 +257,60 @@ describe('Reports — suppression-adjusted public audit reads', () => {
       expect.objectContaining({ id: previousBody.id, siteScore: 97, errors: 0, warnings: 1 }),
     ]));
 
+    const summaryRes = await api(`/api/public/audit-summary/${testWsId}`);
+    expect(summaryRes.status).toBe(200);
+    const summary = await summaryRes.json();
+    expect(summary).toEqual(expect.objectContaining({
+      id: currentBody.id,
+      siteScore: 100,
+      errors: 0,
+      warnings: 0,
+      infos: 0,
+      previousScore: 97,
+    }));
+
+    const adminHistoryRes = await api(`/api/reports/${testSiteId}/history`);
+    expect(adminHistoryRes.status).toBe(200);
+    const adminHistory: Array<{ id: string; siteScore: number; errors: number; warnings: number }> = await adminHistoryRes.json();
+    expect(adminHistory).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: currentBody.id, siteScore: 100, errors: 0, warnings: 0 }),
+      expect.objectContaining({ id: previousBody.id, siteScore: 97, errors: 0, warnings: 1 }),
+    ]));
+
+    const adminSnapshotRes = await api(`/api/reports/snapshot/${currentBody.id}`);
+    expect(adminSnapshotRes.status).toBe(200);
+    const adminSnapshot = await adminSnapshotRes.json();
+    expect(adminSnapshot.audit.siteScore).toBe(100);
+    expect(adminSnapshot.audit.pages[0].issues).toHaveLength(0);
+    expect(adminSnapshot.previousScore).toBe(97);
+
+    const publicReportRes = await api(`/api/public/report/${currentBody.id}`);
+    expect(publicReportRes.status).toBe(200);
+    const publicReport = await publicReportRes.json();
+    expect(publicReport.audit.siteScore).toBe(100);
+    expect(publicReport.audit.pages[0].issues).toHaveLength(0);
+    expect(publicReport.previousScore).toBe(97);
+
+    const publicClientRes = await api(`/api/public/client/${testSiteId}`);
+    expect(publicClientRes.status).toBe(200);
+    const publicClient = await publicClientRes.json();
+    expect(publicClient.latest.siteScore).toBe(100);
+    expect(publicClient.history).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: currentBody.id, siteScore: 100, errors: 0, warnings: 0 }),
+    ]));
+
+    const publicReportsRes = await api(`/api/public/reports/${testWsId}`);
+    expect(publicReportsRes.status).toBe(200);
+    const publicReports: Array<{ id: string; type: string; title: string; score?: number }> = await publicReportsRes.json();
+    expect(publicReports).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: currentBody.id,
+        type: 'audit',
+        title: 'SEO Audit — Score 100',
+        score: 100,
+      }),
+    ]));
+
     const activities = listActivity(testWsId, 20);
     expect(activities.some(a =>
       a.type === 'audit_completed'

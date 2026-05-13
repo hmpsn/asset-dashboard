@@ -79,6 +79,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.ACTIVITY_NEW]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
       qc.invalidateQueries({ queryKey: queryKeys.client.activity(workspaceId) });
     },
     [WS_EVENTS.AUDIT_COMPLETE]: () => {
@@ -90,6 +91,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
     },
     [WS_EVENTS.ANOMALIES_UPDATE]: () => {
       if (!workspaceId) return;
@@ -100,6 +102,8 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.auditSuppressions(workspaceId) });
     },
     [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
       if (!workspaceId) return;

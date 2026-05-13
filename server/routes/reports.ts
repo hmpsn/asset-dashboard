@@ -13,13 +13,11 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { getDataDir } from '../data-dir.js';
-import { applySuppressionsToAudit } from '../helpers.js';
-import { getEffectivePreviousScore, toEffectiveAuditSnapshot } from '../audit-snapshot-views.js';
+import { getEffectiveAudit, getEffectivePreviousScore, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries, toEffectiveAuditSnapshot } from '../audit-snapshot-views.js';
 import { triggerMonthlyReport } from '../monthly-report.js';
 import {
   saveSnapshot,
   getSnapshot,
-  listSnapshots,
   getLatestSnapshot,
   renderReportHTML,
   addActionItem,
@@ -29,6 +27,7 @@ import {
   extractSiteLogo,
   type ActionPriority,
   type ActionStatus,
+  type AuditSnapshot,
 } from '../reports.js';
 import { getMonthlyReportHTML, listMonthlyReports } from '../monthly-report.js';
 import { runSalesAudit } from '../sales-audit.js';
@@ -40,6 +39,15 @@ import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('reports');
+
+function getWorkspaceForSite(siteId: string) {
+  return listWorkspaces().find(w => w.webflowSiteId === siteId);
+}
+
+function getEffectiveSnapshotForRead(snapshot: AuditSnapshot): AuditSnapshot {
+  const workspace = getWorkspaceForSite(snapshot.siteId);
+  return workspace ? toEffectiveAuditSnapshot(snapshot, workspace.auditSuppressions || []) : snapshot;
+}
 
 const actionPrioritySchema = z.enum(['high', 'medium', 'low']);
 const actionStatusSchema = z.enum(['planned', 'in-progress', 'completed']);
@@ -176,11 +184,11 @@ router.post('/api/reports/:siteId/save', requireWorkspaceSiteAccess({
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);
     // Log activity — use suppression-adjusted score so it matches client dashboard stat card
-    const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const auditWs = getWorkspaceForSite(siteId);
     let responseScore = audit.siteScore;
     let responsePreviousScore = snapshot.previousScore;
     if (auditWs) {
-      const effectiveAudit = auditWs.auditSuppressions?.length ? applySuppressionsToAudit(audit, auditWs.auditSuppressions) : audit;
+      const effectiveAudit = getEffectiveAudit(audit, auditWs.auditSuppressions || []);
       const effectivePreviousScore = getEffectivePreviousScore(snapshot, auditWs.auditSuppressions || []);
       responseScore = effectiveAudit.siteScore;
       responsePreviousScore = effectivePreviousScore;
@@ -206,7 +214,7 @@ router.post('/api/reports/:siteId/snapshot', requireWorkspaceSiteAccess({
     const { siteName, audit } = req.body;
     if (!audit) return res.status(400).json({ error: 'Missing audit data' });
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit);
-    const auditWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const auditWs = getWorkspaceForSite(siteId);
     const effectiveSnapshot = auditWs
       ? toEffectiveAuditSnapshot(snapshot, auditWs.auditSuppressions || [])
       : snapshot;
@@ -214,7 +222,7 @@ router.post('/api/reports/:siteId/snapshot', requireWorkspaceSiteAccess({
       addActivity(auditWs.id, 'audit_completed', `Site audit snapshot saved — score ${effectiveSnapshot.audit.siteScore}`,
         `${effectiveSnapshot.audit.totalPages} pages scanned, ${effectiveSnapshot.audit.errors} errors, ${effectiveSnapshot.audit.warnings} warnings`,
         { score: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore, snapshotOnly: true });
-      handleOnDemandSeoAuditResult(auditWs, audit);
+      handleOnDemandSeoAuditResult(auditWs, effectiveSnapshot.audit);
       broadcastToWorkspace(auditWs.id, WS_EVENTS.AUDIT_COMPLETE, { score: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore, snapshotOnly: true });
     }
     res.json({ id: snapshot.id, createdAt: snapshot.createdAt, siteScore: effectiveSnapshot.audit.siteScore, previousScore: effectiveSnapshot.previousScore });
@@ -229,7 +237,7 @@ router.get('/api/reports/:siteId/latest', requireWorkspaceSiteAccessFromQuery(),
   const latest = getLatestSnapshot(req.params.siteId);
   if (!latest) return res.json(null);
   // Apply suppressions so admin sees filtered scores matching client view
-  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  const ws = getWorkspaceForSite(req.params.siteId);
   if (ws && ws.auditSuppressions && ws.auditSuppressions.length > 0) {
     return res.json(toEffectiveAuditSnapshot(latest, ws.auditSuppressions));
   }
@@ -238,7 +246,8 @@ router.get('/api/reports/:siteId/latest', requireWorkspaceSiteAccessFromQuery(),
 
 // List snapshots for a site
 router.get('/api/reports/:siteId/history', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
-  const history = listSnapshots(req.params.siteId);
+  const ws = getWorkspaceForSite(req.params.siteId);
+  const history = listEffectiveSnapshotSummaries(req.params.siteId, ws?.auditSuppressions || []);
   res.json(history);
 });
 
@@ -246,7 +255,7 @@ router.get('/api/reports/:siteId/history', requireWorkspaceSiteAccessFromQuery()
 router.get('/api/reports/snapshot/:id', requireSnapshotWorkspaceAccess, (req, res) => {
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).json({ error: 'Report not found' });
-  res.json(snapshot);
+  res.json(getEffectiveSnapshotForRead(snapshot));
 });
 
 // --- Action Items ---
@@ -288,27 +297,29 @@ router.delete('/api/reports/snapshot/:id/actions/:actionId', requireSnapshotWork
 router.get('/report/:id', (req, res) => {
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).send('<h1>Report not found</h1>');
-  res.type('html').send(renderReportHTML(snapshot));
+  res.type('html').send(renderReportHTML(getEffectiveSnapshotForRead(snapshot)));
 });
 
 // Public: JSON report data (no auth required)
 router.get('/api/public/report/:id', (req, res) => {
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).json({ error: 'Report not found' });
-  res.json(snapshot);
+  res.json(getEffectiveSnapshotForRead(snapshot));
 });
 
 // Public: Latest audit for a site (client dashboard)
 router.get('/api/public/client/:siteId', (req, res) => {
-  const latest = getLatestSnapshot(req.params.siteId);
+  const ws = getWorkspaceForSite(req.params.siteId);
+  const latest = getLatestEffectiveSnapshot(req.params.siteId, ws?.auditSuppressions || []);
   if (!latest) return res.status(404).json({ error: 'No audits found for this site' });
-  const history = listSnapshots(req.params.siteId);
+  const history = listEffectiveSnapshotSummaries(req.params.siteId, ws?.auditSuppressions || []);
   res.json({ latest: latest.audit, siteName: latest.siteName, history });
 });
 
 // Audit report HTML page (renamed from /client/ to avoid conflict with SPA client dashboard)
 router.get('/report/audit/:siteId', (req, res) => {
-  const latest = getLatestSnapshot(req.params.siteId);
+  const ws = getWorkspaceForSite(req.params.siteId);
+  const latest = getLatestEffectiveSnapshot(req.params.siteId, ws?.auditSuppressions || []);
   if (!latest) return res.status(404).send('<h1>No audits found</h1>');
   res.type('html').send(renderReportHTML(latest));
 });
@@ -348,7 +359,7 @@ router.get('/api/public/reports/:workspaceId', (req, res) => {
 
   // Audit snapshots
   if (ws.webflowSiteId) {
-    const snapshots = listSnapshots(ws.webflowSiteId);
+    const snapshots = listEffectiveSnapshotSummaries(ws.webflowSiteId, ws.auditSuppressions || []);
     for (const s of snapshots) {
       reports.push({
         id: s.id,
