@@ -226,7 +226,7 @@ describe('page-analysis job hardening', () => {
     mocks.getPageKeyword.mockReturnValue({
       pagePath: '/',
       pageTitle: 'Home',
-      primaryKeyword: 'invented keyword',
+      primaryKeyword: 'old verified keyword',
       secondaryKeywords: [],
       keywordDifficulty: 99,
       monthlyVolume: 9999,
@@ -259,6 +259,32 @@ describe('page-analysis job hardening', () => {
         primaryKeyword: 'invented keyword',
         keywordDifficulty: 0,
         monthlyVolume: 0,
+      }),
+    ]);
+  });
+
+  it('preserves existing metrics for the same keyword when provider lookup misses in bulk page analysis', async () => {
+    const provider = { name: 'mock', getKeywordMetrics: vi.fn().mockResolvedValue([]) };
+    mocks.getConfiguredProvider.mockReturnValue(provider);
+    mocks.getPageKeyword.mockReturnValue({
+      pagePath: '/',
+      pageTitle: 'Home',
+      primaryKeyword: 'home service',
+      secondaryKeywords: [],
+      keywordDifficulty: 44,
+      monthlyVolume: 1200,
+    });
+    mocks.getWorkspacePages.mockResolvedValue([{ id: 'page_1', title: 'Home', slug: '', path: '/', seo: {} }]);
+    mocks.resolveBaseUrl.mockResolvedValue('https://example.com');
+    globalThis.fetch = vi.fn(async () => ({ ok: true, text: async () => '<html><title>Home</title><main>Service page</main></html>' })) as typeof fetch;
+
+    await runPageAnalysisJob({ jobId: 'job_preserve_metrics', siteId: 'site_1', workspaceId: 'ws_1' });
+
+    expect(mocks.upsertPageKeywordsBatch).toHaveBeenCalledWith('ws_1', [
+      expect.objectContaining({
+        primaryKeyword: 'home service',
+        keywordDifficulty: 44,
+        monthlyVolume: 1200,
       }),
     ]);
   });

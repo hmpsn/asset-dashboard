@@ -15,7 +15,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { requireWorkspaceAccessFromBody } from '../auth.js';
-import { getProviderMetricsForKeyword } from '../provider-keyword-metrics.js';
+import { getProviderMetricsForKeyword, resolvePersistedKeywordMetrics } from '../provider-keyword-metrics.js';
 
 const log = createLogger('webflow-keywords');
 
@@ -170,8 +170,7 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromB
     const existing = getPageKeyword(workspaceId, normalized);
     const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || '';
     const providerMetrics = await getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword, 'single page analysis persist');
-    const guardedKeywordDifficulty = providerMetrics?.difficulty ?? 0;
-    const guardedMonthlyVolume = providerMetrics?.volume ?? 0;
+    const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, providerMetrics);
     upsertPageKeyword(workspaceId, {
       pagePath: normalized,
       pageTitle: pageTitle || existing?.pageTitle || '',
@@ -187,8 +186,8 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromB
       longTailKeywords: analysis.longTailKeywords || [],
       competitorKeywords: analysis.competitorKeywords || [],
       estimatedDifficulty: analysis.estimatedDifficulty,
-      keywordDifficulty: guardedKeywordDifficulty,
-      monthlyVolume: guardedMonthlyVolume,
+      keywordDifficulty: guardedMetrics.keywordDifficulty,
+      monthlyVolume: guardedMetrics.monthlyVolume,
       topicCluster: analysis.topicCluster,
       searchIntentConfidence: analysis.searchIntentConfidence,
       // Preserve enrichment fields from existing entry

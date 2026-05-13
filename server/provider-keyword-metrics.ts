@@ -1,12 +1,18 @@
 import { createLogger } from './logger.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import type { PageKeywordMap } from '../shared/types/workspace.js';
 
 const log = createLogger('provider-keyword-metrics');
 
 export interface ProviderKeywordMetric {
   difficulty: number;
   volume: number;
+}
+
+export interface PersistedKeywordMetrics {
+  keywordDifficulty: number | undefined;
+  monthlyVolume: number | undefined;
 }
 
 export async function getProviderMetricsForKeywords(
@@ -44,4 +50,34 @@ export async function getProviderMetricsForKeyword(
 
   const metrics = await getProviderMetricsForKeywords(workspaceId, [trimmedKeyword], context);
   return metrics.get(trimmedKeyword.toLowerCase()) ?? null;
+}
+
+export function resolvePersistedKeywordMetrics(
+  existing: Pick<PageKeywordMap, 'primaryKeyword' | 'keywordDifficulty' | 'monthlyVolume'> | undefined,
+  resolvedPrimaryKeyword: string,
+  providerMetrics: ProviderKeywordMetric | null | undefined,
+): PersistedKeywordMetrics {
+  if (providerMetrics) {
+    return {
+      keywordDifficulty: providerMetrics.difficulty,
+      monthlyVolume: providerMetrics.volume,
+    };
+  }
+
+  const normalizedExistingKeyword = existing?.primaryKeyword.trim().toLowerCase();
+  const normalizedResolvedKeyword = resolvedPrimaryKeyword.trim().toLowerCase();
+  const isSamePersistedKeyword = !!normalizedExistingKeyword && normalizedExistingKeyword === normalizedResolvedKeyword;
+  const hasPersistedMetrics = existing?.keywordDifficulty != null || existing?.monthlyVolume != null;
+
+  if (isSamePersistedKeyword && hasPersistedMetrics) {
+    return {
+      keywordDifficulty: existing.keywordDifficulty,
+      monthlyVolume: existing.monthlyVolume,
+    };
+  }
+
+  return {
+    keywordDifficulty: 0,
+    monthlyVolume: 0,
+  };
 }

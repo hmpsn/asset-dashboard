@@ -35,8 +35,9 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(src).toContain('guardedAnalysis.monthlyVolume = responseMetrics?.volume ?? 0');
     expect(src).toContain("const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || ''");
     expect(src).toContain("getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword, 'single page analysis persist')");
-    expect(src).toContain('const guardedKeywordDifficulty = providerMetrics?.difficulty ?? 0');
-    expect(src).toContain('const guardedMonthlyVolume = providerMetrics?.volume ?? 0');
+    expect(src).toContain('const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, providerMetrics)');
+    expect(src).toContain('keywordDifficulty: guardedMetrics.keywordDifficulty');
+    expect(src).toContain('monthlyVolume: guardedMetrics.monthlyVolume');
     expect(src).not.toContain('preservedExistingMetrics');
     expect(src).not.toContain('analysis.hasProviderMetrics === true');
   });

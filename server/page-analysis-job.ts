@@ -16,7 +16,7 @@ import {
   listPageKeywords,
   upsertPageKeywordsBatch,
 } from './page-keywords.js';
-import { getProviderMetricsForKeywords } from './provider-keyword-metrics.js';
+import { getProviderMetricsForKeywords, resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { getConfiguredProvider, getProviderDisplayName } from './seo-data-provider.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } from './webflow.js';
@@ -333,6 +333,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           const existing = existingByPath.get(normalized);
           const resolvedPrimaryKeyword = (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
           const keywordMetrics = providerMetrics.get(resolvedPrimaryKeyword.toLowerCase());
+          const guardedMetrics = resolvePersistedKeywordMetrics(existing, resolvedPrimaryKeyword, keywordMetrics);
           return {
             pagePath: normalized,
             pageTitle: page.title,
@@ -348,8 +349,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             longTailKeywords: (analysis.longTailKeywords as string[]) || [],
             competitorKeywords: (analysis.competitorKeywords as string[]) || [],
             estimatedDifficulty: analysis.estimatedDifficulty as string,
-            keywordDifficulty: keywordMetrics?.difficulty ?? 0,
-            monthlyVolume: keywordMetrics?.volume ?? 0,
+            keywordDifficulty: guardedMetrics.keywordDifficulty,
+            monthlyVolume: guardedMetrics.monthlyVolume,
             topicCluster: analysis.topicCluster as string,
             searchIntentConfidence: analysis.searchIntentConfidence as number,
             // Preserve enrichment fields from existing entry

@@ -123,6 +123,7 @@ describe('Webflow SEO suggestions route coverage', () => {
 
   it('rejects keyword analysis when body workspaceId is outside the JWT scope', async () => {
     const forbiddenWs = seedWorkspace();
+    const originalOpenAiKey = process.env.OPENAI_API_KEY;
     const scopedUser = await createUser(
       `keyword-analysis-scope-${Date.now()}@test.local`,
       'ScopedPass1!',
@@ -131,8 +132,23 @@ describe('Webflow SEO suggestions route coverage', () => {
       [ws.workspaceId],
     );
     const token = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+    delete process.env.OPENAI_API_KEY;
 
     try {
+      const allowedRes = await fetch(`${baseUrl}/api/webflow/keyword-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          workspaceId: ws.workspaceId,
+          pageTitle: 'Allowed Page',
+        }),
+      });
+      expect(allowedRes.status).toBe(500);
+      await expect(allowedRes.json()).resolves.toMatchObject({ error: 'OPENAI_API_KEY not configured' });
+
       const res = await fetch(`${baseUrl}/api/webflow/keyword-analysis`, {
         method: 'POST',
         headers: {
@@ -147,6 +163,8 @@ describe('Webflow SEO suggestions route coverage', () => {
       expect(res.status).toBe(403);
       await expect(res.json()).resolves.toMatchObject({ error: 'You do not have access to this workspace' });
     } finally {
+      if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalOpenAiKey;
       deleteUser(scopedUser.id);
       forbiddenWs.cleanup();
     }
