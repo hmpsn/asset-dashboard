@@ -15,7 +15,6 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/llms-txt-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/rewrite-chat.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/google.ts', aiImport: "from '../ai.js'" },
-  { path: 'server/routes/jobs.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/public-analytics.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-seo-page-tools.ts', aiImport: "from '../ai.js'" },
@@ -95,5 +94,16 @@ describe('AI dispatch migration', () => {
       expect(source, file.path).not.toContain("from './anthropic-helpers.js'");
       expect(source, file.path).not.toContain('callAnthropic({');
     }
+  });
+
+  it('keeps bulk SEO job creative copy on the unified creative dispatcher', () => {
+    const source = readFileSync('server/routes/jobs.ts', 'utf-8'); // readFile-ok — source contract for bulk SEO job dispatcher migration
+    expect(source).toContain("from '../content-posts-ai.js'");
+    expect(source).toContain('callCreativeAI({');
+    expect(source).toContain('systemPrompt: buildSystemPrompt(bulkSeoWorkspaceId');
+    expect(source).not.toContain("from '../openai-helpers.js'");
+    expect(source).not.toContain("from '../anthropic-helpers.js'");
+    expect(source).not.toContain('callOpenAI({');
+    expect(source).not.toContain('callAnthropic({');
   });
 });

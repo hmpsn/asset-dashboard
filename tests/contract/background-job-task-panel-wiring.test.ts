@@ -10,10 +10,12 @@ describe('background job task panel wiring', () => {
     const seoEditor = read('src/components/SeoEditor.tsx');
     const bulkWorkflow = read('src/components/editor/useSeoEditorBulkWorkflow.ts');
 
-    expect(seoEditor).toContain('const { cancelJob, trackJob } = useBackgroundTasks()');
+    expect(seoEditor).toContain('const { cancelJob, startJob, trackJob } = useBackgroundTasks()');
     expect(seoEditor).toContain('useSeoEditorBulkWorkflow({');
+    expect(seoEditor).toContain('startJob,');
     expect(seoEditor).toContain('trackJob,');
     expect(seoEditor).toContain('cancelJob,');
+    expect(bulkWorkflow).toContain('startJob(BACKGROUND_JOB_TYPES.BULK_SEO_FIX');
     expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId })');
     expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId })');
     expect(bulkWorkflow).toContain('setBulkAnalyzeJobId(jobId)');

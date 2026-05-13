@@ -5528,3 +5528,14 @@ Bug hardening included:
 **Client value:** Immediately see what needs attention most — highest-impact items are highlighted above the full list.
 
 **Files:** `src/components/client/inbox/PriorityStrip.tsx` (new).
+
+---
+
+### 407. SEO Editor Job Safety + Page State Wiring
+**What it does:** Hardens SEO Editor durable mutations. The old synchronous AI bulk-fix route now returns a supported-path error and the editor starts the existing `bulk-seo-fix` background job instead. Background bulk fixes broadcast page-edit-state updates and write activity context when pages are changed. SEO suggestion selection and dismissal now read pending rows before mutation, then broadcast/cache-refresh and log activity. SEO Editor also reads from the all-pages source so CMS rows can be reviewed while direct write paths remain guarded for static Webflow pages only.
+
+**Agency value:** Long-running AI/write work no longer ties up a request, cross-tab SEO Editor state refreshes after suggestion changes, and activity history explains durable SEO decisions.
+
+**Client value:** Reviewable SEO work is less likely to show stale state or impossible CMS write behavior.
+
+**Files:** `server/routes/jobs.ts`; `server/routes/webflow-seo-apply.ts`; `server/routes/webflow-seo-suggestions.ts`; `server/seo-suggestions.ts`; `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorBulkWorkflow.ts`; `src/hooks/admin/useSeoEditor.ts`; `src/api/seo.ts`; `tests/integration/webflow-seo-writes.test.ts`; `tests/integration/webflow-seo-bulk-slugless.test.ts`; `tests/unit/useSeoEditor.test.ts`.

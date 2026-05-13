@@ -273,6 +273,16 @@
           "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive."
         },
         {
+          "id": "seo-editor-job-safety-page-state-wiring",
+          "title": "SEO Editor Job Safety + Page Edit State Wiring",
+          "source": "Backend Health + Content Quality Hardening PR 6",
+          "est": "2-4h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: retired the synchronous AI `/api/webflow/seo-bulk-fix/:siteId` write route in favor of the existing `bulk-seo-fix` background job, added page-state broadcasts and activity context for background bulk fixes plus SEO suggestion select/dismiss mutations, removed the stale frontend bulk-fix wrapper, and switched SEO Editor reads to the all-pages source while preserving CMS manual-apply/write guards."
+        },
+        {
           "id": "platform-org-extraction-pilot",
           "title": "Route-to-Service Extraction Pilot",
           "source": "Product engineering organization review 2026-05-13",

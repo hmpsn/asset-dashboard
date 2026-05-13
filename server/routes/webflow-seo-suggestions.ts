@@ -12,8 +12,10 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { createLogger } from '../logger.js';
 import {
   dismissSuggestions,
+  getPendingSuggestion,
   getSelectedSuggestions,
   getSuggestionCounts,
+  listPendingSuggestionsByIds,
   listSuggestions,
   markApplied,
   selectVariation,
@@ -43,8 +45,28 @@ router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', requireW
   if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
     return res.status(400).json({ error: 'selectedIndex must be 0, 1, or 2' });
   }
+  const suggestion = getPendingSuggestion(workspaceId, suggestionId);
   const ok = selectVariation(workspaceId, suggestionId, selectedIndex);
   if (!ok) return res.status(404).json({ error: 'Suggestion not found or already applied' });
+  if (suggestion) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageId: suggestion.pageId,
+      fields: [suggestion.field],
+      source: 'seo-suggestion-selected',
+    });
+    addActivity(
+      workspaceId,
+      'seo_updated',
+      `Selected SEO ${suggestion.field} variation`,
+      `Selected variation ${selectedIndex + 1} for ${suggestion.pageTitle || suggestion.pageSlug || suggestion.pageId}`,
+      {
+        suggestionId,
+        pageId: suggestion.pageId,
+        field: suggestion.field,
+        selectedIndex,
+      },
+    );
+  }
   res.json({ ok: true });
 });
 
@@ -126,7 +148,32 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceA
 router.delete('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { suggestionIds } = req.body as { suggestionIds?: string[] } || {};
+  const pendingBefore = listPendingSuggestionsByIds(workspaceId, suggestionIds);
   const dismissed = dismissSuggestions(workspaceId, suggestionIds);
+  if (dismissed > 0) {
+    const affected = pendingBefore;
+    const pageIds = Array.from(new Set(affected.map(s => s.pageId)));
+    const fields = Array.from(new Set(affected.map(s => s.field)));
+    broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds,
+      fields,
+      source: 'seo-suggestions-dismissed',
+    });
+    addActivity(
+      workspaceId,
+      'seo_updated',
+      `Dismissed ${dismissed} SEO ${dismissed === 1 ? 'suggestion' : 'suggestions'}`,
+      suggestionIds?.length
+        ? `Dismissed selected SEO suggestions for ${pageIds.length} ${pageIds.length === 1 ? 'page' : 'pages'}`
+        : `Dismissed all pending SEO suggestions for ${pageIds.length} ${pageIds.length === 1 ? 'page' : 'pages'}`,
+      {
+        dismissed,
+        pageIds,
+        fields,
+        suggestionIds: affected.map(s => s.id),
+      },
+    );
+  }
   res.json({ dismissed });
 });
 
