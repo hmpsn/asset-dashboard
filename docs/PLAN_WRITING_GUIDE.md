@@ -31,7 +31,7 @@ Run the `pre-plan-audit` skill **before writing-plans** for:
 1. Exhaustive findings table — every affected file, line, value, category
 2. Coverage verification — which existing mechanisms already handle which findings
 3. Infrastructure recommendations — shared utilities, pr-check rules, test coverage gaps
-4. Parallelization strategy — dependency graph + model assignments
+4. Parallelization strategy — dependency graph + platform-appropriate model assignments
 
 Plans written without a pre-plan audit miss 50–70% of affected files. Don't skip it for applicable tasks.
 
@@ -82,15 +82,15 @@ Every plan should state:
 
 ### 3. Model assignments per task
 
-Use the least capable model that can handle the task:
+Name the active agent platform in the plan, then use the least capable model on that platform that can handle the task. Codex/OpenAI plans should use the OpenAI ladder; Claude/Anthropic plans should use the Anthropic ladder.
 
-| Task type | Model | Signal |
-|-----------|-------|--------|
-| Migration SQL, shared types from spec, route boilerplate, API client wrappers | `haiku` | Pure transcription — no judgment calls |
-| Service/CRUD layers, React components, tasks with edge-case awareness | `sonnet` | Pattern-following with local judgment |
-| Prompt engineering, brand context logic, complex shared components, auto-summarization | `opus` | Creative judgment or high reuse surface |
-| Spec compliance reviewer | `opus` | Review quality scales with model capability |
-| Code quality reviewer | `opus` | Never downgrade reviewers |
+| Task type | Codex / OpenAI model | Claude / Anthropic model | Signal |
+|-----------|----------------------|--------------------------|--------|
+| Mechanical doc cleanup, route boilerplate, small fixture updates | `GPT-5.4-Mini` | `Haiku` | Pure transcription or low-judgment edits |
+| Service/CRUD layers, React components, bounded docs, read-only reports, tests with local patterns | `GPT-5.4` | `Sonnet` | Pattern-following with local judgment |
+| Prompt engineering, brand context logic, complex shared components, cross-context plans, final integration | `GPT-5.5` | `Opus` | Creative judgment, high reuse surface, or broad blast radius |
+| Spec compliance reviewer | `GPT-5.5` | `Opus` | Review quality scales with model capability |
+| Code quality reviewer | `GPT-5.5` | `Opus` | Never downgrade reviewers |
 
 ### 4. File ownership declarations
 
@@ -145,6 +145,10 @@ Specify *how* to verify each phase, not just "manual verification":
 - Specific `npx vitest run --reporter=verbose` test commands
 - `curl` commands for API endpoints
 - Contrast or color checks for design work
+
+### 8. Golden path and PR readiness references
+
+For common feature shapes, start from [platform-golden-paths.md](./workflows/platform-golden-paths.md) and select the closest template before assigning files. Before final review, run through [pr-readiness-checklist.md](./workflows/pr-readiness-checklist.md) so the plan's ownership, data flow, tests, docs, and verification are visible in the PR.
 
 ---
 
@@ -239,7 +243,7 @@ One paragraph: what this implements and why.
 
 ## Task List
 
-### Task 1 — [Name] (Model: haiku | sonnet | opus)
+### Task 1 — [Name] (Platform: Codex/OpenAI | Claude/Anthropic; Model: [platform model])
 **Owns:** [files]
 **Must not touch:** [files]
 Steps...
