@@ -15,27 +15,11 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { requireWorkspaceAccessFromBody } from '../auth.js';
+import { getProviderMetricsForKeyword } from '../provider-keyword-metrics.js';
 
 const log = createLogger('webflow-keywords');
 
 const router = Router();
-
-async function getProviderMetricsForKeyword(workspaceId: string, keyword: string): Promise<{ difficulty: number; volume: number } | null> {
-  const trimmedKeyword = keyword.trim();
-  if (!trimmedKeyword) return null;
-  const ws = getWorkspace(workspaceId);
-  const provider = getConfiguredProvider(ws?.seoDataProvider);
-  if (!provider) return null;
-  try {
-    const metrics = await provider.getKeywordMetrics([trimmedKeyword], workspaceId).catch(() => []);
-    const match = metrics.find(m => m.keyword.toLowerCase() === trimmedKeyword.toLowerCase());
-    if (!match) return null;
-    return { difficulty: match.difficulty, volume: match.volume };
-  } catch (err) {
-    log.warn({ err, workspaceId, keyword: trimmedKeyword }, 'keyword provider metrics lookup failed during page analysis persist');
-    return null;
-  }
-}
 
 // --- AI Keyword Analysis ---
 router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody(), async (req, res) => {
@@ -131,7 +115,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     const analysis = parseJsonFallback(cleaned, null);
     if (analysis && typeof analysis === 'object' && !Array.isArray(analysis)) {
       const guardedAnalysis = analysis as Record<string, unknown>;
-      const responseMetrics = await getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''));
+      const responseMetrics = await getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''), 'single page analysis response');
       applyBulkKeywordGuards(guardedAnalysis, responseMetrics ? kwBlock : '');
       guardedAnalysis.keywordDifficulty = responseMetrics?.difficulty ?? 0;
       guardedAnalysis.monthlyVolume = responseMetrics?.volume ?? 0;
@@ -185,7 +169,7 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromB
     // Merge with existing entry (preserves GSC/SEMRush enrichment and keyword assignments)
     const existing = getPageKeyword(workspaceId, normalized);
     const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || '';
-    const providerMetrics = await getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword);
+    const providerMetrics = await getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword, 'single page analysis persist');
     const guardedKeywordDifficulty = providerMetrics?.difficulty ?? 0;
     const guardedMonthlyVolume = providerMetrics?.volume ?? 0;
     upsertPageKeyword(workspaceId, {

@@ -182,7 +182,8 @@ describe('webflow SEO bulk rewrite job', () => {
       result: expect.objectContaining({ suggestions: 2, generatedPages: 1, failed: 0, total: 1, field: 'both' }),
     }));
     expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:complete', expect.objectContaining({
-      generated: 1,
+      generated: 2,
+      generatedPages: 1,
       suggestions: 2,
       total: 1,
       field: 'both',

@@ -124,7 +124,7 @@ export function useSeoEditorBulkWorkflow({
       }
     },
     [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
-      const detail = data as { jobId: string; operation: string; generated?: number; suggestions?: number; failed?: number; total: number; field?: string };
+      const detail = data as { jobId: string; operation: string; generated?: number; generatedPages?: number; suggestions?: number; failed?: number; total: number; field?: string };
       if (detail.operation === 'bulk-analyze' && detail.jobId === bulkAnalyzeJobId) {
         setBulkAnalyzeProgress(prev => (prev ? { ...prev, done: prev.total } : null));
         setBulkAnalyzeJobId(null);
@@ -136,7 +136,7 @@ export function useSeoEditorBulkWorkflow({
 
       if (detail.operation === 'bulk-rewrite' && detail.jobId === bulkRewriteJobId) {
         const failed = detail.failed || 0;
-        const generated = detail.generated ?? (detail.total - failed);
+        const generated = detail.generatedPages ?? (detail.total - failed);
         const fieldLabel = detail.field === 'both' ? 'title + description' : (detail.field || 'title');
         const suggestionSuffix = detail.suggestions != null && detail.suggestions !== generated
           ? ` (${detail.suggestions} suggestion rows)`

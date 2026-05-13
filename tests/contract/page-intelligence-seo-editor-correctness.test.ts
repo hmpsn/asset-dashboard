@@ -30,11 +30,11 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(src).toContain("router.post('/api/webflow/keyword-analysis', requireWorkspaceAccessFromBody()");
     expect(src).toContain("router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromBody()");
     expect(src).toContain("applyBulkKeywordGuards(guardedAnalysis, responseMetrics ? kwBlock : '')");
-    expect(src).toContain("getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''))");
+    expect(src).toContain("getProviderMetricsForKeyword(workspaceId, String(guardedAnalysis.primaryKeyword || ''), 'single page analysis response')");
     expect(src).toContain('guardedAnalysis.keywordDifficulty = responseMetrics?.difficulty ?? 0');
     expect(src).toContain('guardedAnalysis.monthlyVolume = responseMetrics?.volume ?? 0');
     expect(src).toContain("const resolvedPrimaryKeyword = analysis.primaryKeyword || existing?.primaryKeyword || ''");
-    expect(src).toContain('getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword)');
+    expect(src).toContain("getProviderMetricsForKeyword(workspaceId, resolvedPrimaryKeyword, 'single page analysis persist')");
     expect(src).toContain('const guardedKeywordDifficulty = providerMetrics?.difficulty ?? 0');
     expect(src).toContain('const guardedMonthlyVolume = providerMetrics?.volume ?? 0');
     expect(src).not.toContain('preservedExistingMetrics');
@@ -77,5 +77,6 @@ describe('Page Intelligence + SEO Editor correctness contracts', () => {
     expect(routeSrc).toContain('broadcastToWorkspace(bulkWsId, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(routeSrc).toContain('broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED');
     expect(routeSrc).toContain("addActivity(ws.id, 'seo_updated'");
+    expect(routeSrc).toContain('if (!ws || ws.webflowSiteId !== siteId)');
   });
 });

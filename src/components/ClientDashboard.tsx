@@ -395,6 +395,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
       queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
       refetchClient('activity', '');
     },

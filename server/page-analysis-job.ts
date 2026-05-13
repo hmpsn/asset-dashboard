@@ -16,6 +16,7 @@ import {
   listPageKeywords,
   upsertPageKeywordsBatch,
 } from './page-keywords.js';
+import { getProviderMetricsForKeywords } from './provider-keyword-metrics.js';
 import { getConfiguredProvider, getProviderDisplayName } from './seo-data-provider.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain, toCmsPageId } from './webflow.js';
@@ -48,27 +49,6 @@ interface PageItem {
   source: 'static' | 'cms';
   seoTitle?: string;
   metaDesc?: string;
-}
-
-async function getProviderMetricsForKeywords(
-  workspaceId: string,
-  keywords: string[],
-): Promise<Map<string, { difficulty: number; volume: number }>> {
-  const cleanKeywords = Array.from(new Set(keywords.map(keyword => keyword.trim()).filter(Boolean)));
-  const results = new Map<string, { difficulty: number; volume: number }>();
-  if (cleanKeywords.length === 0) return results;
-  const ws = getWorkspace(workspaceId);
-  const provider = getConfiguredProvider(ws?.seoDataProvider);
-  if (!provider) return results;
-  try {
-    const metrics = await provider.getKeywordMetrics(cleanKeywords, workspaceId).catch(() => []);
-    for (const metric of metrics) {
-      results.set(metric.keyword.toLowerCase(), { difficulty: metric.difficulty, volume: metric.volume });
-    }
-  } catch (err) {
-    log.warn({ err, workspaceId }, 'keyword provider metrics lookup failed during bulk page analysis persist');
-  }
-  return results;
 }
 
 /**
@@ -346,7 +326,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           existingByPath.set(normalized, existing);
           return (analysis.primaryKeyword as string) || existing?.primaryKeyword || '';
         });
-        const providerMetrics = await getProviderMetricsForKeywords(workspaceId, resolvedKeywords);
+        const providerMetrics = await getProviderMetricsForKeywords(workspaceId, resolvedKeywords, 'bulk page analysis persist');
         const entries = batchResults.map(({ page, analysis }) => {
           const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
           // Merge with existing entry if present (preserves keyword assignments)

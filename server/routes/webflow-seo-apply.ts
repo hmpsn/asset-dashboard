@@ -50,6 +50,9 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceSiteAccess({
 
   // Try to fetch page content for pages that don't have it (best-effort)
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  if (!ws || ws.webflowSiteId !== siteId) {
+    return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
   const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
@@ -178,6 +181,9 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceSiteAccess
   const siteId = req.params.siteId;
   const token = getTokenForSite(siteId) || undefined;
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
+  if (!ws || ws.webflowSiteId !== siteId) {
+    return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
   const maxLen = field === 'description' ? 160 : 60;
 
   const results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean; error?: string }> = [];

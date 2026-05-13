@@ -8,9 +8,11 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 
 import db from '../../server/db/index.js';
+import { signToken } from '../../server/auth.js';
 import { saveSuggestion, selectVariation } from '../../server/seo-suggestions.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { createUser, deleteUser } from '../../server/users.js';
 import {
   setupOpenAIMocks,
   mockOpenAIJsonResponse,
@@ -117,6 +119,37 @@ describe('Webflow SEO suggestions route coverage', () => {
     await stopServer();
     deleteSeoSuggestions(ws.workspaceId);
     ws.cleanup();
+  });
+
+  it('rejects keyword analysis when body workspaceId is outside the JWT scope', async () => {
+    const forbiddenWs = seedWorkspace();
+    const scopedUser = await createUser(
+      `keyword-analysis-scope-${Date.now()}@test.local`,
+      'ScopedPass1!',
+      'Keyword Analysis Scoped User',
+      'member',
+      [ws.workspaceId],
+    );
+    const token = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+
+    try {
+      const res = await fetch(`${baseUrl}/api/webflow/keyword-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          workspaceId: forbiddenWs.workspaceId,
+          pageTitle: 'Forbidden Page',
+        }),
+      });
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toMatchObject({ error: 'You do not have access to this workspace' });
+    } finally {
+      deleteUser(scopedUser.id);
+      forbiddenWs.cleanup();
+    }
   });
 
   it('lists pending suggestions with counts for a workspace', async () => {

@@ -259,7 +259,8 @@ export async function runSeoBulkRewriteJob({
     broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
       jobId,
       operation: 'bulk-rewrite',
-      generated: generatedPages,
+      generated: suggestions.length,
+      generatedPages,
       suggestions: suggestions.length,
       failed,
       total: pages.length,
