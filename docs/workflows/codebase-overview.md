@@ -185,7 +185,11 @@ All client-facing copy should:
 ## Development Enforcement
 
 - `docs/rules/data-flow.md` — **MANDATORY rules** for data flow consistency: broadcast patterns, delete pre-read, external module callbacks, public API safety, activity logging. Read before any write endpoint work.
+- `docs/rules/platform-organization.md` — Canonical bounded-context ownership map. Use it to place new/touched work and to identify shared coordination files before planning.
 - `docs/workflows/new-feature-checklist.md` — Pre/during/post implementation checklist for every feature or modification. Covers server broadcasts, frontend handlers, docs, and common pitfalls.
+- `docs/workflows/platform-golden-paths.md` — Golden-path templates for the common feature classes: admin CRUD, client-visible, background job, AI generation, analytics/intelligence, and approval/inbox.
+- `docs/workflows/pr-readiness-checklist.md` — Lightweight pre-PR platform health checklist covering context ownership, public exposure, query invalidation, broadcasts, activity logging, actual read-path tests, docs, and verification.
+- `npm run verify:organization` — Read-only advisory report for bounded-context coverage across routes, server modules, API wrappers, hooks, components, tests, and docs.
 - `server/ws-events.ts` — Single source of truth for all WebSocket event names. New events MUST be registered here.
 
 ## Documentation

@@ -102,50 +102,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave1-operating-model",
-      "name": "Platform Health Wave 1 — Operating Model",
-      "hours": "8-12",
-      "rationale": "Create the operating model for future platform work: domains, file placement, feature templates, and PR readiness checks before deeper refactors begin.",
-      "items": [
-        {
-          "id": "platform-org-bounded-context-map",
-          "title": "Bounded Context Ownership Map",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "2-3h",
-          "priority": "P0",
-          "status": "pending",
-          "notes": "Define canonical product domains for Client Portal, Inbox, Schema, Content Pipeline, Analytics Intelligence, Brand Engine, Outcomes/ROI, Billing, Integrations, and Platform Foundation. For each domain, document owned routes, components, hooks, API wrappers, shared types, WebSocket events, tests, and docs. Output should make it obvious where new work belongs and which files are shared coordination points."
-        },
-        {
-          "id": "platform-org-feature-folder-convention",
-          "title": "Feature Folder Convention Guide",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "1-2h",
-          "priority": "P0",
-          "status": "pending",
-          "notes": "Add a lightweight convention for new and touched features: shared/types/<domain>.ts, src/api/<domain>.ts, src/hooks/admin|client domain hooks, src/components/<domain>/, server/routes/<domain>.ts, server/domains/<domain>/ for business logic, and matching tests/docs. This is a forward-looking convention, not a mandate to move the whole repo."
-        },
-        {
-          "id": "platform-confidence-golden-path-templates",
-          "title": "Golden Path Feature Templates",
-          "source": "Product engineering confidence review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P0",
-          "status": "pending",
-          "notes": "Create implementation templates for common feature classes: admin CRUD feature, client-visible feature, background job feature, AI generation feature, analytics/intelligence feature, and approval/inbox feature. Each template should list expected files, bounded context, shared types, query keys, WebSocket events, activity logging, tests, docs updates, and verification commands."
-        },
-        {
-          "id": "platform-confidence-pr-readiness-checklist",
-          "title": "PR Readiness Checklist",
-          "source": "Product engineering confidence review 2026-05-13",
-          "est": "1-2h",
-          "priority": "P1",
-          "status": "pending",
-          "notes": "Create a short PR checklist that asks: owning bounded context, user-visible state changed, query keys invalidated, WebSocket events emitted, public/client endpoint exposure, activity log proof, tests for actual read path, and verification commands run. This should operationalize existing rules rather than introduce new bureaucracy."
-        }
-      ]
-    },
-    {
       "id": "sprint-platform-health-wave2-shipping-confidence",
       "name": "Platform Health Wave 2 — Shipping Confidence Spine",
       "hours": "12-20",
@@ -1349,6 +1305,55 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave1-operating-model",
+      "name": "✅ SHIPPED — Platform Health Wave 1 — Operating Model",
+      "hours": "8-12",
+      "rationale": "Create the operating model for future platform work: domains, file placement, feature templates, and PR readiness checks before deeper refactors begin.",
+      "items": [
+        {
+          "id": "platform-org-bounded-context-map",
+          "title": "Bounded Context Ownership Map",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: expanded docs/rules/platform-organization.md into the canonical bounded-context ownership map across workspace command center, client portal, inbox, content pipeline, schema, SEO health, analytics intelligence, brand engine, outcomes/ROI, billing, integrations, and platform foundation. Each context now documents owned routes/modules, API wrappers, hooks, components, tests, docs, events, shared types, and coordination files."
+        },
+        {
+          "id": "platform-org-feature-folder-convention",
+          "title": "Feature Folder Convention Guide",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added the forward-looking placement convention to docs/rules/platform-organization.md. New/touched work should choose context-owned shared types, API wrappers, hooks, components, route adapters, service/domain modules, tests, and docs without triggering repo-wide moves or file-layout churn."
+        },
+        {
+          "id": "platform-confidence-golden-path-templates",
+          "title": "Golden Path Feature Templates",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added docs/workflows/platform-golden-paths.md with templates for admin CRUD, client-visible, background job, AI generation, analytics/intelligence, and approval/inbox features. Templates call out bounded context, shared types, query keys, broadcasts/listeners, activity logging, tests, docs, and verification."
+        },
+        {
+          "id": "platform-confidence-pr-readiness-checklist",
+          "title": "PR Readiness Checklist",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added docs/workflows/pr-readiness-checklist.md and linked it from the feature workflow docs. The checklist operationalizes context ownership, public/client exposure, query invalidation, WebSocket broadcast/listener pairs, activity logging, actual read-path tests, docs, and verification commands."
+        }
+      ],
+      "shippedAt": "2026-05-13"
     },
     {
       "id": "sprint-may-2026",

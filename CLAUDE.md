@@ -274,11 +274,13 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `MONETIZATION.md` | Tiers, pricing, Stripe spec, UX soft-gating |
 | `ACTION_PLAN.md` | Execution roadmap, decision log |
 | `data/roadmap.json` | Sprint tracking — what's done/pending |
-| `docs/PLAN_WRITING_GUIDE.md` | **Writing plans** — parallel agents, model assignments, PR gates, testing, verification |
+| `docs/PLAN_WRITING_GUIDE.md` | **Writing plans** — parallel agents, platform-appropriate model assignments, PR gates, testing, verification |
 | `docs/workflows/use-primitives.md` | When and how to use UI primitives |
 | `docs/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text |
 | `docs/workflows/feature-integration.md` | Connecting features together |
 | `docs/workflows/feature-shipped.md` | 9-step post-ship checklist |
+| `docs/workflows/platform-golden-paths.md` | Golden-path templates for admin CRUD, client-visible, background job, AI generation, analytics, and inbox work |
+| `docs/workflows/pr-readiness-checklist.md` | Pre-PR platform health checklist for context ownership, read paths, broadcasts, logging, tests, and verification |
 | `docs/workflows/wiring-patterns.md` | Adding data sources to chat/strategy/briefs |
 | `docs/workflows/stripe-integration.md` | Payment architecture |
 | `docs/workflows/auth-system.md` | Auth architecture and flows |
@@ -315,7 +317,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 **Before dispatching subagents:** pre-commit shared contracts (types, function signatures, barrel exports, migrations), assign exclusive file ownership per task, and schedule a diff review checkpoint after every batch (git diff, grep duplicates, tsc, full test suite). Dispatch prompts must include app-level context: rate limiters, React Query caches, WS events, current conditional rendering state.
 
-**Every implementation plan must include:** task dependency graph, model assignments (Haiku/Sonnet/Opus), file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), and a verification strategy with specific commands. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
+**Every implementation plan must include:** task dependency graph, platform-appropriate model assignments, file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), and a verification strategy with specific commands. Name the active agent platform in the plan: Codex/OpenAI plans use `GPT-5.4-Mini` for mechanical cleanup, `GPT-5.4` for implementation with local judgment, and `GPT-5.5` for complex cross-context work and review; Claude/Anthropic plans use the corresponding `Haiku`/`Sonnet`/`Opus` ladder. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
 
 ---
 

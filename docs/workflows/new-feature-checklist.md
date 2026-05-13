@@ -10,6 +10,7 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 
 - [ ] **Full-stack scope**: Every backend change needs a matching frontend — new endpoints get UI, new data fields get displayed, new email types get verified, background jobs surface status, webhooks reflect state without hard refresh.
 - [ ] **Bounded-context owner**: Name the owning context from `docs/rules/platform-organization.md` and use it to choose routes, domain modules, API wrappers, hooks, components, tests, and docs.
+- [ ] **Golden-path template**: Pick the closest template from `docs/workflows/platform-golden-paths.md` (admin CRUD, client-visible, background job, AI generation, analytics/intelligence, or approval/inbox) and note any intentional deviations.
 - [ ] **Narrative placement**: If client-facing, where does this fit in the "why, then how" arc? Data → Diagnosis → Plan → Action. See `feature-integration.md` § 3 tab placement guide.
 - [ ] **Identify all data flow points**: Which endpoints read/write the data? Which components display it?
 - [ ] **Check existing patterns**: Review `wiring-patterns.md` for the relevant pattern (chat, strategy, reports, WebSocket, email, etc.)
@@ -38,6 +39,7 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 
 - [ ] **TypeScript build check**: `npx tsc --noEmit` passes with zero errors
 - [ ] **Test both sides**: Verify the change appears in real-time on both admin and client dashboards
+- [ ] **PR readiness pass**: Complete `docs/workflows/pr-readiness-checklist.md` before requesting review
 - [ ] **Update documentation**:
   - `wiring-patterns.md` if a new pattern was introduced
   - `codebase-overview.md` if architecture changed
