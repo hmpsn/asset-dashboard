@@ -21,6 +21,7 @@
  *   which sets the client_session cookie in the test cookie jar.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { WebSocket } from 'ws';
 import { createTestContext } from './helpers.js';
 import {
   createWorkspace,
@@ -35,6 +36,7 @@ import { replaceAllKeywordGaps, deleteAllKeywordGaps } from '../../server/keywor
 import { replaceAllTopicClusters, deleteAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues, deleteAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
@@ -172,6 +174,41 @@ async function listKeywordFeedback(workspaceId: string) {
   const res = await api(`/api/public/keyword-feedback/${workspaceId}`);
   expect(res.status).toBe(200);
   return await res.json() as Array<{ keyword: string; status: string; reason?: string | null; source?: string }>;
+}
+
+async function captureWorkspaceEvent<T>(
+  workspaceId: string,
+  event: string,
+  action: () => Promise<void>,
+): Promise<T> {
+  const socket = new WebSocket(`ws://localhost:${ctx.PORT}/ws`);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    socket.send(JSON.stringify({ action: 'subscribe', workspaceId }));
+
+    const messagePromise = new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${event}`)), 2_000);
+      socket.on('message', raw => {
+        const message = JSON.parse(String(raw)) as { event?: string; workspaceId?: string; data?: T };
+        if (message.event === event && message.workspaceId === workspaceId) {
+          clearTimeout(timer);
+          resolve(message.data as T);
+        }
+      });
+      socket.once('error', err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    await action();
+    return await messagePromise;
+  } finally {
+    socket.close();
+  }
 }
 
 async function listContentGapVotes(workspaceId: string) {
@@ -984,6 +1021,33 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.keyword).toBe('mixedcase keyword');
+  });
+
+  it('broadcasts strategy updates when keyword feedback is deleted', async () => {
+    const keyword = `delete feedback ${Date.now()}`;
+    seedKeywordFeedback(feedbackWsId, [{ keyword, status: 'declined', source: 'content_gap' }]);
+
+    const payload = await captureWorkspaceEvent<{
+      keyword: string;
+      status: string;
+      previousStatus: string;
+      source: string | null;
+    }>(feedbackWsId, WS_EVENTS.STRATEGY_UPDATED, async () => {
+      const res = await api(`/api/public/keyword-feedback/${feedbackWsId}?keyword=${encodeURIComponent(keyword)}`, {
+        method: 'DELETE',
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ deleted: keyword, existed: true });
+    });
+
+    expect(payload).toEqual({
+      keyword,
+      status: 'cleared',
+      previousStatus: 'declined',
+      source: 'content_gap',
+    });
+    expect((await listKeywordFeedback(feedbackWsId)).find(row => row.keyword === keyword)).toBeUndefined();
   });
 });
 
