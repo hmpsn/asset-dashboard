@@ -914,6 +914,15 @@
           "status": "done"
         },
         {
+          "id": 630,
+          "title": "Canonical Page Address Contract — platform-wide slug/path hardening follow-up",
+          "source": "PageSpeed single-page bug + nested Webflow page audit 2026-05-12",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "Follow-up to PR #689 and the earlier slug-path-hardening sprint. We now have multiple confirmed places where bare Webflow leaf slugs can diverge from real published paths (`slug: invisalign`, `publishedPath: /services/invisalign`). Scope: audit remaining page identity call sites; define a single Page Address contract with canonicalPath, canonicalUrl, rawSlug, source, and legacy matching helpers; route all live-page fetch/analyze flows through shared server/frontend helpers; migrate high-risk callers first (single-page PageSpeed, SEO rewrite/page HTML fetches, asset/OG scans, audit-to-editor navigation, client traffic joins); add pr-check/source guards for new `/${slug}` URL construction outside approved helpers. Keep this as platform health hardening only — no UI redesign or new feature surface.",
+          "status": "pending"
+        },
+        {
           "id": 587,
           "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
           "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
