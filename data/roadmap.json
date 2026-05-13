@@ -152,8 +152,9 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "2-3h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Refresh docs/workflows/codebase-overview.md, ownership maps, and related architecture docs after the bounded-context convention lands. Ensure docs describe the current app shape rather than older route counts, retired helpers, or outdated module ownership."
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: refreshed `docs/workflows/codebase-overview.md` with current route, migration, API wrapper, shared type, testing, AI dispatch, and platform-health doc references. Converted `docs/superpowers/MODULE_OWNERSHIP_MAP.md` into a historical pointer so `docs/rules/platform-organization.md` remains the canonical ownership source. Added a current-baseline pointer to `docs/testing-plan.md`."
         }
       ]
     },
@@ -169,8 +170,9 @@
           "source": "Platform test coverage review 2026-05-13",
           "est": "1-2d",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Create a coverage and risk matrix for Auth/workspace boundaries, Billing/Stripe/tier gates, Client Portal/Inbox, Content Pipeline, Schema generation/publish, Background Jobs, AI write paths, external integrations, and broadcast/cache invalidation infrastructure. Record current coverage by domain, identify route files without integration tests, list public/client serialization seams, and set practical per-domain targets: 70-85% lines for critical backend domains, 65-75% branches for auth/billing/state machines, 60-75% workflow coverage for client UI, and E2E smoke for golden paths."
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added `docs/testing/critical-domain-coverage-baseline.md`, `scripts/report-critical-domain-coverage.ts`, `tests/unit/critical-domain-coverage-report.test.ts`, and `npm run verify:coverage-baseline`. The advisory report covers every canonical bounded context with critical surfaces, existing test signals, known gaps, target coverage posture, and recommended next test slices while preserving the current 2026-05-13 global baseline."
         },
         {
           "id": "platform-test-auth-billing-route-contracts",
