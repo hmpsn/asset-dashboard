@@ -114,9 +114,20 @@ export interface CannibalizationItem {
   pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
   severity: 'high' | 'medium' | 'low'; // high = 3+ pages, medium = 2 pages with close positions
   recommendation: string;
+  canonicalPath?: string;
+  canonicalUrl?: string;
+  action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
 }
 
 export type SeoDataMode = 'quick' | 'full' | 'none';
+
+export interface SeoDataStatus {
+  mode: SeoDataMode;
+  provider?: string;
+  status: 'disabled' | 'available' | 'degraded';
+  reasons?: string[];
+  fallbackProviderAvailable?: boolean;
+}
 
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
@@ -152,6 +163,7 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
+  seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
   /** @deprecated use seoDataMode. Kept for strategies generated before provider-neutral naming. */
   semrushMode?: SeoDataMode;
   /** Enriched search signals stored alongside strategy (not included in pageMap). */

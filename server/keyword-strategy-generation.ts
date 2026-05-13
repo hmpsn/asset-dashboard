@@ -172,6 +172,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       relatedKeywords: relatedKws,
       questionKeywords: allQuestionKws,
       competitorKeywords: competitorKeywordData,
+      seoDataStatus,
     } = await fetchAndCacheKeywordStrategySeoData({
       ws,
       provider,
@@ -281,6 +282,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       questionKeywords: allQuestionKws,
       businessContext,
       seoDataMode,
+      seoDataStatus,
       searchData: {
         deviceBreakdown,
         countryBreakdown,

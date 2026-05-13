@@ -12,13 +12,15 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import db from '../../server/db/index.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { listQuickWins, replaceAllQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
-import type { PageKeywordMap } from '../../shared/types/workspace.js';
+import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import type { ContentGap, PageKeywordMap } from '../../shared/types/workspace.js';
 
 const PORT = 13320;
 const ctx = createTestContext(PORT);
@@ -92,6 +94,42 @@ describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', (
     expect(body.generatedAt).toBeNull();
     expect(body.siteKeywords).toEqual([]);
     expect(body.opportunities).toEqual([]);
+  });
+
+  it('falls back to legacy contentGaps stored in the strategy blob when table rows are absent', async () => {
+    const wsId = createWorkspace('Legacy content gaps fallback').id;
+    try {
+      const legacyGaps: ContentGap[] = [
+        {
+          topic: 'legacy seo gap',
+          targetKeyword: 'legacy seo services',
+          intent: 'commercial',
+          priority: 'high',
+          rationale: 'Stored before normalized content gap rows existed.',
+          suggestedPageType: 'service',
+        },
+      ];
+      updateWorkspace(wsId, {
+        keywordStrategy: {
+          siteKeywords: ['seo'],
+          opportunities: [],
+          contentGaps: legacyGaps,
+          generatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      });
+
+      const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.contentGaps).toEqual([
+        expect.objectContaining({
+          topic: 'legacy seo gap',
+          targetKeyword: 'legacy seo services',
+        }),
+      ]);
+    } finally {
+      deleteWorkspace(wsId);
+    }
   });
 });
 
@@ -246,6 +284,9 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
             ],
             severity: 'high',
             recommendation: 'Consolidate overlapping pages.',
+            canonicalPath: '/services',
+            canonicalUrl: 'https://example.com/services',
+            action: 'canonical_tag',
           },
         ],
       }),
@@ -264,6 +305,9 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     expect(issues).toHaveLength(1);
     expect(issues[0].keyword).toBe('seo services');
     expect(issues[0].severity).toBe('high');
+    expect(issues[0].canonicalPath).toBe('/services');
+    expect(issues[0].canonicalUrl).toBe('https://example.com/services');
+    expect(issues[0].action).toBe('canonical_tag');
   });
 
   it('rejects invalid quickWins payload and preserves existing table rows', async () => {
@@ -423,5 +467,179 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     });
     const bumped = await bumpRes.json();
     expect(bumped.generatedAt).not.toBe(originalGeneratedAt);
+  });
+
+  it('strategy persistence rolls back normalized table writes when a later table write fails', () => {
+    const wsId = freshShellWorkspace('Persist atomic rollback');
+    updateWorkspace(wsId, {
+      keywordStrategy: {
+        siteKeywords: ['baseline'],
+        opportunities: ['baseline opportunity'],
+        generatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
+    replaceAllQuickWins(wsId, [
+      { pagePath: '/baseline', action: 'Keep baseline', estimatedImpact: 'medium', rationale: 'Existing data' },
+    ]);
+
+    db.exec(`
+      DROP TRIGGER IF EXISTS strategy_atomic_cannibalization_abort;
+      CREATE TEMP TRIGGER strategy_atomic_cannibalization_abort
+      BEFORE INSERT ON cannibalization_issues
+      WHEN NEW.keyword = 'explode'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced cannibalization failure');
+      END;
+    `);
+
+    try {
+      const ws = getWorkspace(wsId);
+      expect(ws).toBeTruthy();
+      expect(() => persistKeywordStrategy({
+        ws: ws!,
+        strategy: {
+          siteKeywords: ['new strategy'],
+          opportunities: ['new opportunity'],
+          pageMap: [
+            {
+              pagePath: '/services/seo',
+              pageTitle: 'SEO Services',
+              primaryKeyword: 'seo services',
+              secondaryKeywords: ['seo agency'],
+            },
+          ],
+          quickWins: [
+            { pagePath: '/services/seo', action: 'New quick win', estimatedImpact: 'high', rationale: 'Should roll back' },
+          ],
+        },
+        strategyMode: 'full',
+        pagesToAnalyze: [{
+          path: '/services/seo',
+          title: 'SEO Services',
+          seoTitle: 'SEO Services',
+          seoDesc: 'SEO service page',
+          contentSnippet: 'SEO service content',
+        }],
+        siteKeywordMetrics: [],
+        keywordGaps: [],
+        competitorKeywordData: [],
+        topicClusters: [
+          {
+            topic: 'seo services',
+            keywords: ['seo services'],
+            ownedCount: 1,
+            totalCount: 1,
+            coveragePercent: 100,
+            gap: [],
+          },
+        ],
+        cannibalization: [
+          {
+            keyword: 'explode',
+            pages: [{ path: '/services/seo', source: 'keyword_map' }],
+            severity: 'high',
+            recommendation: 'This insert is forced to fail.',
+          },
+        ],
+        questionKeywords: [],
+        businessContext: '',
+        seoDataMode: 'quick',
+        seoDataStatus: { mode: 'quick', provider: 'dataforseo', status: 'degraded', reasons: ['test_failure'] },
+        searchData: {
+          deviceBreakdown: [],
+          countryBreakdown: [],
+          periodComparison: null,
+          organicLandingPages: [],
+          organicOverview: null,
+        },
+      })).toThrow(/forced cannibalization failure/);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS strategy_atomic_cannibalization_abort;');
+    }
+
+    expect(listQuickWins(wsId)).toEqual([
+      expect.objectContaining({ pagePath: '/baseline', action: 'Keep baseline' }),
+    ]);
+    expect(listTopicClusters(wsId)).toEqual([]);
+    expect(listCannibalizationIssues(wsId)).toEqual([]);
+    expect(getWorkspace(wsId)?.keywordStrategy?.siteKeywords).toEqual(['baseline']);
+  });
+
+  it('strategy persistence rolls back when outcome tracking cannot be recorded', () => {
+    const wsId = freshShellWorkspace('Persist outcome rollback');
+    updateWorkspace(wsId, {
+      keywordStrategy: {
+        siteKeywords: ['baseline'],
+        opportunities: ['baseline opportunity'],
+        generatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
+    replaceAllQuickWins(wsId, [
+      { pagePath: '/baseline', action: 'Keep baseline', estimatedImpact: 'medium', rationale: 'Existing data' },
+    ]);
+
+    db.exec(`
+      DROP TRIGGER IF EXISTS strategy_atomic_outcome_abort;
+      CREATE TEMP TRIGGER strategy_atomic_outcome_abort
+      BEFORE INSERT ON tracked_actions
+      WHEN NEW.action_type = 'strategy_keyword_added'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced outcome failure');
+      END;
+    `);
+
+    try {
+      const ws = getWorkspace(wsId);
+      expect(ws).toBeTruthy();
+      expect(() => persistKeywordStrategy({
+        ws: ws!,
+        strategy: {
+          siteKeywords: ['new strategy'],
+          opportunities: ['new opportunity'],
+          pageMap: [
+            {
+              pagePath: '/services/seo',
+              pageTitle: 'SEO Services',
+              primaryKeyword: 'seo services',
+              secondaryKeywords: ['seo agency'],
+            },
+          ],
+          quickWins: [
+            { pagePath: '/services/seo', action: 'New quick win', estimatedImpact: 'high', rationale: 'Should roll back' },
+          ],
+        },
+        strategyMode: 'full',
+        pagesToAnalyze: [{
+          path: '/services/seo',
+          title: 'SEO Services',
+          seoTitle: 'SEO Services',
+          seoDesc: 'SEO service page',
+          contentSnippet: 'SEO service content',
+        }],
+        siteKeywordMetrics: [],
+        keywordGaps: [],
+        competitorKeywordData: [],
+        topicClusters: [],
+        cannibalization: [],
+        questionKeywords: [],
+        businessContext: '',
+        seoDataMode: 'quick',
+        seoDataStatus: { mode: 'quick', provider: 'dataforseo', status: 'degraded', reasons: ['test_failure'] },
+        searchData: {
+          deviceBreakdown: [],
+          countryBreakdown: [],
+          periodComparison: null,
+          organicLandingPages: [],
+          organicOverview: null,
+        },
+      })).toThrow(/forced outcome failure/);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS strategy_atomic_outcome_abort;');
+    }
+
+    expect(listQuickWins(wsId)).toEqual([
+      expect.objectContaining({ pagePath: '/baseline', action: 'Keep baseline' }),
+    ]);
+    expect(getWorkspace(wsId)?.keywordStrategy?.siteKeywords).toEqual(['baseline']);
   });
 });

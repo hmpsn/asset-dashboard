@@ -100,6 +100,41 @@ describe('keywordStrategySchema', () => {
     expect((result as any).quickWins).toBeDefined();
   });
 
+  it('keeps strategy provider status and cannibalization metadata in schema shape', () => {
+    const data = {
+      siteKeywords: ['seo'],
+      opportunities: [],
+      seoDataStatus: {
+        mode: 'full',
+        provider: 'dataforseo',
+        status: 'degraded',
+        reasons: ['provider_returned_no_keyword_data'],
+        fallbackProviderAvailable: true,
+      },
+      cannibalization: [
+        {
+          keyword: 'seo services',
+          pages: [{ path: '/services', source: 'keyword_map' }],
+          severity: 'high',
+          recommendation: 'Set a canonical target.',
+          canonicalPath: '/services',
+          canonicalUrl: 'https://example.com/services',
+          action: 'canonical_tag',
+        },
+      ],
+    };
+    const result = parseJsonSafe(JSON.stringify(data), keywordStrategySchema, fallback);
+    expect((result as any).seoDataStatus).toEqual(expect.objectContaining({
+      status: 'degraded',
+      fallbackProviderAvailable: true,
+    }));
+    expect((result as any).cannibalization?.[0]).toEqual(expect.objectContaining({
+      canonicalPath: '/services',
+      canonicalUrl: 'https://example.com/services',
+      action: 'canonical_tag',
+    }));
+  });
+
   it('keeps extended PageKeywordMap optional fields in schema shape', () => {
     const map = {
       pagePath: '/services/seo',

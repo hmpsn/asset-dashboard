@@ -19,6 +19,9 @@ interface CannibalizationIssueRow {
   pages_json: string;
   severity: string;
   recommendation: string;
+  canonical_path: string | null;
+  canonical_url: string | null;
+  action: string | null;
 }
 
 function nonEmptyString(value: unknown): string | undefined {
@@ -38,6 +41,7 @@ const pageSchema = z.object({
 });
 
 type CannibalizationPage = z.infer<typeof pageSchema>;
+const actionValues: NonNullable<CannibalizationItem['action']>[] = ['canonical_tag', 'redirect_301', 'differentiate', 'noindex'];
 
 function normalizePage(raw: unknown): CannibalizationPage | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -72,19 +76,28 @@ export function normalizeCannibalizationIssue(raw: unknown): CannibalizationItem
       .filter((page): page is CannibalizationPage => page != null)
     : [];
   if (!keyword || !severity || !recommendation || pages.length === 0) return null;
-  return {
+  const issue: CannibalizationItem = {
     keyword,
     pages,
     severity,
     recommendation,
   };
+  const canonicalPath = nonEmptyString(candidate.canonicalPath);
+  const canonicalUrl = nonEmptyString(candidate.canonicalUrl);
+  const action = typeof candidate.action === 'string' && (actionValues as readonly string[]).includes(candidate.action)
+    ? candidate.action as CannibalizationItem['action']
+    : undefined;
+  if (canonicalPath) issue.canonicalPath = canonicalPath;
+  if (canonicalUrl) issue.canonicalUrl = canonicalUrl;
+  if (action) issue.action = action;
+  return issue;
 }
 
 function rowToModel(row: CannibalizationIssueRow): CannibalizationItem {
   const severity = row.severity === 'high' || row.severity === 'medium' || row.severity === 'low'
     ? row.severity
     : 'medium';
-  return {
+  const issue: CannibalizationItem = {
     keyword: row.keyword,
     pages: parseJsonSafeArray(row.pages_json, pageSchema, {
       table: 'cannibalization_issues',
@@ -93,6 +106,12 @@ function rowToModel(row: CannibalizationIssueRow): CannibalizationItem {
     severity,
     recommendation: row.recommendation,
   };
+  if (row.canonical_path) issue.canonicalPath = row.canonical_path;
+  if (row.canonical_url) issue.canonicalUrl = row.canonical_url;
+  if (row.action && (actionValues as readonly string[]).includes(row.action)) {
+    issue.action = row.action as CannibalizationItem['action'];
+  }
+  return issue;
 }
 
 function modelToParams(workspaceId: string, issue: CannibalizationItem) {
@@ -102,6 +121,9 @@ function modelToParams(workspaceId: string, issue: CannibalizationItem) {
     pages_json: JSON.stringify(issue.pages),
     severity: issue.severity,
     recommendation: issue.recommendation,
+    canonical_path: issue.canonicalPath ?? null,
+    canonical_url: issue.canonicalUrl ?? null,
+    action: issue.action ?? null,
   };
 }
 
@@ -125,9 +147,11 @@ const stmts = createStmtCache(() => ({
   ),
   insert: db.prepare(`
     INSERT INTO cannibalization_issues (
-      workspace_id, keyword, pages_json, severity, recommendation
+      workspace_id, keyword, pages_json, severity, recommendation,
+      canonical_path, canonical_url, action
     ) VALUES (
-      @workspace_id, @keyword, @pages_json, @severity, @recommendation
+      @workspace_id, @keyword, @pages_json, @severity, @recommendation,
+      @canonical_path, @canonical_url, @action
     )
   `),
   deleteAll: db.prepare<[workspaceId: string]>(

@@ -449,7 +449,6 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
-// broadcast-ok: keyword feedback is internal strategy input, not live workspace content; local UI updates optimistically.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -488,6 +487,12 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   }
 
   log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    keyword,
+    status: 'cleared',
+    previousStatus: existing.status,
+    source: existing.source,
+  });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${existing.status})`, 'Via client portal');
   res.json({ deleted: keyword, existed: true });

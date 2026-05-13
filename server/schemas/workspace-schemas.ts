@@ -101,7 +101,40 @@ export const keywordStrategySchema = z.object({
     volume: z.number(),
     difficulty: z.number(),
   })).optional(),
+  topicClusters: z.array(z.object({
+    topic: z.string(),
+    keywords: z.array(z.string()),
+    ownedCount: z.number(),
+    totalCount: z.number(),
+    coveragePercent: z.number(),
+    avgPosition: z.number().optional(),
+    topCompetitor: z.string().optional(),
+    topCompetitorCoverage: z.number().optional(),
+    gap: z.array(z.string()),
+  }).passthrough()).optional(),
+  cannibalization: z.array(z.object({
+    keyword: z.string(),
+    pages: z.array(z.object({
+      path: z.string(),
+      position: z.number().optional(),
+      impressions: z.number().optional(),
+      clicks: z.number().optional(),
+      source: z.enum(['keyword_map', 'gsc']),
+    }).passthrough()),
+    severity: z.enum(['high', 'medium', 'low']),
+    recommendation: z.string(),
+    canonicalPath: z.string().optional(),
+    canonicalUrl: z.string().optional(),
+    action: z.enum(['canonical_tag', 'redirect_301', 'differentiate', 'noindex']).optional(),
+  }).passthrough()).optional(),
   generatedAt: z.string().optional(),
+  seoDataStatus: z.object({
+    mode: z.enum(['quick', 'full', 'none']),
+    provider: z.string().optional(),
+    status: z.enum(['disabled', 'available', 'degraded']),
+    reasons: z.array(z.string()).optional(),
+    fallbackProviderAvailable: z.boolean().optional(),
+  }).passthrough().optional(),
 }).passthrough();
 
 // ── Personas ──
