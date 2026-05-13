@@ -302,7 +302,12 @@ function serviceTypeFromTitleCandidate(candidate: string | undefined): string | 
   if (!cleaned) return undefined;
   // Slug-like values should not outrank the dedicated slug cleaner.
   if (cleaned.includes('-') && !cleaned.includes(' ')) return undefined;
-  const withoutPrefix = cleaned
+  const withoutSeoSuffix = cleaned.split(/\s+\|\s+/)[0]?.trim() || cleaned;
+  const withoutProviderContext = withoutSeoSuffix
+    .replace(/\s+at\s+[^|–—-]*(?:dental|dentist|studio|clinic|company|co\.?|llc|inc\.?|group|partners|agency|medical|health|orthodontics?|smiles?)\b.*$/i, '')
+    .replace(/\s+[–—-]\s+[^|–—-]*(?:dental|dentist|studio|clinic|company|co\.?|llc|inc\.?|group|partners|agency|medical|health|orthodontics?|smiles?)\b.*$/i, '')
+    .trim();
+  const withoutPrefix = (withoutProviderContext || withoutSeoSuffix)
     .replace(/^[A-Za-z0-9&'’.-]{2,30}\s+services?\s+/i, '')
     .replace(/^services?\s+/i, '')
     .trim();
@@ -422,14 +427,14 @@ export function extractPageData(input: ExtractInput): PageData {
   // Derive Service.areaServed + LocalBusiness.areaServed from BusinessProfile address.
   const areaServed = formatAreaServed(input.workspace.businessProfile?.address);
 
-  // Derive Service.serviceType from mapped profile (authoritative), then visible/CMS title, then cleaned slug.
+  // Derive Service labels from mapped profile (authoritative), then visible/CMS title, then cleaned slug.
   const slug = leafSlug(input.pageMeta.publishedPath);
-  const serviceType = input.pageMeta.serviceProfile?.serviceType
-    || serviceTypeFromTitleCandidate(input.pageMeta.serviceProfile?.serviceName)
+  const derivedServiceLabel = serviceTypeFromTitleCandidate(input.pageMeta.serviceProfile?.serviceName)
     || serviceTypeFromTitleCandidate(cleanTitle)
     || serviceTypeFromTitleCandidate(title)
     || (slug ? cleanServiceSlug(slug, input.workspace.name) || capitalizeSlugSegment(slug) : undefined);
-  const serviceName = input.pageMeta.serviceProfile?.serviceName;
+  const serviceType = input.pageMeta.serviceProfile?.serviceType || derivedServiceLabel;
+  const serviceName = input.pageMeta.serviceProfile?.serviceName || derivedServiceLabel;
   const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
 
   return {
