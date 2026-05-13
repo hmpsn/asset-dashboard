@@ -4,7 +4,7 @@ description: Golden-path implementation templates for the platform's most common
 
 # Platform Golden Paths
 
-Use these templates when scoping a new feature or substantial enhancement. Each feature must name one owning bounded context from `docs/rules/platform-organization.md`, then wire shared contracts, routes, hooks, invalidation, and tests inside that context.
+Use these templates when scoping a new feature or substantial enhancement. Each feature must name one owning bounded context from `docs/rules/platform-organization.md`, check the context's surfaces in `docs/rules/platform-integration-surfaces.md`, then wire shared contracts, routes, hooks, invalidation, and tests inside that context. Before closeout, confirm the matching gates in `docs/workflows/feature-class-definition-of-done.md`.
 
 ## How to use this doc
 

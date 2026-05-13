@@ -37,6 +37,12 @@ Every meaningful feature should name one primary owner from this list:
 
 Cross-context work must still declare one primary owner plus secondary integrations.
 
+Related confidence maps:
+
+- `docs/rules/platform-integration-surfaces.md` names the external APIs, DB/storage, AI calls, jobs, events, query keys, surfaces, public endpoints, and activity types that tend to break together by context.
+- `docs/testing/platform-domain-smoke-matrix.md` names the fast smoke signal for each context.
+- `docs/workflows/feature-class-definition-of-done.md` lists completion gates by feature class.
+
 ## Shared Coordination Files
 
 These files are shared coordination points, not context-owned implementation homes:
