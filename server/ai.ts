@@ -34,6 +34,8 @@ export interface AICallOptions {
   signal?: AbortSignal;
   /** OpenAI-only structured response mode. */
   responseFormat?: { type: 'json_object' };
+  /** Adds factual-grounding instructions for research-heavy outputs. */
+  researchMode?: boolean;
 }
 
 export interface AICallResult {
@@ -41,17 +43,30 @@ export interface AICallResult {
   tokens: { prompt: number; completion: number; total: number };
 }
 
+export const RESEARCH_MODE_INSTRUCTIONS = `RESEARCH MODE:
+- Make factual claims only when they are supported by the provided context.
+- If the context does not contain enough evidence, say what is missing instead of guessing.
+- Do not invent statistics, quotes, citations, studies, client results, publication names, or source URLs.
+- When using supplied source material, preserve source names and direct evidence accurately.
+- Prefer cautious, verifiable wording over confident claims when evidence is partial.`;
+
+function applyResearchMode(system: string | undefined, enabled: boolean | undefined): string | undefined {
+  if (!enabled) return system;
+  return [system, RESEARCH_MODE_INSTRUCTIONS].filter(Boolean).join('\n\n');
+}
+
 /**
  * Call an AI model through the unified interface.
  * Dispatches to OpenAI or Anthropic based on opts.provider.
  */
 export async function callAI(opts: AICallOptions): Promise<AICallResult> {
-  const { provider = 'openai', system, messages, ...rest } = opts;
+  const { provider = 'openai', system, messages, researchMode, ...rest } = opts;
+  const effectiveSystem = applyResearchMode(system, researchMode);
 
   if (provider === 'anthropic') {
     const result = await callAnthropic({
       model: rest.model as Parameters<typeof callAnthropic>[0]['model'],
-      system,
+      system: effectiveSystem,
       messages,
       maxTokens: rest.maxTokens,
       temperature: rest.temperature,
@@ -69,7 +84,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
 
   // OpenAI: inject system message as first message
   const openaiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-  if (system) openaiMessages.push({ role: 'system', content: system });
+  if (effectiveSystem) openaiMessages.push({ role: 'system', content: effectiveSystem });
   openaiMessages.push(...messages);
 
   const result = await callOpenAI({

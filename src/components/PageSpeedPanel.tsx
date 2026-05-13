@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Gauge, Smartphone, Monitor, ChevronDown, ChevronRight,
   Zap, AlertTriangle, Info,
@@ -131,6 +131,8 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
   const [selectedPage, setSelectedPage] = useState<string>('');
   const [singleResult, setSingleResult] = useState<PageSpeedResult | null>(null);
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const bulkRunInFlightRef = useRef(false);
+  const bulkRunVersionRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,18 +144,31 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
         if (list.length > 0) setSelectedPage(list[0].id);
       })
       .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
-    // Load last saved bulk PageSpeed snapshot
-    pageWeight.pagespeedSnapshot(siteId, workspaceId)
-      .then(snap => {
-        if (cancelled) return;
-        const s = snap as { result?: SiteSpeedResult } | null;
-        if (s?.result) { setData(s.result); setHasRun(true); }
-      })
-      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId, workspaceId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const snapshotVersion = bulkRunVersionRef.current;
+    pageWeight.pagespeedSnapshot(siteId, workspaceId, strategy)
+      .then(snap => {
+        if (cancelled || bulkRunInFlightRef.current || snapshotVersion !== bulkRunVersionRef.current) return;
+        const s = snap as { result?: SiteSpeedResult } | null;
+        if (s?.result) {
+          setData(s.result);
+          setHasRun(true);
+        } else {
+          setData(null);
+          setHasRun(false);
+        }
+      })
+      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
+    return () => { cancelled = true; };
+  }, [siteId, workspaceId, strategy]);
+
   const runBulkTest = (strat: 'mobile' | 'desktop') => {
+    bulkRunInFlightRef.current = true;
+    bulkRunVersionRef.current += 1;
     setLoading(true);
     setHasRun(true);
     setStrategy(strat);
@@ -166,9 +181,13 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
         if (result.error) { setError(result.error); return; }
         if ((result as { pages?: unknown[] }).pages?.length === 0) { setError('No pages could be tested. The Google PageSpeed API may be rate-limited. Add a GOOGLE_PSI_KEY env variable for higher limits.'); return; }
         setData(result);
+        setHasRun(true);
       })
       .catch(e => setError(e instanceof Error ? e.message : 'PageSpeed analysis failed'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        bulkRunInFlightRef.current = false;
+        setLoading(false);
+      });
   };
 
   const runSingleTest = (strat: 'mobile' | 'desktop') => {

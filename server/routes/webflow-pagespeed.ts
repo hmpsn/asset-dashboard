@@ -13,14 +13,18 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-pagespeed');
 
+function parseStrategy(value: unknown): 'mobile' | 'desktop' {
+  return value === 'desktop' ? 'desktop' : 'mobile';
+}
+
 // --- PageSpeed / Core Web Vitals ---
 router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
-    const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
+    const strategy = parseStrategy(req.query.strategy);
     const maxPages = parseInt(req.query.maxPages as string) || 5;
     const psWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
-    savePageSpeed(req.params.siteId, result);
+    savePageSpeed(req.params.siteId, strategy, result);
     res.json(result);
   } catch (err) {
     log.error({ err: err }, 'PageSpeed error');
@@ -30,7 +34,7 @@ router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery
 
 // Load last saved PageSpeed snapshot
 router.get('/api/webflow/pagespeed-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
-  const snapshot = getPageSpeed(req.params.siteId);
+  const snapshot = getPageSpeed(req.params.siteId, parseStrategy(req.query.strategy));
   res.json(snapshot);
 });
 

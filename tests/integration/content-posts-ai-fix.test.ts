@@ -92,7 +92,7 @@ beforeAll(async () => {
       {
         index: 0,
         heading: 'Section One',
-        content: '<p>Section one content here.</p>',
+        content: '<p>Section one content here. Revenue grew 42%.</p>',
         wordCount: 5,
         targetWordCount: 100,
         keywords: [],
@@ -349,14 +349,16 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
     expect(res.status).toBe(200);
     const body = await res.json() as {
-      review: Record<string, { pass: boolean; reason: string; humanReviewRequired?: boolean }>;
+      review: Record<string, { pass: boolean; reason: string; humanReviewRequired?: boolean; claimsToVerify?: string[] }>;
     };
 
     expect(body.review.factual_accuracy.pass).toBe(false);
     expect(body.review.factual_accuracy.humanReviewRequired).toBe(true);
     expect(body.review.factual_accuracy.reason).toMatch(/Human verification is required/);
+    expect(body.review.factual_accuracy.claimsToVerify).toContain('Revenue grew 42%.');
     expect(body.review.no_hallucinations.pass).toBe(false);
     expect(body.review.no_hallucinations.humanReviewRequired).toBe(true);
+    expect(body.review.no_hallucinations.claimsToVerify).toContain('Revenue grew 42%.');
     expect(body.review.brand_voice.pass).toBe(true);
     expect(body.review.internal_links.pass).toBe(true);
     expect(body.review.factual_accuracy).not.toHaveProperty('confidence');

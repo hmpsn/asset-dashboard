@@ -115,6 +115,7 @@ export interface AIReviewResult {
   pass: boolean;
   reason: string;
   humanReviewRequired?: boolean;
+  claimsToVerify?: string[];
 }
 
 /**

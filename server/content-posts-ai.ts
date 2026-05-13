@@ -59,6 +59,8 @@ export async function callCreativeAI(opts: {
    * strip markdown code fences from the returned text. Defaults to false.
    */
   json?: boolean;
+  /** Adds factual-grounding instructions for evidence-sensitive generation. */
+  researchMode?: boolean;
   /** Optional caller cancellation signal. */
   signal?: AbortSignal;
 }): Promise<string> {
@@ -84,6 +86,7 @@ export async function callCreativeAI(opts: {
         workspaceId,
         maxRetries: 3,      // patient retries — quality over speed
         timeoutMs: 90_000,
+        researchMode: opts.researchMode,
         signal: opts.signal,
       });
       log.info(`[${feature}] Generated with Claude`);
@@ -103,6 +106,7 @@ export async function callCreativeAI(opts: {
     temperature,
     feature,
     workspaceId,
+    researchMode: opts.researchMode,
     signal: opts.signal,
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
@@ -237,6 +241,14 @@ export function buildBriefContextBlock(brief: ContentBrief, siteDomain?: string)
     parts.push(`CONTENT STRATEGY CONTEXT: ${brief.executiveSummary}`);
   }
 
+  if (brief.realPeopleAlsoAsk?.length) {
+    parts.push(`OBSERVED PEOPLE ALSO ASK QUESTIONS (from live SERP data — answer these when relevant, but do not invent source details):\n${brief.realPeopleAlsoAsk.map((q, i) => `${i + 1}. ${q}`).join('\n')}`);
+  }
+
+  if (brief.realTopResults?.length) {
+    parts.push(`OBSERVED TOP SEARCH RESULTS (from live SERP data — use as competitive context, not as citation proof unless source content is provided):\n${brief.realTopResults.map(r => `${r.position}. ${r.title} — ${r.url}`).join('\n')}`);
+  }
+
   if (brief.peopleAlsoAsk?.length) {
     parts.push(`QUESTIONS TO ANSWER (from "People Also Ask" — weave answers naturally into the content):\n${brief.peopleAlsoAsk.map((q, i) => `${i + 1}. ${q}`).join('\n')}`);
   }
@@ -340,6 +352,7 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     maxTokens: 600,
     feature: 'content-post-intro',
     workspaceId,
+    researchMode: true,
     signal: options.signal,
   });
 }
@@ -432,6 +445,7 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     maxTokens: Math.max(800, sectionTarget * 2),
     feature: 'content-post-section',
     workspaceId,
+    researchMode: true,
     signal: options.signal,
   });
 }
@@ -492,6 +506,7 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     maxTokens: 800,
     feature: 'content-post-conclusion',
     workspaceId,
+    researchMode: true,
     signal: options.signal,
   });
 }
@@ -678,6 +693,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     feature: 'content-post-unify',
     workspaceId,
     json: true,
+    researchMode: true,
     signal: options.signal,
   });
 
