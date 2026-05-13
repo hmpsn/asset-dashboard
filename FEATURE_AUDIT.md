@@ -5358,6 +5358,8 @@ Bug hardening included:
 
 **Files:** `server/db/migrations/089-topic-clusters.sql`; `server/topic-clusters.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/topic-clusters.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
 
+**May 2026 integrity hardening:** Public `/api/public/seo-strategy/:workspaceId` now reassembles `topicClusters` from `topic_clusters` with legacy blob fallback, including shell-state responses when normalized strategy rows exist without a workspace strategy blob. Strategy persistence and manual strategy PATCH writes now run table replacements under one transaction so topic-cluster rows cannot land in a mixed-generation state if a later normalized write fails.
+
 ### 396. Hardening Sprint — Cannibalization Table Normalization
 **What it does:** Normalizes `keywordStrategy.cannibalization[]` into a dedicated `cannibalization_issues` SQLite table and updates strategy read/write paths to use table-backed cannibalization issues.
 
@@ -5387,6 +5389,8 @@ Bug hardening included:
 **Mutual:** Adds direct unit coverage for cannibalization table CRUD + blob migration, plus integration coverage for shell-state patch/validation behavior.
 
 **Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
+
+**May 2026 integrity hardening:** Cannibalization issues now preserve reviewer-facing `canonicalPath`, `canonicalUrl`, and `action` metadata through migration `094-cannibalization-action-metadata.sql`, shared types, storage mappers, admin reads, public strategy serialization, and history snapshots. Public strategy reads now include table-backed cannibalization data with shell-state parity, feedback delete broadcasts `STRATEGY_UPDATED`, and provider-grounding status is stored on generated strategies when SEO provider data is degraded or unavailable.
 
 ### 397. Hardening Sprint — Per-Feature Usage Budget Split
 **What it does:** Splits the previously shared `strategy_generations` monthly budget into dedicated feature pools so different AI workflows no longer cannibalize each other.

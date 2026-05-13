@@ -306,6 +306,9 @@ const patchStrategySchema = z.object({
     }).strict()),
     severity: z.union([z.literal('high'), z.literal('medium'), z.literal('low')]),
     recommendation: z.string(),
+    canonicalPath: z.string().optional(),
+    canonicalUrl: z.string().optional(),
+    action: z.union([z.literal('canonical_tag'), z.literal('redirect_301'), z.literal('differentiate'), z.literal('noindex')]).optional(),
   }).strict()).optional(),
   opportunities: z.array(z.string()).optional(),
 }).strict();
@@ -313,87 +316,88 @@ const patchStrategySchema = z.object({
 router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(patchStrategySchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  // If pageMap is being updated, save to dedicated table
-  if (req.body.pageMap) {
-    upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
-    // Bridge #5: page keywords replaced — invalidate page caches
+  let pageMapChanged = false;
+  const applyPatch = db.transaction(() => {
+    if (req.body.pageMap) {
+      pageMapChanged = true;
+      upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
+    }
+    if (Array.isArray(req.body.contentGaps)) {
+      replaceAllContentGaps(ws.id, req.body.contentGaps as ContentGap[]);
+    }
+    if (Array.isArray(req.body.quickWins)) {
+      replaceAllQuickWins(ws.id, req.body.quickWins as QuickWin[]);
+    }
+    if (Array.isArray(req.body.keywordGaps)) {
+      replaceAllKeywordGaps(ws.id, req.body.keywordGaps as KeywordGapItem[]);
+    }
+    if (Array.isArray(req.body.topicClusters)) {
+      replaceAllTopicClusters(ws.id, req.body.topicClusters as TopicCluster[]);
+    }
+    if (Array.isArray(req.body.cannibalization)) {
+      replaceAllCannibalizationIssues(ws.id, req.body.cannibalization as CannibalizationItem[]);
+    }
+
+    // Guard: table-backed-only edits must not fabricate a strategy blob.
+    const {
+      pageMap: _pm,
+      contentGaps: _cg,
+      quickWins: _qw,
+      keywordGaps: _kg,
+      topicClusters: _tc,
+      cannibalization: _ci,
+      ...rest
+    } = req.body;
+    const hasBlobFields = Object.keys(rest).length > 0;
+    const blobExists = ws.keywordStrategy != null;
+    let updated: KeywordStrategy | null = null;
+    if (hasBlobFields || blobExists) {
+      const preservedGeneratedAt = blobExists && !hasBlobFields
+        ? ws.keywordStrategy?.generatedAt
+        : undefined;
+      updated = {
+        ...(ws.keywordStrategy || {}),
+        ...rest,
+        generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
+      } as KeywordStrategy;
+      delete (updated as { contentGaps?: unknown }).contentGaps;
+      delete (updated as { quickWins?: unknown }).quickWins;
+      delete (updated as { keywordGaps?: unknown }).keywordGaps;
+      delete (updated as { topicClusters?: unknown }).topicClusters;
+      delete (updated as { cannibalization?: unknown }).cannibalization;
+      updateWorkspace(ws.id, { keywordStrategy: updated });
+    }
+
+    return {
+      updated,
+      responsePageMap: listPageKeywords(ws.id),
+      responseContentGaps: listContentGaps(ws.id),
+      responseQuickWins: listQuickWins(ws.id),
+      responseKeywordGaps: listKeywordGaps(ws.id),
+      responseTopicClusters: listTopicClusters(ws.id),
+      responseCannibalization: listCannibalizationIssues(ws.id),
+    };
+  });
+  const {
+    updated,
+    responsePageMap,
+    responseContentGaps,
+    responseQuickWins,
+    responseKeywordGaps,
+    responseTopicClusters,
+    responseCannibalization,
+  } = applyPatch();
+  if (pageMapChanged) {
     debouncedPageAnalysisInvalidate(ws.id, () => {
       invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
     });
   }
-  // If contentGaps is being updated, save to dedicated table (replace-all
-  // semantics — same as the strategy generation write path).
-  if (Array.isArray(req.body.contentGaps)) {
-    replaceAllContentGaps(ws.id, req.body.contentGaps as ContentGap[]);
-  }
-  // If quickWins is being updated, save to dedicated table (replace-all semantics).
-  if (Array.isArray(req.body.quickWins)) {
-    replaceAllQuickWins(ws.id, req.body.quickWins as QuickWin[]);
-  }
-  // If keywordGaps is being updated, save to dedicated table (replace-all semantics).
-  if (Array.isArray(req.body.keywordGaps)) {
-    replaceAllKeywordGaps(ws.id, req.body.keywordGaps as KeywordGapItem[]);
-  }
-  // If topicClusters is being updated, save to dedicated table (replace-all semantics).
-  if (Array.isArray(req.body.topicClusters)) {
-    replaceAllTopicClusters(ws.id, req.body.topicClusters as TopicCluster[]);
-  }
-  // If cannibalization is being updated, save to dedicated table (replace-all semantics).
-  if (Array.isArray(req.body.cannibalization)) {
-    replaceAllCannibalizationIssues(ws.id, req.body.cannibalization as CannibalizationItem[]);
-  }
-  // Save non-pageMap, non-contentGaps fields to workspace blob.
-  // Guard: if the workspace has no existing strategy blob AND the patch only updates
-  // table-backed fields (pageMap/contentGaps/quickWins/keywordGaps/topicClusters/cannibalization), don't silently fabricate a
-  // blob with just a timestamp — that would promote a shell-state workspace to a
-  // "real" strategy without any AI-generated content. This matters for callers
-  // like PageIntelligence that only patch pageMap.
-  const {
-    pageMap: _pm,
-    contentGaps: _cg,
-    quickWins: _qw,
-    keywordGaps: _kg,
-    topicClusters: _tc,
-    cannibalization: _ci,
-    ...rest
-  } = req.body;
-  const hasBlobFields = Object.keys(rest).length > 0;
-  const blobExists = ws.keywordStrategy != null;
-  let updated: KeywordStrategy | null = null;
-  if (hasBlobFields || blobExists) {
-    // Only bump generatedAt when strategy-level fields change. A pure-pageMap or
-    // pure-contentGaps patch on an existing blob should preserve the original
-    // generation timestamp — otherwise the KeywordStrategy panel misleadingly
-    // shows "Generated [today]" for every per-page or per-gap edit.
-    const preservedGeneratedAt = blobExists && !hasBlobFields
-      ? ws.keywordStrategy?.generatedAt
-      : undefined;
-    updated = {
-      ...(ws.keywordStrategy || {}),
-      ...rest,
-      generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
-    } as KeywordStrategy;
-    // Strip any stray table-backed fields from the merged blob — the tables are
-    // the source of truth post-normalization.
-    delete (updated as { contentGaps?: unknown }).contentGaps;
-    delete (updated as { quickWins?: unknown }).quickWins;
-    delete (updated as { keywordGaps?: unknown }).keywordGaps;
-    delete (updated as { topicClusters?: unknown }).topicClusters;
-    delete (updated as { cannibalization?: unknown }).cannibalization;
-    updateWorkspace(ws.id, { keywordStrategy: updated });
-  }
   invalidateIntelligenceCache(ws.id);
   // Broadcast strategy update so other surfaces (PageIntelligence, SeoEditor, other tabs)
   // invalidate their React Query caches. Without this, pageMap edits from PageIntelligence
   // leave KeywordStrategy/SeoEditor showing stale pageMap until staleTime expires.
-  const responsePageMap = listPageKeywords(ws.id);
-  const responseContentGaps = listContentGaps(ws.id);
-  const responseQuickWins = listQuickWins(ws.id);
-  const responseKeywordGaps = listKeywordGaps(ws.id);
-  const responseTopicClusters = listTopicClusters(ws.id);
-  const responseCannibalization = listCannibalizationIssues(ws.id);
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: responsePageMap.length,
     siteKeywords: updated?.siteKeywords?.length ?? 0,
@@ -505,12 +509,18 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
 });
 
 // Delete feedback (un-decline a keyword)
-// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
 router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
-  db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);
+  const removeFeedback = db.transaction(() => {
+    const existing = db.prepare('SELECT keyword, status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, kw) as { keyword: string; status: string; source: string | null } | undefined; // txn-ok: read-before-delete and delete are enclosed by removeFeedback transaction
+    db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);
+    return existing;
+  });
+  const existing = removeFeedback();
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status: 'cleared', previousStatus: existing?.status ?? null, source: existing?.source ?? null });
   res.json({ deleted: kw });
 });
 

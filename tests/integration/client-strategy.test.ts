@@ -32,8 +32,10 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { replaceAllContentGaps, deleteAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllQuickWins, deleteAllQuickWins } from '../../server/quick-wins.js';
 import { replaceAllKeywordGaps, deleteAllKeywordGaps } from '../../server/keyword-gaps.js';
+import { replaceAllTopicClusters, deleteAllTopicClusters } from '../../server/topic-clusters.js';
+import { replaceAllCannibalizationIssues, deleteAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
-import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap } from '../../shared/types/workspace.js';
+import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
 
@@ -99,6 +101,33 @@ function buildStrategy(overrides?: Partial<KeywordStrategy>): KeywordStrategy {
       { keyword: 'seo audit tool', volume: 2400, difficulty: 48, competitorPosition: 3, competitorDomain: 'competitor.com' },
       { keyword: 'website analytics dashboard', volume: 1800, difficulty: 42, competitorPosition: 7, competitorDomain: 'rival.io' },
     ],
+    topicClusters: [
+      {
+        topic: 'technical seo',
+        keywords: ['technical seo', 'site audit', 'crawlability'],
+        ownedCount: 1,
+        totalCount: 3,
+        coveragePercent: 33,
+        avgPosition: 12,
+        topCompetitor: 'competitor.com',
+        topCompetitorCoverage: 67,
+        gap: ['crawlability'],
+      },
+    ] as TopicCluster[],
+    cannibalization: [
+      {
+        keyword: 'seo services',
+        pages: [
+          { path: '/services', position: 8, source: 'keyword_map' },
+          { path: '/seo-services', position: 10, source: 'gsc' },
+        ],
+        severity: 'high',
+        recommendation: 'Use the services page as the canonical target.',
+        canonicalPath: '/services',
+        canonicalUrl: 'https://example.com/services',
+        action: 'canonical_tag',
+      },
+    ] as CannibalizationItem[],
     generatedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -167,6 +196,8 @@ beforeAll(async () => {
     contentGaps: stratContentGaps,
     quickWins: stratQuickWins,
     keywordGaps: stratKeywordGaps,
+    topicClusters: stratTopicClusters,
+    cannibalization: stratCannibalization,
     ...stratBlob
   } = stratStrategy;
   updateWorkspace(strategyWsId, {
@@ -176,6 +207,8 @@ beforeAll(async () => {
   replaceAllContentGaps(strategyWsId, stratContentGaps ?? []);
   replaceAllQuickWins(strategyWsId, stratQuickWins ?? []);
   replaceAllKeywordGaps(strategyWsId, stratKeywordGaps ?? []);
+  replaceAllTopicClusters(strategyWsId, stratTopicClusters ?? []);
+  replaceAllCannibalizationIssues(strategyWsId, stratCannibalization ?? []);
 
   // Seed page_keywords for the strategy workspace (reassembled into pageMap by the endpoint)
   const pageEntries: PageKeywordMap[] = [
@@ -231,6 +264,8 @@ beforeAll(async () => {
     contentGaps: isolationContentGaps,
     quickWins: isolationQuickWins,
     keywordGaps: isolationKeywordGaps,
+    topicClusters: isolationTopicClusters,
+    cannibalization: isolationCannibalization,
     ...isolationBlob
   } = isolationStrategy;
   updateWorkspace(isolationWsId, {
@@ -240,6 +275,8 @@ beforeAll(async () => {
   replaceAllQuickWins(isolationWsId, isolationQuickWins ?? []);
   replaceAllContentGaps(isolationWsId, isolationContentGaps ?? []);
   replaceAllKeywordGaps(isolationWsId, isolationKeywordGaps ?? []);
+  replaceAllTopicClusters(isolationWsId, isolationTopicClusters ?? []);
+  replaceAllCannibalizationIssues(isolationWsId, isolationCannibalization ?? []);
 }, 30_000);
 
 afterAll(async () => {
@@ -251,9 +288,13 @@ afterAll(async () => {
   deleteAllContentGaps(strategyWsId);
   deleteAllQuickWins(strategyWsId);
   deleteAllKeywordGaps(strategyWsId);
+  deleteAllTopicClusters(strategyWsId);
+  deleteAllCannibalizationIssues(strategyWsId);
   deleteAllContentGaps(isolationWsId);
   deleteAllQuickWins(isolationWsId);
   deleteAllKeywordGaps(isolationWsId);
+  deleteAllTopicClusters(isolationWsId);
+  deleteAllCannibalizationIssues(isolationWsId);
   deleteWorkspace(strategyWsId);
   deleteWorkspace(gatedWsId);
   deleteWorkspace(feedbackWsId);
@@ -430,6 +471,38 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     }
   });
 
+  it('topicClusters are included from normalized table rows', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    const body = await res.json();
+
+    expect(Array.isArray(body.topicClusters)).toBe(true);
+    const cluster = body.topicClusters.find((c: { topic: string }) => c.topic === 'technical seo');
+    expect(cluster).toEqual(expect.objectContaining({
+      topic: 'technical seo',
+      ownedCount: 1,
+      totalCount: 3,
+      coveragePercent: 33,
+      topCompetitor: 'competitor.com',
+    }));
+    expect(cluster.gap).toEqual(['crawlability']);
+  });
+
+  it('cannibalization includes canonical action metadata from normalized table rows', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    const body = await res.json();
+
+    expect(Array.isArray(body.cannibalization)).toBe(true);
+    const issue = body.cannibalization.find((c: { keyword: string }) => c.keyword === 'seo services');
+    expect(issue).toEqual(expect.objectContaining({
+      keyword: 'seo services',
+      severity: 'high',
+      recommendation: 'Use the services page as the canonical target.',
+      canonicalPath: '/services',
+      canonicalUrl: 'https://example.com/services',
+      action: 'canonical_tag',
+    }));
+  });
+
   it('generatedAt timestamp is preserved', async () => {
     const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
     const body = await res.json();
@@ -471,6 +544,56 @@ describe('GET /api/public/seo-strategy — access control and edge cases', () =>
       const body = await res.json();
       expect(body).toBeNull();
     } finally {
+      deleteWorkspace(tempWs.id);
+    }
+  });
+
+  it('returns table-backed shell data when normalized strategy rows exist without a strategy blob', async () => {
+    const tempWs = createWorkspace('Public Strategy Shell Test');
+    try {
+      updateWorkspace(tempWs.id, { seoClientView: true });
+      upsertPageKeyword(tempWs.id, {
+        pagePath: '/services/seo',
+        pageTitle: 'SEO Services',
+        primaryKeyword: 'seo services',
+        secondaryKeywords: ['seo agency'],
+      });
+      replaceAllTopicClusters(tempWs.id, [
+        {
+          topic: 'seo services',
+          keywords: ['seo services'],
+          ownedCount: 1,
+          totalCount: 1,
+          coveragePercent: 100,
+          gap: [],
+        },
+      ]);
+      replaceAllCannibalizationIssues(tempWs.id, [
+        {
+          keyword: 'seo services',
+          pages: [{ path: '/services/seo', source: 'keyword_map' }],
+          severity: 'medium',
+          recommendation: 'Keep the service page as the canonical target.',
+          canonicalPath: '/services/seo',
+          action: 'canonical_tag',
+        },
+      ]);
+
+      const res = await api(`/api/public/seo-strategy/${tempWs.id}`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).not.toBeNull();
+      expect(body.generatedAt).toBeNull();
+      expect(body.pageMap[0].pagePath).toBe('/services/seo');
+      expect(body.topicClusters[0].topic).toBe('seo services');
+      expect(body.cannibalization[0]).toEqual(expect.objectContaining({
+        canonicalPath: '/services/seo',
+        action: 'canonical_tag',
+      }));
+    } finally {
+      db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(tempWs.id);
+      deleteAllTopicClusters(tempWs.id);
+      deleteAllCannibalizationIssues(tempWs.id);
       deleteWorkspace(tempWs.id);
     }
   });

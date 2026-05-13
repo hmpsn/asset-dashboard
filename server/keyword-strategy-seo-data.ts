@@ -4,8 +4,9 @@ import { filterDiscoveredCompetitors } from './competitor-domain-filter.js';
 import { MAX_COMPETITORS } from './constants.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { createLogger } from './logger.js';
+import { listProviders } from './seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
-import type { Workspace } from '../shared/types/workspace.js';
+import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -47,6 +48,13 @@ export interface FetchAndCacheKeywordStrategySeoDataResult {
   relatedKeywords: RelatedKeyword[];
   questionKeywords: QuestionKeywordGroup[];
   competitorKeywords: CompetitorKeywordData[];
+  seoDataStatus: SeoDataStatus;
+}
+
+function hasAlternateConfiguredProvider(provider: SeoDataProvider | null): boolean {
+  const configured = listProviders().filter(p => p.configured);
+  if (!provider) return configured.length > 0;
+  return configured.some(p => p.name !== provider.name);
 }
 
 /**
@@ -69,6 +77,14 @@ export async function fetchAndCacheKeywordStrategySeoData({
   const relatedKeywords: RelatedKeyword[] = [];
   const questionKeywords: QuestionKeywordGroup[] = [];
   const competitorKeywords: CompetitorKeywordData[] = [];
+  const providerReasons = new Set<string>();
+  const providerRequested = seoDataMode !== 'none';
+  const seoDataStatus: SeoDataStatus = {
+    mode: seoDataMode,
+    provider: provider?.name,
+    status: seoDataMode === 'none' ? 'disabled' : 'available',
+    fallbackProviderAvailable: hasAlternateConfiguredProvider(provider),
+  };
 
   const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws, competitorDomains);
 
@@ -92,7 +108,12 @@ export async function fetchAndCacheKeywordStrategySeoData({
   }
 
   if (seoDataMode === 'none' || !provider) {
-    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords };
+    if (!provider && providerRequested) {
+      seoDataStatus.status = 'degraded';
+      providerReasons.add('no_configured_provider');
+    }
+    seoDataStatus.reasons = [...providerReasons];
+    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
   sendProgress('seo-data', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
@@ -103,7 +124,10 @@ export async function fetchAndCacheKeywordStrategySeoData({
 
   const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
   if (!siteDomain) {
-    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords };
+    seoDataStatus.status = 'degraded';
+    providerReasons.add('missing_site_domain');
+    seoDataStatus.reasons = [...providerReasons];
+    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
   try {
@@ -119,6 +143,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
     }
   } catch (err) {
     log.error({ err }, 'Domain organic error');
+    providerReasons.add('domain_keywords_error');
   }
 
   if (fetchCompetitors && competitorDomains.length === 0) {
@@ -135,6 +160,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       }
     } catch (err) {
       log.error({ err }, 'Competitor auto-discovery error');
+      providerReasons.add('competitor_discovery_error');
     }
   }
 
@@ -167,6 +193,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
           log.info(`Got ${compKws.length} keywords from competitor ${cleanComp} (fetched ${rawKws.length})`);
         } catch (err) {
           log.warn({ err }, `Failed to fetch keywords for competitor ${cleanComp}`);
+          providerReasons.add('competitor_keywords_partial_error');
         }
       }
 
@@ -182,6 +209,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       }
     } catch (err) {
       log.error({ err }, 'Competitor keywords error');
+      providerReasons.add('competitor_keywords_error');
     }
   }
 
@@ -200,6 +228,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       }
     } catch (err) {
       log.error({ err }, 'Keyword gap error');
+      providerReasons.add('keyword_gap_error');
     }
   }
 
@@ -227,6 +256,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       }
     } catch (err) {
       log.error({ err }, 'Related keywords error');
+      providerReasons.add('related_keywords_error');
     }
 
     try {
@@ -250,8 +280,24 @@ export async function fetchAndCacheKeywordStrategySeoData({
       }
     } catch (err) {
       log.error({ err }, 'Question keywords error');
+      providerReasons.add('question_keywords_error');
     }
   }
 
-  return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords };
+  if (
+    providerRequested
+    && domainKeywords.length === 0
+    && keywordGaps.length === 0
+    && competitorKeywords.length === 0
+    && relatedKeywords.length === 0
+    && questionKeywords.length === 0
+  ) {
+    providerReasons.add('provider_returned_no_keyword_data');
+  }
+  if (providerReasons.size > 0) {
+    seoDataStatus.status = 'degraded';
+    seoDataStatus.reasons = [...providerReasons];
+  }
+
+  return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
 }
