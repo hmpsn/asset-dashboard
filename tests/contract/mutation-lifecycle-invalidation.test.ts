@@ -43,4 +43,39 @@ describe('mutation lifecycle invalidation contracts', () => {
     const orderStatusSource = readProjectFile('src/components/client/OrderStatus.tsx');
     expect(orderStatusSource).toContain('queryKeys.client.workOrders(workspaceId)');
   });
+
+  it('client action updates refresh client/admin action read models and intelligence surfaces', () => {
+    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
+    const clientActionBlock = eventBlock(invalidationSource, 'CLIENT_ACTION_UPDATE');
+
+    expect(clientActionBlock).toContain('queryKeys.client.clientActions(workspaceId)');
+    expect(clientActionBlock).toContain('queryKeys.admin.clientActions(workspaceId)');
+    expect(clientActionBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
+    expect(clientActionBlock).toContain('queryKeys.admin.intelligence(workspaceId)');
+    expect(clientActionBlock).toContain('queryKeys.admin.intelligenceAll(workspaceId)');
+
+    const clientDashboardSource = readProjectFile('src/components/ClientDashboard.tsx');
+    expect(clientDashboardSource).toContain("'client-action:update'");
+    expect(clientDashboardSource).toContain("refetchClient('clientActions'");
+  });
+
+  it('content updates refresh content read paths and client-facing intelligence', () => {
+    const invalidationSource = readProjectFile('src/hooks/useWsInvalidation.ts');
+    const contentBlock = eventBlock(invalidationSource, 'CONTENT_UPDATED');
+
+    expect(contentBlock).toContain('queryKeys.admin.briefs(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.admin.posts(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.admin.contentPipeline(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.admin.workspaceHome(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.admin.intelligenceAll(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.client.contentRequests(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.client.contentPlan(workspaceId)');
+    expect(contentBlock).toContain('queryKeys.client.intelligence(workspaceId)');
+
+    const clientDashboardSource = readProjectFile('src/components/ClientDashboard.tsx');
+    expect(clientDashboardSource).toContain('[WS_EVENTS.CONTENT_UPDATED]');
+    expect(clientDashboardSource).toContain("refetchClient('content'");
+    expect(clientDashboardSource).toContain("refetchClient('content-plan'");
+    expect(clientDashboardSource).toContain("refetchClient('intelligence'");
+  });
 });
