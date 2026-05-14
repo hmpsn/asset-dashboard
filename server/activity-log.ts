@@ -28,6 +28,7 @@ export type ActivityType =
   | 'links_fixed'
   | 'content_updated'
   | 'content_requested'
+  | 'content_request_deleted'
   | 'content_declined'
   | 'content_request_commented'
   | 'brief_generated'
