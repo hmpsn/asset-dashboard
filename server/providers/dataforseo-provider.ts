@@ -196,6 +196,16 @@ function cleanDomain(domain: string): string {
   return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
 }
 
+function cleanUrlTarget(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch { // catch-ok: malformed provider target degrades to domain-style target normalization.
+    return cleanDomain(url);
+  }
+}
+
 interface DataForSeoResponse {
   version?: string;
   status_code?: number;
@@ -576,6 +586,63 @@ export class DataForSeoProvider implements SeoDataProvider {
       return results;
     } catch (err) {
       log.error({ err }, `DataForSEO ranked_keywords error for "${target}"`);
+      return [];
+    }
+  }
+
+  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
+    const target = cleanUrlTarget(url);
+    const cacheKey = `url_ranked_${database}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
+    const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'ranked_keywords_url', query: target, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
+        target,
+        location_code: locationCode(database),
+        language_code: 'en',
+        limit,
+        order_by: ['keyword_data.keyword_info.search_volume,desc'],
+      }]);
+
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results: DomainKeyword[] = [];
+      const seen = new Set<string>();
+      for (const item of items) {
+        const kwData = item.keyword_data as Record<string, unknown> | undefined;
+        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+        const itemType = (serpItem?.type as string) ?? 'organic';
+        const keyword = (kwData?.keyword as string) ?? '';
+        if (itemType !== 'organic' || !keyword || seen.has(keyword)) continue;
+        seen.add(keyword);
+        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+        results.push({
+          keyword,
+          position: (serpItem?.rank_group as number) ?? 0,
+          volume: (kwInfo?.search_volume as number) ?? 0,
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          cpc: (kwInfo?.cpc as number) ?? 0,
+          url: (serpItem?.url as string) ?? target,
+          traffic: (serpItem?.etv as number) ?? 0,
+          trafficPercent: 0,
+          trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+        });
+      }
+
+      logCreditUsage({ credits: cost, endpoint: 'ranked_keywords_url', query: target, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO URL ranked_keywords error for "${target}"`);
       return [];
     }
   }

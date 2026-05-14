@@ -381,6 +381,74 @@ export async function getDomainOrganicKeywords(
   return results;
 }
 
+export async function getUrlOrganicKeywords(
+  url: string,
+  workspaceId: string,
+  limit = 20,
+  database = 'us',
+): Promise<DomainKeyword[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
+
+  let normalizedUrl = url.trim();
+  try {
+    const parsed = new URL(normalizedUrl);
+    parsed.hash = '';
+    normalizedUrl = parsed.toString();
+  } catch { // catch-ok: user/provider URL target is invalid, so the URL-level report cannot run.
+    return [];
+  }
+
+  const cacheKey = `url_organic_${database}_${normalizedUrl.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
+  const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
+  if (cached) {
+    logCreditUsage({ credits: 0, endpoint: 'url_organic', query: normalizedUrl, rowsReturned: cached.length, workspaceId, cached: true });
+    return cached;
+  }
+
+  if (areCreditsExhausted()) return [];
+  const params = new URLSearchParams({
+    type: 'url_organic',
+    key: apiKey,
+    url: normalizedUrl,
+    database,
+    display_limit: String(limit),
+    export_columns: 'Ph,Po,Nq,Kd,Cp,Ur,Tr,Tc,Td,Fk',
+  });
+
+  const res = await fetch(`${SEMRUSH_API_BASE}?${params}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    log.warn(`URL organic error for "${normalizedUrl}": ${errText.slice(0, 200)}`);
+    return [];
+  }
+
+  const csv = await res.text();
+  if (csv.startsWith('ERROR')) {
+    if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
+    if (!csv.includes('NOTHING FOUND')) log.warn(`URL organic error for "${normalizedUrl}": ${csv}`);
+    return [];
+  }
+
+  const rows = parseSemrushCSV(csv);
+  const results: DomainKeyword[] = rows.map(row => ({
+    keyword: row['Ph'] || '',
+    position: parseInt(row['Po'] || '0', 10),
+    volume: parseInt(row['Nq'] || '0', 10),
+    difficulty: parseFloat(row['Kd'] || '0'),
+    cpc: parseFloat(row['Cp'] || '0'),
+    url: row['Ur'] || normalizedUrl,
+    traffic: parseFloat(row['Tr'] || '0'),
+    trafficPercent: parseFloat(row['Tc'] || '0'),
+    trend: row['Td'] ? row['Td'].split(',').map(Number) : undefined,
+    serpFeatures: row['Fk'] || undefined,
+  }));
+
+  logCreditUsage({ credits: results.length * 10, endpoint: 'url_organic', query: normalizedUrl, rowsReturned: results.length, workspaceId, cached: false });
+  writeCache(workspaceId, cacheKey, results);
+  return results;
+}
+
 // ── Keyword Gap (keywords competitors rank for but you don't) ──
 export interface KeywordGap {
   keyword: string;

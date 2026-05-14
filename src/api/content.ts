@@ -8,6 +8,7 @@ import type {
   ContentMatrix,
   KeywordCandidate,
   AiFixResult,
+  AIReviewResponse,
   IssueKey,
   BriefTemplateCrossrefMatch,
 } from '../../shared/types/content';
@@ -16,6 +17,9 @@ import type { ClientContentRequest } from '../components/client/types';
 export const contentBriefs = {
   list: (wsId: string) =>
     get<ContentBrief[]>(`/api/content-briefs/${wsId}`),
+
+  getById: (wsId: string, briefId: string) =>
+    get<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}`),
 
   generate: (wsId: string, body: Record<string, unknown>) =>
     post<ContentBrief>(`/api/content-briefs/${wsId}/generate`, body),
@@ -77,7 +81,7 @@ export const contentPosts = {
     ),
 
   aiReview: (wsId: string, postId: string) =>
-    post<{ review: Record<string, { pass: boolean; reason: string }> }>(
+    post<AIReviewResponse>(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
     ),
 

@@ -5,15 +5,17 @@
  * Each row = one page's keyword assignment + analysis data for a workspace.
  */
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
-import type { MetricsSource } from '../shared/types/keywords.js';
+import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from '../shared/types/keywords.js';
 import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 
 const log = createLogger('page-keywords');
+const SCORE_HISTORY_PER_PAGE_LIMIT = 25;
 
 // ── Row <-> Model mapping ──
 
@@ -35,6 +37,8 @@ interface PageKeywordRow {
   secondary_metrics: string | null;
   metrics_source: string | null;
   validated: number | null;
+  url_level_keywords: string | null;
+  url_level_keyword_source: string | null;
   optimization_score: number | null;
   analysis_generated_at: string | null;
   optimization_issues: string | null;
@@ -51,7 +55,36 @@ interface PageKeywordRow {
   serp_features: string | null;
 }
 
-function rowToModel(r: PageKeywordRow): PageKeywordMap {
+interface PageKeywordScoreHistoryRow {
+  workspace_id: string;
+  page_path: string;
+  optimization_score: number;
+  source: PageOptimizationScoreSnapshot['source'] | string;
+  recorded_at: string;
+}
+
+const urlLevelKeywordSchema = z.object({
+  keyword: z.string(),
+  position: z.number(),
+  volume: z.number(),
+  difficulty: z.number(),
+  cpc: z.number(),
+  traffic: z.number().optional(),
+  url: z.string().optional(),
+}).strip();
+
+function rowToScoreHistory(row: PageKeywordScoreHistoryRow): PageOptimizationScoreSnapshot {
+  const source = ['page-analysis', 'bulk-analysis', 'strategy', 'unknown'].includes(row.source)
+    ? row.source as PageOptimizationScoreSnapshot['source']
+    : 'unknown';
+  return {
+    score: row.optimization_score,
+    recordedAt: row.recorded_at,
+    source,
+  };
+}
+
+function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizationScoreSnapshot[] = []): PageKeywordMap {
   const m: PageKeywordMap = {
     pagePath: r.page_path,
     pageTitle: r.page_title,
@@ -70,6 +103,9 @@ function rowToModel(r: PageKeywordRow): PageKeywordMap {
   if (r.secondary_metrics) m.secondaryMetrics = parseJsonFallback(r.secondary_metrics, undefined);
   if (r.metrics_source) m.metricsSource = r.metrics_source as MetricsSource;
   if (r.validated != null) m.validated = !!r.validated;
+  if (r.url_level_keywords) m.urlLevelKeywords = parseJsonSafeArray(r.url_level_keywords, urlLevelKeywordSchema, { table: 'page_keywords', field: 'url_level_keywords' }) as UrlLevelKeyword[];
+  if (r.url_level_keyword_source === 'semrush' || r.url_level_keyword_source === 'dataforseo') m.urlLevelKeywordSource = r.url_level_keyword_source;
+  if (optimizationScoreHistory.length) m.optimizationScoreHistory = optimizationScoreHistory;
   if (r.optimization_score != null) m.optimizationScore = r.optimization_score;
   if (r.analysis_generated_at) m.analysisGeneratedAt = r.analysis_generated_at;
   if (r.optimization_issues) m.optimizationIssues = parseJsonSafeArray(r.optimization_issues, z.string(), { table: 'page_keywords', field: 'optimization_issues' });
@@ -106,6 +142,8 @@ function modelToParams(workspaceId: string, m: PageKeywordMap) {
     secondary_metrics: m.secondaryMetrics ? JSON.stringify(m.secondaryMetrics) : null,
     metrics_source: m.metricsSource ?? null,
     validated: m.validated != null ? (m.validated ? 1 : 0) : null,
+    url_level_keywords: m.urlLevelKeywords ? JSON.stringify(m.urlLevelKeywords) : null,
+    url_level_keyword_source: m.urlLevelKeywordSource ?? null,
     optimization_score: m.optimizationScore ?? null,
     analysis_generated_at: m.analysisGeneratedAt ?? null,
     optimization_issues: m.optimizationIssues ? JSON.stringify(m.optimizationIssues) : null,
@@ -137,6 +175,7 @@ const stmts = createStmtCache(() => ({
       workspace_id, page_path, page_title, primary_keyword, secondary_keywords,
       search_intent, current_position, previous_position, impressions, clicks,
       gsc_keywords, volume, difficulty, cpc, secondary_metrics, metrics_source, validated,
+      url_level_keywords, url_level_keyword_source,
       optimization_score, analysis_generated_at, optimization_issues, recommendations,
       content_gaps, primary_keyword_presence, long_tail_keywords, competitor_keywords,
       estimated_difficulty, keyword_difficulty, monthly_volume, topic_cluster, search_intent_confidence,
@@ -145,6 +184,7 @@ const stmts = createStmtCache(() => ({
       @workspace_id, @page_path, @page_title, @primary_keyword, @secondary_keywords,
       @search_intent, @current_position, @previous_position, @impressions, @clicks,
       @gsc_keywords, @volume, @difficulty, @cpc, @secondary_metrics, @metrics_source, @validated,
+      @url_level_keywords, @url_level_keyword_source,
       @optimization_score, @analysis_generated_at, @optimization_issues, @recommendations,
       @content_gaps, @primary_keyword_presence, @long_tail_keywords, @competitor_keywords,
       @estimated_difficulty, @keyword_difficulty, @monthly_volume, @topic_cluster, @search_intent_confidence,
@@ -166,6 +206,8 @@ const stmts = createStmtCache(() => ({
       secondary_metrics = excluded.secondary_metrics,
       metrics_source = excluded.metrics_source,
       validated = excluded.validated,
+      url_level_keywords = COALESCE(excluded.url_level_keywords, page_keywords.url_level_keywords),
+      url_level_keyword_source = COALESCE(excluded.url_level_keyword_source, page_keywords.url_level_keyword_source),
       optimization_score = COALESCE(excluded.optimization_score, page_keywords.optimization_score),
       analysis_generated_at = COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at),
       optimization_issues = COALESCE(excluded.optimization_issues, page_keywords.optimization_issues),
@@ -213,25 +255,108 @@ const stmts = createStmtCache(() => ({
   unanalyzed: db.prepare<[workspaceId: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ? AND (optimization_score IS NULL OR optimization_score <= 0)',
   ),
+  scoreHistoryByWs: db.prepare<[workspaceId: string, limit: number]>(`
+    SELECT workspace_id, page_path, optimization_score, source, recorded_at
+    FROM (
+      SELECT
+        workspace_id, page_path, optimization_score, source, recorded_at, id,
+        ROW_NUMBER() OVER (PARTITION BY page_path ORDER BY recorded_at DESC, id DESC) AS rn
+      FROM page_keyword_score_history
+      WHERE workspace_id = ?
+    )
+    WHERE rn <= ?
+    ORDER BY page_path ASC, recorded_at ASC
+  `,
+  ),
+  scoreHistoryByPage: db.prepare<[workspaceId: string, pagePath: string, limit: number]>(`
+    SELECT workspace_id, page_path, optimization_score, source, recorded_at
+    FROM (
+      SELECT workspace_id, page_path, optimization_score, source, recorded_at, id
+      FROM page_keyword_score_history
+      WHERE workspace_id = ? AND page_path = ?
+      ORDER BY recorded_at DESC, id DESC
+      LIMIT ?
+    )
+    ORDER BY recorded_at ASC
+  `,
+  ),
+  latestScoreHistory: db.prepare<[workspaceId: string, pagePath: string]>(
+    'SELECT workspace_id, page_path, optimization_score, source, recorded_at FROM page_keyword_score_history WHERE workspace_id = ? AND page_path = ? ORDER BY recorded_at DESC LIMIT 1',
+  ),
+  insertScoreHistory: db.prepare(`
+    INSERT OR IGNORE INTO page_keyword_score_history (id, workspace_id, page_path, optimization_score, source, recorded_at)
+    VALUES (@id, @workspace_id, @page_path, @optimization_score, @source, @recorded_at)
+  `),
+  pruneScoreHistory: db.prepare<[workspaceId: string, pagePath: string, subWorkspaceId: string, subPagePath: string, limit: number]>(`
+    DELETE FROM page_keyword_score_history
+    WHERE workspace_id = ? AND page_path = ? AND id IN (
+      SELECT id
+      FROM page_keyword_score_history
+      WHERE workspace_id = ? AND page_path = ?
+      ORDER BY recorded_at DESC, id DESC
+      LIMIT -1 OFFSET ?
+    )
+  `),
 }));
 
 // ── Public API ──
 
+function scoreHistorySourceFor(entry: PageKeywordMap): PageOptimizationScoreSnapshot['source'] {
+  if (!entry.analysisGeneratedAt) return 'strategy';
+  return 'page-analysis';
+}
+
+function groupScoreHistory(workspaceId: string): Map<string, PageOptimizationScoreSnapshot[]> {
+  const rows = stmts().scoreHistoryByWs.all(workspaceId, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
+  const grouped = new Map<string, PageOptimizationScoreSnapshot[]>();
+  for (const row of rows) {
+    const key = normalizePath(row.page_path).toLowerCase();
+    const existing = grouped.get(key) ?? [];
+    existing.push(rowToScoreHistory(row));
+    grouped.set(key, existing);
+  }
+  return grouped;
+}
+
+function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): void {
+  if (entry.optimizationScore == null) return;
+  const pagePath = normalizePath(entry.pagePath);
+  const roundedScore = Math.round(entry.optimizationScore);
+  const latest = stmts().latestScoreHistory.get(workspaceId, pagePath) as PageKeywordScoreHistoryRow | undefined;
+  if (latest?.optimization_score === roundedScore) return;
+  stmts().insertScoreHistory.run({
+    id: randomUUID(),
+    workspace_id: workspaceId,
+    page_path: pagePath,
+    optimization_score: roundedScore,
+    source: scoreHistorySourceFor(entry),
+    recorded_at: entry.analysisGeneratedAt ?? new Date().toISOString(),
+  });
+  stmts().pruneScoreHistory.run(workspaceId, pagePath, workspaceId, pagePath, SCORE_HISTORY_PER_PAGE_LIMIT);
+}
+
 /** Get all page keywords for a workspace. */
 export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
-  return rows.map(rowToModel);
+  const histories = groupScoreHistory(workspaceId);
+  return rows.map(row => rowToModel(row, histories.get(normalizePath(row.page_path).toLowerCase()) ?? []));
 }
 
 /** Get a single page's keywords by path (normalized). */
 export function getPageKeyword(workspaceId: string, pagePath: string): PageKeywordMap | undefined {
-  const row = stmts().getOne.get(workspaceId, normalizePath(pagePath)) as PageKeywordRow | undefined;
-  return row ? rowToModel(row) : undefined;
+  const normalized = normalizePath(pagePath);
+  const row = stmts().getOne.get(workspaceId, normalized) as PageKeywordRow | undefined;
+  const historyRows = stmts().scoreHistoryByPage.all(workspaceId, normalized, SCORE_HISTORY_PER_PAGE_LIMIT) as PageKeywordScoreHistoryRow[];
+  return row ? rowToModel(row, historyRows.map(rowToScoreHistory)) : undefined;
 }
 
 /** Upsert a single page keyword entry. */
 export function upsertPageKeyword(workspaceId: string, entry: PageKeywordMap): void {
-  stmts().upsert.run(modelToParams(workspaceId, entry));
+  const run = db.transaction(() => {
+    stmts().upsert.run(modelToParams(workspaceId, entry));
+    maybeRecordScoreSnapshot(workspaceId, entry);
+  });
+  run();
 }
 
 /** Upsert multiple page keyword entries in a single transaction. */
@@ -240,6 +365,7 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
     const stmt = stmts().upsert;
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
+      maybeRecordScoreSnapshot(workspaceId, entry);
     }
   });
   run();
@@ -255,6 +381,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
     const stmt = stmts().upsert;
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
+      maybeRecordScoreSnapshot(workspaceId, entry);
     }
     if (entries.length === 0) {
       // Empty batch — delete all rows for this workspace
@@ -277,6 +404,7 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
     const stmt = stmts().upsert;
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
+      maybeRecordScoreSnapshot(workspaceId, entry);
     }
   });
   run();
@@ -311,7 +439,7 @@ export function countAnalyzedPages(workspaceId: string): number {
 /** Get pages that haven't been analyzed yet. */
 export function getUnanalyzedPages(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().unanalyzed.all(workspaceId) as PageKeywordRow[];
-  return rows.map(rowToModel);
+  return rows.map(row => rowToModel(row));
 }
 
 /**

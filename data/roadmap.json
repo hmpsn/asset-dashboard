@@ -659,8 +659,9 @@
           "source": "USER REQUEST",
           "est": "3h",
           "priority": "P2",
-          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added provider-level URL organic keyword support (`getUrlKeywords`) for SEMRush and DataForSEO, persisted `urlLevelKeywords`/`urlLevelKeywordSource` on page keyword rows, and made strategy enrichment prefer URL-level page-specific keyword data over domain-level fallback when available. Capped per-run URL lookups to avoid provider-credit blowups.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": 351,
@@ -668,8 +669,9 @@
           "source": "USER REQUEST",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added append-only `page_keyword_score_history` snapshots, attached score history to `PageKeywordMap`, recorded snapshots on single/batch analysis writes only when the score changes, and surfaced compact Page Intelligence score deltas in the page list. Broader month-level reporting can build on the same table later.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": 355,
@@ -686,8 +688,9 @@
           "source": "USER REQUEST",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up to the content-quality hardening PR. The bug fix already surfaces numeric/statistical claims in the review checklist, but stored SERP evidence (`realPeopleAlsoAsk`, `realTopResults`) is currently used only as hidden grounding context for generation/review. Add a lightweight reviewer-facing evidence panel or expandable section that shows the source SERP questions/results used for factual grounding, links claims-to-review back to available evidence when possible, and makes clear this is reviewer support, not automated fact-checking. Keep this in the existing post-review/editor surface; no workflow redesign.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Post review now loads the source brief and displays stored `realPeopleAlsoAsk` and `realTopResults` in the existing review checklist as reviewer support. AI review still marks factual accuracy/no hallucinations as human-review-only and never auto-checks provenance-sensitive items.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": 631,

@@ -5,11 +5,13 @@
 import { useState } from 'react';
 import {
   Check, ChevronDown, ChevronUp, Eye, ClipboardCheck, Square, CheckSquare,
-  Sparkles, Loader2,
+  Sparkles, Loader2, ExternalLink,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
 import {
-  type AIReviewResult,
+  type AIReviewMap,
+  type AIReviewResponse,
+  type ContentReviewEvidence,
   PROVENANCE_SENSITIVE_REVIEW_KEYS,
   type ReviewChecklistKey,
 } from '../../../shared/types/content';
@@ -48,20 +50,23 @@ export interface ReviewChecklistProps {
   onToggleShowChecklist: () => void;
   onToggleItem: (key: ReviewChecklistKey) => void;
   onChangeStatus: (status: string) => void;
-  onRunAIReview?: () => Promise<Record<string, AIReviewResult> | null>;
+  onRunAIReview?: () => Promise<AIReviewResponse | null>;
   onRequestFix?: (issueKey: string, reason: string) => Promise<void>;
+  evidence?: ContentReviewEvidence;
 }
 
 export function ReviewChecklist({
   postStatus, reviewChecklist, showChecklist,
-  onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview, onRequestFix,
+  onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview, onRequestFix, evidence,
 }: ReviewChecklistProps) {
   const checklist = reviewChecklist ?? EMPTY_CHECKLIST;
   const checkedCount = CHECKLIST_ITEMS.filter(item => checklist[item.key]).length;
   const allChecked = checkedCount === CHECKLIST_ITEMS.length;
   const [aiRunning, setAiRunning] = useState(false);
-  const [aiResults, setAiResults] = useState<Record<string, AIReviewResult> | null>(null);
+  const [aiResults, setAiResults] = useState<AIReviewMap | null>(null);
+  const [reviewEvidence, setReviewEvidence] = useState<ContentReviewEvidence | undefined>(undefined);
   const [fixingKey, setFixingKey] = useState<string | null>(null);
+  const evidenceToShow = reviewEvidence ?? evidence;
 
   const handleFixThis = async (issueKey: string, reason: string) => {
     if (!onRequestFix || fixingKey) return;
@@ -78,9 +83,11 @@ export function ReviewChecklist({
     setAiRunning(true);
     setAiResults(null);
     try {
-      const results = await onRunAIReview();
-      if (results) {
+      const response = await onRunAIReview();
+      if (response) {
+        const results = response.review;
         setAiResults(results);
+        setReviewEvidence(response.evidence);
         // Auto-check objective items that passed. Provenance-sensitive checks need
         // human source verification even when AI finds no obvious issues.
         for (const item of CHECKLIST_ITEMS) {
@@ -128,6 +135,41 @@ export function ReviewChecklist({
                   <Icon as={aiRunning ? Loader2 : Sparkles} size="sm" className={aiRunning ? 'animate-spin' : ''} />
                   {aiRunning ? 'Running AI Review...' : 'AI Pre-Check'}
                 </button>
+              )}
+              {evidenceToShow && (
+                <div className="mb-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/5 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="t-caption-sm font-medium text-blue-300">SERP Evidence</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">Reviewer support</span>
+                  </div>
+                  <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{evidenceToShow.note}</p>
+                  {evidenceToShow.peopleAlsoAsk.length > 0 && (
+                    <div className="mt-2">
+                      <p className="t-caption-sm text-[var(--brand-text)]">People Also Ask</p>
+                      <ul className="mt-1 space-y-0.5 list-disc pl-4 text-[var(--brand-text-muted)]">
+                        {evidenceToShow.peopleAlsoAsk.map(question => (
+                          <li key={question} className="t-caption-sm">{question}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {evidenceToShow.topResults.length > 0 && (
+                    <div className="mt-2">
+                      <p className="t-caption-sm text-[var(--brand-text)]">Top Results</p>
+                      <ul className="mt-1 space-y-1">
+                        {evidenceToShow.topResults.map(result => (
+                          <li key={`${result.position}-${result.url}`} className="t-caption-sm text-[var(--brand-text-muted)]">
+                            <a href={result.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-blue-300 hover:text-blue-200">
+                              <span className="shrink-0">#{result.position}</span>
+                              <span className="truncate">{result.title}</span>
+                              <Icon as={ExternalLink} size="xs" className="shrink-0" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               )}
               {CHECKLIST_ITEMS.map(item => (
                 <div key={item.key}>

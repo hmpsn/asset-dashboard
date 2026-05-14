@@ -20,6 +20,7 @@ import {
   getRelatedKeywords as semrushRelated,
   getQuestionKeywords as semrushQuestions,
   getDomainOrganicKeywords,
+  getUrlOrganicKeywords,
   getDomainOverview as semrushDomainOverview,
   getOrganicCompetitors,
   getKeywordGap as semrushKeywordGap,
@@ -48,6 +49,10 @@ export class SemrushProvider implements SeoDataProvider {
 
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     return getDomainOrganicKeywords(domain, workspaceId, limit, database);
+  }
+
+  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
+    return getUrlOrganicKeywords(url, workspaceId, limit, database);
   }
 
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
