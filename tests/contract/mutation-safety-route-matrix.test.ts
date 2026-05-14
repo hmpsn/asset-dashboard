@@ -70,6 +70,11 @@ const ROUTE_MATRIX: RouteSignal[] = [
     routeHints: ['content-subscription', 'ws_events.workspace_updated', 'stripe billing mutations'],
     files: ['tests/contract/billing-mutation-lifecycle.test.ts'],
   },
+  {
+    routeId: 'webflow-cms-writes',
+    routeHints: ['/api/webflow/collections', 'PAGE_STATE_UPDATED', 'cms-publish'],
+    files: ['tests/integration/webflow-cms-mutation-safety.test.ts'],
+  },
 ];
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

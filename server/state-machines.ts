@@ -97,6 +97,20 @@ export const BRIEFING_DRAFT_TRANSITIONS: Record<string, readonly string[]> = {
   skipped:   [],   // terminal
 };
 
+// ── Background Job Status ──
+// Jobs move forward from pending → running and then to terminal states.
+// Some jobs can fail/cancel before running, so pending can move directly to
+// error/cancelled. Terminal states never reopen.
+export const BACKGROUND_JOB_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['running', 'done', 'error', 'cancelled'],
+  running: ['done', 'error', 'cancelled'],
+  done: [],
+  error: [],
+  cancelled: [],
+};
+
+export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled';
+
 // ── Generic validator ──
 
 export class InvalidTransitionError extends Error {
