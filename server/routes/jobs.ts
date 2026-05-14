@@ -753,6 +753,12 @@ router.post('/api/jobs', async (req, res) => {
         const paSiteId = params.siteId as string;
         const paWsId = params.workspaceId as string;
         if (!paSiteId || !paWsId) return res.status(400).json({ error: 'siteId and workspaceId required' });
+        const paWs = getWorkspace(paWsId);
+        if (!paWs) return res.status(404).json({ error: 'Workspace not found' });
+        if (!paWs.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+        if (paWs.webflowSiteId !== paSiteId) {
+          return res.status(403).json({ error: 'You do not have access to this workspace' });
+        }
         const activePA = hasActiveJob('page-analysis', paWsId);
         if (activePA) return res.status(409).json({ error: 'Page analysis is already running', jobId: activePA.id });
         const paToken = getTokenForSite(paSiteId) || undefined;
