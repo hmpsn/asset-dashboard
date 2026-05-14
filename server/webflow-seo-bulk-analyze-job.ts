@@ -208,24 +208,44 @@ IMPORTANT: Return ONLY valid JSON.`;
       return;
     }
 
+    const analyzed = done - failed;
+    if (analyzed === 0 && failed > 0) {
+      const errorMessage = `Bulk analyze failed for all ${pages.length} pages`;
+      updateJob(jobId, {
+        status: 'error',
+        progress: done,
+        message: errorMessage,
+        error: errorMessage,
+        result: { analyzed, failed, total: pages.length },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId,
+        operation: 'bulk-analyze',
+        error: errorMessage,
+        failed,
+        total: pages.length,
+      });
+      return;
+    }
+
     updateJob(jobId, {
       status: 'done',
       progress: done,
-      message: `Analysis complete: ${done - failed}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}`,
-      result: { analyzed: done - failed, failed, total: pages.length },
+      message: `Analysis complete: ${analyzed}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}`,
+      result: { analyzed, failed, total: pages.length },
     });
     broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
       jobId,
       operation: 'bulk-analyze',
-      analyzed: done - failed,
+      analyzed,
       failed,
       total: pages.length,
     });
 
     addActivity(workspaceId, 'page_analysis',
-      `Bulk page analysis: ${done - failed}/${pages.length} pages analyzed`,
+      `Bulk page analysis: ${analyzed}/${pages.length} pages analyzed`,
       `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
-      { analyzed: done - failed, failed, total: pages.length },
+      { analyzed, failed, total: pages.length },
     );
   } catch (err) {
     log.error({ err }, 'bulk-analyze: job failed');

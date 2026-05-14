@@ -15,6 +15,7 @@ const PROVIDER_SIGNALS: ProviderSignal[] = [
     files: [
       'tests/integration/webflow-cms-writes.test.ts',
       'tests/integration/webflow-cms-mutation-safety.test.ts',
+      'tests/integration/seo-background-job-mutation-safety.test.ts',
       'tests/integration/webflow-schema-writes.test.ts',
       'tests/integration/content-publish-writes.test.ts',
       'tests/integration/public-approval-broadcasts.test.ts',
@@ -44,14 +45,16 @@ const PROVIDER_SIGNALS: ProviderSignal[] = [
     provider: 'dataforseo-semrush',
     files: [
       'tests/integration/semrush-routes.test.ts',
+      'tests/integration/keyword-strategy-job-mutation-safety.test.ts',
       'tests/unit/seo-provider-routing.test.ts',
       'tests/unit/jobs-bulk-analysis.test.ts',
     ],
-    mustContainOneOf: ['failed', 'error', 'balance is zero', 'fallback'],
+    mustContainOneOf: ['seo provider fetch failed', 'failed', 'error', 'balance is zero', 'fallback'],
   },
   {
     provider: 'openai',
     files: [
+      'tests/integration/seo-background-job-mutation-safety.test.ts',
       'tests/integration/keyword-strategy-job-mutation-safety.test.ts',
       'tests/integration/background-job-mutation-safety.test.ts',
       'tests/integration/content-post-generation-mutation-safety.test.ts',

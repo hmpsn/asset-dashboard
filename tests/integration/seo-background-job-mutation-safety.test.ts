@@ -6,6 +6,18 @@ const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
 }));
 
+const analyzeAiState = vi.hoisted(() => ({
+  mode: 'success' as 'success' | 'error',
+}));
+
+const rewriteAiState = vi.hoisted(() => ({
+  mode: 'success' as 'success' | 'error',
+}));
+
+const webflowUpdateState = vi.hoisted(() => ({
+  mode: 'success' as 'success' | 'error',
+}));
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
@@ -18,25 +30,30 @@ vi.mock('../../server/ai.js', async importOriginal => {
   const original = await importOriginal<typeof import('../../server/ai.js')>();
   return {
     ...original,
-    callAI: vi.fn(async () => ({
-      text: JSON.stringify({
-        primaryKeyword: 'seo services',
-        primaryKeywordPresence: { inTitle: true, inMeta: true, inContent: true, inSlug: true },
-        secondaryKeywords: ['technical seo'],
-        longTailKeywords: ['technical seo services'],
-        searchIntent: 'commercial',
-        searchIntentConfidence: 0.91,
-        contentGaps: ['pricing'],
-        competitorKeywords: ['seo agency'],
-        optimizationScore: 88,
-        optimizationIssues: ['Need more proof'],
-        recommendations: ['Add a case study'],
-        estimatedDifficulty: 'medium',
-        keywordDifficulty: 0,
-        monthlyVolume: 0,
-        topicCluster: 'SEO services',
-      }),
-    })),
+    callAI: vi.fn(async () => {
+      if (analyzeAiState.mode === 'error') {
+        throw new Error('Bulk analyze provider failure');
+      }
+      return {
+        text: JSON.stringify({
+          primaryKeyword: 'seo services',
+          primaryKeywordPresence: { inTitle: true, inMeta: true, inContent: true, inSlug: true },
+          secondaryKeywords: ['technical seo'],
+          longTailKeywords: ['technical seo services'],
+          searchIntent: 'commercial',
+          searchIntentConfidence: 0.91,
+          contentGaps: ['pricing'],
+          competitorKeywords: ['seo agency'],
+          optimizationScore: 88,
+          optimizationIssues: ['Need more proof'],
+          recommendations: ['Add a case study'],
+          estimatedDifficulty: 'medium',
+          keywordDifficulty: 0,
+          monthlyVolume: 0,
+          topicCluster: 'SEO services',
+        }),
+      };
+    }),
   };
 });
 
@@ -44,9 +61,12 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
   const original = await importOriginal<typeof import('../../server/content-posts-ai.js')>();
   return {
     ...original,
-    callCreativeAI: vi.fn(async () =>
-      JSON.stringify(['First improved title', 'Second improved title', 'Third improved title'])
-    ),
+    callCreativeAI: vi.fn(async () => {
+      if (rewriteAiState.mode === 'error') {
+        throw new Error('Bulk rewrite provider failure');
+      }
+      return JSON.stringify(['First improved title', 'Second improved title', 'Third improved title']);
+    }),
   };
 });
 
@@ -99,7 +119,12 @@ vi.mock('../../server/webflow.js', async importOriginal => {
   const original = await importOriginal<typeof import('../../server/webflow.js')>();
   return {
     ...original,
-    updatePageSeo: vi.fn(async () => ({ success: true })),
+    updatePageSeo: vi.fn(async () => {
+      if (webflowUpdateState.mode === 'error') {
+        return { success: false as const, error: 'Webflow CMS update failed' };
+      }
+      return { success: true as const };
+    }),
   };
 });
 
@@ -200,6 +225,9 @@ beforeEach(() => {
   resetWorkspaceState(workspaceId);
   resetWorkspaceState(otherWorkspaceId);
   broadcastState.calls = [];
+  analyzeAiState.mode = 'success';
+  rewriteAiState.mode = 'success';
+  webflowUpdateState.mode = 'success';
 });
 
 afterAll(async () => {
@@ -361,5 +389,100 @@ describe('SEO background-job mutation safety', () => {
       expect.objectContaining({ workspaceId, event: WS_EVENTS.PAGE_STATE_UPDATED }),
       expect.objectContaining({ workspaceId, event: WS_EVENTS.BULK_OPERATION_COMPLETE }),
     ]));
+  });
+
+  it('bulk analyze provider failure marks job error and avoids success side effects', async () => {
+    analyzeAiState.mode = 'error';
+
+    const startRes = await postJson(`/api/seo/${workspaceId}/bulk-analyze`, {
+      pages: [{
+        pageId: 'page-analyze-fail-1',
+        title: 'Services',
+        publishedPath: '/services/seo',
+        seoTitle: 'SEO Services',
+        seoDescription: 'Old description',
+      }],
+    });
+    expect(startRes.status).toBe(200);
+    const { jobId } = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(jobId);
+    expect(job).toMatchObject({
+      workspaceId,
+      type: 'seo-bulk-analyze',
+      status: 'error',
+      message: 'Bulk analyze failed for all 1 pages',
+      result: { analyzed: 0, failed: 1, total: 1 },
+    });
+
+    expect(countRows('page_keywords', workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspaceId)).toBe(0);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_COMPLETE)).toBe(false);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.STRATEGY_UPDATED)).toBe(false);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_FAILED)).toBe(true);
+  });
+
+  it('bulk rewrite provider failure marks job error and avoids suggestions/activity writes', async () => {
+    rewriteAiState.mode = 'error';
+
+    const startRes = await postJson(`/api/seo/${workspaceId}/bulk-rewrite`, {
+      siteId: primarySiteId,
+      field: 'title',
+      pages: [{
+        pageId: 'page-rewrite-fail-1',
+        title: 'Services',
+        publishedPath: '/services/seo',
+        currentSeoTitle: 'Old title',
+      }],
+    });
+    expect(startRes.status).toBe(200);
+    const { jobId } = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(jobId);
+    expect(job).toMatchObject({
+      workspaceId,
+      type: 'seo-bulk-rewrite',
+      status: 'error',
+      message: 'Bulk rewrite failed for all 1 pages',
+      result: { suggestions: 0, generatedPages: 0, failed: 1, total: 1, field: 'title' },
+    });
+
+    expect(countRows('seo_suggestions', workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspaceId)).toBe(0);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_COMPLETE)).toBe(false);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_FAILED)).toBe(true);
+  });
+
+  it('bulk accept fixes provider failure marks job error and avoids page-state/activity writes', async () => {
+    webflowUpdateState.mode = 'error';
+
+    const startRes = await postJson(`/api/seo/${workspaceId}/bulk-accept-fixes`, {
+      siteId: primarySiteId,
+      fixes: [{
+        pageId: 'page-accept-fail-1',
+        check: 'meta-description',
+        suggestedFix: 'A better meta description',
+        pageSlug: 'services',
+        publishedPath: '/services/seo',
+        pageName: 'Services',
+      }],
+    });
+    expect(startRes.status).toBe(200);
+    const { jobId } = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(jobId);
+    expect(job).toMatchObject({
+      workspaceId,
+      type: 'seo-bulk-accept-fixes',
+      status: 'error',
+      message: 'Bulk accept fixes failed for all 1 fixes',
+      result: { applied: 0, failed: 1, total: 1 },
+    });
+
+    expect(countRows('page_edit_states', workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspaceId)).toBe(0);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.PAGE_STATE_UPDATED)).toBe(false);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_COMPLETE)).toBe(false);
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.BULK_OPERATION_FAILED)).toBe(true);
   });
 });
