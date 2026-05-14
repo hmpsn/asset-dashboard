@@ -3,7 +3,10 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Minus,
   Plus,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import { scoreColorClass, Icon } from '../ui';
@@ -12,6 +15,7 @@ import {
   kdColor,
   positionColor,
 } from './pageIntelligenceDisplay';
+import { summarizeScoreTrend } from './pageIntelligenceData';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageDetails } from './PageIntelligencePageDetails';
 
@@ -72,6 +76,17 @@ export function PageIntelligencePageRow({
 }: Props) {
   const strategy = page.strategy;
   const displayScore = analysis?.optimizationScore ?? strategy?.optimizationScore;
+  const scoreTrend = summarizeScoreTrend(strategy?.optimizationScoreHistory);
+  const trendIcon = scoreTrend?.direction === 'up'
+    ? TrendingUp
+    : scoreTrend?.direction === 'down'
+      ? TrendingDown
+      : Minus;
+  const trendClass = scoreTrend?.direction === 'up'
+    ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20'
+    : scoreTrend?.direction === 'down'
+      ? 'text-red-400/80 bg-red-500/8 border-red-500/20'
+      : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border-hover)]';
 
   return (
     <div className="border-b border-[var(--brand-border)]/50 last:border-b-0">
@@ -137,6 +152,15 @@ export function PageIntelligencePageRow({
           ) : null}
           {displayScore !== undefined && (
             <span className={`t-caption font-bold tabular-nums ${scoreColorClass(displayScore)}`}>{displayScore}</span>
+          )}
+          {scoreTrend && (
+            <span
+              className={`inline-flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border tabular-nums ${trendClass}`}
+              title={`Optimization score changed from ${scoreTrend.previous} to ${scoreTrend.current}`}
+            >
+              <Icon as={trendIcon} size="xs" />
+              {scoreTrend.delta > 0 ? '+' : ''}{scoreTrend.delta}
+            </span>
           )}
         </div>
       </button>

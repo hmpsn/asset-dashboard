@@ -118,6 +118,19 @@ export interface AIReviewResult {
   claimsToVerify?: string[];
 }
 
+export type AIReviewMap = Record<ReviewChecklistKey, AIReviewResult>;
+
+export interface ContentReviewEvidence {
+  peopleAlsoAsk: string[];
+  topResults: { position: number; title: string; url: string }[];
+  note: string;
+}
+
+export interface AIReviewResponse {
+  review: AIReviewMap;
+  evidence?: ContentReviewEvidence;
+}
+
 /**
  * Lightweight post summary used in admin list views (RequestList, ContentBriefs).
  * Full shape lives in GeneratedPost; this is the summary projection returned by

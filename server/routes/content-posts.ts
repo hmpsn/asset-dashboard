@@ -45,7 +45,7 @@ import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { normalizePageUrl } from '../helpers.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
-import type { AIReviewResult, AiFixResult, IssueKey, PostSection } from '../../shared/types/content.js';
+import type { AIReviewMap, AiFixResult, ContentReviewEvidence, IssueKey, PostSection } from '../../shared/types/content.js';
 import { ISSUE_KEYS, PROVENANCE_SENSITIVE_REVIEW_KEYS } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
@@ -74,9 +74,9 @@ const aiMetaFixResponseSchema = z.object({
 }).strip();
 
 function markProvenanceItemsForHumanReview(
-  review: Record<string, AIReviewResult>,
+  review: AIReviewMap,
   claimsToVerify: string[] = [],
-): Record<string, AIReviewResult> {
+): AIReviewMap {
   const next = { ...review };
   for (const key of PROVENANCE_SENSITIVE_REVIEW_KEYS) {
     const existing = next[key];
@@ -110,6 +110,18 @@ function extractNumericClaims(text: string): string[] {
     if (claims.length >= 8) break;
   }
   return claims;
+}
+
+function buildReviewEvidence(workspaceId: string, briefId: string): ContentReviewEvidence | undefined {
+  const brief = getBrief(workspaceId, briefId);
+  const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
+  const topResults = brief?.realTopResults?.filter(r => r.title && r.url).slice(0, 8) ?? [];
+  if (!peopleAlsoAsk.length && !topResults.length) return undefined;
+  return {
+    peopleAlsoAsk,
+    topResults,
+    note: 'SERP evidence used for grounding support. Reviewers should verify important claims against the original sources before approving factual checklist items.',
+  };
 }
 
 const generatePostSchema = z.object({
@@ -545,7 +557,10 @@ Return ONLY valid JSON like:
     }
 
     log.info(`AI review completed for post ${post.id}`);
-    res.json({ review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify) });
+    res.json({
+      review: markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify),
+      evidence: buildReviewEvidence(req.params.workspaceId, post.briefId),
+    });
   } catch (err) {
     log.error({ err }, 'AI review failed');
     const msg = err instanceof Error ? err.message : String(err);

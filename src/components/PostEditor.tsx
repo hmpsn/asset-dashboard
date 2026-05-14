@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
   History,
 } from 'lucide-react';
 import { useAutoSave } from '../hooks/useAutoSave';
-import { contentPosts } from '../api/content';
+import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
 import { SectionCard, Icon } from './ui';
@@ -16,7 +16,7 @@ import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
-import type { AiFixResult, IssueKey } from '../../shared/types/content';
+import type { AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 
@@ -90,6 +90,23 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const queryClient = useQueryClient();
   const postQ = useAdminPost(workspaceId, postId);
   const post = (postQ.data ?? null) as GeneratedPost | null;
+  const briefQ = useQuery({
+    queryKey: post?.briefId ? queryKeys.admin.brief(workspaceId, post.briefId) : queryKeys.admin.brief(workspaceId, 'none'),
+    queryFn: () => contentBriefs.getById(workspaceId, post!.briefId),
+    enabled: !!post?.briefId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const reviewEvidence: ContentReviewEvidence | undefined = (() => {
+    const brief = briefQ.data as ContentBrief | undefined;
+    const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
+    const topResults = brief?.realTopResults?.filter(result => result.title && result.url).slice(0, 8) ?? [];
+    if (!peopleAlsoAsk.length && !topResults.length) return undefined;
+    return {
+      peopleAlsoAsk,
+      topResults,
+      note: 'SERP evidence used for grounding support. Verify important factual claims against the original sources before checking provenance-sensitive items.',
+    };
+  })();
   const loading = postQ.isLoading;
   const error = postQ.error ? (postQ.error instanceof Error ? postQ.error.message : 'Failed to load') : '';
   const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
@@ -469,9 +486,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           onChangeStatus={(status) => saveField({ status })}
           onRunAIReview={async () => {
             const res = await contentPosts.aiReview(workspaceId, postId);
-            return res?.review ?? null;
+            return res ?? null;
           }}
           onRequestFix={handleRequestFix}
+          evidence={reviewEvidence}
         />
       )}
 

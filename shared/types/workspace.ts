@@ -1,5 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
-import type { MetricsSource } from './keywords.ts';
+import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 
 export interface EventGroup {
   id: string;
@@ -36,6 +36,10 @@ export interface PageKeywordMap {
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   metricsSource?: MetricsSource;
   validated?: boolean;
+  /** Page-specific provider keywords for this exact URL. Prefer over domain-level fallback when present. */
+  urlLevelKeywords?: UrlLevelKeyword[];
+  urlLevelKeywordSource?: 'semrush' | 'dataforseo';
+  optimizationScoreHistory?: PageOptimizationScoreSnapshot[];
   // Persisted page analysis (generated via keyword analysis, feeds into AI rewrites)
   optimizationIssues?: string[];
   recommendations?: string[];

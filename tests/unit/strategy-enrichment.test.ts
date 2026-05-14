@@ -10,12 +10,15 @@
  *  - Enrichment of raw keyword data (filterBrandedContentGaps, filterBrandedKeywords)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseSerpFeatures,
   hasSerpOpportunity,
   trendDirection,
 } from '../../server/seo-provider-signals.js';
+import { enrichKeywordStrategy } from '../../server/keyword-strategy-enrichment.js';
+import type { SeoDataProvider } from '../../server/seo-data-provider.js';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import {
   extractBrandTokens,
   isBrandedQuery,
@@ -364,6 +367,136 @@ describe('question keyword matching logic', () => {
     ];
     const result = matchQuestionKeywords('seo basics', questionKws);
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe('URL-level keyword intelligence', () => {
+  it('uses provider URL-level keywords before domain-level fallback for page assignments', async () => {
+    const provider = {
+      name: 'semrush',
+      isConfigured: () => true,
+      getUrlKeywords: async () => [
+        {
+          keyword: 'url specific keyword',
+          position: 3,
+          volume: 900,
+          difficulty: 34,
+          cpc: 2.5,
+          url: 'https://example.com/services/seo',
+          traffic: 120,
+          trafficPercent: 0,
+        },
+      ],
+      getKeywordMetrics: async () => [],
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_url_level',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/services/seo',
+          pageTitle: 'SEO',
+          primaryKeyword: 'domain fallback keyword',
+          secondaryKeywords: [],
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [{
+        keyword: 'domain fallback keyword',
+        position: 9,
+        volume: 100,
+        difficulty: 60,
+        cpc: 1,
+        url: 'https://example.com/services/seo',
+        traffic: 10,
+        trafficPercent: 0,
+      }],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'full',
+      sendProgress: () => undefined,
+    });
+
+    const page = result.strategy.pageMap?.[0];
+    expect(page?.primaryKeyword).toBe('url specific keyword');
+    expect(page?.metricsSource).toBe(METRICS_SOURCE.URL_LEVEL);
+    expect(page?.volume).toBe(900);
+    expect(page?.urlLevelKeywords?.[0]?.keyword).toBe('url specific keyword');
+  });
+
+  it('does not spend URL-level provider calls in quick SEO data mode', async () => {
+    const getUrlKeywords = vi.fn(async () => [
+      {
+        keyword: 'url specific keyword',
+        position: 3,
+        volume: 900,
+        difficulty: 34,
+        cpc: 2.5,
+        url: 'https://example.com/services/seo',
+        traffic: 120,
+        trafficPercent: 0,
+      },
+    ]);
+    const provider = {
+      name: 'semrush',
+      isConfigured: () => true,
+      getUrlKeywords,
+      getKeywordMetrics: async () => [],
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_url_level_quick',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/services/seo',
+          pageTitle: 'SEO',
+          primaryKeyword: 'domain fallback keyword',
+          secondaryKeywords: [],
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [{
+        keyword: 'domain fallback keyword',
+        position: 9,
+        volume: 100,
+        difficulty: 60,
+        cpc: 1,
+        url: 'https://example.com/services/seo',
+        traffic: 10,
+        trafficPercent: 0,
+      }],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'quick',
+      sendProgress: () => undefined,
+    });
+
+    expect(getUrlKeywords).not.toHaveBeenCalled();
+    expect(result.strategy.pageMap?.[0]?.metricsSource).toBe(METRICS_SOURCE.EXACT);
   });
 });
 

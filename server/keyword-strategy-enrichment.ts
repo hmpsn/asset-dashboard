@@ -1,6 +1,7 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
+import { normalizePath } from './helpers.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
@@ -8,6 +9,7 @@ import type { KeywordStrategySearchData } from './keyword-strategy-search-data.j
 import {
   callKeywordStrategyAI,
   type KeywordStrategyKeywordPool,
+  type StrategyPageMapEntry,
   type StrategyContentGap,
   type StrategyOutput,
 } from './keyword-strategy-ai-synthesis.js';
@@ -16,6 +18,9 @@ import { matchesQuestionKeyword } from './strategy-filters.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 
 const log = createLogger('keyword-strategy:enrichment');
+const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
+const URL_LEVEL_KEYWORD_PER_PAGE_LIMIT = 10;
+const URL_LEVEL_KEYWORD_CONCURRENCY = 3;
 
 export interface KeywordStrategyTopicCluster {
   topic: string;
@@ -67,6 +72,89 @@ export interface EnrichKeywordStrategyResult {
   cannibalization: KeywordStrategyCannibalizationIssue[];
 }
 
+function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
+  if (!baseUrl || !pagePath) return null;
+  try {
+    return new URL(normalizePath(pagePath), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
+  } catch { // catch-ok: workspace URL/page path can be malformed; URL-level enrichment degrades safely.
+    return null;
+  }
+}
+
+function chooseUrlLevelKeyword(keywords: DomainKeyword[]): DomainKeyword | undefined {
+  return keywords
+    .filter(k => k.keyword?.trim())
+    .sort((a, b) =>
+      (b.traffic ?? 0) - (a.traffic ?? 0) ||
+      (b.volume ?? 0) - (a.volume ?? 0) ||
+      (a.position || 999) - (b.position || 999)
+    )[0];
+}
+
+async function applyUrlLevelKeywordIntelligence(options: {
+  workspaceId: string;
+  baseUrl: string;
+  strategy: StrategyOutput;
+  provider: SeoDataProvider;
+}): Promise<number> {
+  const getUrlKeywords = options.provider.getUrlKeywords;
+  if (!getUrlKeywords || !options.strategy.pageMap?.length) return 0;
+
+  const candidates = options.strategy.pageMap
+    .filter(pm => !!pm.pagePath)
+    .slice(0, URL_LEVEL_KEYWORD_PAGE_LIMIT);
+
+  let enriched = 0;
+  let nextIndex = 0;
+  const enrichCandidate = async (pm: StrategyPageMapEntry): Promise<boolean> => {
+    const pageUrl = resolvePageUrl(options.baseUrl, pm.pagePath);
+    if (!pageUrl) return false;
+    try {
+      const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT);
+      const top = chooseUrlLevelKeyword(urlKeywords);
+      if (!top) return false;
+      pm.urlLevelKeywords = urlKeywords.slice(0, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT).map(k => ({
+        keyword: k.keyword,
+        position: k.position,
+        volume: k.volume,
+        difficulty: k.difficulty,
+        cpc: k.cpc,
+        traffic: k.traffic,
+        url: k.url,
+      }));
+      pm.urlLevelKeywordSource = options.provider.name === 'semrush' ? 'semrush' : 'dataforseo';
+
+      // URL-level provider data is page-specific, so it is a stronger assignment
+      // signal than domain-level organic fallback. GSC exact-query data still wins
+      // above this block when it exists.
+      if (!pm.gscKeywords?.length || !pm.primaryKeyword) {
+        pm.primaryKeyword = top.keyword;
+      }
+      pm.currentPosition = top.position || pm.currentPosition;
+      pm.volume = top.volume;
+      pm.difficulty = top.difficulty;
+      pm.cpc = top.cpc;
+      pm.metricsSource = METRICS_SOURCE.URL_LEVEL;
+      return true;
+    } catch (err) {
+      log.warn({ err, pagePath: pm.pagePath }, 'URL-level keyword enrichment failed for page');
+      return false;
+    }
+  };
+
+  const workers = Array.from(
+    { length: Math.min(URL_LEVEL_KEYWORD_CONCURRENCY, candidates.length) },
+    async () => {
+      while (nextIndex < candidates.length) {
+        const pm = candidates[nextIndex++];
+        if (await enrichCandidate(pm)) enriched++;
+      }
+    },
+  );
+  await Promise.all(workers);
+  return enriched;
+}
+
 export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOptions): Promise<EnrichKeywordStrategyResult> {
   const {
     workspaceId,
@@ -109,11 +197,20 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     }
   }
 
+  if (provider && seoDataMode === 'full') {
+    sendProgress('enrichment', 'Checking URL-level keyword intelligence...', 0.91);
+    const enriched = await applyUrlLevelKeywordIntelligence({ workspaceId, baseUrl, strategy, provider });
+    if (enriched > 0) {
+      log.info(`URL-level keyword enrichment applied to ${enriched} page${enriched === 1 ? '' : 's'}`);
+    }
+  }
+
   // Enrich pageMap with SEO provider volume/difficulty data
   if (domainKeywords.length > 0) {
     // Build lookup: keyword → metrics
     const kwLookup = new Map(domainKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
     for (const pm of strategy.pageMap ?? []) {
+      if (pm.metricsSource === METRICS_SOURCE.URL_LEVEL) continue;
       // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
       if (!pm.primaryKeyword) continue;
       const match = kwLookup.get(pm.primaryKeyword.toLowerCase());

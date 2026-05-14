@@ -19,7 +19,11 @@ describe('METRICS_SOURCE', () => {
     expect(METRICS_SOURCE.AI_ESTIMATE).toBe('ai_estimate');
   });
 
-  it('has exactly 4 keys', () => {
-    expect(Object.keys(METRICS_SOURCE)).toHaveLength(4);
+  it('URL_LEVEL equals url_level', () => {
+    expect(METRICS_SOURCE.URL_LEVEL).toBe('url_level');
+  });
+
+  it('has exactly 5 keys', () => {
+    expect(Object.keys(METRICS_SOURCE)).toHaveLength(5);
   });
 });
