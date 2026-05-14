@@ -61,9 +61,9 @@ export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancell
 // ── Content Subscription ──
 export const CONTENT_SUB_TRANSITIONS: Record<string, readonly string[]> = {
   pending:   ['active', 'cancelled'],
-  active:    ['paused', 'cancelled', 'past_due'],
-  paused:    ['active', 'cancelled'],
-  past_due:  ['active', 'cancelled'],
+  active:    ['pending', 'paused', 'cancelled', 'past_due'],
+  paused:    ['pending', 'active', 'cancelled'],
+  past_due:  ['pending', 'active', 'cancelled'],
   cancelled: [],  // terminal
 };
 

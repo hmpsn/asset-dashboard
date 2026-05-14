@@ -430,6 +430,10 @@ describe('Content Subscription transitions', () => {
       expect(validate('active', 'paused')).toBe('paused');
     });
 
+    it('active → pending', () => {
+      expect(validate('active', 'pending')).toBe('pending');
+    });
+
     it('active → past_due', () => {
       expect(validate('active', 'past_due')).toBe('past_due');
     });
@@ -442,12 +446,20 @@ describe('Content Subscription transitions', () => {
       expect(validate('paused', 'active')).toBe('active');
     });
 
+    it('paused → pending', () => {
+      expect(validate('paused', 'pending')).toBe('pending');
+    });
+
     it('paused → cancelled', () => {
       expect(validate('paused', 'cancelled')).toBe('cancelled');
     });
 
     it('past_due → active (payment recovered)', () => {
       expect(validate('past_due', 'active')).toBe('active');
+    });
+
+    it('past_due → pending', () => {
+      expect(validate('past_due', 'pending')).toBe('pending');
     });
 
     it('past_due → cancelled', () => {

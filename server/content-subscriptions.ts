@@ -10,6 +10,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
+import { CONTENT_SUB_TRANSITIONS, validateTransition } from './state-machines.js';
 import type { ContentSubscription, ContentSubPlan } from '../shared/types/content.js';
 
 const log = createLogger('content-subscriptions');
@@ -169,6 +170,12 @@ export function updateContentSubscription(
     'topicSource' | 'preferredPageTypes' | 'notes'
   >>,
 ): ContentSubscription | null {
+  const existing = getContentSubscriptionForWorkspace(workspaceId, id);
+  if (!existing) return null;
+  if (updates.status && updates.status !== existing.status) {
+    validateTransition('content_subscription', CONTENT_SUB_TRANSITIONS, existing.status, updates.status);
+  }
+
   const fieldMap: Record<string, string> = {
     status: 'status',
     stripeSubscriptionId: 'stripe_subscription_id',
@@ -198,7 +205,7 @@ export function updateContentSubscription(
     }
   }
 
-  if (sets.length === 0) return getContentSubscriptionForWorkspace(workspaceId, id);
+  if (sets.length === 0) return existing;
 
   sets.push("updated_at = @now");
   values.now = new Date().toISOString();
