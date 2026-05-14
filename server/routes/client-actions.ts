@@ -17,6 +17,7 @@ import { enqueuePlaybook } from '../playbooks.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import { toClientInboxItem, toClientInboxItems } from '../serializers/client-safe.js';
 
 const router = Router();
 
@@ -73,11 +74,11 @@ router.post('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspac
     });
   }
   broadcastActionUpdate(workspaceId, action.id, 'created');
-  res.json(action);
+  res.json(toClientInboxItem(action));
 });
 
 router.get('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(listClientActions(req.params.workspaceId));
+  res.json(toClientInboxItems(listClientActions(req.params.workspaceId)));
 });
 
 router.patch('/api/client-actions/:workspaceId/:actionId', requireWorkspaceAccess('workspaceId'), validate(adminUpdateSchema), (req, res) => {
@@ -97,11 +98,11 @@ router.patch('/api/client-actions/:workspaceId/:actionId', requireWorkspaceAcces
     addActivity(req.params.workspaceId, 'client_action_completed', `Completed client action: ${updated.title}`, updated.summary, { actionId: updated.id, sourceType: updated.sourceType });
   }
   broadcastActionUpdate(req.params.workspaceId, req.params.actionId, 'updated');
-  res.json(updated);
+  res.json(toClientInboxItem(updated));
 });
 
 router.get('/api/public/client-actions/:workspaceId', requireClientPortalAuth(), (req, res) => {
-  res.json(listClientActions(req.params.workspaceId));
+  res.json(toClientInboxItems(listClientActions(req.params.workspaceId)));
 });
 
 router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
@@ -148,7 +149,7 @@ router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requir
     enqueuePlaybook(req.params.workspaceId, updated);
   }
 
-  res.json(updated);
+  res.json(toClientInboxItem(updated));
 });
 
 export default router;

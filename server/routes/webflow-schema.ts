@@ -52,6 +52,12 @@ import {
 import { validateLeanSchema } from '../schema/validator.js';
 import { validateWholeSiteSchemaGraph } from '../schema/whole-site-graph-validator.js';
 import { isProgrammingError } from '../errors.js';
+import {
+  toAdminSchemaSnapshotView,
+  toAdminSchemaView,
+  toClientSchemaSnapshotView,
+  toClientSchemaView,
+} from '../serializers/client-safe.js';
 
 const router = Router();
 const log = createLogger('webflow-schema');
@@ -196,12 +202,8 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccess
 router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getSchemaSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
-  // Annotate each page result with its last publish date (for stale schema detection)
   const publishDates = getPublishDatesForSite(req.params.siteId);
-  for (const result of snapshot.results) {
-    (result as unknown as Record<string, unknown>).lastPublishedAt = publishDates[result.pageId] || null;
-  }
-  res.json(snapshot);
+  res.json(toAdminSchemaSnapshotView(snapshot, publishDates));
 });
 
 // ── Page Type Persistence ──
@@ -642,7 +644,7 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQu
 router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.json(null);
-  res.json(plan);
+  res.json(toAdminSchemaView(plan));
 });
 
 // PUT: update page roles / canonical entities on the plan
@@ -808,18 +810,7 @@ router.get('/api/public/schema-snapshot/:workspaceId', requireClientPortalAuth()
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const snapshot = getSchemaSnapshot(ws.webflowSiteId);
   if (!snapshot) return res.json(null);
-  // Return a simplified view — page titles, slugs, schema types only
-  const pages = snapshot.results.map(r => ({
-    pageId: r.pageId,
-    pageTitle: r.pageTitle,
-    slug: r.slug,
-    url: r.url,
-    existingSchemas: r.existingSchemas || [],
-    schemaTypes: (r.suggestedSchemas?.[0]?.template?.['@graph'] as Array<{ '@type'?: string }> || [])
-      .map(n => String(n['@type'])).filter(Boolean),
-    priority: r.suggestedSchemas?.[0]?.priority || 'medium',
-  }));
-  res.json({ pages, pageCount: snapshot.pageCount, createdAt: snapshot.createdAt });
+  res.json(toClientSchemaSnapshotView(snapshot));
 });
 
 // GET: client-readable schema plan (read-only)
@@ -829,7 +820,7 @@ router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (r
   const plan = getSchemaPlan(ws.webflowSiteId);
   if (!plan) return res.json(null);
   if (!['sent_to_client', 'client_approved', 'client_changes_requested', 'active'].includes(plan.status)) return res.json(null);
-  res.json(plan);
+  res.json(toClientSchemaView(plan));
 });
 
 // POST: client feedback on schema plan (approve / request changes)
@@ -852,7 +843,7 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
     action: 'schema_plan_feedback',
     status: newStatus,
   });
-  res.json(plan);
+  res.json(toClientSchemaView(plan));
 });
 
 // ── Pending Schemas (D7: pre-generated schema skeletons) ──

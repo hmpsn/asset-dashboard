@@ -42,6 +42,7 @@ import { validate, z } from '../middleware/validate.js';
 import { normalizePageUrl } from '../helpers.js';
 import { WS_EVENTS } from '../ws-events.js';
 import db from '../db/index.js';
+import { toClientInboxApprovalBatch, toClientInboxApprovalBatches } from '../serializers/client-safe.js';
 
 const log = createLogger('approvals');
 
@@ -138,13 +139,13 @@ router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId')
 });
 
 router.get('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(listBatches(req.params.workspaceId));
+  res.json(toClientInboxApprovalBatches(listBatches(req.params.workspaceId)));
 });
 
 router.get('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
-  res.json(batch);
+  res.json(toClientInboxApprovalBatch(batch));
 });
 
 router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -218,13 +219,13 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
 
 // --- Public Approvals (client dashboard, no auth required) ---
 router.get('/api/public/approvals/:workspaceId', requireClientPortalAuth(), (req, res) => {
-  res.json(listBatches(req.params.workspaceId));
+  res.json(toClientInboxApprovalBatches(listBatches(req.params.workspaceId)));
 });
 
 router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAuth(), (req, res) => {
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
-  res.json(batch);
+  res.json(toClientInboxApprovalBatch(batch));
 });
 
 const bulkApproveSchema = z.object({
