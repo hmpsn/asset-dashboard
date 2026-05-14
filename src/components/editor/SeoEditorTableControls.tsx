@@ -12,6 +12,7 @@ interface SeoEditorTableControlsProps {
   cmsPageCount: number;
   search: string;
   onSearchChange: (value: string) => void;
+  showSearch?: boolean;
 }
 
 export function SeoEditorTableControls({
@@ -25,6 +26,7 @@ export function SeoEditorTableControls({
   cmsPageCount,
   search,
   onSearchChange,
+  showSearch = true,
 }: SeoEditorTableControlsProps) {
   return (
     <>
@@ -70,13 +72,15 @@ export function SeoEditorTableControls({
         )}
       </div>
 
-      <input
-        type="text"
-        value={search}
-        onChange={e => onSearchChange(e.target.value)}
-        placeholder="Search pages..."
-        className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
-      />
+      {showSearch && (
+        <input
+          type="text"
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search pages..."
+          className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+        />
+      )}
     </>
   );
 }

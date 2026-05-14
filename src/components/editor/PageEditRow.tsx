@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
+import { resolvePagePath } from '../../lib/pathUtils';
 import type {
   SeoEditState,
   SeoEditorPage,
@@ -351,7 +352,7 @@ export function PageEditRow({
                 }`}
               >
                 <Icon as={isSendingToClient ? Loader2 : isSentToClient ? Check : Send} size="sm" className={isSendingToClient ? 'animate-spin' : ''} />
-                {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to Client'}
+                {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to client'}
               </button>
             )}
             {onSaveDraft && (
@@ -401,7 +402,7 @@ export function PageEditRow({
               <SerpPreview
                 title={edit?.seoTitle || page.title}
                 description={edit?.seoDescription || ''}
-                url={page.publishedPath || `/${page.slug}`}
+                url={resolvePagePath(page)}
                 siteName="Your Site"
                 size="sm"
               />

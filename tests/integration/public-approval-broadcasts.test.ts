@@ -7,13 +7,17 @@ const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{
     workspaceId: string;
     event: string;
-    payload: { batchId?: string; itemId?: string; status?: string; applied?: number };
+    payload: { batchId?: string; itemId?: string; status?: string; applied?: number; pageIds?: string[]; source?: string };
   }>,
 }));
 
 const webflowState = vi.hoisted(() => ({
   calls: [] as Array<{ pageId: string; fields: unknown; token?: string }>,
+  cmsCalls: [] as Array<{ collectionId: string; itemId: string; fieldData: unknown; token?: string }>,
+  publishCalls: [] as Array<{ collectionId: string; itemIds: string[]; token?: string }>,
   result: { success: true } as { success: boolean; error?: string },
+  cmsResult: { success: true } as { success: boolean; error?: string },
+  publishResult: { success: true } as { success: boolean; error?: string },
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -22,7 +26,7 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn((
     workspaceId: string,
     event: string,
-    payload: { batchId?: string; itemId?: string; status?: string; applied?: number },
+    payload: { batchId?: string; itemId?: string; status?: string; applied?: number; pageIds?: string[]; source?: string },
   ) => {
     broadcastState.calls.push({ workspaceId, event, payload });
   }),
@@ -35,6 +39,14 @@ vi.mock('../../server/webflow.js', async importOriginal => {
     updatePageSeo: async (pageId: string, fields: unknown, token?: string) => {
       webflowState.calls.push({ pageId, fields, token });
       return webflowState.result;
+    },
+    updateCollectionItem: async (collectionId: string, itemId: string, fieldData: unknown, token?: string) => {
+      webflowState.cmsCalls.push({ collectionId, itemId, fieldData, token });
+      return webflowState.cmsResult;
+    },
+    publishCollectionItems: async (collectionId: string, itemIds: string[], token?: string) => {
+      webflowState.publishCalls.push({ collectionId, itemIds, token });
+      return webflowState.publishResult;
     },
   };
 });
@@ -134,6 +146,10 @@ function approvalAppliedBroadcasts() {
   return broadcastState.calls.filter(call => call.event === WS_EVENTS.APPROVAL_APPLIED);
 }
 
+function pageStateBroadcasts() {
+  return broadcastState.calls.filter(call => call.event === WS_EVENTS.PAGE_STATE_UPDATED);
+}
+
 function countActivities(type: string, metadataLike: string): number {
   const row = db.prepare(`
     SELECT COALESCE(COUNT(*), 0) AS count
@@ -158,20 +174,44 @@ function latestActivityTitle(type: string, metadataLike: string): string | undef
   return row?.title;
 }
 
+function latestSeoChange(pageId: string): { fields: string; source: string } | undefined {
+  return db.prepare(`
+    SELECT fields, source
+    FROM seo_changes
+    WHERE workspace_id = ? AND page_id = ?
+    ORDER BY changed_at DESC
+    LIMIT 1
+  `).get(wsId, pageId) as { fields: string; source: string } | undefined;
+}
+
+function countTrackedActionsForSource(sourceId: string): number {
+  const row = db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count
+    FROM tracked_actions
+    WHERE workspace_id = ? AND source_type = 'approval' AND source_id = ?
+  `).get(wsId, sourceId) as { count: number };
+  return row.count;
+}
+
 beforeAll(async () => {
   await startTestServer();
   const ws = createWorkspace('Public Approval Broadcasts', siteId);
   wsId = ws.id;
-});
+}, 30_000);
 
 beforeEach(() => {
   broadcastState.calls = [];
   webflowState.calls = [];
+  webflowState.cmsCalls = [];
+  webflowState.publishCalls = [];
   webflowState.result = { success: true };
+  webflowState.cmsResult = { success: true };
+  webflowState.publishResult = { success: true };
 });
 
 afterAll(async () => {
   db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM seo_changes WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM page_edit_states WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM approval_batches WHERE workspace_id = ?').run(wsId);
@@ -187,7 +227,7 @@ afterAll(async () => {
   } else {
     process.env.WEBFLOW_API_TOKEN = originalWebflowToken;
   }
-});
+}, 30_000);
 
 describe('public approval broadcasts and workflow side effects', () => {
   it('broadcasts exactly once when a client approves an approval item', async () => {
@@ -401,6 +441,11 @@ describe('public approval broadcasts and workflow side effects', () => {
     ]);
     expect(getBatch(wsId, batch.id)?.items[0].status).toBe('applied');
     expect(getPageState(wsId, item.pageId)?.status).toBe('live');
+    expect(latestSeoChange(item.pageId)).toEqual(expect.objectContaining({
+      fields: '["description"]',
+      source: 'approval',
+    }));
+    expect(countTrackedActionsForSource(item.id)).toBe(1);
     expect(approvalAppliedBroadcasts()).toEqual([
       {
         workspaceId: wsId,
@@ -408,7 +453,121 @@ describe('public approval broadcasts and workflow side effects', () => {
         payload: { batchId: batch.id, applied: 1 },
       },
     ]);
+    expect(pageStateBroadcasts()).toEqual([
+      {
+        workspaceId: wsId,
+        event: WS_EVENTS.PAGE_STATE_UPDATED,
+        payload: { pageIds: [item.pageId], source: 'approval' },
+      },
+    ]);
     expect(countActivities('approval_applied', `%"batchId":"${batch.id}"%`)).toBe(1);
+  });
+
+  it('applies real CMS item approvals through collection item write and publish', async () => {
+    const batch = createBatch(wsId, siteId, 'CMS Apply Broadcast', [
+      {
+        pageId: 'wf-item-1',
+        pageTitle: 'CMS Article',
+        pageSlug: 'blog/cms-article',
+        field: 'meta-description',
+        collectionId: 'collection-blog',
+        currentValue: 'Old CMS description',
+        proposedValue: 'New CMS description',
+      },
+    ]);
+    const item = batch.items[0];
+    updateItem(wsId, batch.id, item.id, { status: 'approved' });
+    broadcastState.calls = [];
+
+    const res = await postJson(`/api/public/approvals/${wsId}/${batch.id}/apply`, {});
+    expect(res.status).toBe(200);
+    const body = await res.json() as { applied: number; failed: number };
+    expect(body).toMatchObject({ applied: 1, failed: 0 });
+
+    expect(webflowState.cmsCalls).toEqual([
+      {
+        collectionId: 'collection-blog',
+        itemId: 'wf-item-1',
+        fieldData: { 'meta-description': 'New CMS description' },
+        token: 'test-webflow-token-approval-broadcasts',
+      },
+    ]);
+    expect(webflowState.publishCalls).toEqual([
+      {
+        collectionId: 'collection-blog',
+        itemIds: ['wf-item-1'],
+        token: 'test-webflow-token-approval-broadcasts',
+      },
+    ]);
+    expect(getBatch(wsId, batch.id)?.items[0].status).toBe('applied');
+    expect(getPageState(wsId, item.pageId)?.status).toBe('live');
+    expect(approvalAppliedBroadcasts()).toEqual([
+      {
+        workspaceId: wsId,
+        event: WS_EVENTS.APPROVAL_APPLIED,
+        payload: { batchId: batch.id, applied: 1 },
+      },
+    ]);
+    expect(pageStateBroadcasts()).toEqual([
+      {
+        workspaceId: wsId,
+        event: WS_EVENTS.PAGE_STATE_UPDATED,
+        payload: { pageIds: [item.pageId], source: 'approval' },
+      },
+    ]);
+  });
+
+  it('leaves CMS approval unapplied when draft update succeeds but publish fails', async () => {
+    const batch = createBatch(wsId, siteId, 'CMS Publish Failure', [
+      {
+        pageId: 'wf-item-publish-failure',
+        pageTitle: 'CMS Article',
+        pageSlug: 'blog/cms-article',
+        field: 'meta-title',
+        collectionId: 'collection-blog',
+        currentValue: 'Old CMS title',
+        proposedValue: 'New CMS title',
+      },
+    ]);
+    const item = batch.items[0];
+    updateItem(wsId, batch.id, item.id, { status: 'approved' });
+    webflowState.publishResult = { success: false, error: 'Webflow publish failed' };
+    broadcastState.calls = [];
+
+    const res = await postJson(`/api/public/approvals/${wsId}/${batch.id}/apply`, {});
+    expect(res.status).toBe(200);
+    const body = await res.json() as { applied: number; failed: number; results: Array<{ success: boolean; error?: string }> };
+    expect(body.applied).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.results[0]).toMatchObject({ success: false, error: 'Webflow publish failed' });
+
+    expect(webflowState.cmsCalls).toEqual([
+      {
+        collectionId: 'collection-blog',
+        itemId: 'wf-item-publish-failure',
+        fieldData: { 'meta-title': 'New CMS title' },
+        token: 'test-webflow-token-approval-broadcasts',
+      },
+    ]);
+    expect(webflowState.publishCalls).toEqual([
+      {
+        collectionId: 'collection-blog',
+        itemIds: ['wf-item-publish-failure'],
+        token: 'test-webflow-token-approval-broadcasts',
+      },
+    ]);
+    expect(getBatch(wsId, batch.id)?.items[0].status).toBe('approved');
+    expect(getPageState(wsId, item.pageId)).toBeUndefined();
+    expect(latestSeoChange(item.pageId)).toBeUndefined();
+    expect(countTrackedActionsForSource(item.id)).toBe(0);
+    expect(approvalAppliedBroadcasts()).toEqual([
+      {
+        workspaceId: wsId,
+        event: WS_EVENTS.APPROVAL_APPLIED,
+        payload: { batchId: batch.id, applied: 0 },
+      },
+    ]);
+    expect(pageStateBroadcasts()).toEqual([]);
   });
 
   it('does not mark items applied when the Webflow apply path fails', async () => {

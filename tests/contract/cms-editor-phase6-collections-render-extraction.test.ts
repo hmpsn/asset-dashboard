@@ -10,7 +10,7 @@ describe('CmsEditor phase-6 collections render extraction contract', () => {
 
     expect(cmsEditorSource).toContain("from './cms-editor/CmsEditorCollections'");
     expect(cmsEditorSource).toContain('<CmsEditorCollections');
-    expect(cmsEditorSource).toContain('collections={collections}');
+    expect(cmsEditorSource).toContain('collections={displayCollections}');
     expect(cmsEditorSource).toContain('toggleSelectAllInCollection={toggleSelectAllInCollection}');
     expect(cmsEditorSource).toContain('saveItem={saveItem}');
     expect(cmsEditorSource).toContain('aiRewriteBoth={aiRewriteBoth}');

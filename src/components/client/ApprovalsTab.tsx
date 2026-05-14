@@ -8,6 +8,7 @@ import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
 import { findPageMapEntryBySlug } from '../../lib/pathUtils';
+import { isClientApplyableBatch } from './approvalApplyability';
 
 type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
 
@@ -85,9 +86,6 @@ export function ApprovalsTab({
   const appliedCount = approvalBatches.filter(b =>
     b.items.length > 0 && b.items.every(i => i.status === 'applied')
   ).length;
-
-  const isClientApplyableBatch = (batch: ApprovalBatch) =>
-    batch.items.every(i => (i.field === 'seoTitle' || i.field === 'seoDescription') && !i.collectionId && !i.pageId.startsWith('cms-'));
 
   const filteredBatches = approvalBatches.filter(batch => {
     if (batchFilter === 'needs-action') return batch.items.some(i => i.status === 'pending' || !i.status);

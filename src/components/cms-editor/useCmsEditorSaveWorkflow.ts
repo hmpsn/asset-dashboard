@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { patch } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface UseCmsEditorSaveWorkflowArgs {
   siteId: string;
@@ -10,6 +12,7 @@ interface UseCmsEditorSaveWorkflowArgs {
   setDirty: Dispatch<SetStateAction<Set<string>>>;
   setSaved: Dispatch<SetStateAction<Set<string>>>;
   refreshStates: () => void;
+  queryClient: QueryClient;
 }
 
 export function useCmsEditorSaveWorkflow({
@@ -21,6 +24,7 @@ export function useCmsEditorSaveWorkflow({
   setDirty,
   setSaved,
   refreshStates,
+  queryClient,
 }: UseCmsEditorSaveWorkflowArgs) {
   const saveItem = async (collectionId: string, itemId: string) => {
     const fields = edits[itemId];
@@ -50,6 +54,8 @@ export function useCmsEditorSaveWorkflow({
       });
       setSaved(previous => new Set(previous).add(itemId));
       refreshStates();
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.cmsEditor(siteId, workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
     } catch (error) {
       console.error('CmsEditor operation failed:', error);
       setErrors(previous => ({ ...previous, [itemId]: 'Network error' }));

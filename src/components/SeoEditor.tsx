@@ -29,9 +29,10 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   fixContext?: FixContext | null;
+  externalSearch?: string;
 }
 
-export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
+export function SeoEditor({ siteId, workspaceId, fixContext, externalSearch }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
   const { cancelJob, startJob, trackJob } = useBackgroundTasks();
@@ -64,6 +65,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [search, setSearch] = useState('');
+  const effectiveSearch = externalSearch ?? search;
   const writablePages = useMemo(() => filterWritablePages(pages), [pages]);
   const cmsPageCount = pages.length - writablePages.length;
   const {
@@ -149,8 +151,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   }, [writablePages, recsLoaded, recsForPage]);
 
   const filteredPages = useMemo(
-    () => filterAndSortSeoPages(writablePages, { search, metadataRecommendationCountByPageId }),
-    [writablePages, search, metadataRecommendationCountByPageId],
+    () => filterAndSortSeoPages(writablePages, { search: effectiveSearch, metadataRecommendationCountByPageId }),
+    [writablePages, effectiveSearch, metadataRecommendationCountByPageId],
   );
   const analyzedWritablePagesCount = useMemo(
     () => writablePages.filter(page => analyzedPages.has(page.id)).length,
@@ -265,8 +267,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         analyzedPagesCount={analyzedWritablePagesCount}
         totalPages={writablePages.length}
         cmsPageCount={cmsPageCount}
-        search={search}
+        search={effectiveSearch}
         onSearchChange={setSearch}
+        showSearch={externalSearch === undefined}
       />
 
       <SeoEditorWorkflowPanels

@@ -22,12 +22,15 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
@@ -110,6 +113,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
       qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.pageJoinPagesAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });

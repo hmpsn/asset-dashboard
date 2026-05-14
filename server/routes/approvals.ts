@@ -22,6 +22,8 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
+  publishCollectionItems,
+  updateCollectionItem,
   updatePageSeo,
 } from '../webflow.js';
 import {
@@ -65,6 +67,22 @@ const APPROVAL_FIELD_LABELS: Record<string, string> = {
 
 function approvalActivityLabel(field: string): string {
   return APPROVAL_FIELD_LABELS[field] ?? field.replace(/[_-]+/g, ' ');
+}
+
+const CMS_NON_SEO_APPROVAL_FIELDS = new Set(['name', 'slug']);
+
+function isCmsSeoApprovalField(field: string): boolean {
+  const normalized = field.trim().toLowerCase();
+  return normalized.length > 0 && !CMS_NON_SEO_APPROVAL_FIELDS.has(normalized);
+}
+
+function normalizeSeoChangeField(field: string): string {
+  if (field === 'seoTitle') return 'title';
+  if (field === 'seoDescription') return 'description';
+  const normalized = field.trim().toLowerCase();
+  if (normalized.includes('title')) return 'title';
+  if (normalized.includes('description') || normalized.includes('desc')) return 'description';
+  return normalized || field;
 }
 
 const createBatchSchema = z.object({
@@ -359,8 +377,12 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   const approved = batch.items.filter(i => i.status === 'approved');
   if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
-  if (approved.some(i => (i.field !== 'seoTitle' && i.field !== 'seoDescription') || i.collectionId || i.pageId.startsWith('cms-'))) {
-    return res.status(400).json({ error: 'Only static page SEO title and meta description approvals can be applied by clients in this version.' });
+  if (approved.some(i => {
+    if (i.pageId.startsWith('cms-')) return true;
+    if (i.collectionId) return !isCmsSeoApprovalField(i.field);
+    return i.field !== 'seoTitle' && i.field !== 'seoDescription';
+  })) {
+    return res.status(400).json({ error: 'Only static page SEO title/meta approvals and real CMS item approvals can be applied by clients.' });
   }
 
   const results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }> = [];
@@ -376,11 +398,29 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
       }
       const value = item.clientValue || item.proposedValue;
-      const fields = item.field === 'seoTitle'
-        ? { seo: { title: value } }
-        : { seo: { description: value } };
-      const seoResult = await updatePageSeo(item.pageId, fields, token);
-      if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
+      if (item.collectionId) {
+        const cmsResult = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
+        if (cmsResult.success === false) throw new Error(cmsResult.error || 'CMS item update failed');
+        const publishResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
+        if (publishResult.success === false) {
+          log.warn(
+            {
+              batchId: req.params.batchId,
+              collectionId: item.collectionId,
+              itemId: item.pageId,
+              field: item.field,
+            },
+            'CMS approval apply updated draft but publish failed',
+          );
+          throw new Error(publishResult.error || 'CMS item publish failed');
+        }
+      } else {
+        const fields = item.field === 'seoTitle'
+          ? { seo: { title: value } }
+          : { seo: { description: value } };
+        const seoResult = await updatePageSeo(item.pageId, fields, token);
+        if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
+      }
       appliedIds.push(item.id);
       results.push({ itemId: item.id, pageId: item.pageId, success: true });
     } catch (err) {
@@ -395,8 +435,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       if (r.success) {
         updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
         const appliedItem = approved.find(i => i.id === r.itemId);
-        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription')) {
-          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : 'description';
+        if (appliedItem) {
+          const fieldName = normalizeSeoChangeField(appliedItem.field);
           const rawAppliedPagePath = appliedItem.publishedPath || appliedItem.pageSlug || '';
           const pagePath = rawAppliedPagePath ? normalizePageUrl(rawAppliedPagePath) : '';
           recordSeoChange(req.params.workspaceId, r.pageId, pagePath, appliedItem.pageTitle || '', [fieldName], 'approval');
@@ -412,11 +452,18 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   }
 
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_APPLIED, { batchId: req.params.batchId, applied: appliedIds.length });
+  if (appliedIds.length > 0) {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageIds: results.filter(result => result.success).map(result => result.pageId),
+      source: 'approval',
+    });
+  }
 
   // Record for outcome tracking — only successfully applied meta updates
   try {
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
-      if (item.field === 'seoTitle' || item.field === 'seoDescription') {
+      const fieldName = normalizeSeoChangeField(item.field);
+      if (fieldName === 'title' || fieldName === 'description') {
         if (getActionBySource('approval', item.id)) continue;
         const rawPagePath = item.publishedPath || item.pageSlug || '';
         const pagePath = rawPagePath ? normalizePageUrl(rawPagePath) : null;

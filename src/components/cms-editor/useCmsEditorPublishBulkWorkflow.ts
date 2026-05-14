@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { post } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 import {
   getExtraSeoFields,
   getTitleAndDescriptionFields,
@@ -18,6 +20,7 @@ interface UseCmsEditorPublishBulkWorkflowArgs {
   setExpandedItems: Dispatch<SetStateAction<Set<string>>>;
   aiRewrite: (collectionId: string, itemId: string, fieldSlug: string) => Promise<boolean>;
   aiRewriteBoth: (collectionId: string, itemId: string, titleSlug: string, descSlug: string) => Promise<boolean>;
+  queryClient: QueryClient;
 }
 
 export function useCmsEditorPublishBulkWorkflow({
@@ -30,6 +33,7 @@ export function useCmsEditorPublishBulkWorkflow({
   setExpandedItems,
   aiRewrite,
   aiRewriteBoth,
+  queryClient,
 }: UseCmsEditorPublishBulkWorkflowArgs) {
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
@@ -57,6 +61,8 @@ export function useCmsEditorPublishBulkWorkflow({
       const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds, siteId, workspaceId });
       if (result.success) {
         setPublished(previous => new Set(previous).add(collectionId));
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.cmsEditor(siteId, workspaceId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
         const timeoutId = setTimeout(() => {
           setPublished(previous => {
             const next = new Set(previous);
