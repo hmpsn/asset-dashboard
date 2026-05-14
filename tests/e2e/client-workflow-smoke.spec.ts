@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 let workspaceId = '';
 let approvalBatchId = '';
 let approvalItemId = '';
+let schemaSiteId = '';
 
 test.describe('Client workflow smoke pack', () => {
   test.beforeAll(async ({ request }) => {
@@ -12,12 +13,14 @@ test.describe('Client workflow smoke pack', () => {
     expect(wsRes.ok()).toBe(true);
     const wsBody = await wsRes.json();
     workspaceId = wsBody.id;
+    schemaSiteId = `schema-smoke-${Date.now()}`;
 
     await request.patch(`/api/workspaces/${workspaceId}`, {
       data: {
         clientPortalEnabled: true,
         tier: 'growth',
         billingMode: 'platform',
+        webflowSiteId: schemaSiteId,
       },
     });
   });
@@ -25,6 +28,9 @@ test.describe('Client workflow smoke pack', () => {
   test.afterAll(async ({ request }) => {
     if (approvalBatchId) {
       await request.delete(`/api/approvals/${workspaceId}/${approvalBatchId}`);
+    }
+    if (schemaSiteId) {
+      await request.delete(`/api/webflow/schema-plan/${schemaSiteId}`).catch(() => undefined);
     }
     if (workspaceId) {
       await request.delete(`/api/workspaces/${workspaceId}`);
@@ -121,5 +127,66 @@ test.describe('Client workflow smoke pack', () => {
       typeof terminal!.message === 'string' ||
       typeof terminal!.error === 'string',
     ).toBe(true);
+  });
+
+  test('workflow smoke: schema + content publish visibility stays coherent across public reads', async ({ request }) => {
+    const requestRes = await request.post(`/api/public/content-request/${workspaceId}`, {
+      data: {
+        topic: `Smoke Publish Topic ${Date.now()}`,
+        targetKeyword: 'smoke publish keyword',
+        intent: 'informational',
+        priority: 'medium',
+        rationale: 'Smoke visibility flow',
+        source: 'client',
+        serviceType: 'brief_only',
+      },
+    });
+    expect(requestRes.ok()).toBe(true);
+    const created = await requestRes.json() as { id: string };
+
+    const deliveredRes = await request.patch(`/api/content-requests/${workspaceId}/${created.id}`, {
+      data: {
+        status: 'delivered',
+        deliveryUrl: 'https://example.test/smoke-publish',
+        deliveryNotes: 'Ready to publish',
+      },
+    });
+    expect(deliveredRes.ok()).toBe(true);
+
+    const publishedRes = await request.patch(`/api/content-requests/${workspaceId}/${created.id}`, {
+      data: { status: 'published' },
+    });
+    expect(publishedRes.ok()).toBe(true);
+
+    const publicContentRes = await request.get(`/api/public/content-requests/${workspaceId}`);
+    expect(publicContentRes.ok()).toBe(true);
+    const publicContent = await publicContentRes.json() as Array<{ id: string; status: string; deliveryUrl?: string }>;
+    const published = publicContent.find(item => item.id === created.id);
+    expect(published).toBeDefined();
+    expect(published?.status).toBe('published');
+    expect(published?.deliveryUrl).toBe('https://example.test/smoke-publish');
+
+    const generatePlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}`);
+    expect(generatePlanRes.ok()).toBe(true);
+
+    const sendPlanRes = await request.post(`/api/webflow/schema-plan/${schemaSiteId}/send-to-client`);
+    expect(sendPlanRes.ok()).toBe(true);
+
+    const publicSchemaRes = await request.get(`/api/public/schema-plan/${workspaceId}`);
+    expect(publicSchemaRes.ok()).toBe(true);
+    const publicSchema = await publicSchemaRes.json() as { id: string; status: string };
+    expect(publicSchema).toBeTruthy();
+    expect(typeof publicSchema.id).toBe('string');
+    expect(publicSchema.status).toBe('sent_to_client');
+
+    const feedbackRes = await request.post(`/api/public/schema-plan/${workspaceId}/feedback`, {
+      data: { action: 'approve' },
+    });
+    expect(feedbackRes.ok()).toBe(true);
+
+    const approvedSchemaRes = await request.get(`/api/public/schema-plan/${workspaceId}`);
+    expect(approvedSchemaRes.ok()).toBe(true);
+    const approvedSchema = await approvedSchemaRes.json() as { status: string };
+    expect(approvedSchema.status).toBe('client_approved');
   });
 });

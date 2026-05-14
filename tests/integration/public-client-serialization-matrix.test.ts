@@ -88,6 +88,9 @@ beforeAll(async () => {
     webflowSiteId: siteAId,
     clientPortalEnabled: true,
     clientPassword: '',
+    tier: 'growth',
+    stripeCustomerId: 'cus_matrix_secret',
+    stripeSubscriptionId: 'sub_matrix_secret',
   });
   updateWorkspace(workspaceBId, {
     webflowSiteId: siteBId,
@@ -210,6 +213,48 @@ afterAll(async () => {
 });
 
 describe('public/client serialization contract matrix', () => {
+  it('public workspace read exposes client-safe fields and strips sensitive admin fields', async () => {
+    const res = await api(`/api/public/workspace/${workspaceAId}`);
+    expect(res.status).toBe(200);
+    const workspace = await res.json() as Record<string, unknown>;
+
+    expect(workspace.id).toBe(workspaceAId);
+    expect(workspace.name).toBe('Public Client Serialization Matrix A');
+    expect(workspace.tier).toBe('growth');
+    expect(workspace.baseTier).toBe('growth');
+    expect(workspace.clientPortalEnabled).toBe(true);
+    expect(workspace.requiresPassword).toBe(false);
+    expect(typeof workspace.stripeEnabled).toBe('boolean');
+    expect(workspace.billingMode).toBe('platform');
+
+    expect(workspace.webflowToken).toBeUndefined();
+    expect(workspace.clientPassword).toBeUndefined();
+    expect(workspace.stripeCustomerId).toBeUndefined();
+    expect(workspace.stripeSubscriptionId).toBeUndefined();
+    expect(workspace.portalContacts).toBeUndefined();
+    expect(workspace.knowledgeBase).toBeUndefined();
+  });
+
+  it('public intelligence read stays client-safe and never leaks workspace secrets', async () => {
+    const res = await api(`/api/public/intelligence/${workspaceAId}`);
+    expect(res.status).toBe(200);
+    const intelligence = await res.json() as Record<string, unknown>;
+
+    expect(intelligence.workspaceId).toBe(workspaceAId);
+    expect(intelligence.tier).toBe('growth');
+    expect(intelligence.assembledAt).toBeTypeOf('string');
+    expect('insightsSummary' in intelligence).toBe(true);
+    expect('pipelineStatus' in intelligence).toBe(true);
+    expect('learningHighlights' in intelligence).toBe(true);
+
+    expect(intelligence.webflowToken).toBeUndefined();
+    expect(intelligence.clientPassword).toBeUndefined();
+    expect(intelligence.stripeCustomerId).toBeUndefined();
+    expect(intelligence.stripeSubscriptionId).toBeUndefined();
+    expect(intelligence.eventConfig).toBeUndefined();
+    expect(intelligence.eventGroups).toBeUndefined();
+  });
+
   it('public approvals read stays workspace-scoped and exposes approval item essentials', async () => {
     const res = await api(`/api/public/approvals/${workspaceAId}`);
     expect(res.status).toBe(200);
