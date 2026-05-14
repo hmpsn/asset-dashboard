@@ -144,7 +144,7 @@
           "est": "4-6h",
           "priority": "P2",
           "status": "pending",
-          "notes": "Add or expand contract tests for high-value serialization seams: /api/public/workspace/:id, client inbox endpoints, client intelligence endpoints, content plan/review endpoints, schema validation/review surfaces, and other public/client read paths where a server field can exist but fail to serialize to the consuming UI."
+          "notes": "Add or expand contract tests for high-value serialization seams: /api/public/workspace/:id, client inbox endpoints, client intelligence endpoints, content plan/review endpoints, schema validation/review surfaces, and other public/client read paths where a server field can exist but fail to serialize to the consuming UI. Focused serialization matrix slice shipped 2026-05-14: added end-to-end read-path contract coverage for public approvals, content requests, client actions, content-plan list/detail, schema snapshot, and schema plan visibility states (including draft suppression) with explicit workspace-isolation assertions and field-level safe-shape checks."
         },
         {
           "id": "platform-org-docs-freshness-pass",
@@ -209,7 +209,7 @@
           "est": "1-2w",
           "priority": "P1",
           "status": "pending",
-          "notes": "Add focused component/workflow tests for Client Portal and Inbox decisions/conversations/reviews, schema review, content request/review, tier gates, empty/error/loading states, and tab deep-link behavior. Add a small E2E smoke pack for admin send-to-client -> client decision -> admin update, billing/tier gate visibility, background job progress/result, and schema/content publish flows. Keep this to high-value journeys rather than exhaustive UI snapshots."
+          "notes": "Add focused component/workflow tests for Client Portal and Inbox decisions/conversations/reviews, schema review, content request/review, tier gates, empty/error/loading states, and tab deep-link behavior. Add a small E2E smoke pack for admin send-to-client -> client decision -> admin update, billing/tier gate visibility, background job progress/result, and schema/content publish flows. Keep this to high-value journeys rather than exhaustive UI snapshots. Focused smoke slice shipped 2026-05-14: added a Playwright client workflow smoke pack that validates admin->client->admin decision convergence, public tier/billing visibility coherence, deep-link URL stability (`/client/:workspaceId/inbox?tab=decisions`), and async background-job status surfaces."
         },
         {
           "id": "platform-test-coverage-ratchet-ci",
