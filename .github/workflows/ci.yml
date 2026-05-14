@@ -206,6 +206,19 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Enforce coverage ratchet guardrails
+        run: npm run verify:coverage-ratchet
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-artifacts
+          path: |
+            coverage/coverage-summary.json
+            coverage/lcov.info
+          retention-days: 14
+
   check:
     if: always()
     needs: [changes, quality, test, coverage]

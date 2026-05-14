@@ -87,7 +87,7 @@ export default defineConfig(async () => ({
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'text-summary', 'lcov'],
+      reporter: ['text', 'text-summary', 'lcov', 'json-summary'],
       reportsDirectory: './coverage',
       include: ['server/**/*.ts', 'src/**/*.{ts,tsx}', 'shared/**/*.ts'],
       exclude: [
