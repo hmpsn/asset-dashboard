@@ -27,13 +27,13 @@ import {
   getContentRequest,
 } from '../../server/content-requests.js';
 
-const ctx = createTestContext(13308);
+const ctx = createTestContext(13273);
 const { api } = ctx;
 
 let wsAId = '';
 let wsBId = '';
 let wsAWebflowSiteId = '';
-let cleanupWorkspaces: () => void;
+let cleanupWorkspaces: () => void = () => {};
 
 // IDs for data seeded into workspace A
 let wsABatchId = '';

@@ -90,6 +90,11 @@ const ROUTE_MATRIX: RouteSignal[] = [
     routeHints: ['/api/webflow/collections', 'PAGE_STATE_UPDATED', 'cms-publish'],
     files: ['tests/integration/webflow-cms-mutation-safety.test.ts'],
   },
+  {
+    routeId: 'copy-batch-async-writes',
+    routeHints: ['/api/copy/:workspaceid/:blueprintid/batch', 'COPY_BATCH_PROGRESS', 'COPY_BATCH_COMPLETE'],
+    files: ['tests/integration/copy-batch-mutation-safety.test.ts'],
+  },
 ];
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
