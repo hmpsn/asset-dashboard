@@ -153,10 +153,15 @@ jobs:
         with:
           pattern: blob-report-shard-*
           path: all-blob-reports/
-          merge-multiple: true
+
+      - name: Prepare shard blob reports
+        run: |
+          mkdir -p merged-blob-reports
+          find all-blob-reports -name '*.zip' -type f -exec cp {} merged-blob-reports/ \;
+          test -n "$(find merged-blob-reports -name '*.zip' -type f -print -quit)"
 
       - name: Merge shard reports
-        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+        run: npx playwright merge-reports --reporter=html ./merged-blob-reports
 
       - name: Upload merged Playwright report
         uses: actions/upload-artifact@v5
