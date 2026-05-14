@@ -179,6 +179,7 @@ export const queryKeys = {
     anomalies: (wsId: string) => ['client-anomalies', wsId] as const,
     approvals: (wsId: string) => ['client-approvals', wsId] as const,
     clientActions: (wsId: string) => ['client-actions', wsId] as const,
+    workOrders: (wsId: string) => ['client-work-orders', wsId] as const,
     requests: (wsId: string) => ['client-requests', wsId] as const,
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
