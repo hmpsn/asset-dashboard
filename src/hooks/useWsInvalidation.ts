@@ -124,6 +124,30 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
     },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });

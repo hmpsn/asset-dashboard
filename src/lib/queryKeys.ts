@@ -189,6 +189,7 @@ export const queryKeys = {
     schemaSnapshot: (wsId: string) => ['client-schema-snapshot', wsId] as const,
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
+    contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
     pageKeywords: (wsId: string) => ['client-page-keywords', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,
