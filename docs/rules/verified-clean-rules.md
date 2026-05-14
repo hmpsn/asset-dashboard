@@ -84,6 +84,7 @@ explicit justification.
 | formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices) | regex-shell | Literal function name with nested match; grep succeeds. |
 | Placeholder test assertion — expect(true).toBe(true) | regex-shell | Fully-escaped literal; grep succeeds; `tests/` pathFilter correctly opted in after the EXCLUDED_DIRS fix. |
 | Source-sniffing in tests (readFileSync on .ts/.tsx source) | regex-shell | Pattern `readFileSync\(.*\.(ts\|tsx)`; grep succeeds; intentional endpoint migration guards must use `// readFile-ok` on the source-read line. Current migration contract tests use those hatches explicitly, so full-repo scan reports ✓. |
+| Vacuous .every() in tests (no length guard) | regex-shell | Pattern `\.every\(` with pathFilter `tests/`; excludeLines require a nearby non-vacuous guard (`.length`, `toBeGreaterThan`, `toHaveLength`) or explicit `// every-ok` hatch. Full-repo scan reports ✓ and manual grep confirms no unguarded `.every()` assertions remain. |
 | Bare JSON.parse on DB row column | regex-shell | Literal `JSON\.parse\(row\.`; grep succeeds; json-validation.ts and migrate-json.ts are excluded. |
 | Unguarded SET status = ? (state machine transition) | regex-shell | Pattern `SET\s+(status\|batch_status)\s*=\s*[?@]`; standard alternation; grep succeeds. |
 | Raw bulk_lookup string outside keywords type file | regex-shell | Literal `'bulk_lookup'`; grep succeeds. |
@@ -163,7 +164,7 @@ explicit justification.
 | prediction-showcase-ungated | customCheck-fixture | customCheck scans `src/**/*.tsx` for `<PredictionShowcaseCard` on non-comment lines and checks whether `!winsEnabled` appears on the same line or within 2 preceding lines. Pre-existing usage in `src/components/client/OverviewTab.tsx:331` suppressed with `{/* prediction-showcase-ungated-ok */}` on the immediately preceding line. Hatch `prediction-showcase-ungated-ok`. Fixture tests (Task 5) cover: bare usage trigger, guarded usage negative, hatch suppression. Rule reports ✓ on full-repo scan. |
 | inbox-action-queue-strip | backfill-complete | Pattern `ActionQueueStrip`; restricted to files named exactly `InboxTab.tsx`. Pre-existing JSDoc comment reference in `src/components/client/InboxTab.tsx:36` suppressed with `inbox-action-queue-strip-ok` appended to the comment line (pattern-based grep matches the comment; hatch is placed inline on the matched line). Hatch `inbox-action-queue-strip-ok`. Rule reports ✓ on full-repo scan after hatch comment added. |
 
-**Count: 98 verified-clean rules.**
+**Count: 99 verified-clean rules.**
 
 > Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
 > warn severity because a full-repo `--all` scan finds ~11 remaining

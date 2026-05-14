@@ -180,8 +180,9 @@
           "source": "Platform test coverage review 2026-05-13",
           "est": "1-2w",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Focused slice shipped 2026-05-13: added route-contract coverage for workspace-scoped admin reads, HMAC/no-JWT admin pass-through, cross-workspace client-user mutation guards, public workspace client-safe serialization, trial/effective tier fields, protected public billing routes, payment-status scoping, and admin payment workspace isolation. Keep this item pending until the broader route-contract suite also covers the remaining auth, Stripe checkout/webhook, trial/tier, and entitlement seams across the full P0 scope."
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Focused slice shipped 2026-05-13: added route-contract coverage for workspace-scoped admin reads, HMAC/no-JWT admin pass-through, cross-workspace client-user mutation guards, public workspace client-safe serialization, trial/effective tier fields, protected public billing routes, payment-status scoping, and admin payment workspace isolation. Closeout shipped 2026-05-14: completed remaining P0 auth/billing seams with route-level webhook ingress contracts (`/api/stripe/webhook` missing signature, verification failure, and success path), and validated the broader contract matrix across `wave2b-route-contracts`, `public-portal-auth`, `stripe-admin-auth`, `stripe-checkout-flow`, `stripe-webhooks`, `stripe-webhook-idempotency`, `journey-payment-tier-upgrade`, and `tier-gate-enforcement`."
         },
         {
           "id": "platform-test-mutation-safety-suite",
