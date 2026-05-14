@@ -668,6 +668,75 @@ describe('Content Subscription — past_due and expiration', () => {
     expect(contentSubUpdates).toHaveLength(0);
   });
 
+  it('customer.subscription.updated maps paused and incomplete statuses without mutating workspace plan state', async () => {
+    updateWorkspace(ws.workspaceId, {
+      tier: 'growth',
+      stripeSubscriptionId: 'sub_test_platform_plan_guard',
+    });
+    const sub = seedSubscription(ws.workspaceId, {
+      status: 'active',
+      stripeSubscriptionId: 'sub_test_pause_resume_mapping',
+    });
+
+    await handleWebhookEvent(createWebhookEvent('customer.subscription.updated', {
+      id: 'sub_test_pause_resume_mapping',
+      metadata: { workspaceId: ws.workspaceId },
+      status: 'paused',
+    }) as never);
+    expect(getContentSubscription(sub.id)?.status).toBe('paused');
+
+    await handleWebhookEvent(createWebhookEvent('customer.subscription.updated', {
+      id: 'sub_test_pause_resume_mapping',
+      metadata: { workspaceId: ws.workspaceId },
+      status: 'incomplete',
+    }) as never);
+    expect(getContentSubscription(sub.id)?.status).toBe('pending');
+
+    const workspace = getWorkspace(ws.workspaceId);
+    expect(workspace?.tier).toBe('growth');
+    expect(workspace?.stripeSubscriptionId).toBe('sub_test_platform_plan_guard');
+  });
+
+  it('customer.subscription.updated with no metadata and no local content subscription is a no-op', async () => {
+    updateWorkspace(ws.workspaceId, {
+      tier: 'growth',
+      stripeSubscriptionId: 'sub_test_platform_plan_noop',
+    });
+    const activityBefore = db.prepare('SELECT COUNT(*) AS count FROM activity_log WHERE workspace_id = ?').get(ws.workspaceId) as { count: number };
+
+    await handleWebhookEvent(createWebhookEvent('customer.subscription.updated', {
+      id: 'sub_test_no_metadata_noop',
+      status: 'active',
+    }) as never);
+
+    const workspace = getWorkspace(ws.workspaceId);
+    const activityAfter = db.prepare('SELECT COUNT(*) AS count FROM activity_log WHERE workspace_id = ?').get(ws.workspaceId) as { count: number };
+    expect(workspace?.tier).toBe('growth');
+    expect(workspace?.stripeSubscriptionId).toBe('sub_test_platform_plan_noop');
+    expect(mockBroadcast).toHaveLength(0);
+    expect(activityAfter.count).toBe(activityBefore.count);
+  });
+
+  it('customer.subscription.deleted with no metadata and no local content subscription is a no-op', async () => {
+    updateWorkspace(ws.workspaceId, {
+      tier: 'growth',
+      stripeSubscriptionId: 'sub_test_platform_plan_deleted_noop',
+    });
+    const activityBefore = db.prepare('SELECT COUNT(*) AS count FROM activity_log WHERE workspace_id = ?').get(ws.workspaceId) as { count: number };
+
+    await handleWebhookEvent(createWebhookEvent('customer.subscription.deleted', {
+      id: 'sub_test_deleted_no_metadata_noop',
+      status: 'canceled',
+    }) as never);
+
+    const workspace = getWorkspace(ws.workspaceId);
+    const activityAfter = db.prepare('SELECT COUNT(*) AS count FROM activity_log WHERE workspace_id = ?').get(ws.workspaceId) as { count: number };
+    expect(workspace?.tier).toBe('growth');
+    expect(workspace?.stripeSubscriptionId).toBe('sub_test_platform_plan_deleted_noop');
+    expect(mockBroadcast).toHaveLength(0);
+    expect(activityAfter.count).toBe(activityBefore.count);
+  });
+
   it('listActiveContentSubscriptions only returns active and past_due', () => {
     const active = seedSubscription(ws.workspaceId, { status: 'active', stripeSubscriptionId: 'sub_list_active' });
     const pastDue = seedSubscription(ws.workspaceId, { status: 'past_due', stripeSubscriptionId: 'sub_list_pastdue' });
