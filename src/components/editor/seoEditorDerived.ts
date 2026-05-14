@@ -13,7 +13,6 @@ export interface SeoApprovalItem {
 
 interface SeoFilterAndSortOptions {
   search: string;
-  showCmsOnly: boolean;
   metadataRecommendationCountByPageId: Map<string, number>;
 }
 
@@ -86,7 +85,6 @@ export function filterAndSortSeoPages(
 
   return pages
     .filter((page) => {
-      if (options.showCmsOnly && page.source !== 'cms') return false;
       if (!query) return true;
       return page.title.toLowerCase().includes(query) || (page.slug || '').toLowerCase().includes(query);
     })

@@ -19,6 +19,7 @@ import { resolvePagePath } from '../lib/pathUtils';
 import {
   filterAndSortSeoPages,
 } from './editor/seoEditorDerived';
+import { filterWritablePages } from '../hooks/admin/seoEditorFilters';
 import { useSeoEditorApprovalWorkflow } from './editor/useSeoEditorApprovalWorkflow';
 import { useSeoEditorPageWorkflow } from './editor/useSeoEditorPageWorkflow';
 import { useSeoEditorBulkWorkflow } from './editor/useSeoEditorBulkWorkflow';
@@ -63,7 +64,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [search, setSearch] = useState('');
-  const [showCmsOnly, setShowCmsOnly] = useState(false);
+  const writablePages = useMemo(() => filterWritablePages(pages), [pages]);
+  const cmsPageCount = pages.length - writablePages.length;
   const {
     edits,
     setEdits,
@@ -77,7 +79,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   } = useSeoEditorSessionState({
     siteId,
     workspaceId,
-    pages,
+    pages: writablePages,
     fixContext,
   });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
@@ -106,7 +108,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   } = useSeoEditorPageWorkflow({
     siteId,
     workspaceId,
-    pages,
+    pages: writablePages,
     edits,
     setEdits,
     setVariations,
@@ -139,20 +141,23 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const metadataRecommendationCountByPageId = useMemo(() => {
     if (!recsLoaded) return new Map<string, number>();
     return new Map(
-      pages.map(page => [
+      writablePages.map(page => [
         page.id,
         recsForPage(resolvePagePath(page)).filter((recommendation: { type: string }) => recommendation.type === 'metadata').length,
       ]),
     );
-  }, [pages, recsLoaded, recsForPage]);
+  }, [writablePages, recsLoaded, recsForPage]);
 
   const filteredPages = useMemo(
-    () => filterAndSortSeoPages(pages, { search, showCmsOnly, metadataRecommendationCountByPageId }),
-    [pages, search, showCmsOnly, metadataRecommendationCountByPageId],
+    () => filterAndSortSeoPages(writablePages, { search, metadataRecommendationCountByPageId }),
+    [writablePages, search, metadataRecommendationCountByPageId],
+  );
+  const analyzedWritablePagesCount = useMemo(
+    () => writablePages.filter(page => analyzedPages.has(page.id)).length,
+    [writablePages, analyzedPages],
   );
   const {
     approvalSelected,
-    setApprovalSelected,
     sendingApproval,
     approvalSent,
     approvalRefreshKey,
@@ -165,7 +170,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   } = useSeoEditorApprovalWorkflow({
     workspaceId,
     siteId,
-    pages,
+    pages: writablePages,
     edits,
     filteredPageIds: filteredPages.map(page => page.id),
     refreshStates,
@@ -202,7 +207,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   } = useSeoEditorBulkWorkflow({
     siteId,
     workspaceId,
-    pages,
+    pages: writablePages,
     edits,
     approvalSelected,
     analyzedPages,
@@ -227,7 +232,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   return (
     <div className="space-y-8">
       <SeoEditorHeaderActions
-        pagesCount={pages.length}
+        pagesCount={writablePages.length}
         missingTitles={missingTitles}
         missingDescs={missingDescs}
         bulkFixing={bulkFixing}
@@ -256,15 +261,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         bulkAnalyzeProgress={bulkAnalyzeProgress}
         onCancelAnalyze={cancelAnalyze}
         onAnalyzeAllPages={analyzeAllPages}
-        analyzeDisabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-        analyzedPagesCount={analyzedPages.size}
-        totalPages={pages.length}
-        showCmsOnly={showCmsOnly}
-        onToggleCmsOnly={() => {
-          setShowCmsOnly(prev => !prev);
-          setApprovalSelected(new Set());
-        }}
-        filteredCmsCount={filteredPages.length}
+        analyzeDisabled={analyzing.size > 0 || analyzedWritablePagesCount === writablePages.length}
+        analyzedPagesCount={analyzedWritablePagesCount}
+        totalPages={writablePages.length}
+        cmsPageCount={cmsPageCount}
         search={search}
         onSearchChange={setSearch}
       />
@@ -287,7 +287,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           bulkPreview,
           bulkProgress,
           bulkSource,
-          pages,
+          pages: writablePages,
           onSelectAll: selectAllForApproval,
           onSetBulkField: setBulkField,
           onSetBulkMode: setBulkMode,
@@ -304,7 +304,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
       <SeoEditorPageList
         workspaceId={workspaceId}
-        showCmsOnly={showCmsOnly}
+        showCmsOnly={false}
         filteredPages={filteredPages}
         expanded={expanded}
         saving={saving}

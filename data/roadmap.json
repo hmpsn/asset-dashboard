@@ -283,6 +283,15 @@
           "notes": "Shipped 2026-05-13: retired the synchronous AI `/api/webflow/seo-bulk-fix/:siteId` write route in favor of the existing `bulk-seo-fix` background job, added page-state broadcasts and activity context for background bulk fixes plus SEO suggestion select/dismiss mutations, removed the stale frontend bulk-fix wrapper, and switched SEO Editor reads to the all-pages source while preserving CMS manual-apply/write guards."
         },
         {
+          "id": "seo-editor-unified-static-cms-write-targets",
+          "title": "Unified SEO Editor Static + CMS Write Targets",
+          "source": "Staging smoke follow-up 2026-05-13",
+          "est": "4-7h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Revisit the earlier unified SEO Editor effort with a shared PageWriteTarget resolver: static Webflow pages route to page SEO writes, CMS items with collectionId/itemId and mapped SEO fields route to CMS item writes, and unresolved sitemap-only URLs fall back to manual apply. Current hotfix keeps CMS discovery and the CMS Collections editor, but hides sitemap CMS rows from the static Pages tab so static saves remain clear and safe."
+        },
+        {
           "id": "platform-org-extraction-pilot",
           "title": "Route-to-Service Extraction Pilot",
           "source": "Product engineering organization review 2026-05-13",
@@ -2479,74 +2488,6 @@
         }
       ],
       "shippedAt": "2026-04-14"
-    },
-    {
-      "id": "sprint-admin-ux-pr4",
-      "name": "✅ SHIPPED — Admin UX PR4: Onboarding & Guided Flows",
-      "shippedAt": "2026-04-13",
-      "rationale": "Reduce cold-start friction and learning curve for new workspaces. Add workflow orientation to complex multi-step tools. Surface in-app educational guides alongside analysis views.",
-      "items": [
-        {
-          "id": 291,
-          "title": "OnboardingChecklist — workspace first-visit setup overlay",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Modal-style overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, focus trap, Escape key close, localStorage dismissal per workspace, auto-celebrate on completion.",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        },
-        {
-          "id": 292,
-          "title": "WorkflowStepper — horizontal numbered stepper primitive",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Shared UI primitive: horizontal stepper with green=completed/teal=current/zinc=future states, compact variant, clickable steps via onStepClick. Integrated in ContentPipeline (4 steps: Strategy→Briefs→Posts→Publish) and SchemaSuggester generator view (5 steps: Scan→Review→Edit→Publish→Validate).",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        },
-        {
-          "id": 293,
-          "title": "WorkspaceHealthBar — multi-metric health + recommended next action",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Progress bars for key workspace health metrics (blue fills per data-color law), Recommended Next section with teal CTA, SectionCard wrapper. Renders below stat cards on WorkspaceHome.",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        },
-        {
-          "id": 294,
-          "title": "SeoAuditGuide — in-app guide tab for SeoAudit",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide sub-tab in SeoAudit analysis section (5 sections: issue severity, prioritization, fix options, AEO review, content decay). Uses existing custom tab bar pattern from SeoAudit.",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        },
-        {
-          "id": 295,
-          "title": "KeywordStrategyGuide — in-app guide tab for KeywordStrategy",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to KeywordStrategy (TabBar added, analysis|guide). 6 sections: reading the strategy, intent badges, content gap prioritization, KD/volume interpretation, quick wins, implementation order.",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        },
-        {
-          "id": 296,
-          "title": "PageIntelligenceGuide — in-app guide tab for PageIntelligence",
-          "source": "feat/admin-ux-pr4-onboarding",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to PageIntelligence (pages|architecture|guide TabBar). 6 sections: page scores, architecture signals, link health, prioritization, action recommendations, tool integrations. Also fixed pre-existing purple color violations in PageIntelligence.",
-          "status": "done",
-          "shippedAt": "2026-04-13"
-        }
-      ]
     }
   ]
 }

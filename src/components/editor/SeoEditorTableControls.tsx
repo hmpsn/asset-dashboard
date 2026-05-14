@@ -9,9 +9,7 @@ interface SeoEditorTableControlsProps {
   analyzeDisabled: boolean;
   analyzedPagesCount: number;
   totalPages: number;
-  showCmsOnly: boolean;
-  onToggleCmsOnly: () => void;
-  filteredCmsCount: number;
+  cmsPageCount: number;
   search: string;
   onSearchChange: (value: string) => void;
 }
@@ -24,9 +22,7 @@ export function SeoEditorTableControls({
   analyzeDisabled,
   analyzedPagesCount,
   totalPages,
-  showCmsOnly,
-  onToggleCmsOnly,
-  filteredCmsCount,
+  cmsPageCount,
   search,
   onSearchChange,
 }: SeoEditorTableControlsProps) {
@@ -67,19 +63,9 @@ export function SeoEditorTableControls({
       )}
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={onToggleCmsOnly}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors border ${
-            showCmsOnly
-              ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand'
-              : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-          }`}
-        >
-          CMS pages only
-        </button>
-        {showCmsOnly && (
+        {cmsPageCount > 0 && (
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            {filteredCmsCount} CMS pages
+            {cmsPageCount} CMS items are managed in CMS Collections.
           </span>
         )}
       </div>

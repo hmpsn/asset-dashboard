@@ -1,56 +1,23 @@
 // tests/integration/seo-editor-unified.test.ts
 import { describe, it, expect } from 'vitest';
+import { filterWritablePages } from '../../src/hooks/admin/seoEditorFilters';
+import type { PageMeta } from '../../src/hooks/admin/useSeoEditor';
 
 // Structural contract tests — verify the SeoEditor integration expectations
 // without mounting the full component (no DOM environment needed).
 
 describe('SeoEditor — unified pages integration contracts', () => {
-  it('PageMeta source field drives CMS filter: static pages excluded when showCmsOnly=true', () => {
-    // Re-tests the core integration contract with explicit inputs matching real component logic
-    const pages: Array<{ id: string; source?: string; title: string; slug: string }> = [
+  it('static Pages tab hides CMS sitemap rows and keeps legacy/static rows writable', () => {
+    const pages: PageMeta[] = [
       { id: 's1', source: 'static', title: 'Home', slug: '/' },
       { id: 'c1', source: 'cms', title: 'Post A', slug: '/blog/a' },
       { id: 'c2', source: 'cms', title: 'Post B', slug: '/blog/b' },
       { id: 's2', source: undefined, title: 'Unknown', slug: '/unknown' },
     ];
-    const showCmsOnly = true;
-    const filtered = pages.filter(p => !(showCmsOnly && p.source !== 'cms'));
-    expect(filtered.length > 0 && filtered.every(p => p.source === 'cms')).toBe(true);
+    const filtered = filterWritablePages(pages);
+    expect(filtered.length > 0 && filtered.every(p => p.source !== 'cms')).toBe(true);
     expect(filtered).toHaveLength(2);
-  });
-
-  it('showCmsOnly filter excludes static pages', () => {
-    const pages = [
-      { id: '1', source: 'static', title: 'Home', slug: '/', seo: {} },
-      { id: '2', source: 'cms', title: 'Blog Post', slug: '/blog/post', seo: {} },
-    ];
-    const filtered = pages.filter(p => p.source === 'cms');
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
-  });
-
-  it('showCmsOnly=false shows all pages', () => {
-    const pages = [
-      { id: '1', source: 'static', title: 'Home', slug: '/' },
-      { id: '2', source: 'cms', title: 'Blog', slug: '/blog' },
-    ];
-    const showCmsOnly = false;
-    const filtered = pages.filter(p => {
-      if (showCmsOnly && p.source !== 'cms') return false;
-      return true;
-    });
-    expect(filtered).toHaveLength(2);
-  });
-
-  it('ALL CMS pages trigger the manual apply banner regardless of collectionId', () => {
-    // SeoEditor.tsx shows the banner for page.source === 'cms' unconditionally.
-    // Sitemap-discovered CMS pages never have a real collectionId, so collectionId
-    // cannot gate this UI — the condition is always true for CMS pages.
-    const pageWithoutCollectionId = { source: 'cms', collectionId: undefined };
-    const pageWithCollectionId = { source: 'cms', collectionId: 'col-123' };
-    const needsManual = (p: { source: string }) => p.source === 'cms';
-    expect(needsManual(pageWithoutCollectionId)).toBe(true);
-    expect(needsManual(pageWithCollectionId)).toBe(true);
+    expect(filtered.map(p => p.id)).toEqual(['s1', 's2']);
   });
 
   it('approval items do NOT include collectionId — SeoEditor omits it intentionally', () => {
