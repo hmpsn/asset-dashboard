@@ -288,9 +288,8 @@
           "source": "Staging smoke follow-up 2026-05-13",
           "est": "4-7h",
           "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Shipped 2026-05-14: added a shared SEO Editor write-target contract and resolver that separates static Webflow pages, real CMS collection items, and unresolved sitemap-only CMS URLs. The SEO Editor now exposes one source/collection/search surface while preserving static page writes, CMS collection item saves/publishes, and read-only manual fallback rows. CMS approval apply now supports real collection item IDs while synthetic `cms-*` rows remain blocked."
+          "status": "pending",
+          "notes": "PR #711 landed the shared SEO Editor write-target contract/resolver and CMS approval apply support, but staging smoke found product-quality issues in the unified surface: duplicated Sent to Client panels, unscoped approval history, CMS summaries that may already be truncated at source, and missing effective-title fallback semantics when a CMS item name is the practical SEO title. Follow-up hotfix gated the unified shell behind `seo-editor-unified` (default off) so the legacy Pages / CMS Collections split remains active while these issues are resolved."
         },
         {
           "id": "platform-org-extraction-pilot",
