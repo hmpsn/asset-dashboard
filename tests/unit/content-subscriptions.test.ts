@@ -11,6 +11,7 @@ import {
   resetPeriod,
   updateContentSubscription,
 } from '../../server/content-subscriptions.js';
+import { InvalidTransitionError } from '../../server/state-machines.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
@@ -105,6 +106,14 @@ describe('content-subscriptions store', () => {
       preferredPageTypes: undefined,
     });
     expect(clearedTypes?.preferredPageTypes).toBeUndefined();
+  });
+
+  it('rejects invalid content subscription status transitions', () => {
+    const sub = createSub(ws.workspaceId, { status: 'cancelled' });
+    expect(() =>
+      updateContentSubscription(ws.workspaceId, sub.id, { status: 'active' }),
+    ).toThrow(InvalidTransitionError);
+    expect(getContentSubscription(sub.id)?.status).toBe('cancelled');
   });
 
   it('does not leak another workspace subscription when scoped updates miss', () => {
