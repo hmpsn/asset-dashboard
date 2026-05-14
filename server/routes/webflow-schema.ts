@@ -847,7 +847,11 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
 
   const label = action === 'approve' ? 'approved' : 'requested changes on';
   addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
-  broadcastToWorkspace(ws.id, WS_EVENTS.APPROVAL_UPDATE, { action: 'schema_plan_feedback', status: newStatus });
+  broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, {
+    siteId: ws.webflowSiteId,
+    action: 'schema_plan_feedback',
+    status: newStatus,
+  });
   res.json(plan);
 });
 
