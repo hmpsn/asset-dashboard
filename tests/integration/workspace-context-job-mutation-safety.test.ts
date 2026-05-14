@@ -29,17 +29,18 @@ vi.mock('../../server/workspace-site-scrape.js', () => ({
 }));
 
 vi.mock('../../server/ai.js', () => ({
-  callAI: vi.fn(async (opts: { feature?: string }) => {
+  callAI: vi.fn(async (opts: { feature?: string; operation?: string }) => {
     if (aiState.mode === 'error') {
       throw new Error('Workspace context AI failed');
     }
-    if (opts.feature === 'brand-voice-gen') {
+    const operationKey = opts.operation ?? opts.feature;
+    if (operationKey === 'brand-voice-gen') {
       return { text: 'Confident, practical, and direct tone.' };
     }
-    if (opts.feature === 'knowledge-base-gen') {
+    if (operationKey === 'knowledge-base-gen') {
       return { text: 'BUSINESS OVERVIEW: Example Agency' };
     }
-    if (opts.feature === 'personas-gen') {
+    if (operationKey === 'personas-gen') {
       return {
         text: JSON.stringify([
           {

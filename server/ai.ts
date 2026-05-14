@@ -8,8 +8,11 @@
 
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic } from './anthropic-helpers.js';
+import { getAIOperationContract, type AIOperationId } from './ai-operation-registry.js';
 
 export interface AICallOptions {
+  /** Registry operation id for auditable operation contracts. */
+  operation?: AIOperationId;
   /** Provider to use. Defaults to 'openai'. */
   provider?: 'openai' | 'anthropic';
   /** Model override. Defaults to provider's default (gpt-5.4-mini / claude-sonnet-4-6). */
@@ -23,7 +26,7 @@ export interface AICallOptions {
   /** Temperature (0-2 for OpenAI, 0-1 for Anthropic). */
   temperature?: number;
   /** Feature label for logging and cost tracking. */
-  feature: string;
+  feature?: string;
   /** Workspace ID for cost attribution. */
   workspaceId?: string;
   /** Optional request timeout. */
@@ -60,21 +63,30 @@ function applyResearchMode(system: string | undefined, enabled: boolean | undefi
  * Dispatches to OpenAI or Anthropic based on opts.provider.
  */
 export async function callAI(opts: AICallOptions): Promise<AICallResult> {
-  const { provider = 'openai', system, messages, researchMode, ...rest } = opts;
-  const effectiveSystem = applyResearchMode(system, researchMode);
+  const operationContract = opts.operation ? getAIOperationContract(opts.operation) : undefined;
+  const provider = opts.provider ?? operationContract?.defaultProvider ?? 'openai';
+  const model = opts.model ?? operationContract?.defaultModel;
+  const feature = opts.feature ?? operationContract?.feature;
+  if (!feature) throw new Error('callAI requires either feature or operation');
+
+  const maxRetries = opts.maxRetries ?? operationContract?.defaultMaxRetries;
+  const timeoutMs = opts.timeoutMs ?? operationContract?.defaultTimeoutMs;
+  const responseFormat = opts.responseFormat ?? operationContract?.defaultResponseFormat;
+  const researchMode = opts.researchMode ?? operationContract?.defaultResearchMode ?? false;
+  const effectiveSystem = applyResearchMode(opts.system, researchMode);
 
   if (provider === 'anthropic') {
     const result = await callAnthropic({
-      model: rest.model as Parameters<typeof callAnthropic>[0]['model'],
+      model: model as Parameters<typeof callAnthropic>[0]['model'],
       system: effectiveSystem,
-      messages,
-      maxTokens: rest.maxTokens,
-      temperature: rest.temperature,
-      feature: rest.feature,
-      workspaceId: rest.workspaceId,
-      maxRetries: rest.maxRetries,
-      timeoutMs: rest.timeoutMs,
-      signal: rest.signal,
+      messages: opts.messages,
+      maxTokens: opts.maxTokens,
+      temperature: opts.temperature,
+      feature,
+      workspaceId: opts.workspaceId,
+      maxRetries,
+      timeoutMs,
+      signal: opts.signal,
     });
     return {
       text: result.text,
@@ -85,19 +97,19 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
   // OpenAI: inject system message as first message
   const openaiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
   if (effectiveSystem) openaiMessages.push({ role: 'system', content: effectiveSystem });
-  openaiMessages.push(...messages);
+  openaiMessages.push(...opts.messages);
 
   const result = await callOpenAI({
-    model: rest.model as Parameters<typeof callOpenAI>[0]['model'],
+    model: model as Parameters<typeof callOpenAI>[0]['model'],
     messages: openaiMessages,
-    maxTokens: rest.maxTokens,
-    temperature: rest.temperature,
-    feature: rest.feature,
-    workspaceId: rest.workspaceId,
-    maxRetries: rest.maxRetries,
-    timeoutMs: rest.timeoutMs,
-    signal: rest.signal,
-    responseFormat: rest.responseFormat,
+    maxTokens: opts.maxTokens,
+    temperature: opts.temperature,
+    feature,
+    workspaceId: opts.workspaceId,
+    maxRetries,
+    timeoutMs,
+    signal: opts.signal,
+    responseFormat,
   });
 
   return {

@@ -343,12 +343,12 @@ IMPORTANT:
 
   try {
     const result = await callAI({
+      operation: 'schema-plan',
       model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.1,
       responseFormat: { type: 'json_object' },
-      feature: 'schema-plan',
       workspaceId,
       maxRetries: 3,
     });

@@ -667,6 +667,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   );
 
   const aiResult = await callAI({
+    operation: 'content-brief-regenerate',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
@@ -674,7 +675,6 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
     researchMode: true,
-    feature: 'content-brief-regenerate',
     workspaceId,
   });
 

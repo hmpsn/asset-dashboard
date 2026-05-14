@@ -149,13 +149,13 @@ export async function callKeywordStrategyAI(
   const aiMessages = (system ? wrappedMessages.slice(1) : wrappedMessages) as Array<{ role: 'user' | 'assistant'; content: string }>;
 
   const result = await callAI({
+    operation: 'keyword-strategy',
     model: 'gpt-5.4-mini',
     system,
     messages: aiMessages,
     maxTokens,
     temperature: 0.3,
     // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer
-    feature: 'keyword-strategy',
     workspaceId,
     maxRetries: 3,
     timeoutMs: 90_000,
