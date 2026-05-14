@@ -168,8 +168,17 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
 
 // Delete a content request
 router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const existing = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Request not found' });
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
+  addActivity(
+    req.params.workspaceId,
+    'content_request_deleted',
+    `Content request deleted: "${existing.topic}"`,
+    existing.targetKeyword ? `Keyword: "${existing.targetKeyword}"` : '',
+    { requestId: existing.id },
+  );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
