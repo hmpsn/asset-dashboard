@@ -4,6 +4,8 @@ This is the current Wave 2b test-coverage ownership baseline. It is a planning a
 
 Source of truth: `scripts/report-critical-domain-coverage.ts`
 
+Coverage regression guardrails: `docs/testing/coverage-ratchet-ci.md`
+
 Run:
 
 ```bash

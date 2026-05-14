@@ -217,8 +217,9 @@
           "source": "Platform test coverage review 2026-05-13",
           "est": "3-5d",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Add a coverage ratchet that prevents critical-domain regressions while allowing global coverage to rise gradually. Start with domain-specific thresholds and reports rather than immediately requiring global 80-90%. Suggested milestones: 1 week for smoke/contract baseline, 3-4 weeks for critical domains at 70%+ line coverage and 60%+ branch coverage, 6-8 weeks for critical domains at 80-85% line coverage and 70%+ branch coverage, and a quarter-scale effort for broad global 75-85%."
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Shipped 2026-05-14: added `scripts/report-coverage-ratchet.ts` plus `tests/unit/coverage-ratchet-report.test.ts` and `docs/testing/coverage-ratchet-ci.md` to enforce global coverage floors while keeping bounded-context signal checks advisory. Added `npm run verify:coverage-ratchet`, enabled `json-summary` coverage output, and wired CI push coverage jobs to run the ratchet plus upload `coverage/coverage-summary.json` and `coverage/lcov.info` artifacts. Floors are intentionally below the 2026-05-13 baseline and are designed to ratchet upward over time."
         }
       ]
     },

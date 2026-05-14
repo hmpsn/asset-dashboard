@@ -22,6 +22,7 @@
     "pr-check:all": "tsx scripts/pr-check.ts --all",
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
+    "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
