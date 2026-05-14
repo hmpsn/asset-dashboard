@@ -10,6 +10,8 @@ import {
   POST_STATUS_TRANSITIONS,
   WORK_ORDER_TRANSITIONS,
   CONTENT_SUB_TRANSITIONS,
+  CLIENT_ACTION_TRANSITIONS,
+  BRIEFING_DRAFT_TRANSITIONS,
 } from '../../server/state-machines.js';
 
 // ── validateTransition() core behavior ──
@@ -488,5 +490,124 @@ describe('Content Subscription transitions', () => {
 
   it('cancelled has an empty transition array (terminal)', () => {
     expect(CONTENT_SUB_TRANSITIONS['cancelled']).toEqual([]);
+  });
+});
+
+// ── Client Action transitions ──
+
+describe('Client Action transitions', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('client_action', CLIENT_ACTION_TRANSITIONS, from, to);
+
+  describe('valid transitions', () => {
+    it('pending → approved', () => {
+      expect(validate('pending', 'approved')).toBe('approved');
+    });
+
+    it('pending → changes_requested', () => {
+      expect(validate('pending', 'changes_requested')).toBe('changes_requested');
+    });
+
+    it('pending → completed', () => {
+      expect(validate('pending', 'completed')).toBe('completed');
+    });
+
+    it('approved → completed', () => {
+      expect(validate('approved', 'completed')).toBe('completed');
+    });
+
+    it('changes_requested → pending', () => {
+      expect(validate('changes_requested', 'pending')).toBe('pending');
+    });
+
+    it('completed → archived', () => {
+      expect(validate('completed', 'archived')).toBe('archived');
+    });
+  });
+
+  describe('invalid transitions', () => {
+    it('approved → pending (must route through changes_requested when reopening)', () => {
+      expect(() => validate('approved', 'pending')).toThrow(InvalidTransitionError);
+    });
+
+    it('changes_requested → approved (must return to pending first)', () => {
+      expect(() => validate('changes_requested', 'approved')).toThrow(InvalidTransitionError);
+    });
+
+    it('completed → pending (terminal except archive)', () => {
+      expect(() => validate('completed', 'pending')).toThrow(InvalidTransitionError);
+    });
+
+    it('archived → pending (terminal)', () => {
+      expect(() => validate('archived', 'pending')).toThrow(InvalidTransitionError);
+    });
+
+    it('archived → completed (terminal)', () => {
+      expect(() => validate('archived', 'completed')).toThrow(InvalidTransitionError);
+    });
+  });
+
+  it('archived has an empty transition array (terminal)', () => {
+    expect(CLIENT_ACTION_TRANSITIONS['archived']).toEqual([]);
+  });
+});
+
+// ── Briefing Draft transitions ──
+
+describe('Briefing Draft transitions', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('briefing_draft', BRIEFING_DRAFT_TRANSITIONS, from, to);
+
+  describe('valid transitions', () => {
+    it('draft → approved', () => {
+      expect(validate('draft', 'approved')).toBe('approved');
+    });
+
+    it('draft → published', () => {
+      expect(validate('draft', 'published')).toBe('published');
+    });
+
+    it('draft → skipped', () => {
+      expect(validate('draft', 'skipped')).toBe('skipped');
+    });
+
+    it('approved → published', () => {
+      expect(validate('approved', 'published')).toBe('published');
+    });
+
+    it('approved → skipped', () => {
+      expect(validate('approved', 'skipped')).toBe('skipped');
+    });
+
+    it('approved → draft', () => {
+      expect(validate('approved', 'draft')).toBe('draft');
+    });
+  });
+
+  describe('invalid transitions', () => {
+    it('draft → draft (no self transition)', () => {
+      expect(() => validate('draft', 'draft')).toThrow(InvalidTransitionError);
+    });
+
+    it('published → approved (terminal)', () => {
+      expect(() => validate('published', 'approved')).toThrow(InvalidTransitionError);
+    });
+
+    it('published → draft (terminal)', () => {
+      expect(() => validate('published', 'draft')).toThrow(InvalidTransitionError);
+    });
+
+    it('skipped → draft (terminal)', () => {
+      expect(() => validate('skipped', 'draft')).toThrow(InvalidTransitionError);
+    });
+
+    it('skipped → approved (terminal)', () => {
+      expect(() => validate('skipped', 'approved')).toThrow(InvalidTransitionError);
+    });
+  });
+
+  it('published and skipped are terminal arrays', () => {
+    expect(BRIEFING_DRAFT_TRANSITIONS['published']).toEqual([]);
+    expect(BRIEFING_DRAFT_TRANSITIONS['skipped']).toEqual([]);
   });
 });
