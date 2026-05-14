@@ -14,6 +14,7 @@ const PROVIDER_SIGNALS: ProviderSignal[] = [
     provider: 'webflow',
     files: [
       'tests/integration/webflow-cms-writes.test.ts',
+      'tests/integration/webflow-cms-mutation-safety.test.ts',
       'tests/integration/webflow-schema-writes.test.ts',
       'tests/integration/content-publish-writes.test.ts',
       'tests/integration/public-approval-broadcasts.test.ts',

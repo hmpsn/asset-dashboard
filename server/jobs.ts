@@ -5,6 +5,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { getBackgroundJobLabel, type BackgroundJobType } from '../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TRANSITIONS, validateTransition } from './state-machines.js';
 
 
 const log = createLogger('jobs');
@@ -241,9 +242,15 @@ export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 
   const job = jobs.get(id);
   if (!job) return;
   const normalizedUpdate = { ...update };
-  if (job.status === 'cancelled' && update.status && update.status !== 'cancelled') {
-    delete normalizedUpdate.status;
-    delete normalizedUpdate.message;
+  if (normalizedUpdate.status && normalizedUpdate.status !== job.status) {
+    try {
+      validateTransition('background_job', BACKGROUND_JOB_TRANSITIONS, job.status, normalizedUpdate.status);
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, jobId: id, from: job.status, to: normalizedUpdate.status }, 'jobs/updateJob: invalid status transition ignored');
+      }
+      return;
+    }
   }
   Object.assign(job, normalizedUpdate, { updatedAt: new Date().toISOString() });
   // Write through to SQLite

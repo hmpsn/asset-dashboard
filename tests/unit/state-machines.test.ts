@@ -11,6 +11,7 @@ import {
   WORK_ORDER_TRANSITIONS,
   CONTENT_SUB_TRANSITIONS,
   CLIENT_ACTION_TRANSITIONS,
+  BACKGROUND_JOB_TRANSITIONS,
   BRIEFING_DRAFT_TRANSITIONS,
 } from '../../server/state-machines.js';
 
@@ -609,5 +610,52 @@ describe('Briefing Draft transitions', () => {
   it('published and skipped are terminal arrays', () => {
     expect(BRIEFING_DRAFT_TRANSITIONS['published']).toEqual([]);
     expect(BRIEFING_DRAFT_TRANSITIONS['skipped']).toEqual([]);
+  });
+});
+
+// ── Background Job transitions ──
+
+describe('Background Job transitions', () => {
+  const validate = (from: string, to: string) =>
+    validateTransition('background_job', BACKGROUND_JOB_TRANSITIONS, from, to);
+
+  describe('valid transitions', () => {
+    it('pending → running', () => {
+      expect(validate('pending', 'running')).toBe('running');
+    });
+
+    it('pending → done', () => {
+      expect(validate('pending', 'done')).toBe('done');
+    });
+
+    it('pending → error', () => {
+      expect(validate('pending', 'error')).toBe('error');
+    });
+
+    it('running → done', () => {
+      expect(validate('running', 'done')).toBe('done');
+    });
+
+    it('running → error', () => {
+      expect(validate('running', 'error')).toBe('error');
+    });
+  });
+
+  describe('invalid transitions', () => {
+    it('done → running (terminal)', () => {
+      expect(() => validate('done', 'running')).toThrow(InvalidTransitionError);
+    });
+
+    it('error → running (terminal)', () => {
+      expect(() => validate('error', 'running')).toThrow(InvalidTransitionError);
+    });
+
+    it('cancelled → running (terminal)', () => {
+      expect(() => validate('cancelled', 'running')).toThrow(InvalidTransitionError);
+    });
+
+    it('running → pending (no rollback)', () => {
+      expect(() => validate('running', 'pending')).toThrow(InvalidTransitionError);
+    });
   });
 });

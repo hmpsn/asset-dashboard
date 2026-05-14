@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPROVAL_ITEM_TRANSITIONS,
+  BACKGROUND_JOB_TRANSITIONS,
   BRIEFING_DRAFT_TRANSITIONS,
   CLIENT_ACTION_TRANSITIONS,
   CONTENT_REQUEST_TRANSITIONS,
@@ -25,6 +26,7 @@ const TRANSITION_GRAPHS: TransitionGraphSpec[] = [
   { name: 'content_subscription', map: CONTENT_SUB_TRANSITIONS },
   { name: 'client_action', map: CLIENT_ACTION_TRANSITIONS },
   { name: 'briefing_draft', map: BRIEFING_DRAFT_TRANSITIONS },
+  { name: 'background_job', map: BACKGROUND_JOB_TRANSITIONS },
 ];
 
 function assertGraphShape(name: string, graph: TransitionMap): void {
