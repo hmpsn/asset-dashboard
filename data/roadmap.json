@@ -199,8 +199,9 @@
           "source": "Product engineering base-layer review 2026-05-13",
           "est": "4-6h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Build a registry for AI operations that declares feature/domain, provider/model, prose vs structured JSON, response schema/parser, research-mode expectations, cost-tracking key, timeout/retry policy, and whether the operation may run synchronously or must use the background job platform. This extends callAI() from a dispatcher into an auditable contract surface."
+          "status": "done",
+          "notes": "Build a registry for AI operations that declares feature/domain, provider/model, prose vs structured JSON, response schema/parser, research-mode expectations, cost-tracking key, timeout/retry policy, and whether the operation may run synchronously or must use the background job platform. This extends callAI() from a dispatcher into an auditable contract surface.\nShipped 2026-05-14: added server/ai-operation-registry.ts as the canonical contract map, extended callAI() to accept operation ids with registry-derived defaults (provider/model/feature/retry/timeout/responseFormat/researchMode), and wired representative high-value flows (content brief regenerate, schema plan, client search chat, content decay, keyword strategy synthesis, workspace context generation jobs). Added unit + contract coverage for registry integrity, dispatcher default/override behavior, and representative operation wiring.",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": "platform-base-external-fetch-helper",
