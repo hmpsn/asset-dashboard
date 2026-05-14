@@ -216,6 +216,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       strategy: queryKeys.client.strategy(workspaceId),
       'page-keywords': queryKeys.client.pageKeywords(workspaceId),
       pricing: queryKeys.client.pricing(workspaceId),
+      'content-subscription': queryKeys.client.contentSubscription(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),
       'client-insights': queryKeys.client.clientInsights(workspaceId),
       intelligence: queryKeys.client.intelligence(workspaceId),
@@ -382,6 +383,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       refetchClient('content-plan', `/api/public/content-plan/${workspaceId}`);
       refetchClient('intelligence', '');
     },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => refetchClient('content-subscription', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => refetchClient('content-subscription', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => refetchClient('content-subscription', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes

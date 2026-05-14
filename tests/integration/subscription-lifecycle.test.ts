@@ -63,6 +63,7 @@ import {
   InvalidTransitionError,
 } from '../../server/state-machines.js';
 import type { ContentSubscription } from '../../shared/types/content.js';
+import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -422,6 +423,28 @@ describe('Content Subscription — cancellation', () => {
     );
   });
 
+  it('customer.subscription.deleted for a content subscription uses the local row when Stripe metadata is missing', async () => {
+    const sub = seedSubscription(ws.workspaceId, {
+      status: 'active',
+      stripeSubscriptionId: 'sub_test_cancel_without_metadata',
+    });
+
+    const event = createWebhookEvent('customer.subscription.deleted', {
+      id: 'sub_test_cancel_without_metadata',
+      status: 'canceled',
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const updated = getContentSubscription(sub.id);
+    expect(updated?.status).toBe('cancelled');
+    expect(mockBroadcast).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'content-subscription:updated',
+      expect.objectContaining({ id: sub.id, status: 'cancelled' }),
+    );
+  });
+
   it('customer.subscription.deleted for non-content sub downgrades workspace to free', async () => {
     const { updateWorkspace, getWorkspace } = await import('../../server/workspaces.js');
     updateWorkspace(ws.workspaceId, { tier: 'growth', stripeSubscriptionId: 'sub_test_plan_cancel' });
@@ -568,6 +591,59 @@ describe('Content Subscription — past_due and expiration', () => {
       ws.workspaceId,
       'content-subscription:updated',
       expect.objectContaining({ id: sub.id, status: 'past_due' }),
+    );
+  });
+
+  it('customer.subscription.updated for a content subscription does not mutate platform plan billing state', async () => {
+    updateWorkspace(ws.workspaceId, {
+      tier: 'growth',
+      stripeSubscriptionId: 'sub_test_platform_plan',
+    });
+    const sub = seedSubscription(ws.workspaceId, {
+      status: 'past_due',
+      stripeSubscriptionId: 'sub_test_content_reactivate_no_plan_mutation',
+    });
+
+    const event = createWebhookEvent('customer.subscription.updated', {
+      id: 'sub_test_content_reactivate_no_plan_mutation',
+      metadata: { workspaceId: ws.workspaceId },
+      status: 'active',
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const updatedSub = getContentSubscription(sub.id);
+    expect(updatedSub?.status).toBe('active');
+
+    const workspace = getWorkspace(ws.workspaceId);
+    expect(workspace?.tier).toBe('growth');
+    expect(workspace?.stripeSubscriptionId).toBe('sub_test_platform_plan');
+    expect(mockBroadcast).not.toHaveBeenCalledWith(
+      ws.workspaceId,
+      'workspace:updated',
+      expect.objectContaining({ tier: null }),
+    );
+  });
+
+  it('customer.subscription.updated for a content subscription uses the local row when Stripe metadata is missing', async () => {
+    const sub = seedSubscription(ws.workspaceId, {
+      status: 'past_due',
+      stripeSubscriptionId: 'sub_test_update_without_metadata',
+    });
+
+    const event = createWebhookEvent('customer.subscription.updated', {
+      id: 'sub_test_update_without_metadata',
+      status: 'active',
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const updatedSub = getContentSubscription(sub.id);
+    expect(updatedSub?.status).toBe('active');
+    expect(mockBroadcast).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'content-subscription:updated',
+      expect.objectContaining({ id: sub.id, status: 'active' }),
     );
   });
 

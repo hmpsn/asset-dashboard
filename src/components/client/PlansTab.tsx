@@ -1,5 +1,6 @@
 import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, ArrowUp, CreditCard, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
 import { SectionCard, type Tier, Icon, Button } from '../ui';
@@ -10,6 +11,7 @@ import { post } from '../../api/client';
 import { contentSubscriptions } from '../../api/misc';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../../shared/types/content';
 import type { PricingData } from '../../hooks/usePayments';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -31,14 +33,11 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
   const [billingLoading, setBillingLoading] = useState(false);
 
   // Content subscription state
-  const [subData, setSubData] = useState<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] } | null>(null);
   const [subLoading, setSubLoading] = useState(false);
-
-  useEffect(() => {
-    contentSubscriptions.clientStatus(workspaceId).then(data => {
-      if (data) setSubData(data);
-    });
-  }, [workspaceId]);
+  const { data: subData } = useQuery<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] } | null>({
+    queryKey: queryKeys.client.contentSubscription(workspaceId),
+    queryFn: () => contentSubscriptions.clientStatus(workspaceId),
+  });
 
   const handleSubscribe = async (plan: string) => {
     setSubLoading(true);

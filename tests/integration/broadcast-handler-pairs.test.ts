@@ -310,14 +310,6 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // content-subscription:* — Stripe webhook events broadcast by stripe.ts via the
-  // _broadcastFn alias.  These signal content subscription lifecycle changes but
-  // the frontend does not yet subscribe to them; they are candidates for future
-  // real-time UX (e.g. showing a "subscription activated" toast).
-  'content-subscription:created',
-  'content-subscription:updated',
-  'content-subscription:renewed',
-
 ]);
 
 /**
@@ -508,7 +500,6 @@ describe('broadcast ↔ handler pairing audit', () => {
 
   it('KNOWN_UNHANDLED_BROADCASTS contains only events that are truly unhandled', () => {
     const knownList = [...KNOWN_UNHANDLED_BROADCASTS];
-    expect(knownList.length).toBeGreaterThan(0);
 
     const falsePositives: string[] = [];
     for (const eventName of knownList) {
