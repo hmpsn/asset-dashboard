@@ -290,7 +290,10 @@ describe('page analysis job mutation safety', () => {
 
     expect(countRows('page_keywords', otherWorkspace.workspaceId)).toBe(0);
     expect(countRows('activity_log', otherWorkspace.workspaceId)).toBe(0);
-    expect(broadcastState.calls.every(call => call.workspaceId === workspace.workspaceId)).toBe(true);
+    expect(broadcastState.calls.length).toBeGreaterThan(0);
+    for (const call of broadcastState.calls) {
+      expect(call.workspaceId).toBe(workspace.workspaceId);
+    }
   });
 
   it('records skipped analysis without persisting page-keyword rows or broadcasts when page analysis crashes per page', async () => {
