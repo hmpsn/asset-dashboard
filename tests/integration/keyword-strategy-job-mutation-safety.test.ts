@@ -10,6 +10,10 @@ const strategyState = vi.hoisted(() => ({
   mode: 'success' as 'success' | 'upToDate' | 'error',
 }));
 
+const seoDataState = vi.hoisted(() => ({
+  mode: 'success' as 'success' | 'error',
+}));
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
@@ -48,14 +52,19 @@ vi.mock('../../server/keyword-strategy-search-data.js', () => ({
 }));
 
 vi.mock('../../server/keyword-strategy-seo-data.js', () => ({
-  fetchAndCacheKeywordStrategySeoData: vi.fn(async () => ({
-    seoContext: '',
-    domainKeywords: [],
-    keywordGaps: [],
-    relatedKeywords: [],
-    questionKeywords: [],
-    competitorKeywords: [],
-  })),
+  fetchAndCacheKeywordStrategySeoData: vi.fn(async () => {
+    if (seoDataState.mode === 'error') {
+      throw new Error('SEO provider fetch failed');
+    }
+    return {
+      seoContext: '',
+      domainKeywords: [],
+      keywordGaps: [],
+      relatedKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+    };
+  }),
 }));
 
 vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal => {
@@ -269,6 +278,7 @@ beforeEach(() => {
   otherWorkspace = seedWorkspace({ tier: 'premium' });
   broadcastState.calls = [];
   strategyState.mode = 'success';
+  seoDataState.mode = 'success';
 });
 
 afterEach(() => {
@@ -410,6 +420,39 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       status: 'error',
       error: 'Strategy synthesis failed',
+      message: 'Strategy generation failed',
+    });
+
+    expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
+    expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    expect(countRows('quick_wins', workspace.workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspace.workspaceId)).toBe(0);
+    expect(getTrackedKeywords(workspace.workspaceId)).toEqual([]);
+    expect(getUsageCount(workspace.workspaceId, 'strategy_generations')).toBe(0);
+    expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(listJobs(workspace.workspaceId)).toHaveLength(1);
+  });
+
+  it('marks the job failed and refunds usage when SEO provider fetch fails before synthesis', async () => {
+    seoDataState.mode = 'error';
+
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+      },
+    });
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'error',
+      error: 'SEO provider fetch failed',
       message: 'Strategy generation failed',
     });
 

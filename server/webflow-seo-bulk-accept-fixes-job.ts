@@ -118,6 +118,25 @@ export async function runSeoBulkAcceptFixesJob({
       return;
     }
 
+    if (applied.length === 0 && failed > 0) {
+      const errorMessage = `Bulk accept fixes failed for all ${fixes.length} fixes`;
+      updateJob(jobId, {
+        status: 'error',
+        progress: done,
+        message: errorMessage,
+        error: errorMessage,
+        result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId,
+        operation: 'bulk-accept-fixes',
+        error: errorMessage,
+        failed,
+        total: fixes.length,
+      });
+      return;
+    }
+
     updateJob(jobId, {
       status: 'done',
       progress: done,

@@ -101,7 +101,7 @@ describe('webflow SEO bulk accept fixes job', () => {
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job_1');
   });
 
-  it('counts Webflow update failures without recording page state changes', async () => {
+  it('marks all-failed Webflow updates as an error without recording page state changes', async () => {
     const ac = new AbortController();
     mocks.updatePageSeo.mockResolvedValue({ success: false, error: 'Webflow rejected update' });
 
@@ -118,9 +118,16 @@ describe('webflow SEO bulk accept fixes job', () => {
     expect(mocks.addActivity).not.toHaveBeenCalled();
     expect(mocks.broadcastToWorkspace).not.toHaveBeenCalledWith('ws_1', 'page-state:updated', expect.anything());
     expect(mocks.updateJob).toHaveBeenCalledWith('job_fail', expect.objectContaining({
-      status: 'done',
-      message: 'Applied 0/1 fixes (1 failed)',
+      status: 'error',
+      message: 'Bulk accept fixes failed for all 1 fixes',
       result: expect.objectContaining({ applied: 0, failed: 1, total: 1 }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:failed', expect.objectContaining({
+      jobId: 'job_fail',
+      operation: 'bulk-accept-fixes',
+      error: 'Bulk accept fixes failed for all 1 fixes',
+      failed: 1,
+      total: 1,
     }));
   });
 

@@ -173,7 +173,7 @@ describe('webflow SEO bulk analyze job', () => {
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job_1');
   });
 
-  it('counts invalid AI JSON as a failed page and still completes', async () => {
+  it('marks all-failed invalid AI JSON runs as an error', async () => {
     const ac = new AbortController();
     mocks.callAI.mockResolvedValueOnce({ text: 'not json' });
 
@@ -187,11 +187,14 @@ describe('webflow SEO bulk analyze job', () => {
 
     expect(mocks.upsertPageKeyword).not.toHaveBeenCalled();
     expect(mocks.updateJob).toHaveBeenCalledWith('job_invalid_json', expect.objectContaining({
-      status: 'done',
+      status: 'error',
+      message: 'Bulk analyze failed for all 1 pages',
       result: expect.objectContaining({ analyzed: 0, failed: 1, total: 1 }),
     }));
-    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:complete', expect.objectContaining({
-      analyzed: 0,
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:failed', expect.objectContaining({
+      jobId: 'job_invalid_json',
+      operation: 'bulk-analyze',
+      error: 'Bulk analyze failed for all 1 pages',
       failed: 1,
       total: 1,
     }));

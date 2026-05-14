@@ -66,6 +66,21 @@ const ROUTE_MATRIX: RouteSignal[] = [
     files: ['tests/integration/media-jobs-mutation-safety.test.ts'],
   },
   {
+    routeId: 'jobs-workspace-context',
+    routeHints: ['BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION', 'BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION', 'BACKGROUND_JOB_TYPES.PERSONA_GENERATION'],
+    files: ['tests/integration/workspace-context-job-mutation-safety.test.ts'],
+  },
+  {
+    routeId: 'jobs-legacy',
+    routeHints: ['seo-audit', 'bulk-seo-fix', 'sales-report'],
+    files: ['tests/integration/legacy-jobs-mutation-safety.test.ts'],
+  },
+  {
+    routeId: 'jobs-action-playbook',
+    routeHints: ['action-playbook-execute', 'client_action_completed', 'CONTENT_UPDATED'],
+    files: ['tests/integration/background-job-mutation-safety.test.ts'],
+  },
+  {
     routeId: 'billing-subscription-lifecycle',
     routeHints: ['content-subscription', 'ws_events.workspace_updated', 'stripe billing mutations'],
     files: ['tests/contract/billing-mutation-lifecycle.test.ts'],

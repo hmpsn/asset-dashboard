@@ -250,6 +250,26 @@ export async function runSeoBulkRewriteJob({
     }
 
     const generatedPages = done - failed;
+    if (generatedPages === 0 && failed > 0) {
+      const errorMessage = `Bulk rewrite failed for all ${pages.length} pages`;
+      updateJob(jobId, {
+        status: 'error',
+        progress: done,
+        message: errorMessage,
+        error: errorMessage,
+        result: { suggestions: suggestions.length, generatedPages, failed, total: pages.length, field },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId,
+        operation: 'bulk-rewrite',
+        error: errorMessage,
+        failed,
+        total: pages.length,
+        field,
+      });
+      return;
+    }
+
     updateJob(jobId, {
       status: 'done',
       progress: done,
