@@ -6,6 +6,27 @@ let approvalBatchId = '';
 let approvalItemId = '';
 let schemaSiteId = '';
 
+async function gotoClientRouteWithFallback(
+  page: import('@playwright/test').Page,
+  path: string,
+) {
+  const initial = await page.goto(path);
+  const initialStatus = initial?.status() ?? 0;
+  if (initialStatus >= 400) {
+    const fallback = await page.goto(`http://localhost:5173${path}`);
+    expect((fallback?.status() ?? 0) < 400).toBe(true);
+    return;
+  }
+  expect(initialStatus < 400).toBe(true);
+}
+
+async function dismissOnboardingIfPresent(page: import('@playwright/test').Page) {
+  const skipButton = page.getByRole('button', { name: /skip for now/i });
+  if (await skipButton.isVisible().catch(() => false)) {
+    await skipButton.click();
+  }
+}
+
 test.describe('Client workflow smoke pack', () => {
   test.beforeAll(async ({ request }) => {
     const wsRes = await request.post('/api/workspaces', {
@@ -114,7 +135,7 @@ test.describe('Client workflow smoke pack', () => {
   });
 
   test('workflow smoke: deep-link URL and async job status surfaces remain healthy', async ({ page, request }) => {
-    await page.goto(`/client/${workspaceId}/inbox?tab=decisions`);
+    await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=decisions`);
     await expect(page.locator('body')).not.toBeEmpty();
     await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=decisions`));
 
@@ -146,6 +167,21 @@ test.describe('Client workflow smoke pack', () => {
       typeof terminal!.message === 'string' ||
       typeof terminal!.error === 'string',
     ).toBe(true);
+  });
+
+  test('workflow smoke: inbox conversation/review deep-links stay routable', async ({ page }) => {
+    await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=conversations`);
+    await dismissOnboardingIfPresent(page);
+    await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=conversations`));
+    await expect(page.getByRole('button', { name: /^Conversations/ })).toBeVisible();
+
+    await gotoClientRouteWithFallback(page, `/client/${workspaceId}/inbox?tab=reviews`);
+    await dismissOnboardingIfPresent(page);
+    await expect(page).toHaveURL(new RegExp(`/client/${workspaceId}/inbox\\?tab=reviews`));
+    const reviewsVisible = await page.getByRole('button', { name: /^Reviews/ }).isVisible().catch(() => false);
+    if (!reviewsVisible) {
+      await expect(page.getByRole('button', { name: /^Decisions/ })).toBeVisible();
+    }
   });
 
   test('client smoke: free tier public workspace + tier endpoints stay coherent', async ({ request }) => {

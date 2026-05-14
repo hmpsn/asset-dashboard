@@ -14,11 +14,32 @@ vi.mock('../../src/components/client/ApprovalBatchCard', () => ({
 }));
 
 vi.mock('../../src/components/client/RequestsTab', () => ({
-  RequestsTab: () => <div data-testid="requests-tab">requests-tab</div>,
+  RequestsTab: ({
+    requestsLoading,
+    requests,
+  }: {
+    requestsLoading: boolean;
+    requests: Array<unknown>;
+  }) => (
+    <div data-testid="requests-tab">
+      {requestsLoading ? 'requests-loading' : `requests-count:${requests.length}`}
+    </div>
+  ),
 }));
 
 vi.mock('../../src/components/client/ContentTab', () => ({
-  ContentTab: () => <div data-testid="content-tab">content-tab</div>,
+  ContentTab: ({
+    contentRequests,
+  }: {
+    contentRequests: Array<{ status: string }>;
+  }) => (
+    <div data-testid="content-tab">
+      {`content-count:${contentRequests.length}`}
+      <span data-testid="content-review-count">
+        {contentRequests.filter((item) => item.status === 'client_review' || item.status === 'post_review').length}
+      </span>
+    </div>
+  ),
 }));
 
 vi.mock('../../src/components/client/ClientCopyReview', () => ({
@@ -71,6 +92,10 @@ function renderInboxTab(
     initialFilter?: InboxFilter;
     approvalsLoading?: boolean;
     clientActions?: ClientAction[];
+    requestsLoading?: boolean;
+    requests?: ClientRequest[];
+    contentRequests?: ClientContentRequest[];
+    hasCopyEntries?: boolean;
   },
 ) {
   const client = new QueryClient({
@@ -80,8 +105,8 @@ function renderInboxTab(
   });
 
   const approvalBatches: ApprovalBatch[] = [];
-  const requests: ClientRequest[] = [];
-  const contentRequests: ClientContentRequest[] = [];
+  const requests: ClientRequest[] = options?.requests ?? [];
+  const contentRequests: ClientContentRequest[] = options?.contentRequests ?? [];
 
   const setApprovalBatches = vi.fn();
   const setContentRequests = vi.fn();
@@ -104,7 +129,7 @@ function renderInboxTab(
                 setApprovalBatches={setApprovalBatches}
                 loadApprovals={vi.fn()}
                 requests={requests}
-                requestsLoading={false}
+                requestsLoading={options?.requestsLoading ?? false}
                 clientUser={null}
                 loadRequests={vi.fn()}
                 contentRequests={contentRequests}
@@ -116,7 +141,7 @@ function renderInboxTab(
                 pricingConfirming={false}
                 setToast={setToast}
                 contentPlanReviewCells={[]}
-                hasCopyEntries={false}
+                hasCopyEntries={options?.hasCopyEntries ?? false}
                 initialFilter={options?.initialFilter}
                 hidePrices={false}
                 clientActions={options?.clientActions ?? []}
@@ -143,6 +168,7 @@ describe('InboxTab workflow routing (new inbox IA)', () => {
     expect(screen.queryByLabelText('Decisions')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Reviews')).not.toBeInTheDocument();
     expect(screen.getByTestId('requests-tab')).toBeInTheDocument();
+    expect(screen.getByText('requests-count:0')).toBeInTheDocument();
   });
 
   it('maps legacy ?tab=requests to conversations', () => {
@@ -214,5 +240,94 @@ describe('InboxTab workflow routing (new inbox IA)', () => {
     renderInboxTab('/client/ws_test/inbox?tab=not-a-filter', { initialFilter: 'conversations' });
     expect(screen.getByLabelText('Conversations')).toBeInTheDocument();
     expect(screen.queryByLabelText('Decisions')).not.toBeInTheDocument();
+  });
+
+  it('passes requests loading state through the conversations section', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=conversations', { requestsLoading: true });
+    expect(screen.getByText('requests-loading')).toBeInTheDocument();
+  });
+
+  it('renders reviews section with schema + content review surfaces', async () => {
+    mockGetOptional.mockResolvedValue({
+      id: 'schema-plan-1',
+      siteId: 'site_1',
+      workspaceId: 'ws_test',
+      siteUrl: 'https://example.test',
+      canonicalEntities: [],
+      pageRoles: [{
+        pagePath: '/',
+        pageTitle: 'Home',
+        role: 'homepage',
+        primaryType: 'WebPage',
+        entityRefs: [],
+      }],
+      status: 'sent_to_client',
+      generatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const reviewItem: ClientContentRequest = {
+      id: 'cr_1',
+      topic: 'Homepage refresh',
+      targetKeyword: 'homepage refresh',
+      intent: 'informational',
+      status: 'client_review',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      source: 'strategy',
+      comments: [],
+      serviceType: 'brief_only',
+      briefId: null,
+      postId: null,
+    };
+
+    renderInboxTab('/client/ws_test/inbox?tab=reviews', {
+      contentRequests: [reviewItem],
+      hasCopyEntries: true,
+    });
+
+    expect(await screen.findByLabelText('Reviews')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /review schema plan/i })).toBeInTheDocument();
+    expect(screen.getByTestId('content-tab')).toBeInTheDocument();
+    expect(screen.getByText('content-count:1')).toBeInTheDocument();
+    expect(screen.getByTestId('copy-review')).toBeInTheDocument();
+  });
+
+  it('keeps reviews section stable when schema summary lookup fails', async () => {
+    mockGetOptional.mockRejectedValueOnce(new Error('schema fetch failed'));
+
+    const reviewItem: ClientContentRequest = {
+      id: 'cr_error_1',
+      topic: 'Fallback review topic',
+      targetKeyword: 'fallback review keyword',
+      intent: 'informational',
+      status: 'post_review',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      source: 'client',
+      comments: [],
+      serviceType: 'brief_only',
+      briefId: null,
+      postId: null,
+    };
+
+    renderInboxTab('/client/ws_test/inbox?tab=reviews', {
+      contentRequests: [reviewItem],
+      hasCopyEntries: true,
+    });
+
+    expect(await screen.findByLabelText('Reviews')).toBeInTheDocument();
+    expect(screen.getByText('content-count:1')).toBeInTheDocument();
+    expect(screen.getByTestId('copy-review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /review schema plan/i })).not.toBeInTheDocument();
+  });
+
+  it('renders legacy inbox layout sections when the feature flag is off', () => {
+    mockUseFeatureFlag.mockReturnValue(false);
+    renderInboxTab('/client/ws_test/inbox?tab=all');
+
+    expect(screen.getByLabelText('Needs Action & Requests')).toBeInTheDocument();
+    expect(screen.getByLabelText('SEO Changes')).toBeInTheDocument();
+    expect(screen.getByLabelText('Content')).toBeInTheDocument();
   });
 });
