@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxTab, type InboxFilter } from '../../src/components/client/InboxTab';
@@ -7,6 +7,7 @@ import type { ClientContentRequest, ClientRequest, ApprovalBatch } from '../../s
 import { useFeatureFlag } from '../../src/hooks/useFeatureFlag';
 import { useBetaMode } from '../../src/components/client/BetaContext';
 import { getOptional } from '../../src/api/client';
+import type { ClientAction } from '../../shared/types/client-actions';
 
 vi.mock('../../src/components/client/ApprovalBatchCard', () => ({
   ApprovalBatchCard: () => <div data-testid="approval-batch-card">approval-batch-card</div>,
@@ -64,7 +65,14 @@ const mockUseFeatureFlag = vi.mocked(useFeatureFlag);
 const mockUseBetaMode = vi.mocked(useBetaMode);
 const mockGetOptional = vi.mocked(getOptional);
 
-function renderInboxTab(initialPath: string, initialFilter?: InboxFilter) {
+function renderInboxTab(
+  initialPath: string,
+  options?: {
+    initialFilter?: InboxFilter;
+    approvalsLoading?: boolean;
+    clientActions?: ClientAction[];
+  },
+) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -91,7 +99,7 @@ function renderInboxTab(initialPath: string, initialFilter?: InboxFilter) {
                 workspaceId="ws_test"
                 effectiveTier="growth"
                 approvalBatches={approvalBatches}
-                approvalsLoading={false}
+                approvalsLoading={options?.approvalsLoading ?? false}
                 pendingApprovals={0}
                 setApprovalBatches={setApprovalBatches}
                 loadApprovals={vi.fn()}
@@ -109,9 +117,9 @@ function renderInboxTab(initialPath: string, initialFilter?: InboxFilter) {
                 setToast={setToast}
                 contentPlanReviewCells={[]}
                 hasCopyEntries={false}
-                initialFilter={initialFilter}
+                initialFilter={options?.initialFilter}
                 hidePrices={false}
-                clientActions={[]}
+                clientActions={options?.clientActions ?? []}
               />
             }
           />
@@ -145,10 +153,20 @@ describe('InboxTab workflow routing (new inbox IA)', () => {
     expect(screen.queryByLabelText('Reviews')).not.toBeInTheDocument();
   });
 
+  it('maps legacy ?tab=approvals to decisions', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=approvals');
+    expect(screen.getByLabelText('Decisions')).toBeInTheDocument();
+  });
+
+  it('maps legacy ?tab=copy to reviews', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=copy');
+    expect(screen.getByLabelText('Reviews')).toBeInTheDocument();
+  });
+
   it('falls back from ?tab=reviews to decisions in beta mode', () => {
     mockUseBetaMode.mockReturnValue(true);
 
-    renderInboxTab('/client/ws_test/inbox?tab=reviews', 'decisions');
+    renderInboxTab('/client/ws_test/inbox?tab=reviews', { initialFilter: 'decisions' });
 
     expect(screen.getByLabelText('Decisions')).toBeInTheDocument();
     expect(screen.queryByLabelText('Reviews')).not.toBeInTheDocument();
@@ -158,5 +176,43 @@ describe('InboxTab workflow routing (new inbox IA)', () => {
     renderInboxTab('/client/ws_test/inbox?tab=decisions');
 
     expect(screen.getByText('All caught up — no decisions needed right now.')).toBeInTheDocument();
+  });
+
+  it('hides decisions empty-state copy while approvals are loading', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=decisions', { approvalsLoading: true });
+    expect(screen.queryByText('All caught up — no decisions needed right now.')).not.toBeInTheDocument();
+  });
+
+  it('renders pending client actions in decisions section', () => {
+    const now = new Date().toISOString();
+    const action: ClientAction = {
+      id: 'ca_1',
+      workspaceId: 'ws_test',
+      sourceType: 'content_decay',
+      title: 'Refresh service page',
+      summary: 'Decay detected',
+      payload: { targetKeyword: 'service keyword' },
+      status: 'pending',
+      priority: 'high',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    renderInboxTab('/client/ws_test/inbox?tab=decisions', { clientActions: [action] });
+
+    expect(screen.getByTestId('decision-card')).toBeInTheDocument();
+    expect(screen.getByText('Refresh service page')).toBeInTheDocument();
+  });
+
+  it('shows completed-mode empty state after switching modes', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=decisions');
+    fireEvent.click(screen.getByRole('button', { name: 'Completed' }));
+    expect(screen.getByText('No completed items yet')).toBeInTheDocument();
+  });
+
+  it('falls back to provided initial filter for unknown deep-link values', () => {
+    renderInboxTab('/client/ws_test/inbox?tab=not-a-filter', { initialFilter: 'conversations' });
+    expect(screen.getByLabelText('Conversations')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Decisions')).not.toBeInTheDocument();
   });
 });

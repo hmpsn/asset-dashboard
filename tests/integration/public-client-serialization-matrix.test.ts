@@ -14,6 +14,7 @@ const { api } = ctx;
 
 let workspaceAId = '';
 let workspaceBId = '';
+let workspaceProtectedId = '';
 let siteAId = '';
 let siteBId = '';
 let approvalBatchAId = '';
@@ -83,6 +84,7 @@ beforeAll(async () => {
 
   workspaceAId = createWorkspace('Public Client Serialization Matrix A').id;
   workspaceBId = createWorkspace('Public Client Serialization Matrix B').id;
+  workspaceProtectedId = createWorkspace('Public Client Serialization Matrix Protected').id;
 
   updateWorkspace(workspaceAId, {
     webflowSiteId: siteAId,
@@ -96,6 +98,10 @@ beforeAll(async () => {
     webflowSiteId: siteBId,
     clientPortalEnabled: true,
     clientPassword: '',
+  });
+  updateWorkspace(workspaceProtectedId, {
+    clientPortalEnabled: true,
+    clientPassword: 'matrix-protected-password',
   });
 
   const approvalA = createBatch(workspaceAId, siteAId, 'Matrix A Approval Batch', [{
@@ -209,6 +215,7 @@ afterAll(async () => {
   deleteSchemaSnapshot(siteBId);
   if (workspaceAId) deleteWorkspace(workspaceAId);
   if (workspaceBId) deleteWorkspace(workspaceBId);
+  if (workspaceProtectedId) deleteWorkspace(workspaceProtectedId);
   await ctx.stopServer();
 });
 
@@ -253,6 +260,20 @@ describe('public/client serialization contract matrix', () => {
     expect(intelligence.stripeSubscriptionId).toBeUndefined();
     expect(intelligence.eventConfig).toBeUndefined();
     expect(intelligence.eventGroups).toBeUndefined();
+  });
+
+  it('password-protected workspace keeps bootstrap reads open but gates sensitive reads without auth', async () => {
+    const workspaceRes = await api(`/api/public/workspace/${workspaceProtectedId}`);
+    expect(workspaceRes.status).toBe(200);
+    const workspace = await workspaceRes.json() as Record<string, unknown>;
+    expect(workspace.id).toBe(workspaceProtectedId);
+    expect(workspace.requiresPassword).toBe(true);
+
+    const gatedRes = await api(`/api/public/content-requests/${workspaceProtectedId}`);
+    expect(gatedRes.status).toBe(401);
+    await expect(gatedRes.json()).resolves.toMatchObject({
+      error: expect.stringContaining('Authentication required'),
+    });
   });
 
   it('public approvals read stays workspace-scoped and exposes approval item essentials', async () => {
@@ -389,6 +410,32 @@ describe('public/client serialization contract matrix', () => {
     expect(draftRes.status).toBe(200);
     const draftBody = await draftRes.json();
     expect(draftBody).toBeNull();
+  });
+
+  it('disabled portal rejects public workspace bootstrap read with 403', async () => {
+    updateWorkspace(workspaceBId, { clientPortalEnabled: false });
+    try {
+      const workspaceRes = await api(`/api/public/workspace/${workspaceBId}`);
+
+      expect(workspaceRes.status).toBe(403);
+    } finally {
+      updateWorkspace(workspaceBId, { clientPortalEnabled: true });
+    }
+  });
+
+  it('missing workspace ids return 404 for representative read paths', async () => {
+    const missingId = 'ws_missing_public_matrix';
+    const [workspaceRes, intelligenceRes, contentRes, schemaRes] = await Promise.all([
+      api(`/api/public/workspace/${missingId}`),
+      api(`/api/public/intelligence/${missingId}`),
+      api(`/api/public/content-requests/${missingId}`),
+      api(`/api/public/schema-plan/${missingId}`),
+    ]);
+
+    expect(workspaceRes.status).toBe(404);
+    expect(intelligenceRes.status).toBe(404);
+    expect(contentRes.status).toBe(404);
+    expect(schemaRes.status).toBe(404);
   });
 
   it('workspace B public endpoints never include workspace A records', async () => {

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 let workspaceId = '';
+let freeTierWorkspaceId = '';
 let approvalBatchId = '';
 let approvalItemId = '';
 let schemaSiteId = '';
@@ -23,6 +24,21 @@ test.describe('Client workflow smoke pack', () => {
         webflowSiteId: schemaSiteId,
       },
     });
+
+    const freeWsRes = await request.post('/api/workspaces', {
+      data: { name: 'E2E Client Workflow Smoke Free Tier' },
+    });
+    expect(freeWsRes.ok()).toBe(true);
+    const freeWsBody = await freeWsRes.json();
+    freeTierWorkspaceId = freeWsBody.id;
+
+    await request.patch(`/api/workspaces/${freeTierWorkspaceId}`, {
+      data: {
+        clientPortalEnabled: true,
+        tier: 'free',
+        billingMode: 'platform',
+      },
+    });
   });
 
   test.afterAll(async ({ request }) => {
@@ -34,6 +50,9 @@ test.describe('Client workflow smoke pack', () => {
     }
     if (workspaceId) {
       await request.delete(`/api/workspaces/${workspaceId}`);
+    }
+    if (freeTierWorkspaceId) {
+      await request.delete(`/api/workspaces/${freeTierWorkspaceId}`);
     }
   });
 
@@ -127,6 +146,29 @@ test.describe('Client workflow smoke pack', () => {
       typeof terminal!.message === 'string' ||
       typeof terminal!.error === 'string',
     ).toBe(true);
+  });
+
+  test('client smoke: free tier public workspace + tier endpoints stay coherent', async ({ request }) => {
+    const [workspaceRes, tierRes, requestsRes] = await Promise.all([
+      request.get(`/api/public/workspace/${freeTierWorkspaceId}`),
+      request.get(`/api/public/tier/${freeTierWorkspaceId}`),
+      request.get(`/api/public/content-requests/${freeTierWorkspaceId}`),
+    ]);
+
+    expect(workspaceRes.ok()).toBe(true);
+    expect(tierRes.ok()).toBe(true);
+    expect(requestsRes.ok()).toBe(true);
+
+    const workspaceBody = await workspaceRes.json() as { tier: string; baseTier: string; id: string };
+    const tierBody = await tierRes.json() as { tier: string; baseTier: string; isTrial: boolean };
+    const requestsBody = await requestsRes.json() as Array<unknown>;
+
+    expect(workspaceBody.id).toBe(freeTierWorkspaceId);
+    expect(workspaceBody.tier).toBe(tierBody.tier);
+    expect(workspaceBody.baseTier).toBe('free');
+    expect(tierBody.baseTier).toBe('free');
+    expect(typeof tierBody.isTrial).toBe('boolean');
+    expect(Array.isArray(requestsBody)).toBe(true);
   });
 
   test('workflow smoke: schema + content publish visibility stays coherent across public reads', async ({ request }) => {
