@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Clock, FileText, Image, Code2, ArrowRightLeft, Package, Wrench } from 'lucide-react';
 import { getSafe } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 import { SectionCard } from '../ui';
 
 interface WorkOrder {
@@ -60,14 +61,13 @@ interface OrderStatusProps {
 }
 
 export function OrderStatus({ workspaceId }: OrderStatusProps) {
-  const [orders, setOrders] = useState<WorkOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getSafe<WorkOrder[]>(`/api/public/work-orders/${workspaceId}`, [])
-      .then(data => { setOrders(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [workspaceId]);
+  const { data: orders = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.client.workOrders(workspaceId),
+    queryFn: async () => {
+      const data = await getSafe<WorkOrder[]>(`/api/public/work-orders/${workspaceId}`, []);
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
   if (loading) return null;
   if (orders.length === 0) return null;

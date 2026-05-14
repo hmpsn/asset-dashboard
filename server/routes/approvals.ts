@@ -104,6 +104,17 @@ router.post('/api/approvals/:workspaceId', requireWorkspaceAccess('workspaceId')
     const dashUrl = getClientPortalUrl(ws);
     notifyApprovalReady({ clientEmail: ws.clientEmail, workspaceName: ws.name, workspaceId: req.params.workspaceId, batchName: batch.name, itemCount: items.length, dashboardUrl: dashUrl });
   }
+  addActivity(
+    req.params.workspaceId,
+    'approval_sent',
+    `Sent "${batch.name}" to client for review`,
+    `${items.length} item${items.length !== 1 ? 's' : ''} awaiting client review`,
+    {
+      batchId: batch.id,
+      itemCount: items.length,
+      pageIds: items.map((item: { pageId?: string }) => item.pageId).filter(Boolean),
+    },
+  );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
   res.json(batch);
 });
@@ -136,6 +147,17 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
     }
   }
   deleteBatch(workspaceId, batchId);
+  addActivity(
+    workspaceId,
+    'approval_deleted',
+    `Deleted approval batch "${batch.name}"`,
+    `${batch.items.length} item${batch.items.length !== 1 ? 's' : ''} removed from client review`,
+    {
+      batchId,
+      itemCount: batch.items.length,
+      pageIds: batch.items.map(item => item.pageId).filter(Boolean),
+    },
+  );
   broadcastToWorkspace(workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId, action: 'deleted' });
   res.json({ ok: true });
 });

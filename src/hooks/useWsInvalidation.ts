@@ -127,6 +127,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
     },
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;

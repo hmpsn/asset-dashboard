@@ -73,7 +73,7 @@ const serverFiles = collectTsFiles(SERVER_DIR).filter(
  * We capture the second argument only when it is a string literal.
  */
 const BROADCAST_TO_WS_LITERAL_RE =
-  /broadcastToWorkspace\s*\([^,]+,\s*'([^']+)'/g;
+  /broadcastToWorkspace\s*\([^,]+,\s*['"]([^'"]+)['"]/g;
 
 /**
  * String literals used as the event argument in broadcast() calls.
@@ -81,13 +81,16 @@ const BROADCAST_TO_WS_LITERAL_RE =
  *
  * Pattern: broadcast('<literal>', ...
  */
-const BROADCAST_LITERAL_RE = /\bbroadcast\s*\(\s*'([^']+)'/g;
+const BROADCAST_LITERAL_RE = /\bbroadcast\s*\(\s*['"]([^'"]+)['"]/g;
 
 const wsLiteralsBySite: Record<string, string[]> = {};
 const adminLiteralsBySite: Record<string, string[]> = {};
+let broadcastToWorkspaceCallCount = 0;
 
 for (const file of serverFiles) {
   const src = readFileSync(file, 'utf8');
+  broadcastToWorkspaceCallCount += src.match(/\bbroadcastToWorkspace\s*\(/g)?.length ?? 0;
+
   const wsLits = extractStringLiterals(src, BROADCAST_TO_WS_LITERAL_RE);
   if (wsLits.length) wsLiteralsBySite[file] = wsLits;
 
@@ -170,9 +173,10 @@ describe('WS_EVENTS registry', () => {
 });
 
 describe('broadcastToWorkspace() call sites', () => {
-  it('finds at least one broadcastToWorkspace string literal call site', () => {
-    // Sanity check that the regex is working and server files were scanned
-    expect(allWsLiterals.length).toBeGreaterThan(0);
+  it('finds at least one broadcastToWorkspace call site', () => {
+    // Sanity check that server files were scanned. Raw string-literal calls may
+    // legitimately be zero after WS_EVENTS constant migration backfills.
+    expect(broadcastToWorkspaceCallCount).toBeGreaterThan(0);
   });
 
   it('all broadcastToWorkspace string literals are registered in WS_EVENTS', () => {

@@ -205,6 +205,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       activity: queryKeys.client.activity(workspaceId),
       approvals: queryKeys.client.approvals(workspaceId),
       clientActions: queryKeys.client.clientActions(workspaceId),
+      workOrders: queryKeys.client.workOrders(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
       'content-plan': queryKeys.client.contentPlan(workspaceId),
@@ -365,6 +366,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.WORK_ORDER_UPDATE]: () => refetchClient('workOrders', `/api/public/work-orders/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes

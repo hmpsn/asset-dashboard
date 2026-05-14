@@ -14,6 +14,7 @@ import { listPayments } from '../payments.js';
 import { listWorkOrders, updateWorkOrder } from '../work-orders.js';
 import { getWorkspace, updatePageState } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
   const payments = listPayments(req.params.workspaceId);
@@ -89,7 +90,7 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
     }
   }
 
-  broadcastToWorkspace(wsId, 'work-order:update', { id: order.id, status: order.status });
+  broadcastToWorkspace(wsId, WS_EVENTS.WORK_ORDER_UPDATE, { id: order.id, status: order.status });
   res.json(order);
 });
 
