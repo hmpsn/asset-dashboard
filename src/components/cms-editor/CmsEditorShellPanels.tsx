@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Loader2, Check, Search, Sparkles, Send,
 } from 'lucide-react';
@@ -22,7 +23,7 @@ interface CmsEditorShellPanelsProps {
   approvalSelectedCount: number;
   sendingApproval: boolean;
   approvalSent: boolean;
-  sendForApproval: () => void;
+  sendForApproval: (note?: string) => Promise<void>;
   bulkMode: 'idle' | 'rewriting';
   bulkProgress: { done: number; total: number };
   bulkResults: string | null;
@@ -35,6 +36,7 @@ interface CmsEditorShellPanelsProps {
   summary: PageEditSummary;
   search: string;
   onSearchChange: (value: string) => void;
+  showSearch?: boolean;
 }
 
 export function CmsEditorShellPanels({
@@ -58,7 +60,10 @@ export function CmsEditorShellPanels({
   summary,
   search,
   onSearchChange,
+  showSearch = true,
 }: CmsEditorShellPanelsProps) {
+  const [approvalNote, setApprovalNote] = useState('');
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -95,16 +100,26 @@ export function CmsEditorShellPanels({
             </div>
           )}
           {workspaceId && (
-            <button
-              onClick={sendForApproval}
-              disabled={sendingApproval || approvalSelectedCount === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-                approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
-              }`}
-            >
-              <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
-              {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelectedCount})`}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {approvalSelectedCount > 0 && (
+                <input
+                  value={approvalNote}
+                  onChange={event => setApprovalNote(event.target.value)}
+                  placeholder="Add a note for your client (optional)"
+                  className="w-56 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/50 focus:outline-none"
+                />
+              )}
+              <button
+                onClick={() => sendForApproval(approvalNote)}
+                disabled={sendingApproval || approvalSelectedCount === 0}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+                  approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
+                }`}
+              >
+                <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
+                {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send to client (${approvalSelectedCount})`}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -151,16 +166,18 @@ export function CmsEditorShellPanels({
         </div>
       )}
 
-      <div className="relative">
-        <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-        <input
-          type="text"
-          value={search}
-          onChange={event => onSearchChange(event.target.value)}
-          placeholder="Search items..."
-          className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
-        />
-      </div>
+      {showSearch && (
+        <div className="relative">
+          <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
+          <input
+            type="text"
+            value={search}
+            onChange={event => onSearchChange(event.target.value)}
+            placeholder="Search items..."
+            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+          />
+        </div>
+      )}
     </>
   );
 }

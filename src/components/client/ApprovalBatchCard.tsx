@@ -16,6 +16,7 @@ import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
 import { findPageMapEntryBySlug } from '../../lib/pathUtils';
+import { isClientApplyableBatch } from './approvalApplyability';
 
 interface ApprovalBatchCardProps {
   batch: ApprovalBatch;
@@ -158,9 +159,6 @@ export function ApprovalBatchCard({
       },
     );
   };
-
-  const isClientApplyableBatch = (b: ApprovalBatch) =>
-    b.items.every(i => (i.field === 'seoTitle' || i.field === 'seoDescription') && !i.collectionId && !i.pageId.startsWith('cms-'));
 
   const batchPending = batch.items.filter(i => i.status === 'pending').length;
   const batchApproved = batch.items.filter(i => i.status === 'approved').length;

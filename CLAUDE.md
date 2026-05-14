@@ -304,6 +304,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `GLOSSARY.md` | Domain terminology — Activity Log, Approval Batch, Blueprint, Insight, Playbook, etc. |
 | `docs/rules/background-generation.md` | Full background job platform contract — when to use it, worker patterns, pr-check escape hatch |
 | `docs/rules/inbox-section-routing.md` | Inbox section routing rules — Decisions vs Conversations vs Reviews routing logic |
+| `docs/rules/seo-editor-write-targets.md` | SEO Editor static/CMS/manual write-target contract |
 | `docs/rules/brand-engine.md` | Copy & Brand Engine contracts — voice profile, brandscript, prompt assembly patterns |
 | `docs/rules/workspace-intelligence.md` | Intelligence slice architecture — `assemble*()` functions, slice interfaces, token budget |
 | `docs/rules/platform-organization.md` | Bounded-context ownership, route-to-service extraction, and safe organization/refactor rules |

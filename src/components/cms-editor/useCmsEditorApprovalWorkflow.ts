@@ -61,7 +61,7 @@ export function useCmsEditorApprovalWorkflow({
     setApprovalSelected(previous => toggleStringIds(previous, collectionItemIds));
   }, []);
 
-  const sendForApproval = useCallback(async () => {
+  const sendForApproval = useCallback(async (note?: string) => {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     setApprovalError(null);
@@ -80,6 +80,7 @@ export function useCmsEditorApprovalWorkflow({
         siteId,
         name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`,
         items,
+        ...(note?.trim() ? { note: note.trim() } : {}),
       });
 
       setApprovalSent(true);

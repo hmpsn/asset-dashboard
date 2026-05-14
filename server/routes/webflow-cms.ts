@@ -2,6 +2,8 @@
  * CMS collection routes — extracted from webflow.ts
  */
 import { Router } from 'express';
+import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import {
   listCollections,
   getCollectionSchema,
@@ -18,6 +20,7 @@ import {
   listWorkspaces,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('webflow-cms');
 
@@ -79,8 +82,29 @@ router.patch('/api/webflow/collections/:collectionId/items/:itemId', requireWork
   const siteId = typeof req.body.siteId === 'string' ? req.body.siteId : ws?.webflowSiteId;
   const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
   const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData, token);
-  if (req.body.workspaceId) {
-    updatePageState(req.body.workspaceId, req.params.itemId, { status: 'live', source: 'cms', updatedBy: 'admin' });
+  if (result.success !== false && req.body.workspaceId) {
+    updatePageState(req.body.workspaceId, req.params.itemId, {
+      status: 'fix-proposed',
+      source: 'cms-draft',
+      fields: Object.keys(req.body.fieldData || {}),
+      updatedBy: 'admin',
+    });
+    addActivity(
+      req.body.workspaceId,
+      'seo_updated',
+      'Saved CMS item SEO draft',
+      undefined,
+      {
+        collectionId: req.params.collectionId,
+        itemId: req.params.itemId,
+        fields: Object.keys(req.body.fieldData || {}),
+      },
+    );
+    broadcastToWorkspace(req.body.workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+      pageId: req.params.itemId,
+      fields: Object.keys(req.body.fieldData || {}),
+      source: 'cms-draft',
+    });
   }
   res.json(result);
 });
@@ -220,6 +244,22 @@ router.post('/api/webflow/collections/:collectionId/publish', requireWorkspaceSi
     const siteId = typeof req.body.siteId === 'string' ? req.body.siteId : ws?.webflowSiteId;
     const token = siteId ? getTokenForSite(siteId) || undefined : undefined;
     const result = await publishCollectionItems(req.params.collectionId, itemIds, token);
+    if (workspaceId && result.success !== false) {
+      for (const itemId of itemIds) {
+        updatePageState(workspaceId, itemId, { status: 'live', source: 'cms-publish', updatedBy: 'admin' });
+      }
+      addActivity(
+        workspaceId,
+        'seo_updated',
+        `Published ${itemIds.length} CMS item${itemIds.length !== 1 ? 's' : ''}`,
+        undefined,
+        { collectionId: req.params.collectionId, itemIds },
+      );
+      broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
+        pageIds: itemIds,
+        source: 'cms-publish',
+      });
+    }
     res.json(result);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: POST /api/webflow/collections/:collectionId/publish: programming error'); else log.debug({ err }, 'webflow-cms: collection publish error');

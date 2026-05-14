@@ -129,6 +129,7 @@ export const queryKeys = {
     diagnosticForInsightAll: (wsId: string) => ['admin-diagnostic-for-insight', wsId] as const,
 
     // CMS
+    cmsEditorAll: () => ['cms-editor'] as const,
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
     cmsCollections: (siteId: string, wsId?: string) =>
       wsId ? ['cms-collections', siteId, wsId] as const : ['cms-collections', siteId] as const,

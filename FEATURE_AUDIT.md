@@ -5539,3 +5539,16 @@ Bug hardening included:
 **Client value:** Reviewable SEO work is less likely to show stale state or impossible CMS write behavior.
 
 **Files:** `server/routes/jobs.ts`; `server/routes/webflow-seo-apply.ts`; `server/routes/webflow-seo-suggestions.ts`; `server/seo-suggestions.ts`; `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorBulkWorkflow.ts`; `src/hooks/admin/useSeoEditor.ts`; `src/api/seo.ts`; `tests/integration/webflow-seo-writes.test.ts`; `tests/integration/webflow-seo-bulk-slugless.test.ts`; `tests/unit/useSeoEditor.test.ts`.
+
+---
+
+### 408. Unified SEO Editor Static + CMS Write Targets
+**What it does:** Unifies static Webflow page SEO editing and CMS collection-item SEO editing into one SEO Editor surface with source, collection, and search filters. A shared write-target resolver classifies rows as static pages, real CMS items, or manual-only sitemap CMS URLs. Static pages keep the existing page SEO write path. Real CMS items keep collection item save/publish behavior with collection and item identity. Unmatched sitemap-only CMS URLs remain visible but read-only so synthetic `cms-*` IDs never reach Webflow writes.
+
+**Agency value:** Admins can work through static and CMS SEO opportunities from one place without guessing which rows can be saved automatically.
+
+**Client value:** Client-approved CMS SEO changes can now be applied to real Webflow collection items instead of stopping at manual implementation.
+
+**Mutual:** Durable CMS saves/publishes now log activity, broadcast page-state updates, and refresh both static and CMS editor caches. Approval apply still blocks synthetic CMS discovery rows.
+
+**Files:** `shared/types/seo-editor-write-target.ts`; `src/components/SeoEditorWrapper.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `src/components/CmsEditor.tsx`; `server/routes/webflow-cms.ts`; `server/routes/approvals.ts`; `docs/rules/seo-editor-write-targets.md`; `tests/unit/seo-write-target-resolver.test.ts`.

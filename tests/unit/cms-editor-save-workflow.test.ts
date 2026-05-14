@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import type { QueryClient } from '@tanstack/react-query';
 import { useCmsEditorSaveWorkflow } from '../../src/components/cms-editor/useCmsEditorSaveWorkflow';
 
 vi.mock('../../src/api/client', () => ({
@@ -9,6 +10,10 @@ vi.mock('../../src/api/client', () => ({
 import { patch } from '../../src/api/client';
 
 const mockedPatch = vi.mocked(patch);
+const invalidateQueries = vi.fn();
+const queryClient = {
+  invalidateQueries,
+} as unknown as QueryClient;
 
 function createStateTracker<T>(initial: T) {
   let current = initial;
@@ -26,6 +31,7 @@ function createStateTracker<T>(initial: T) {
 describe('useCmsEditorSaveWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    invalidateQueries.mockClear();
   });
 
   it('does not call API when no edits exist for itemId', async () => {
@@ -45,6 +51,7 @@ describe('useCmsEditorSaveWorkflow', () => {
         setDirty: setDirty.setter,
         setSaved: setSaved.setter,
         refreshStates,
+        queryClient,
       })
     );
 
@@ -78,6 +85,7 @@ describe('useCmsEditorSaveWorkflow', () => {
         setDirty: setDirty.setter,
         setSaved: setSaved.setter,
         refreshStates,
+        queryClient,
       })
     );
 
@@ -98,6 +106,7 @@ describe('useCmsEditorSaveWorkflow', () => {
     expect(setErrors.read()).toEqual({});
     expect(setSaving.read().size).toBe(0);
     expect(refreshStates).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces API error message and does not mark as saved', async () => {
@@ -118,6 +127,7 @@ describe('useCmsEditorSaveWorkflow', () => {
         setDirty: setDirty.setter,
         setSaved: setSaved.setter,
         refreshStates,
+        queryClient,
       })
     );
 
@@ -151,6 +161,7 @@ describe('useCmsEditorSaveWorkflow', () => {
         setDirty: setDirty.setter,
         setSaved: setSaved.setter,
         refreshStates,
+        queryClient,
       })
     );
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import type { QueryClient } from '@tanstack/react-query';
 import { useCmsEditorPublishBulkWorkflow } from '../../src/components/cms-editor/useCmsEditorPublishBulkWorkflow';
 import type { CmsCollection } from '../../src/components/cms-editor/cmsEditorModel';
 
@@ -10,6 +11,8 @@ vi.mock('../../src/api/client', () => ({
 import { post } from '../../src/api/client';
 
 const mockedPost = vi.mocked(post);
+const invalidateQueries = vi.fn();
+const queryClient = { invalidateQueries } as unknown as QueryClient;
 
 function createSetTracker<T>() {
   let current = new Set<T>();
@@ -56,6 +59,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    invalidateQueries.mockClear();
   });
 
   afterEach(() => {
@@ -78,6 +82,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
         setExpandedItems: expandedItems.setter,
         aiRewrite: vi.fn().mockResolvedValue(true),
         aiRewriteBoth: vi.fn().mockResolvedValue(true),
+        queryClient,
       })
     );
 
@@ -97,6 +102,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
       { itemIds: ['item-3'], siteId: 'site-1', workspaceId: 'ws-1' }
     );
     expect(result.current.published).toEqual(new Set(['coll-1', 'coll-2']));
+    expect(invalidateQueries).toHaveBeenCalledTimes(4);
 
     await act(async () => {
       vi.advanceTimersByTime(3000);
@@ -122,6 +128,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
         setExpandedItems: expandedItems.setter,
         aiRewrite: vi.fn().mockResolvedValue(true),
         aiRewriteBoth: vi.fn().mockResolvedValue(true),
+        queryClient,
       })
     );
 
@@ -156,6 +163,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
         setExpandedItems: expandedItems.setter,
         aiRewrite,
         aiRewriteBoth,
+        queryClient,
       })
     );
 
@@ -192,6 +200,7 @@ describe('useCmsEditorPublishBulkWorkflow', () => {
         setExpandedItems: expandedItems.setter,
         aiRewrite,
         aiRewriteBoth,
+        queryClient,
       })
     );
 
