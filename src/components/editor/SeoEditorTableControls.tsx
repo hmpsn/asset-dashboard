@@ -1,5 +1,5 @@
 import { Loader2, Sparkles } from 'lucide-react';
-import { Icon } from '../ui';
+import { Icon, Button } from '../ui';
 
 interface SeoEditorTableControlsProps {
   workspaceId?: string;
@@ -38,23 +38,30 @@ export function SeoEditorTableControls({
               <span className="t-caption-sm text-[var(--brand-text-bright)]">
                 Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...
               </span>
-              <button onClick={onCancelAnalyze} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">
+              <Button
+                onClick={onCancelAnalyze}
+                variant="ghost"
+                size="sm"
+                className="ml-2 px-1.5 py-0.5 text-accent-danger hover:text-accent-danger hover:bg-transparent"
+              >
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               onClick={onAnalyzeAllPages}
               disabled={analyzeDisabled}
-              className="flex items-center gap-1.5 px-3 py-1.5 t-caption-sm font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-40"
+              icon={Sparkles}
+              size="sm"
+              variant="secondary"
+              className="bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] border-0 font-medium disabled:opacity-40"
             >
-              <Icon as={Sparkles} size="md" />
               {analyzedPagesCount === totalPages && totalPages > 0
                 ? 'All Pages Analyzed'
                 : analyzedPagesCount > 0
                   ? `Analyze Remaining (${totalPages - analyzedPagesCount})`
                   : 'Analyze All Pages'}
-            </button>
+            </Button>
           )}
           {analyzedPagesCount > 0 && !bulkAnalyzeProgress && (
             <span className="t-caption-sm text-accent-success">

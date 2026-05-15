@@ -218,7 +218,7 @@
           "est": "2-4h",
           "priority": "P2",
           "status": "done",
-          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).",
+          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).\nWave follow-up 2026-05-15: completed a parallel admin action-button primitive sweep across SEO Editor action rows (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls, WorkspaceHome action links/status cards, and SchemaSuggester top controls. Style drift metrics improved from `raw_button_unallowlisted_count: 891 -> 855` and `non_primitive_action_count: 876 -> 840`; admin raw-button count now `717` (down from `753`).",
           "shippedAt": "2026-05-15"
         },
         {

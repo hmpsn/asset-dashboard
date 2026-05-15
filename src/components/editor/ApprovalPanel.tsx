@@ -2,8 +2,8 @@
  * ApprovalPanel — Approval workflow UI for SEO editor.
  * Extracted from SeoEditor.tsx approval button section.
  */
-import { Loader2, Check, Send } from 'lucide-react';
-import { Icon } from '../ui';
+import { Check, Send } from 'lucide-react';
+import { Button } from '../ui';
 
 export interface ApprovalPanelProps {
   approvalSelected: Set<string>;
@@ -16,15 +16,18 @@ export function ApprovalPanel({
   approvalSelected, sendingApproval, approvalSent, onSendApproval,
 }: ApprovalPanelProps) {
   return (
-    <button
+    <Button
       onClick={onSendApproval}
       disabled={sendingApproval || approvalSelected.size === 0}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-        approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
+      loading={sendingApproval}
+      icon={approvalSent ? Check : Send}
+      size="sm"
+      variant="secondary"
+      className={`rounded-[var(--radius-lg)] border-0 text-white ${
+        approvalSent ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-teal-600 hover:bg-teal-500'
       }`}
     >
-      <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
       {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send to Client (${approvalSelected.size})`}
-    </button>
+    </Button>
   );
 }

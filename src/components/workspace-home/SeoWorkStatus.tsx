@@ -1,6 +1,6 @@
 import { Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, ClickableRow } from '../ui';
 import { adminPath } from '../../routes';
 
 interface SeoWorkStatusProps {
@@ -24,28 +24,28 @@ export function SeoWorkStatus({ seoStatus, workspaceId, embedded }: SeoWorkStatu
   const grid = (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--brand-border)]">
       {seoStatus.issueDetected > 0 && (
-        <button onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
+        <ClickableRow onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
           <span className="text-lg font-bold text-amber-400/80">{seoStatus.issueDetected}</span>
           <span className="t-micro text-[var(--brand-text-muted)]">issues found</span>
-        </button>
+        </ClickableRow>
       )}
       {seoStatus.inReview > 0 && (
-        <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
+        <ClickableRow onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
           <span className="text-lg font-bold text-blue-400">{seoStatus.inReview}</span>
           <span className="t-micro text-[var(--brand-text-muted)]">in review</span>
-        </button>
+        </ClickableRow>
       )}
       {seoStatus.approved > 0 && (
-        <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
+        <ClickableRow onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
           <span className="text-lg font-bold text-emerald-400/80">{seoStatus.approved}</span>
           <span className="t-micro text-[var(--brand-text-muted)]">approved</span>
-        </button>
+        </ClickableRow>
       )}
       {seoStatus.rejected > 0 && (
-        <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
+        <ClickableRow onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-[var(--surface-3)] transition-colors bg-[var(--surface-2)]">
           <span className="text-lg font-bold text-red-400/80">{seoStatus.rejected}</span>
           <span className="t-micro text-[var(--brand-text-muted)]">rejected</span>
-        </button>
+        </ClickableRow>
       )}
       {seoStatus.live > 0 && (
         <div className="flex flex-col items-center py-3 bg-[var(--surface-2)]">

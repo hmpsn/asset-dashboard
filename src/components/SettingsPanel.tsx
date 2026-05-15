@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 import { FeatureFlagSettings } from './FeatureFlagSettings';
-import { Icon } from './ui';
+import { Button, Icon, IconButton } from './ui';
 import { get, post, patch, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
@@ -147,14 +147,19 @@ export function SettingsPanel() {
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
               <span className="t-caption-sm font-medium text-accent-success bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Connected</span>
-              <button onClick={disconnectGoogle} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Disconnect Google">
-                <Icon as={LogOut} size="md" className="text-[var(--brand-text-muted)]" />
-              </button>
+              <IconButton
+                onClick={disconnectGoogle}
+                icon={LogOut}
+                label="Disconnect Google"
+                title="Disconnect Google"
+                size="md"
+                variant="ghost"
+              />
             </div>
           ) : googleStatus?.configured ? (
-            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors">
-              <Icon as={LogIn} size="sm" /> Connect Google
-            </button>
+            <Button onClick={connectGoogle} icon={LogIn} size="md" className="px-3">
+              Connect Google
+            </Button>
           ) : (
             <span className="t-caption-sm text-accent-warning bg-amber-500/8 px-2 py-1 rounded-[var(--radius-pill)]">Not configured</span>
           )}
@@ -293,9 +298,16 @@ export function SettingsPanel() {
             <h3 className="t-caption text-[var(--brand-text-bright)]">Storage Monitor</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Persistent disk usage breakdown &amp; cleanup tools</p>
           </div>
-          <button onClick={loadStorage} disabled={storageLoading} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Refresh">
-            <Icon as={RefreshCw} size="md" className={`text-[var(--brand-text-muted)] ${storageLoading ? 'animate-spin' : ''}`} />
-          </button>
+          <IconButton
+            onClick={loadStorage}
+            disabled={storageLoading}
+            icon={RefreshCw}
+            label="Refresh storage stats"
+            title="Refresh"
+            size="md"
+            variant="ghost"
+            className={storageLoading ? '[&_svg]:animate-spin' : undefined}
+          />
         </div>
 
         {storage ? (
@@ -355,10 +367,11 @@ export function SettingsPanel() {
             <div className="pt-2 border-t border-[var(--brand-border)]">
               <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-2">Cleanup Actions</div>
               <div className="space-y-1.5">
-                <button
+                <Button
                   onClick={() => runPrune('backups')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
+                  variant="secondary"
+                  className="w-full justify-start px-3 py-2 rounded-[var(--radius-lg)] text-left h-auto"
                 >
                   <Icon as={Trash2} size="sm" className="text-accent-warning shrink-0" />
                   <div className="flex-1">
@@ -366,11 +379,12 @@ export function SettingsPanel() {
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">Keep last 3 days</span>
                   </div>
                   {pruning === 'backups' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => runPrune('reports')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
+                  variant="secondary"
+                  className="w-full justify-start px-3 py-2 rounded-[var(--radius-lg)] text-left h-auto"
                 >
                   <Icon as={Trash2} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
                   <div className="flex-1">
@@ -378,11 +392,12 @@ export function SettingsPanel() {
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">Keep last 20 per site</span>
                   </div>
                   {pruning === 'reports' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => runPrune('chat')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
+                  variant="secondary"
+                  className="w-full justify-start px-3 py-2 rounded-[var(--radius-lg)] text-left h-auto"
                 >
                   <Icon as={Trash2} size="sm" className="text-accent-brand shrink-0" />
                   <div className="flex-1">
@@ -390,11 +405,12 @@ export function SettingsPanel() {
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;90 days old</span>
                   </div>
                   {pruning === 'chat' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => runPrune('activity')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
+                  variant="secondary"
+                  className="w-full justify-start px-3 py-2 rounded-[var(--radius-lg)] text-left h-auto"
                 >
                   <Icon as={Trash2} size="sm" className="text-accent-danger shrink-0" />
                   <div className="flex-1">
@@ -402,7 +418,7 @@ export function SettingsPanel() {
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;6 months old</span>
                   </div>
                   {pruning === 'activity' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -436,7 +452,7 @@ export function SettingsPanel() {
               placeholder="https://cal.com/yourname or https://calendly.com/yourname"
               className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
             />
-            <button
+            <Button
               onClick={async () => {
                 setBookingSaving(true);
                 try {
@@ -446,11 +462,12 @@ export function SettingsPanel() {
                 finally { setBookingSaving(false); }
               }}
               disabled={bookingSaving}
-              className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption text-white transition-colors flex items-center gap-1.5"
+              loading={bookingSaving}
+              icon={Check}
+              className="px-3 py-2 rounded-[var(--radius-lg)]"
             >
-              {bookingSaving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Check} size="sm" />}
               Save
-            </button>
+            </Button>
           </div>
           {bookingUrl && (
             <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors">

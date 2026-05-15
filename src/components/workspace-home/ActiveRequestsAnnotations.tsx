@@ -1,6 +1,6 @@
 import { Clipboard, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, Badge, Icon } from '../ui';
+import { SectionCard, Badge, Icon, Button } from '../ui';
 import { adminPath } from '../../routes';
 import { timeAgo } from '../../lib/timeAgo';
 
@@ -35,7 +35,16 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         <SectionCard
           title="Active Requests"
           titleIcon={<Icon as={Clipboard} size="md" className="text-amber-400/80" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={(
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => navigate(adminPath(workspaceId, 'requests'))}
+              className="no-underline text-teal-400 hover:text-teal-300"
+            >
+              View All →
+            </Button>
+          )}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]">
@@ -59,7 +68,16 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         <SectionCard
           title="Recent Annotations"
           titleIcon={<Icon as={Flag} size="md" className="text-[var(--brand-text-muted)]" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={(
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+              className="no-underline text-teal-400 hover:text-teal-300"
+            >
+              View All →
+            </Button>
+          )}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]">
