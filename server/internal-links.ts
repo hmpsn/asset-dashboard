@@ -16,13 +16,12 @@ import { normalizePageUrl, resolvePagePath, sanitizeForPromptInjection, stripHtm
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
-import { STUDIO_BOT_UA } from './constants.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
+import { fetchExternalText } from './external-fetch.js';
 
 const log = createLogger('internal-links');
 
 const FETCH_HEADERS = {
-  'User-Agent': STUDIO_BOT_UA,
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 };
 
@@ -37,9 +36,13 @@ function normalizeInternalLinkPath(path: string): string {
 async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; path: string; title: string }>> {
   try {
     const sitemapUrl = `${baseUrl}/sitemap.xml`;
-    const res = await fetch(sitemapUrl, { redirect: 'follow', signal: AbortSignal.timeout(15000), headers: FETCH_HEADERS });
-    if (!res.ok) return [];
-    const xml = await res.text();
+    const xml = await fetchExternalText({
+      url: sitemapUrl,
+      timeoutMs: 15_000,
+      redirect: 'follow',
+      defaultHeaders: FETCH_HEADERS,
+      logContext: { module: 'internal-links', fetchPath: 'sitemap' },
+    });
 
     // Parse <loc> entries from sitemap XML
     const locRegex = /<loc>\s*(.*?)\s*<\/loc>/gi;
@@ -105,9 +108,13 @@ export interface InternalLinkResult {
 
 async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[]; pageTitle?: string } | null> {
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: FETCH_HEADERS });
-    if (!res.ok) return null;
-    const html = await res.text();
+    const html = await fetchExternalText({
+      url,
+      timeoutMs: 10_000,
+      redirect: 'follow',
+      defaultHeaders: FETCH_HEADERS,
+      logContext: { module: 'internal-links', fetchPath: 'page-content' },
+    });
 
     // Extract <title> for better page naming (sitemap doesn't include titles)
     const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
