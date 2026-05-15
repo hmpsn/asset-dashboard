@@ -163,3 +163,5 @@ For new or substantially touched work, name the owning context and scan the matc
 ## Review Use
 
 Before opening a PR, confirm that the touched context's DB/storage, events, query keys, public endpoints, and activity types have either been updated or explicitly marked not applicable in the PR notes. This is advisory guidance, not a new `pr-check` rule.
+
+For workspace event drift checks, use `docs/rules/platform-domain-event-definitions.md` and `npm run verify:domain-events`.

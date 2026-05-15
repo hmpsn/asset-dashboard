@@ -102,74 +102,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave2b-critical-test-coverage",
-      "name": "Platform Health Wave 2b — Critical Test Coverage Hardening",
-      "hours": "70-120",
-      "rationale": "Raise confidence in the highest-risk product domains before chasing global 80-90% coverage. Current baseline from 2026-05-13 coverage run: 32.31% lines, 30.66% statements, 24.64% branches, 24.30% functions. The first goal is critical-domain behavior coverage, not vanity global line coverage.",
-      "items": [
-        {
-          "id": "platform-test-coverage-domain-baseline",
-          "title": "Critical Domain Coverage Baseline + Ownership Matrix",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "1-2d",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-13",
-          "notes": "Shipped 2026-05-13: added `docs/testing/critical-domain-coverage-baseline.md`, `scripts/report-critical-domain-coverage.ts`, `tests/unit/critical-domain-coverage-report.test.ts`, and `npm run verify:coverage-baseline`. The advisory report covers every canonical bounded context with critical surfaces, existing test signals, known gaps, target coverage posture, and recommended next test slices while preserving the current 2026-05-13 global baseline."
-        },
-        {
-          "id": "platform-test-auth-billing-route-contracts",
-          "title": "P0 Auth, Billing, Workspace, and Public Route Contract Tests",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "1-2w",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Focused slice shipped 2026-05-13: added route-contract coverage for workspace-scoped admin reads, HMAC/no-JWT admin pass-through, cross-workspace client-user mutation guards, public workspace client-safe serialization, trial/effective tier fields, protected public billing routes, payment-status scoping, and admin payment workspace isolation. Closeout shipped 2026-05-14: completed remaining P0 auth/billing seams with route-level webhook ingress contracts (`/api/stripe/webhook` missing signature, verification failure, and success path), and validated the broader contract matrix across `wave2b-route-contracts`, `public-portal-auth`, `stripe-admin-auth`, `stripe-checkout-flow`, `stripe-webhooks`, `stripe-webhook-idempotency`, `journey-payment-tier-upgrade`, and `tier-gate-enforcement`."
-        },
-        {
-          "id": "platform-test-mutation-safety-suite",
-          "title": "P0 Mutation Safety Suite",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "1-2w",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Focused slice shipped 2026-05-13: added mutation lifecycle coverage for work-order status updates/completion and admin approval create/delete paths, including DB writes, workspace scoping, activity logging, WS_EVENTS-based broadcasts, page-state side effects, public/admin read paths, and source-level invalidation contracts for approval/work-order events. Schema mutation-safety slice shipped 2026-05-13: added coverage for schema plan send-to-client, client schema feedback, publish/retract/delete/rollback, snapshot/page-state/activity/history/broadcast side effects, and no-side-effect failure/cross-workspace cases; fixed schema-plan feedback to broadcast the schema-plan event so client schema caches refresh. Content request/review mutation-safety slice shipped 2026-05-13: added coverage for public create/submit, admin patch/delete, client approve/request-changes/decline/upgrade/comment, post-review decisions, inbox/page-state side effects, broadcasts, activity, and no-side-effect invalid/cross-workspace cases. Client action/background-job mutation-safety slice shipped 2026-05-13: added coverage for admin/public client-action lifecycle contracts, actor attribution, no-side-effect invalid/cross-workspace cases, content_decay action-playbook success/failure writes, content brief read paths, job state, activity, broadcasts, and invalidation contracts. Billing mutation-safety slice shipped 2026-05-14: added Stripe/content-subscription lifecycle coverage and billing broadcast contracts; fixed content subscription webhooks so they no longer overwrite workspace platform plan subscription state, emit workspace tier updates with null tier payloads, or skip known content subscriptions when Stripe metadata is missing, moved content-subscription broadcasts onto WS_EVENTS constants, wired admin/client invalidation for subscription lifecycle events, and added activity/status handling for content subscription status changes. SEO background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for bulk analyze, bulk rewrite, and bulk accept-fixes jobs across job creation/completion, page_keywords/seo_suggestions/page_edit_states writes, activity logging, WS_EVENTS broadcasts, admin read-path visibility, and no-side-effect invalid/cross-workspace starts; no runtime fixes were required. Content post generation mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `/api/content-posts/:workspaceId/generate`, including skeleton creation, background job completion/failure state, content_posts persistence, activity logging, CONTENT_UPDATED/POST_UPDATED broadcasts, admin read-path visibility, and no-side-effect missing-brief or duplicate-start cases; no runtime fixes were required. Keyword strategy background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `keyword-strategy`, including persisted `keywordStrategy`/page_keywords/content_gaps/quick_wins writes, activity logging, STRATEGY_UPDATED broadcasts, tracked-keyword seeding, usage reservation/refund behavior, no-op incremental completions, duplicate-start rejection, and no-side-effect failure handling; no runtime fixes were required. Page-analysis background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `page-analysis`, including page_keywords persistence, activity logging, STRATEGY_UPDATED broadcasts, graceful skipped-page completion on per-page AI failure, duplicate-start rejection, and no-side-effect cross-workspace starts; fixed the route to reject mismatched `workspaceId`/`siteId` pairs before a job can start writing into another workspace. Billing edge-case follow-up slice shipped 2026-05-14: expanded content-subscription lifecycle coverage for paused/incomplete status mapping plus malformed `customer.subscription.updated` and `customer.subscription.deleted` events with no metadata/local row, asserting strict no-op behavior (no workspace mutation, no activity writes, no broadcasts) when ownership context is absent. Schema-generator background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `schema-generator`, including snapshot persistence, `schema_generated` activity logging, `WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED` broadcasts, admin/public schema snapshot read-path visibility, duplicate-start rejection, and strict no-side-effect cross-workspace or failure behavior. Workspace-context background-job mutation-safety slice shipped 2026-05-14: added lifecycle coverage for legacy and canonical starts (`/api/workspaces/:id/generate-brand-voice` and `POST /api/jobs`) across brand-voice, knowledge-base, and persona jobs, including deterministic done/error job state, stable result payload shape for admin reads, one-time `voice_calibrated` action recording plus `OUTCOME_ACTION_RECORDED` broadcast for brand-voice, no duplicate action/broadcast on repeat runs, and no-side-effect duplicate/failure behavior. Deep-diagnostic background-job mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `POST /api/jobs` with `deep-diagnostic`, including completed/failed report states, job terminal state, insight report-stamp persistence, diagnostic activity logging, DIAGNOSTIC_COMPLETE/DIAGNOSTIC_FAILED broadcasts, read-path visibility, duplicate-start rejection, and cross-workspace no-side-effect contracts. Legacy jobs mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `seo-audit`, `bulk-seo-fix`, and `sales-report` jobs, including done/error job state, workspace/site isolation, activity/broadcast side effects on success, and strict no-side-effect behavior for invalid, duplicate, and cross-workspace starts. Media jobs mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `compress`, `bulk-compress`, and `bulk-alt` jobs, including done/error state handling, duplicate-start/cross-workspace guards, summary activity behavior, and strict no-side-effect behavior on failed fetch/generation paths. Contract matrix slice shipped 2026-05-14: added background-job coverage contracts and high-risk mutation route matrix guardrails to keep lifecycle coverage anchored as new job types and route families are added. Webflow CMS mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `PATCH /api/webflow/collections/:collectionId/items/:itemId` and `POST /api/webflow/collections/:collectionId/publish`, asserting success-path page-state writes/activity/broadcast/read visibility and strict no-side-effect behavior for provider failures and cross-workspace site mismatches. SEO provider-failure closeout slice shipped 2026-05-14: added all-failed safeguards for SEO bulk background jobs (`seo-bulk-analyze`, `seo-bulk-rewrite`, `seo-bulk-accept-fixes`) so provider-wide failures now end in terminal `error` (not phantom `done`) and added lifecycle assertions for no mutation/activity/success-broadcast side effects when every item fails. Copy batch mutation-safety closeout shipped 2026-05-14: added lifecycle coverage for `POST /api/copy/:workspaceId/:blueprintId/batch`, including deterministic success/all-failed terminal states, activity and WS_EVENTS batch broadcast assertions, read-path visibility via `GET /api/copy/:workspaceId/batch/:batchId`, and strict no-side-effect malformed/cross-workspace guards; fixed the route to reject missing or cross-workspace blueprints before any batch job/activity/broadcast side effects."
-        },
-        {
-          "id": "platform-test-external-failure-and-state-machines",
-          "title": "External Failure + State Machine Coverage",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "1-2w",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Mock Webflow, Stripe, Google, DataForSEO, SEMrush, OpenAI, and Anthropic failure modes and assert failed/error states rather than phantom success. Expand transition-guard tests for approval items, content requests, client actions, work orders, content subscriptions, posts, and background jobs so illegal transitions fail consistently. Focused transition-guard slice shipped 2026-05-14: expanded unit coverage to include full valid/invalid transition matrices for `CLIENT_ACTION_TRANSITIONS` and `BRIEFING_DRAFT_TRANSITIONS`, closing state-machine coverage gaps in those two entities while this roadmap item remains pending for broader external-provider failure breadth. External-failure contract slice shipped 2026-05-14: added provider-matrix guardrails plus exhaustive state-machine graph contracts to keep failure and transition coverage from silently regressing as routes/providers evolve. Webflow CMS external-failure + state-machine slice shipped 2026-05-14: added route-level failure contracts that assert no phantom page-state/activity/broadcast success on upstream Webflow write failures and added background-job transition maps plus runtime guard coverage so terminal jobs cannot silently reopen. SEO provider-failure hardening slice shipped 2026-05-14: added explicit mutation-safety coverage for OpenAI-powered bulk analyze/rewrite failures and Webflow update failures in bulk accept-fixes, plus DataForSEO/SEMrush-path keyword-strategy provider fetch failure assertions, and expanded provider matrix contracts to keep these failure signals anchored. Closeout slice shipped 2026-05-14: added deterministic brand-identity AI write-failure contracts (no deliverable/version/activity/usage side effects on provider failure), enforced runtime `CONTENT_SUB_TRANSITIONS` in `updateContentSubscription`, expanded subscription transitions for Stripe `incomplete` recovery (`active|paused|past_due -> pending`), and added a state-machine guard coverage contract to keep validateTransition wiring anchored across all critical status entities."
-        },
-        {
-          "id": "platform-test-client-workflow-and-e2e-smoke",
-          "title": "Client Workflow Component Tests + E2E Smoke Journeys",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "1-2w",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Add focused component/workflow tests for Client Portal and Inbox decisions/conversations/reviews, schema review, content request/review, tier gates, empty/error/loading states, and tab deep-link behavior. Add a small E2E smoke pack for admin send-to-client -> client decision -> admin update, billing/tier gate visibility, background job progress/result, and schema/content publish flows. Keep this to high-value journeys rather than exhaustive UI snapshots. Focused smoke slice shipped 2026-05-14: added a Playwright client workflow smoke pack that validates admin->client->admin decision convergence, public tier/billing visibility coherence, deep-link URL stability (`/client/:workspaceId/inbox?tab=decisions`), and async background-job status surfaces. Lane B confidence slice shipped 2026-05-14: added Inbox IA component deep-link workflow coverage (canonical + legacy inbox tabs, beta reviews fallback, empty-state behavior), expanded public/client serialization contracts to include `/api/public/workspace/:id` and `/api/public/intelligence/:workspaceId` safe-shape assertions, and extended the Playwright smoke pack with content-publish + schema-plan visibility checks. Closeout shipped 2026-05-14: expanded Inbox workflow matrix coverage for loading/empty/error surfaces, added deep-link routability smoke for conversations/reviews, and hardened Playwright route navigation by handling dev-server client-route fallback and first-visit onboarding overlays so CI/local smoke remains deterministic."
-        },
-        {
-          "id": "platform-test-coverage-ratchet-ci",
-          "title": "Coverage Ratchet, Reporting, and CI Guardrails",
-          "source": "Platform test coverage review 2026-05-13",
-          "est": "3-5d",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-05-14",
-          "notes": "Shipped 2026-05-14: added `scripts/report-coverage-ratchet.ts` plus `tests/unit/coverage-ratchet-report.test.ts` and `docs/testing/coverage-ratchet-ci.md` to enforce global coverage floors while keeping bounded-context signal checks advisory. Added `npm run verify:coverage-ratchet`, enabled `json-summary` coverage output, and wired CI push coverage jobs to run the ratchet plus upload `coverage/coverage-summary.json` and `coverage/lcov.info` artifacts. Floors are intentionally below the 2026-05-13 baseline and are designed to ratchet upward over time."
-        }
-      ]
-    },
-    {
       "id": "sprint-platform-health-wave3-silent-failure-rails",
       "name": "Platform Health Wave 3 — Silent-Failure Reduction Rails",
       "hours": "18-30",
@@ -181,8 +113,9 @@
           "source": "Product engineering base-layer review 2026-05-13",
           "est": "4-6h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Create explicit serializers for high-value admin/client/public views such as toPublicWorkspaceView(), toClientInboxItem(), toClientSchemaView(), and toAdminSchemaView(). Goal: stop route handlers from hand-picking fields inline and reduce regressions where the backend stores a field but public/client endpoints forget to expose it."
+          "status": "done",
+          "notes": "Create explicit serializers for high-value admin/client/public views such as toPublicWorkspaceView(), toClientInboxItem(), toClientSchemaView(), and toAdminSchemaView(). Goal: stop route handlers from hand-picking fields inline and reduce regressions where the backend stores a field but public/client endpoints forget to expose it.\nShipped 2026-05-14 in PR #734: added explicit client-safe/public/admin serializers across workspace/public, inbox, and schema read paths with contract coverage so route handlers no longer hand-pick field lists inline.",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": "platform-base-domain-event-definitions",
@@ -190,8 +123,9 @@
           "source": "Product engineering base-layer review 2026-05-13",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Layer a richer event registry over WS_EVENTS that documents event name, owning domain, producer routes/services, payload shape, query keys to invalidate, admin/client listeners, and related activity type. This should prevent drift where a broadcast exists but no listener handles it, or a listener expects a payload field that one emitter does not send."
+          "status": "done",
+          "notes": "Layer a richer event registry over WS_EVENTS that documents event name, owning domain, producer routes/services, payload shape, query keys to invalidate, admin/client listeners, and related activity type. This should prevent drift where a broadcast exists but no listener handles it, or a listener expects a payload field that one emitter does not send.\nShipped 2026-05-14: added `scripts/platform-domain-event-definitions.ts` as the canonical WS event registry (owning context, producer/listener surfaces, invalidation hints, activity mappings), added advisory report CLI (`scripts/report-domain-event-definitions.ts`, markdown + --json), and unit coverage for full WS_EVENTS key coverage, stable report shape, and orphan producer/listener mapping detection.",
+          "shippedAt": "2026-05-14"
         },
         {
           "id": "platform-base-ai-operation-registry",
@@ -1310,6 +1244,75 @@
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
     },
     {
+      "id": "sprint-platform-health-wave2b-critical-test-coverage",
+      "name": "✅ SHIPPED — Platform Health Wave 2b — Critical Test Coverage Hardening",
+      "hours": "70-120",
+      "rationale": "Raise confidence in the highest-risk product domains before chasing global 80-90% coverage. Current baseline from 2026-05-13 coverage run: 32.31% lines, 30.66% statements, 24.64% branches, 24.30% functions. The first goal is critical-domain behavior coverage, not vanity global line coverage.",
+      "items": [
+        {
+          "id": "platform-test-coverage-domain-baseline",
+          "title": "Critical Domain Coverage Baseline + Ownership Matrix",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "1-2d",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: added `docs/testing/critical-domain-coverage-baseline.md`, `scripts/report-critical-domain-coverage.ts`, `tests/unit/critical-domain-coverage-report.test.ts`, and `npm run verify:coverage-baseline`. The advisory report covers every canonical bounded context with critical surfaces, existing test signals, known gaps, target coverage posture, and recommended next test slices while preserving the current 2026-05-13 global baseline."
+        },
+        {
+          "id": "platform-test-auth-billing-route-contracts",
+          "title": "P0 Auth, Billing, Workspace, and Public Route Contract Tests",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "1-2w",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Focused slice shipped 2026-05-13: added route-contract coverage for workspace-scoped admin reads, HMAC/no-JWT admin pass-through, cross-workspace client-user mutation guards, public workspace client-safe serialization, trial/effective tier fields, protected public billing routes, payment-status scoping, and admin payment workspace isolation. Closeout shipped 2026-05-14: completed remaining P0 auth/billing seams with route-level webhook ingress contracts (`/api/stripe/webhook` missing signature, verification failure, and success path), and validated the broader contract matrix across `wave2b-route-contracts`, `public-portal-auth`, `stripe-admin-auth`, `stripe-checkout-flow`, `stripe-webhooks`, `stripe-webhook-idempotency`, `journey-payment-tier-upgrade`, and `tier-gate-enforcement`."
+        },
+        {
+          "id": "platform-test-mutation-safety-suite",
+          "title": "P0 Mutation Safety Suite",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "1-2w",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Focused slice shipped 2026-05-13: added mutation lifecycle coverage for work-order status updates/completion and admin approval create/delete paths, including DB writes, workspace scoping, activity logging, WS_EVENTS-based broadcasts, page-state side effects, public/admin read paths, and source-level invalidation contracts for approval/work-order events. Schema mutation-safety slice shipped 2026-05-13: added coverage for schema plan send-to-client, client schema feedback, publish/retract/delete/rollback, snapshot/page-state/activity/history/broadcast side effects, and no-side-effect failure/cross-workspace cases; fixed schema-plan feedback to broadcast the schema-plan event so client schema caches refresh. Content request/review mutation-safety slice shipped 2026-05-13: added coverage for public create/submit, admin patch/delete, client approve/request-changes/decline/upgrade/comment, post-review decisions, inbox/page-state side effects, broadcasts, activity, and no-side-effect invalid/cross-workspace cases. Client action/background-job mutation-safety slice shipped 2026-05-13: added coverage for admin/public client-action lifecycle contracts, actor attribution, no-side-effect invalid/cross-workspace cases, content_decay action-playbook success/failure writes, content brief read paths, job state, activity, broadcasts, and invalidation contracts. Billing mutation-safety slice shipped 2026-05-14: added Stripe/content-subscription lifecycle coverage and billing broadcast contracts; fixed content subscription webhooks so they no longer overwrite workspace platform plan subscription state, emit workspace tier updates with null tier payloads, or skip known content subscriptions when Stripe metadata is missing, moved content-subscription broadcasts onto WS_EVENTS constants, wired admin/client invalidation for subscription lifecycle events, and added activity/status handling for content subscription status changes. SEO background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for bulk analyze, bulk rewrite, and bulk accept-fixes jobs across job creation/completion, page_keywords/seo_suggestions/page_edit_states writes, activity logging, WS_EVENTS broadcasts, admin read-path visibility, and no-side-effect invalid/cross-workspace starts; no runtime fixes were required. Content post generation mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `/api/content-posts/:workspaceId/generate`, including skeleton creation, background job completion/failure state, content_posts persistence, activity logging, CONTENT_UPDATED/POST_UPDATED broadcasts, admin read-path visibility, and no-side-effect missing-brief or duplicate-start cases; no runtime fixes were required. Keyword strategy background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `keyword-strategy`, including persisted `keywordStrategy`/page_keywords/content_gaps/quick_wins writes, activity logging, STRATEGY_UPDATED broadcasts, tracked-keyword seeding, usage reservation/refund behavior, no-op incremental completions, duplicate-start rejection, and no-side-effect failure handling; no runtime fixes were required. Page-analysis background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `page-analysis`, including page_keywords persistence, activity logging, STRATEGY_UPDATED broadcasts, graceful skipped-page completion on per-page AI failure, duplicate-start rejection, and no-side-effect cross-workspace starts; fixed the route to reject mismatched `workspaceId`/`siteId` pairs before a job can start writing into another workspace. Billing edge-case follow-up slice shipped 2026-05-14: expanded content-subscription lifecycle coverage for paused/incomplete status mapping plus malformed `customer.subscription.updated` and `customer.subscription.deleted` events with no metadata/local row, asserting strict no-op behavior (no workspace mutation, no activity writes, no broadcasts) when ownership context is absent. Schema-generator background-job mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `POST /api/jobs` with `schema-generator`, including snapshot persistence, `schema_generated` activity logging, `WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED` broadcasts, admin/public schema snapshot read-path visibility, duplicate-start rejection, and strict no-side-effect cross-workspace or failure behavior. Workspace-context background-job mutation-safety slice shipped 2026-05-14: added lifecycle coverage for legacy and canonical starts (`/api/workspaces/:id/generate-brand-voice` and `POST /api/jobs`) across brand-voice, knowledge-base, and persona jobs, including deterministic done/error job state, stable result payload shape for admin reads, one-time `voice_calibrated` action recording plus `OUTCOME_ACTION_RECORDED` broadcast for brand-voice, no duplicate action/broadcast on repeat runs, and no-side-effect duplicate/failure behavior. Deep-diagnostic background-job mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `POST /api/jobs` with `deep-diagnostic`, including completed/failed report states, job terminal state, insight report-stamp persistence, diagnostic activity logging, DIAGNOSTIC_COMPLETE/DIAGNOSTIC_FAILED broadcasts, read-path visibility, duplicate-start rejection, and cross-workspace no-side-effect contracts. Legacy jobs mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `seo-audit`, `bulk-seo-fix`, and `sales-report` jobs, including done/error job state, workspace/site isolation, activity/broadcast side effects on success, and strict no-side-effect behavior for invalid, duplicate, and cross-workspace starts. Media jobs mutation-safety slice shipped 2026-05-14: added deterministic lifecycle coverage for `compress`, `bulk-compress`, and `bulk-alt` jobs, including done/error state handling, duplicate-start/cross-workspace guards, summary activity behavior, and strict no-side-effect behavior on failed fetch/generation paths. Contract matrix slice shipped 2026-05-14: added background-job coverage contracts and high-risk mutation route matrix guardrails to keep lifecycle coverage anchored as new job types and route families are added. Webflow CMS mutation-safety slice shipped 2026-05-14: added route-level lifecycle coverage for `PATCH /api/webflow/collections/:collectionId/items/:itemId` and `POST /api/webflow/collections/:collectionId/publish`, asserting success-path page-state writes/activity/broadcast/read visibility and strict no-side-effect behavior for provider failures and cross-workspace site mismatches. SEO provider-failure closeout slice shipped 2026-05-14: added all-failed safeguards for SEO bulk background jobs (`seo-bulk-analyze`, `seo-bulk-rewrite`, `seo-bulk-accept-fixes`) so provider-wide failures now end in terminal `error` (not phantom `done`) and added lifecycle assertions for no mutation/activity/success-broadcast side effects when every item fails. Copy batch mutation-safety closeout shipped 2026-05-14: added lifecycle coverage for `POST /api/copy/:workspaceId/:blueprintId/batch`, including deterministic success/all-failed terminal states, activity and WS_EVENTS batch broadcast assertions, read-path visibility via `GET /api/copy/:workspaceId/batch/:batchId`, and strict no-side-effect malformed/cross-workspace guards; fixed the route to reject missing or cross-workspace blueprints before any batch job/activity/broadcast side effects."
+        },
+        {
+          "id": "platform-test-external-failure-and-state-machines",
+          "title": "External Failure + State Machine Coverage",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "1-2w",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Mock Webflow, Stripe, Google, DataForSEO, SEMrush, OpenAI, and Anthropic failure modes and assert failed/error states rather than phantom success. Expand transition-guard tests for approval items, content requests, client actions, work orders, content subscriptions, posts, and background jobs so illegal transitions fail consistently. Focused transition-guard slice shipped 2026-05-14: expanded unit coverage to include full valid/invalid transition matrices for `CLIENT_ACTION_TRANSITIONS` and `BRIEFING_DRAFT_TRANSITIONS`, closing state-machine coverage gaps in those two entities while this roadmap item remains pending for broader external-provider failure breadth. External-failure contract slice shipped 2026-05-14: added provider-matrix guardrails plus exhaustive state-machine graph contracts to keep failure and transition coverage from silently regressing as routes/providers evolve. Webflow CMS external-failure + state-machine slice shipped 2026-05-14: added route-level failure contracts that assert no phantom page-state/activity/broadcast success on upstream Webflow write failures and added background-job transition maps plus runtime guard coverage so terminal jobs cannot silently reopen. SEO provider-failure hardening slice shipped 2026-05-14: added explicit mutation-safety coverage for OpenAI-powered bulk analyze/rewrite failures and Webflow update failures in bulk accept-fixes, plus DataForSEO/SEMrush-path keyword-strategy provider fetch failure assertions, and expanded provider matrix contracts to keep these failure signals anchored. Closeout slice shipped 2026-05-14: added deterministic brand-identity AI write-failure contracts (no deliverable/version/activity/usage side effects on provider failure), enforced runtime `CONTENT_SUB_TRANSITIONS` in `updateContentSubscription`, expanded subscription transitions for Stripe `incomplete` recovery (`active|paused|past_due -> pending`), and added a state-machine guard coverage contract to keep validateTransition wiring anchored across all critical status entities."
+        },
+        {
+          "id": "platform-test-client-workflow-and-e2e-smoke",
+          "title": "Client Workflow Component Tests + E2E Smoke Journeys",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "1-2w",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Add focused component/workflow tests for Client Portal and Inbox decisions/conversations/reviews, schema review, content request/review, tier gates, empty/error/loading states, and tab deep-link behavior. Add a small E2E smoke pack for admin send-to-client -> client decision -> admin update, billing/tier gate visibility, background job progress/result, and schema/content publish flows. Keep this to high-value journeys rather than exhaustive UI snapshots. Focused smoke slice shipped 2026-05-14: added a Playwright client workflow smoke pack that validates admin->client->admin decision convergence, public tier/billing visibility coherence, deep-link URL stability (`/client/:workspaceId/inbox?tab=decisions`), and async background-job status surfaces. Lane B confidence slice shipped 2026-05-14: added Inbox IA component deep-link workflow coverage (canonical + legacy inbox tabs, beta reviews fallback, empty-state behavior), expanded public/client serialization contracts to include `/api/public/workspace/:id` and `/api/public/intelligence/:workspaceId` safe-shape assertions, and extended the Playwright smoke pack with content-publish + schema-plan visibility checks. Closeout shipped 2026-05-14: expanded Inbox workflow matrix coverage for loading/empty/error surfaces, added deep-link routability smoke for conversations/reviews, and hardened Playwright route navigation by handling dev-server client-route fallback and first-visit onboarding overlays so CI/local smoke remains deterministic."
+        },
+        {
+          "id": "platform-test-coverage-ratchet-ci",
+          "title": "Coverage Ratchet, Reporting, and CI Guardrails",
+          "source": "Platform test coverage review 2026-05-13",
+          "est": "3-5d",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-05-14",
+          "notes": "Shipped 2026-05-14: added `scripts/report-coverage-ratchet.ts` plus `tests/unit/coverage-ratchet-report.test.ts` and `docs/testing/coverage-ratchet-ci.md` to enforce global coverage floors while keeping bounded-context signal checks advisory. Added `npm run verify:coverage-ratchet`, enabled `json-summary` coverage output, and wired CI push coverage jobs to run the ratchet plus upload `coverage/coverage-summary.json` and `coverage/lcov.info` artifacts. Floors are intentionally below the 2026-05-13 baseline and are designed to ratchet upward over time."
+        }
+      ],
+      "shippedAt": "2026-05-14"
+    },
+    {
       "id": "sprint-platform-health-wave2-shipping-confidence",
       "name": "✅ SHIPPED — Platform Health Wave 2 — Shipping Confidence Spine",
       "hours": "12-20",
@@ -2397,108 +2400,6 @@
         }
       ],
       "shippedAt": "2026-04-21"
-    },
-    {
-      "id": "sprint-connected-intelligence",
-      "name": "✅ SHIPPED — Connected Intelligence Engine",
-      "items": [
-        {
-          "id": 528,
-          "title": "Connected Intelligence Engine — Phase 1 (Hub UX + Enrichment)",
-          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
-          "est": "6h",
-          "priority": "P1",
-          "notes": "Shipped — Insight-first tab structure, InsightFeed + SummaryPills components, AnnotatedTrendChart with toggleable lines, new insight types (ranking_mover, ctr_opportunity, serp_opportunity), insight enrichment (page titles, strategy alignment, pipeline status, domain classification, impact scores), content decay delegation, progressive loading states.",
-          "status": "done",
-          "shippedAt": "2026-03-27"
-        },
-        {
-          "id": 526,
-          "title": "Connected Intelligence Engine — Phase 2 (Feedback Loops)",
-          "source": "docs/superpowers/plans/2026-03-27-connected-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — Anomaly digest wiring with dedup (upsertAnomalyDigestInsight, unique index). Feedback loop orchestrator (insight-feedback.ts) generates strategy signals + pipeline signals, broadcasts via WebSocket. API endpoints for strategy signals and pipeline suggestions. React Query hooks. Intelligence Signals UI in KeywordStrategy panel. AI Suggested section in ContentPipeline. Admin chat context enriched with titles, alignment, pipeline status, anomaly digest, critical insight proactive mentions. Audit issues annotated on page health. Schema gaps enriched on SERP opportunities. 21 unit tests.",
-          "status": "done",
-          "shippedAt": "2026-03-27"
-        },
-        {
-          "id": 527,
-          "title": "Connected Intelligence Engine — Phase 3 (Client Intelligence)",
-          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
-          "est": "5h",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-03-28",
-          "notes": "Shipped — Client-facing insight narratives, ROI attribution tracking, monthly performance digest, admin action queue with resolution workflow. Hardened: unified insight feed (server + local insights merged into InsightsDigest with card-style badges and click actions), GSC URL normalization with metric deduplication, digest copy quality (warm voice, no promises), force-recompute admin auth (owner + admin), diverse insight caps (max 5 per type), stable insight IDs, WS event naming convention (namespace:verb), CI pr-check diff detection fix."
-        },
-        {
-          "id": 530,
-          "title": "Unified Workspace Intelligence Layer — Phase 1 (Foundation)",
-          "source": "docs/superpowers/plans/2026-03-30-unified-workspace-intelligence-phase1.md",
-          "est": "8h",
-          "priority": "P1",
-          "notes": "Shipped — Shadow infrastructure layer: shared types (intelligence.ts), LRU cache + single-flight (intelligence-cache.ts), cached page accessors with two-view filtering (workspace-data.ts), core assembler with per-slice graceful degradation (workspace-intelligence.ts), API endpoint + health route, React Query hook, prompt formatter (3 verbosity levels). Migrated all 20 listPages() callers to centralized getWorkspacePages()/getWorkspaceAllPages(). Shadow-mode comparison in buildSeoContext() behind feature flag. DB migration 043.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 533,
-          "title": "Unified Workspace Intelligence Layer — Phase 2A (Bridge Infrastructure)",
-          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — Bridge execution framework: executeBridge() with flag gating/timeout/error isolation, fireBridge() for sync callers, debounceBridge() for rapid-fire invalidation, withWorkspaceLock() for serialized mutations. 15 bridge feature flags (all default OFF). Pre-configured debounced instances. Persistent sub-cache with surgical invalidation. LRU page cache with peek() for stale fallback. Content pipeline summary accessor. Bridge-pairing structural test.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 534,
-          "title": "Unified Workspace Intelligence Layer — Phase 2B (Simple Bridges)",
-          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — 6 event bridges: #2 content decay → suggested briefs, #3 strategy → invalidate intelligence cache, #5 page analysis → clear caches, #7 action → auto-resolve insights, #11 settings → cascade invalidation, #13 action → create annotation. Suggested briefs CRUD store + REST routes + API client. resolution_source field on insights. Frontend WS handlers for 3 bridge events.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 529,
-          "title": "AI insight validation pass (quality gate on surfaced insights)",
-          "source": "User feedback — 2026-03-28",
-          "est": "3-4h",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-04-14",
-          "notes": "Shipped — deterministic rules-based validation pass (validateInsightBatch) inserted into computeAndPersistInsights pipeline after all insight types computed, before feedback loops. Three rule categories: (1) contradiction suppression — ranking_opportunity+content_decay and ctr_opportunity+content_decay on same page suppress weaker signal, (2) severity clash — positive+critical on same page suppresses positive, (3) low-confidence suppression — ranking_opportunity <100 impressions or <5 traffic gain, content_decay <10 absolute click loss, ctr_opportunity <5 click gap. Added suppressInsights batch-delete helper to analytics-insights-store. 11 unit tests covering all rule categories + no-op scenarios."
-        },
-        {
-          "id": 536,
-          "title": "Assembler catch hardening — distinguish programming errors from expected degradation",
-          "source": "PR #154 review — 2026-04-08",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done April 2026. Created server/errors.ts with isProgrammingError(). Upgraded all 64 catch blocks in workspace-intelligence.ts: 3 HIGH-risk dynamic-import blocks get isProgrammingError split → log.warn on TypeError/ReferenceError; 43 SILENT blocks upgraded to log.debug; 2 intentionally-silent invalidateIntelligenceCache catches annotated with // catch-ok. Also applied to content-decay.ts, keyword-recommendations.ts, routes/misc.ts. Compile-time import type contracts added for HIGH-risk modules. Backlog #14/#15/#16/#17 resolved in same pass. pr-check rule added."
-        },
-        {
-          "id": 576,
-          "title": "Broad server catch hardening — extend isProgrammingError to 344 silent catches outside workspace-intelligence.ts",
-          "source": "Assembler catch hardening plan — 2026-04-08",
-          "est": "3-4h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-04-14",
-          "notes": "Shipped — hardened 344 bare `} catch {` blocks across 90 server files. Pattern: (1) `} catch (err) { if (isProgrammingError(err)) log.warn(...)` for standard catches, (2) `log.debug` for JSON-parse and migration catches (expected degradation), (3) `// catch-ok` annotation for intentionally-silent catches. Added createLogger imports to 23 files that previously had no logger. Expanded pr-check rule from workspace-intelligence.ts-only to all server/ files. Top files hardened: admin-chat-context.ts (26), routes/keyword-strategy.ts (21), db/migrate-json.ts (18), routes/webflow-seo.ts (17). Updated count from original estimate of 207 across 67 files to actual 344 across 90 files."
-        },
-        {
-          "id": "intelligence-engine-wiring-gaps",
-          "title": "Intelligence Engine — 12 Data Gap Closures",
-          "status": "done",
-          "notes": "Shipped 2026-04-20. Closed 12 assembler/formatter gaps: businessPriorities→goals, contact info (phone/email/address/hours) from workspace.businessProfile→SeoContextSlice, rewritePlaybook→patterns array, contentPricing, scoringConfig, annotation page_url. Formatter gaps: intentSignals, aeoReadiness, redirectDetails (detailed), contact info (detailed), contentPricing, scoringConfig. Bug fix: briefs.byStatus always {} → populated from DB. Client route: copyPipelineStatus for Growth+. Rewrite-chat: intelligence slice for rewritePlaybook. Dead field: keywordRecommendations removed."
-        }
-      ],
-      "shippedAt": "2026-04-14"
     }
   ]
 }
