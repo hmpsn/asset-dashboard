@@ -22,6 +22,8 @@
     "pr-check:all": "tsx scripts/pr-check.ts --all",
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
+    "verify:ai-reliability": "tsx scripts/report-ai-reliability.ts",
+    "verify:ai-pipeline-wiring": "tsx scripts/report-ai-pipeline-wiring.ts",
     "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
     "verify:domain-events": "tsx scripts/report-domain-event-definitions.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
