@@ -1,8 +1,19 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **358 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **359 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 359. Wave 5 Platform Performance Budget Registry
+**What it does:** Adds a typed platform performance-budget registry in `scripts/performance-budgets.ts` with a verification command (`npm run verify:performance-budgets`) and unit tests. Each budget entry defines per-workflow AI call caps, external fetch caps, route response targets, query-count budgets, expected job duration (for background jobs), cache expectation, and escalation trigger/action with required code and test evidence references.
+
+**Agency value:** Converts vague "this feels slow/expensive" debates into explicit, reviewable performance contracts tied to owned workflows.
+
+**Client value:** Improves consistency and reliability by creating concrete escalation rules before latency or failure patterns impact client-facing experiences.
+
+**Mutual:** Performance and cost posture become measurable release criteria, not tribal knowledge.
 
 ---
 
