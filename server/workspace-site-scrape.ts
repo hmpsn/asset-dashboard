@@ -46,8 +46,10 @@ export async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: Scr
           if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
           else rest.push(url);
         }
+        // url-fetch-ok: sitemap entries can contain malformed URLs; skip invalid entries.
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspace-site-scrape: programming error'); /* skip */ }
     }
+    // url-fetch-ok: sitemap discovery is best-effort external IO and may fail without blocking scrape.
   } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspace-site-scrape: programming error'); /* sitemap unavailable */ }
 
   const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];

@@ -4859,6 +4859,8 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       const [, symbol, name] = match;
       // Skip the summary line — it contains digits immediately after ✗.
       if (/^\d+\s+error/.test(name)) continue;
+      // Skip the success footer line from scripts/pr-check.ts output.
+      if (/^All automated checks passed\.$/.test(name)) continue;
       if (symbol === '✓') cleanRules.push(name);
     }
 

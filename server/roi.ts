@@ -12,6 +12,7 @@ import { listMatrices } from './content-matrices.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
+import { normalizePageUrl } from './helpers.js';
 
 
 const log = createLogger('roi');
@@ -205,7 +206,8 @@ export function computeROI(workspaceId: string): ROIData | null {
   for (const req of deliveredReqs) {
     // Try to match by targetPageSlug or targetPageId
     const slug = req.targetPageSlug;
-    const traffic = slug ? pathTraffic.get(slug) || pathTraffic.get(`/${slug}`) : undefined;
+    const normalizedSlug = slug ? normalizePageUrl(slug) : undefined;
+    const traffic = normalizedSlug ? pathTraffic.get(normalizedSlug) : undefined;
     const clicks = traffic?.clicks || 0;
     const impressions = traffic?.impressions || 0;
     const cpc = traffic?.cpc || avgCPC;
@@ -237,7 +239,8 @@ export function computeROI(workspaceId: string): ROIData | null {
         seenKeywords.add(cell.targetKeyword.toLowerCase());
 
         const slug = cell.plannedUrl;
-        const traffic = slug ? pathTraffic.get(slug) || pathTraffic.get(`/${slug}`) : undefined;
+        const normalizedSlug = slug ? normalizePageUrl(slug) : undefined;
+        const traffic = normalizedSlug ? pathTraffic.get(normalizedSlug) : undefined;
         const clicks = traffic?.clicks || 0;
         const impressions = traffic?.impressions || 0;
         const cpc = traffic?.cpc || avgCPC;

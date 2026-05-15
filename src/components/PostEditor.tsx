@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
@@ -115,7 +115,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const versions = (versionsQ.data ?? []) as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>;
   const versionsLoading = versionsQ.isLoading;
 
-  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+  const [expandedSectionsByPost, setExpandedSectionsByPost] = useState<Record<string, Set<number>>>({});
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editingIntro, setEditingIntro] = useState(false);
   const [editingConclusion, setEditingConclusion] = useState(false);
@@ -156,17 +156,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
-
-  // Auto-expand all done sections on first load
-  const postLoaded = !!post;
-  useEffect(() => {
-    if (!postLoaded) return;
-    const sections = post!.sections;
-    if (sections.some(s => s.status === 'done')) {
-      setExpandedSections(new Set(sections.filter(s => s.status === 'done').map(s => s.index)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postLoaded]);
 
   const handlePublish = async (generateImage = false) => {
     if (!post) return;
@@ -318,10 +307,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const toggleSection = (i: number) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
+    setExpandedSectionsByPost(prev => {
+      const autoExpanded = new Set(post?.sections.filter(s => s.status === 'done').map(s => s.index) ?? []);
+      const next = new Set(prev[postId] ?? autoExpanded);
       if (next.has(i)) next.delete(i); else next.add(i);
-      return next;
+      return { ...prev, [postId]: next };
     });
   };
 
@@ -339,6 +329,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const completedSections = post.sections.filter(s => s.status === 'done').length;
   const totalSections = post.sections.length;
   const progress = isGenerating ? Math.round(((completedSections + (post.introduction ? 1 : 0)) / (totalSections + 2)) * 100) : 100;
+  const autoExpandedSections = new Set(post.sections.filter(s => s.status === 'done').map(s => s.index));
+  const expandedSections = expandedSectionsByPost[postId] ?? autoExpandedSections;
 
   return (
     <div className="space-y-8">

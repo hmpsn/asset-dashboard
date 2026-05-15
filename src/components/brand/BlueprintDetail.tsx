@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -350,6 +351,7 @@ type BlueprintTab = 'pages' | 'copy';
 export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -363,7 +365,11 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   // ── Copy Pipeline state ──────────────────────────────────────────────────
   const copyEnabled = useFeatureFlag('copy-engine-pipeline');
-  const [activeTab, setActiveTab] = useState<BlueprintTab>('pages');
+  const [activeTab, setActiveTab] = useState<BlueprintTab>(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'copy' && copyEnabled) return 'copy';
+    return tabParam === 'pages' ? 'pages' : 'pages';
+  });
   const [reviewingEntryId, setReviewingEntryId] = useState<string | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────

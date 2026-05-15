@@ -98,7 +98,7 @@ export function SeoAuditGuide() {
         {SECTIONS.map((section, idx) => {
           const SectionIcon = section.icon;
           return (
-            <div key={idx} className={cn('border p-5', section.bg)} style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
+            <div key={idx} className={cn('border p-5 rounded-[var(--radius-signature)]', section.bg)}>
               <div className="flex items-start gap-3">
                 <div className={cn('flex items-center justify-center w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/60 flex-shrink-0', section.color)}>
                   <Icon as={SectionIcon} size="md" />

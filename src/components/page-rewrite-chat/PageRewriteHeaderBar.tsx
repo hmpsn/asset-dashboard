@@ -1,6 +1,7 @@
 import { ArrowLeft, FileText, Loader2, Maximize2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { Icon } from '../ui';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import { getIndentLevel, type PageData, type SitemapPage } from './pageRewriteChatModel';
 
 interface PageRewriteHeaderBarProps {
@@ -66,7 +67,7 @@ export function PageRewriteHeaderBar({
         {pageData && !comboOpen && (
           <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
             <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-            <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+            <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? normalizePageUrl(pageData.slug) : pageUrl}</span>
             <button onClick={onOpenCombo} className={"text-[10px] text-accent-brand hover:text-accent-brand font-medium flex-shrink-0" // arbitrary-text-ok
             }>Change</button>
           </div>

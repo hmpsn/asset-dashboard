@@ -7,6 +7,7 @@ import { extractLinks } from './seo-audit-html.js';
 import { isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
 import { runHomepageCwv } from './seo-audit-cwv.js';
 import { createLogger } from './logger.js';
+import { normalizePageUrl } from './helpers.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import type { CwvSummary } from './seo-audit.js';
 
@@ -159,6 +160,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
       });
     }
   } catch (err) {
+    // url-fetch-ok: redirect crawl depends on external network/site state; non-fatal failure should degrade gracefully.
     if (isProgrammingError(err)) {
       log.warn({ err }, 'seo-audit-site-checks/redirect-scan: unexpected error');
     } else {
@@ -188,7 +190,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
     siteWideIssues.push({
       check: 'aeo-trust-pages', severity: 'warning',
       message: `Missing trust page${missingTrustPages.length > 1 ? 's' : ''}: ${missingTrustPages.join(', ')}`,
-      recommendation: `LLMs and AI answer engines trust sites with clear ownership signals. Create these essential pages: ${missingTrustPages.map(p => `/${p.toLowerCase()}`).join(', ')}. For healthcare/medical sites, also consider /editorial-policy, /corrections, and /medical-review-board.`,
+      recommendation: `LLMs and AI answer engines trust sites with clear ownership signals. Create these essential pages: ${missingTrustPages.map(p => normalizePageUrl(p)).join(', ')}. For healthcare/medical sites, also consider /editorial-policy, /corrections, and /medical-review-board.`,
     });
   }
 
@@ -255,7 +257,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
   const ORPHAN_UTILITY_PATTERNS = /(?:^|\/)(?:thank[-_]?you|thanks|thankyou|confirmation|success|members?[-_]?only|members?[-_]?area|password[-_]?protected|unsubscribe|opt[-_]?out)(?:\/|$|-|_|$)/i;
   const orphanPages: string[] = [];
   for (const r of results) {
-    const pagePath = `/${r.slug}`.replace(/\/$/, '').toLowerCase();
+    const pagePath = normalizePageUrl(r.slug).replace(/\/$/, '').toLowerCase();
     if (pagePath === '/' || pagePath === '') continue; // Homepage always linked
     if (isExcludedPage(r.slug, r.page)) continue; // Skip utility pages entirely
     if (ORPHAN_UTILITY_PATTERNS.test(r.slug)) continue; // Skip intentionally unlinked utility pages

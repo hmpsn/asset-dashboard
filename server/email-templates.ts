@@ -197,17 +197,19 @@ function deriveLogoUrl(dashUrl?: string): string | undefined {
   // when ADMIN_URL is unset, producing a broken image link.
   const appUrl = process.env.APP_URL;
   if (appUrl) {
+    // url-fetch-ok: APP_URL can be malformed in env config; degrade to next fallback path.
     try {
       const u = new URL(appUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ } // url-fetch-ok
   }
   // Fallback: derive from the dashboard URL passed by the caller
   if (dashUrl) {
+    // url-fetch-ok: dashboard URL may be invalid/malformed; fallback behavior is intentional.
     try {
       const u = new URL(dashUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ } // url-fetch-ok
   }
   // Final fallback: return undefined (text fallback will be used)
   return undefined;
