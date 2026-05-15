@@ -23,6 +23,7 @@
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
     "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
+    "verify:domain-events": "tsx scripts/report-domain-event-definitions.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
