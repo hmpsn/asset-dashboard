@@ -5616,3 +5616,16 @@ Bug hardening included:
 **Mutual:** Strengthens runtime confidence by turning scattered status checks into one consistent, typed, test-covered surface.
 
 **Files:** `shared/types/integration-health.ts`; `server/routes/health.ts`; `server/google-auth.ts`; `src/api/misc.ts`; `src/api/index.ts`; `src/lib/queryKeys.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/components/settings/ConnectionsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `tests/integration/health-routes.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `data/roadmap.json`.
+
+---
+
+### 414. Data Integrity & Recovery Drills
+**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed.
+
+**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks.
+
+**Client value:** Reduces risk of silent data drift and shortens recovery time when a migration or runtime issue impacts stored customer state.
+
+**Mutual:** Documents a consistent backup/restore drill and restore-based rollback workflow, improving operational confidence without changing product-facing behavior.
+
+**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `docs/workflows/data-integrity-recovery.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `package.json`; `data/roadmap.json`.
