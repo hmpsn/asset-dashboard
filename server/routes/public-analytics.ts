@@ -461,6 +461,7 @@ ${JSON.stringify(context, null, 2)}`;
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
       callAI({
+        operation: 'client-search-chat',
         model: 'gpt-5.4',
         system: systemPrompt,
         messages: [
@@ -469,7 +470,6 @@ ${JSON.stringify(context, null, 2)}`;
         ],
         temperature: 0.7,
         maxTokens: 1500,
-        feature: 'client-search-chat',
         workspaceId: ws.id,
       }),
       betaMode ? Promise.resolve(null) : classifyMessageIntent(question, historyMessages.slice(-4), ws.id),
