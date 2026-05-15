@@ -174,8 +174,9 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "1-2h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Define a recurring platform-health checkpoint every 4-6 product sprints. Keep the scope measurable: fewer oversized modules, clearer owners, updated docs, added contract tests, reduced duplication, and closed pr-check warnings. This is a planning/process item, not a code migration."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped recurring platform-health cadence contract. Added source-of-truth registry (`data/platform-health-cadence.json`) with 4-6 sprint cadence policy, measurable dimensions, checkpoint evidence links, and Wave 5 baseline metrics. Added verifier command `npm run verify:platform-health-cadence` (`scripts/platform-health-cadence.ts`) with policy/roadmap-link checks, due-window computation, and unit coverage (`tests/unit/platform-health-cadence.test.ts`). Added workflow playbook `docs/workflows/platform-health-cadence.md` and wired cadence audit into `verify-platform`."
         },
         {
           "id": "platform-org-adr-log",

@@ -1,0 +1,57 @@
+{
+  "generatedBy": "platform-health-wave5",
+  "cadence": {
+    "sprintIntervalMin": 4,
+    "sprintIntervalMax": 6,
+    "defaultSprintLengthDays": 14
+  },
+  "dimensions": {
+    "oversizedModules": "Count of oversized modules over the agreed threshold.",
+    "ownershipGaps": "Count of touched areas without a clear bounded-context owner.",
+    "docsUpdated": "Number of platform docs materially updated for the cycle.",
+    "contractTestsAdded": "Number of contract tests added or materially expanded.",
+    "duplicationFixes": "Number of duplicated patterns removed/extracted.",
+    "prCheckWarningsClosed": "Number of pr-check warnings/rules closed in the cycle."
+  },
+  "checkpoints": [
+    {
+      "id": "platform-health-wave5-2026-05-15",
+      "label": "Wave 5 Foundation Checkpoint",
+      "completedAt": "2026-05-15",
+      "owner": "platform-engineering",
+      "roadmapSprintId": "sprint-platform-health-wave5-product-lifecycle-discipline",
+      "roadmapItemIds": [
+        "platform-reliability-product-surface-rationalization",
+        "platform-confidence-feature-flag-lifecycle",
+        "platform-confidence-feature-flag-sunset-pass",
+        "platform-reliability-deprecation-discipline",
+        "platform-reliability-performance-budgets",
+        "platform-reliability-local-dev-onboarding",
+        "platform-org-recurring-health-sprint"
+      ],
+      "metrics": {
+        "oversizedModulesBefore": 6,
+        "oversizedModulesAfter": 4,
+        "ownershipGapsBefore": 4,
+        "ownershipGapsAfter": 2,
+        "docsUpdated": 7,
+        "contractTestsAdded": 8,
+        "duplicationFixes": 4,
+        "prCheckWarningsClosed": 3
+      },
+      "evidencePaths": [
+        "docs/rules/product-surface-rationalization.md",
+        "docs/rules/feature-flag-lifecycle.md",
+        "docs/rules/deprecation-lifecycle.md",
+        "docs/rules/performance-budgets.md",
+        "docs/workflows/local-dev-onboarding.md",
+        "scripts/product-surface-map.ts",
+        "scripts/feature-flag-lifecycle.ts",
+        "scripts/deprecation-lifecycle.ts",
+        "scripts/performance-budgets.ts",
+        "scripts/seed-demo-workspaces.ts"
+      ],
+      "notes": "Initial cadence baseline checkpoint for Wave 5 platform-health rollout."
+    }
+  ]
+}
