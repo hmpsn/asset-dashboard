@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,58 +23,15 @@ import type { ClientAction } from '../../../shared/types/client-actions';
 import { DecisionCard } from './DecisionCard';
 import { DecisionDetailModal } from './DecisionDetailModal';
 import { normalizeClientAction } from '../../lib/decision-adapters';
-import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
-
-export type InboxFilter = 'all' | 'decisions' | 'reviews' | 'conversations';
-/**
- * Controls the Active/Completed mode toggle in the inbox page header.
- * The 'completed' branch is implemented in Task 3 (core InboxTab restructure).
- */
-export type InboxMode = 'active' | 'completed';
-
-export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
-  ['all', 'decisions', 'reviews', 'conversations'] as const;
-
-/**
- * Maps legacy ?tab= deep-link values to their new canonical InboxFilter equivalents.
- * Used for backward-compat with external URLs and old bookmarks (URL alias params
- * from CLIENT_INBOX_ALIASES in routes.ts). Intermediate filter names from the
- * Phase 2B migration window have been removed — chips now emit final values directly.
- */
-// inbox-action-queue-strip-ok — JSDoc above documents the migration state, not an import
-export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
-  // legacy URL alias params (from CLIENT_INBOX_ALIASES in routes.ts)
-  approvals:       'decisions',
-  requests:        'conversations',
-  copy:            'reviews',
-  'content-plan':  'decisions',
-  completed:       'all',
-};
-
-export function isInboxFilter(value: string | null): value is InboxFilter {
-  return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
-}
-
-function resolveInboxFilter(
-  param: string | null,
-  betaMode: boolean,
-  initialFilter?: InboxFilter,
-): InboxFilter {
-  const fallback = initialFilter === 'reviews' && betaMode
-    ? 'decisions'
-    : (initialFilter ?? 'decisions');
-
-  if (isInboxFilter(param)) {
-    if (param === 'reviews' && betaMode) return fallback;
-    return param;
-  }
-  if (param && LEGACY_FILTER_MAP[param]) {
-    const mapped = LEGACY_FILTER_MAP[param];
-    if (mapped === 'reviews' && betaMode) return fallback;
-    return mapped;
-  }
-  return fallback;
-}
+import type { FlaggedItem } from '../../../shared/types/decision';
+import { useInboxTabShell, type InboxMode } from './inbox/useInboxTabShell';
+import type { InboxFilter } from './inbox/inbox-filter';
+import { LegacyInboxLayout, NewInboxLayout } from './inbox/InboxTabLayouts';
+export {
+  INBOX_FILTER_VALUES,
+  LEGACY_FILTER_MAP,
+  isInboxFilter,
+} from './inbox/inbox-filter';
 
 interface InboxTabProps {
   workspaceId: string;
@@ -141,25 +97,7 @@ export function InboxTab({
   const queryClient = useQueryClient();
   // Two-halves deep-link contract — see CLAUDE.md UI/UX rule 11
   const [searchParams] = useSearchParams();
-  // betaMode must be declared before useState<InboxFilter> so the init closure can reference it
   const betaMode = useBetaMode();
-  const [filter, setFilter] = useState<InboxFilter>(() =>
-    resolveInboxFilter(searchParams.get('tab'), betaMode, initialFilter),
-  );
-  const [mode, setMode] = useState<InboxMode>('active');
-  const [schemaModalOpen, setSchemaModalOpen] = useState(false);
-  const [detailAction, setDetailAction] = useState<ClientAction | null>(null);
-  const [detailActionSubmitting, setDetailActionSubmitting] = useState(false);
-  const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
-  const [flagComment, setFlagComment] = useState('');
-  const [flagSubmitting, setFlagSubmitting] = useState(false);
-  const [changeRequestAction, setChangeRequestAction] = useState<string | null>(null);
-  const [changeRequestNote, setChangeRequestNote] = useState('');
-  // SEO Changes section collapses when nothing pending in active mode
-  const [seoSectionExpanded, setSeoSectionExpanded] = useState(false);
-  // Decision detail modal state
-  const [openDecision, setOpenDecision] = useState<NormalizedDecision | null>(null);
-  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
   // Schema plan summary — drives SEO Changes card + priority strip item
   const schemaPlanQuery = useQuery({
@@ -188,15 +126,40 @@ export function InboxTab({
   const hasNeedsAction = pendingClientActions.length > 0 || requestReplies > 0 || planReviewCount > 0;
   const copyReviewCount = hasCopyEntries ? 1 : 0;
 
-  // Auto-expand SEO Changes when pending items appear, but allow manual collapse
-  useEffect(() => {
-    if (hasPendingSeoChanges) setSeoSectionExpanded(true);
-  }, [hasPendingSeoChanges]);
-
-  // Keep local filter state in sync with ?tab= deep links while the component remains mounted.
-  useEffect(() => {
-    setFilter(resolveInboxFilter(searchParams.get('tab'), betaMode, initialFilter));
-  }, [searchParams, betaMode, initialFilter]);
+  const shell = useInboxTabShell({
+    currentTabParam: searchParams.get('tab'),
+    betaMode,
+    initialFilter,
+    hasPendingSeoChanges,
+  });
+  const {
+    filter,
+    setFilter,
+    mode,
+    setMode,
+    schemaModalOpen,
+    setSchemaModalOpen,
+    detailAction,
+    setDetailAction,
+    detailActionSubmitting,
+    setDetailActionSubmitting,
+    flaggingCell,
+    setFlaggingCell,
+    flagComment,
+    setFlagComment,
+    flagSubmitting,
+    setFlagSubmitting,
+    changeRequestAction,
+    setChangeRequestAction,
+    changeRequestNote,
+    setChangeRequestNote,
+    seoSectionExpanded,
+    setSeoSectionExpanded,
+    openDecision,
+    setOpenDecision,
+    decisionSubmitting,
+    setDecisionSubmitting,
+  } = shell;
 
   // Feature flag: new 3-section inbox IA layout
   const newInboxIa = useFeatureFlag('new-inbox-ia');
@@ -212,7 +175,7 @@ export function InboxTab({
   // NormalizedDecision lists for the Decisions section.
   // approval_batches without a note are rendered inline via ApprovalsTab (not DecisionCard),
   // so they are excluded here and inserted separately in the Decisions section below.
-  const decisionItems: NormalizedDecision[] = [
+  const decisionItems = [
     ...pendingClientActions.map(a => normalizeClientAction(a)),
   ];
 
@@ -221,8 +184,15 @@ export function InboxTab({
   const reviewsCount = contentReviews + copyReviewCount + (!betaMode && schemaPlanPending ? 1 : 0);
   const conversationsCount = requestReplies + approvalsForConversations.length;
 
+  const newInboxFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'decisions', label: 'Decisions', count: decisionsCount || undefined },
+    ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined }] : []),
+    { id: 'conversations', label: 'Conversations', count: conversationsCount || undefined },
+  ];
+
   // Filter chips (hidden in completed mode)
-  const filterChips: { id: InboxFilter; label: string; count?: number }[] = [
+  const legacyFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
     { id: 'decisions', label: 'Decisions',
       count: (pendingClientActions.length + planReviewCount + (pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)) || undefined },
@@ -302,39 +272,12 @@ export function InboxTab({
 
       {newInboxIa ? (
         /* === NEW 3-SECTION LAYOUT (flag: new-inbox-ia) === */
-        <>
-          {/* ── New filter chips ── */}
-          {mode === 'active' && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {[
-                { id: 'all' as InboxFilter, label: 'All' },
-                { id: 'decisions' as InboxFilter, label: 'Decisions', count: decisionsCount || undefined },
-                ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews', count: reviewsCount || undefined }] : []),
-                { id: 'conversations' as InboxFilter, label: 'Conversations', count: conversationsCount || undefined },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  aria-pressed={filter === f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
-                    filter === f.id
-                      ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
-                      : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
-                  }`}
-                >
-                  {f.label}
-                  {f.count !== undefined && (
-                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
-                      filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
-                    }`}>
-                      {f.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+        <NewInboxLayout
+          mode={mode}
+          filter={filter}
+          setFilter={setFilter}
+          filterChips={newInboxFilterChips}
+        >
 
           {/* ── Section: Decisions ── */}
           {mode === 'active' && (filter === 'all' || filter === 'decisions') && (
@@ -631,37 +574,15 @@ export function InboxTab({
               )}
             </div>
           )}
-        </>
+        </NewInboxLayout>
       ) : (
         /* === EXISTING LAYOUT (flag off — do not modify) === */
-        <>
-          {/* ── Filter chips (active mode only) ── */}
-          {mode === 'active' && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {filterChips.map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  aria-pressed={filter === f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
-                    filter === f.id
-                      ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
-                      : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
-                  }`}
-                >
-                  {f.label}
-                  {f.count !== undefined && (
-                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-[var(--radius-pill)] t-caption-sm font-semibold ${
-                      filter === f.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-2)] text-[var(--brand-text-muted)]'
-                    }`}>
-                      {f.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+        <LegacyInboxLayout
+          mode={mode}
+          filter={filter}
+          setFilter={setFilter}
+          filterChips={legacyFilterChips}
+        >
 
           {/* ── Section 1: Needs Action & Requests ── */}
           {showSection1 && (
@@ -992,7 +913,7 @@ export function InboxTab({
               )}
             </div>
           )}
-        </>
+        </LegacyInboxLayout>
       )}
 
       {/* Schema Review Modal */}
