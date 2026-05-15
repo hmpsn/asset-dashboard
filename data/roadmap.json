@@ -152,8 +152,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Create a practical release safety layer: feature-class release checklist, staging smoke suite, deploy notes generated from roadmap items where possible, rollback checklist, feature-flag rollout checklist, and a short post-release monitoring window for risky changes."
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added a practical release-safety workflow with roadmap-derived deploy notes and a repeatable checklist/report script (`npm run verify:release-safety`) covering feature-class release gates, staging smoke suite, rollback readiness, feature-flag rollout, and a post-release monitoring window. Added companion workflow documentation (`docs/workflows/release-safety.md`) with concrete command paths for health/smoke verification and release execution.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-reliability-tenant-boundary-audit",
