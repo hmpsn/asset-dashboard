@@ -39,8 +39,9 @@
           "source": "Phase 5 Phase 2 follow-up — staging smoke gap",
           "est": "15-20m",
           "priority": "P1",
-          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.",
-          "status": "pending"
+          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.\n[Shipped 2026-05-15] Added repeatable Playwright harness `tests/playwright/visual/wave5-mobile-smoke.spec.ts` to verify those exact routes and breakpoints against staging. First run caught 375px horizontal overflow on client overview/strategy/content routes; fixed via responsive header wrapping + root x-overflow containment in `ClientHeader` and `ClientDashboard`.",
+          "status": "done",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": 626,

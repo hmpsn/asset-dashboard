@@ -218,6 +218,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | AI chat FAB + messages | `from-teal-600 to-emerald-600` (FAB), `bg-teal-600/20` (user msg) | Client chat = teal |
 | Welcome modal | `from-teal-500 to-emerald-500` icon/glow | Brand accent |
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
+| Client header at mobile widths | Responsive stacked toolbar (`flex-col` on mobile, `sm:flex-row` on desktop) with contained horizontal scrollers | Prevent document-level horizontal overflow at 375px while preserving tab/date-range scroll affordances |
 
 #### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
 

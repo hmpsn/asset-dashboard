@@ -1,8 +1,19 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **357 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **358 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 358. Wave 5 Mobile Breakpoint Smoke Harness
+**What it does:** Adds a staging-targeted Playwright smoke suite at `tests/playwright/visual/wave5-mobile-smoke.spec.ts` that validates responsive behavior across 4 breakpoints (375, 640, 768, 1024) and 7 key routes (admin overview, admin audit, workspace settings connections/client-dashboard tabs, client overview/strategy/content). The suite authenticates with workspace credentials, captures screenshots for each route+breakpoint, and fails on document-level horizontal overflow.
+
+**Agency value:** Turns one-off visual QA into a repeatable guardrail for token migrations and mobile regression checks.
+
+**Client value:** Catches real mobile layout issues before release (for example, 375px horizontal scrolling in the client shell).
+
+**Mutual:** Faster rollout confidence with objective pass/fail evidence for staging verification.
 
 ---
 
