@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildReleaseSafetyChecklist,
@@ -6,6 +6,7 @@ import {
   collectReleaseSafetyDeployNotes,
   formatReleaseSafetyReportMarkdown,
   summarizeRoadmapNote,
+  runReleaseSafetyReport,
   type BuildReleaseSafetyOptions,
 } from '../../scripts/platform-release-safety.js';
 import type { RoadmapData } from '../../shared/types/roadmap.js';
@@ -114,5 +115,32 @@ describe('platform release safety report', () => {
     expect(markdown).toContain('## Rollback Checklist');
     expect(markdown).toContain('## Feature-Flag Rollout Checklist');
     expect(markdown).toContain('## Post-Release Monitoring Window');
+  });
+
+  it('rejects impossible --since and --until calendar dates', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const badSinceExit = runReleaseSafetyReport(['--since', '2026-99-99']);
+    expect(badSinceExit).toBe(1);
+    expect(errorSpy.mock.calls.flat().join('\n')).toContain('Invalid --since value');
+
+    errorSpy.mockClear();
+
+    const badUntilExit = runReleaseSafetyReport(['--until', '2026-02-31']);
+    expect(badUntilExit).toBe(1);
+    expect(errorSpy.mock.calls.flat().join('\n')).toContain('Invalid --until value');
+
+    errorSpy.mockRestore();
+  });
+
+  it('rejects reversed date windows where since is after until', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = runReleaseSafetyReport(['--since', '2026-05-20', '--until', '2026-05-01']);
+
+    expect(exitCode).toBe(1);
+    expect(errorSpy.mock.calls.flat().join('\n')).toContain('Invalid date window');
+
+    errorSpy.mockRestore();
   });
 });

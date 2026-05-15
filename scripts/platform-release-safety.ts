@@ -89,11 +89,28 @@ const POST_RELEASE_MONITORING_WINDOW = [
 ];
 
 function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return parseIsoDateUtc(value) != null;
 }
 
 function toIsoDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function parseIsoDateUtc(value: string): Date | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (parsed.getUTCFullYear() !== year) return null;
+  if (parsed.getUTCMonth() + 1 !== month) return null;
+  if (parsed.getUTCDate() !== day) return null;
+
+  return parsed;
 }
 
 function parseDays(value: string | undefined): number | null {
@@ -307,6 +324,10 @@ function parseCliArgs(args: string[]): CliOptions | null {
   })();
   if (!isIsoDate(since)) {
     console.error(`Invalid --since value: ${since}. Expected YYYY-MM-DD.`);
+    return null;
+  }
+  if (since > until) {
+    console.error(`Invalid date window: --since (${since}) cannot be after --until (${until}).`);
     return null;
   }
 
