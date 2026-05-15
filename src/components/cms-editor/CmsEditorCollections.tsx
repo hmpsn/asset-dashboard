@@ -184,6 +184,9 @@ export function CmsEditorCollections({
                   const hasSeoTitle = titleField ? !!String(item.fieldData[titleField.slug] || '').trim() : true;
                   const hasSeoDesc = descField ? !!String(item.fieldData[descField.slug] || '').trim() : true;
                   const hasIssues = !hasName || !hasSeoTitle || !hasSeoDesc;
+                  const fallbackNameTitle = (edits[item.id]?.name || itemName || '').trim();
+                  const configuredSeoTitle = titleField ? (edits[item.id]?.[titleField.slug] || '') : fallbackNameTitle;
+                  const effectiveSeoTitle = configuredSeoTitle.trim() || fallbackNameTitle;
 
                   return (
                     <div key={item.id} className={`border-b border-[var(--brand-border)]/50 last:border-b-0 ${trackingBorder || (hasIssues ? 'border-l-2 border-l-amber-500/40' : '')}`}>
@@ -420,9 +423,9 @@ export function CmsEditorCollections({
                                   </div>
                                   <div className="flex items-center gap-2 t-caption-sm">
                                     <span className="text-[var(--brand-text-muted)] font-medium">{latest.field}</span>
-                                    <span className="text-[var(--brand-text-muted)] truncate max-w-[160px]">{latest.currentValue || '(empty)'}</span>
+                                    <span className="text-[var(--brand-text-muted)] break-words">{latest.currentValue || '(empty)'}</span>
                                     <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)]/60 flex-shrink-0" />
-                                    <span className="text-teal-300 truncate max-w-[200px]">{latest.clientValue || latest.proposedValue}</span>
+                                    <span className="text-teal-300 break-words">{latest.clientValue || latest.proposedValue}</span>
                                   </div>
                                 </div>
 
@@ -446,9 +449,9 @@ export function CmsEditorCollections({
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                               <span className="text-[var(--brand-text-muted)] font-medium">{approval.field}:</span>
-                                              <span className="text-[var(--brand-text-muted)] truncate max-w-[140px]">{approval.currentValue || '(empty)'}</span>
+                                              <span className="text-[var(--brand-text-muted)] break-words">{approval.currentValue || '(empty)'}</span>
                                               <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)]/60 flex-shrink-0" />
-                                              <span className="text-[var(--brand-text-bright)] truncate max-w-[180px]">{approval.clientValue || approval.proposedValue}</span>
+                                              <span className="text-[var(--brand-text-bright)] break-words">{approval.clientValue || approval.proposedValue}</span>
                                             </div>
                                           </div>
                                         ))}
@@ -476,7 +479,7 @@ export function CmsEditorCollections({
                                 <div>
                                   <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Google Search</div>
                                   <SerpPreview
-                                    title={edits[item.id]?.[titleField?.slug ?? 'name'] || (titleField ? '' : itemName)}
+                                    title={effectiveSeoTitle}
                                     description={descField ? (edits[item.id]?.[descField.slug] || '') : ''}
                                     url={`/${coll.collectionSlug}/${itemSlug}`}
                                     siteName="Your Site"
@@ -487,7 +490,7 @@ export function CmsEditorCollections({
                                 <div>
                                   <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Facebook</div>
                                   <SocialPreview
-                                    title={edits[item.id]?.[titleField?.slug ?? 'name'] || (titleField ? '' : itemName)}
+                                    title={effectiveSeoTitle}
                                     description={descField ? (edits[item.id]?.[descField.slug] || '') : ''}
                                     siteName="Your Site"
                                     platform="facebook"

@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AlertCircle, Database, Pencil, Search } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { SeoEditor } from './SeoEditor';
 import { CmsEditor } from './CmsEditor';
+import { PendingApprovals } from './PendingApprovals';
 import type { FixContext } from '../App';
 import { useCmsEditor, useSeoEditor } from '../hooks/admin';
+import { pageEditStatesKey } from '../hooks/usePageEditStates';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveSeoEditorWriteTargets } from './editor/seoWriteTargetResolver';
 import { Icon, SectionCard } from './ui';
@@ -64,9 +67,11 @@ function LegacySeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
 }
 
 function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
+  const queryClient = useQueryClient();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const { data: pages = [] } = useSeoEditor(siteId, workspaceId);
   const { data: cmsData } = useCmsEditor(siteId, workspaceId);
   const resolvedTargets = useMemo(
@@ -92,6 +97,14 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
     if (!query) return true;
     return target.title.toLowerCase().includes(query) || target.canonicalPath.toLowerCase().includes(query);
   });
+  const handleUnifiedApprovalMutation = useCallback(() => {
+    setApprovalRefreshKey(key => key + 1);
+  }, []);
+  const handleUnifiedApprovalsRetracted = useCallback(() => {
+    setApprovalRefreshKey(key => key + 1);
+    if (!workspaceId) return;
+    queryClient.invalidateQueries({ queryKey: pageEditStatesKey(workspaceId, false) });
+  }, [workspaceId, queryClient]);
 
   return (
     <div className="space-y-8">
@@ -142,6 +155,15 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
         </div>
       </div>
 
+      {workspaceId && (
+        <PendingApprovals
+          workspaceId={workspaceId}
+          nameFilter="SEO"
+          refreshKey={approvalRefreshKey}
+          onRetracted={handleUnifiedApprovalsRetracted}
+        />
+      )}
+
       {showStatic && (
         <section className="space-y-3">
           {sourceFilter === 'all' && (
@@ -150,7 +172,14 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
               <p className="t-caption-sm text-[var(--brand-text-muted)]">Direct Webflow page SEO writes.</p>
             </div>
           )}
-          <SeoEditor siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} externalSearch={search} />
+          <SeoEditor
+            siteId={siteId}
+            workspaceId={workspaceId}
+            fixContext={fixContext}
+            externalSearch={search}
+            showPendingApprovals={false}
+            onApprovalBatchMutated={handleUnifiedApprovalMutation}
+          />
         </section>
       )}
 
@@ -167,6 +196,8 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
             workspaceId={workspaceId}
             collectionFilter={collectionFilter}
             externalSearch={search}
+            showPendingApprovals={false}
+            onApprovalBatchMutated={handleUnifiedApprovalMutation}
           />
         </section>
       )}

@@ -22,9 +22,18 @@ interface Props {
   workspaceId?: string;
   collectionFilter?: string;
   externalSearch?: string;
+  showPendingApprovals?: boolean;
+  onApprovalBatchMutated?: () => void;
 }
 
-export function CmsEditor({ siteId, workspaceId, collectionFilter = 'all', externalSearch }: Props) {
+export function CmsEditor({
+  siteId,
+  workspaceId,
+  collectionFilter = 'all',
+  externalSearch,
+  showPendingApprovals = true,
+  onApprovalBatchMutated,
+}: Props) {
   const queryClient = useQueryClient();
   const { data: cmsData, isLoading } = useCmsEditor(siteId, workspaceId);
   const collections = cmsData?.collections || [];
@@ -78,6 +87,7 @@ export function CmsEditor({ siteId, workspaceId, collectionFilter = 'all', exter
     edits,
     collections,
     refreshStates,
+    onApprovalBatchMutated,
   });
 
   // Build per-item approval lookup: itemId → approval items across all batches
@@ -174,6 +184,7 @@ export function CmsEditor({ siteId, workspaceId, collectionFilter = 'all', exter
         workspaceId={workspaceId}
         approvalRefreshKey={approvalRefreshKey}
         onApprovalRetracted={refreshStates}
+        showPendingApprovals={showPendingApprovals}
         summary={summary}
         search={effectiveSearch}
         onSearchChange={setSearch}

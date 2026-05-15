@@ -11,6 +11,12 @@ describe('SEO editor unified flag gate', () => {
     expect(source).toContain('if (!unifiedEditorEnabled)');
     expect(source).toContain('<LegacySeoEditorWrapper');
     expect(source).toContain('<UnifiedSeoEditorWrapper');
+    expect(source).toContain('<PendingApprovals');
+    expect(source).toContain('nameFilter="SEO"');
+    expect(source).toContain('refreshKey={approvalRefreshKey}');
+    expect(source).toContain('onRetracted={handleUnifiedApprovalsRetracted}');
+    expect(source).toContain('showPendingApprovals={false}');
+    expect(source).toContain('onApprovalBatchMutated={handleUnifiedApprovalMutation}');
   });
 
   it('preserves the legacy Pages / CMS Collections split for the flag-off path', () => {
