@@ -5779,3 +5779,16 @@ Bug hardening included:
 **Mutual:** Creates the enforcement foundation for phased admin-first/client-second migration without requiring a single mega-PR.
 
 **Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `data/style-exceptions.json`; `data/style-drift-baseline.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 422. Frontend Container Decomposition Pass (Wave 6 Item 1)
+**What it does:** Ships a behavior-preserving decomposition pass across three high-churn client containers in three sequential staging-first PRs. **PR1 (HealthTab):** extracted shell orchestration into `useHealthTabShell` and moved detailed section rendering into `HealthTabSections` while preserving content-request and render behavior. **PR2 (InboxTab):** extracted local shell state/effects into `useInboxTabShell`, extracted deep-link/legacy filter contract into `inbox-filter`, and moved branch-specific layout scaffolding into focused new/legacy layout wrappers without changing `?tab=` compatibility, alias mapping, or modal workflows. **PR3 (ClientDashboard):** extracted workspace bootstrap side effects into `useClientWorkspaceBootstrap`, extracted nav derivation into `clientDashboardNav`, and moved tab shell composition into `ClientDashboardTabContent` while preserving workspace-event invalidation behavior, query-key mapping, and flag semantics.
+
+**Agency value:** Reduces maintenance friction and review blast radius in the most frequently touched client orchestration surfaces, making future feature work safer and faster.
+
+**Client value:** No UX disruption from this pass itself, but lower regression risk and quicker iteration on client-facing tabs because orchestration responsibilities are now isolated.
+
+**Mutual:** Establishes extraction contracts (`tests/contract/*-shell-extraction.test.ts`) and updates deep-link route-map parsing to keep architecture improvements measurable and guarded in CI.
+
+**Files:** `src/components/client/HealthTab.tsx`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `src/components/client/InboxTab.tsx`; `src/components/client/inbox/useInboxTabShell.ts`; `src/components/client/inbox/inbox-filter.ts`; `src/components/client/inbox/InboxTabLayouts.tsx`; `src/components/ClientDashboard.tsx`; `src/components/client/client-dashboard/useClientWorkspaceBootstrap.ts`; `src/components/client/client-dashboard/clientDashboardNav.ts`; `src/components/client/client-dashboard/ClientDashboardTabContent.tsx`; `tests/contract/health-tab-phase1-shell-extraction.test.ts`; `tests/contract/inbox-tab-phase2-shell-extraction.test.ts`; `tests/contract/client-dashboard-phase3-shell-extraction.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
