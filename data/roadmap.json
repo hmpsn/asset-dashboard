@@ -103,93 +103,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave5-product-lifecycle-discipline",
-      "name": "Platform Health Wave 5 — Product & Lifecycle Discipline",
-      "hours": "14-24",
-      "rationale": "Keep the platform understandable as it grows by managing product surface area, feature flags, deprecations, performance budgets, local onboarding, ADRs, and platform-health cadence.",
-      "items": [
-        {
-          "id": "platform-reliability-product-surface-rationalization",
-          "title": "Product Surface Rationalization",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 product-surface governance baseline. Added typed capability map + report script (`scripts/product-surface-map.ts`) with placement/role/lifecycle/recommendation taxonomy, canonical bounded-context coverage checks, and explicit human-verification queue for non-obvious nav/deprecation decisions. Added test coverage in `tests/unit/product-surface-map.test.ts` and rule doc `docs/rules/product-surface-rationalization.md` that codifies manual approval gates. Added `npm run verify:product-surface` command and documented the capability in FEATURE_AUDIT entry 418."
-        },
-        {
-          "id": "platform-confidence-feature-flag-lifecycle",
-          "title": "Feature Flag Lifecycle Management",
-          "source": "Product engineering confidence review 2026-05-13",
-          "est": "2-3h",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 feature-flag lifecycle management baseline. Expanded `shared/types/feature-flags.ts` into a single source-of-truth catalog with typed lifecycle metadata (owner, createdAt, rolloutTarget, removalCondition, linkedRoadmapItemId, staleAuditCadence, lastReviewedAt), centralized admin grouping/labels, and shared API contract type `FeatureFlagAdminMeta`. Updated server/admin surfaces so `/api/admin/feature-flags` now returns lifecycle context for each flag and FeatureFlagSettings renders that metadata inline. Added lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) plus test coverage (`tests/unit/feature-flag-lifecycle.test.ts`) and refreshed docs (`docs/rules/feature-flag-lifecycle.md`, development/release-safety references)."
-        },
-        {
-          "id": "platform-confidence-feature-flag-sunset-pass",
-          "title": "Feature Flag Promotion & Sunset Pass",
-          "source": "Operator follow-up 2026-05-15",
-          "est": "1-2h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 promotion/sunset pass for low-risk active flags validated on staging. Promoted and removed `client-wins-surface` and `seo-editor-unified` from `shared/types/feature-flags.ts` and lifecycle catalog metadata; removed runtime gates/fallback branches so promoted paths are now canonical (`InsightsBriefingPage` always renders `WinsSurface`; `SeoEditorWrapper` always renders unified editor). Updated contract/component tests and feature audit wording to remove stale flag references."
-        },
-        {
-          "id": "platform-reliability-deprecation-discipline",
-          "title": "Deprecation Lifecycle Discipline",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 deprecation lifecycle governance baseline. Added typed registry + audit command `npm run verify:deprecations` (`scripts/deprecation-lifecycle.ts`) covering lifecycle states (`deprecated`, `hidden`, `read-only`, `migrated`, `removed`) with state-specific policy checks and required code/test evidence links. Added test coverage (`tests/unit/deprecation-lifecycle.test.ts`) and rule doc `docs/rules/deprecation-lifecycle.md` to codify operating flow and human-verification requirements for deprecated/migrated/removed surfaces."
-        },
-        {
-          "id": "platform-reliability-performance-budgets",
-          "title": "Platform Performance Budgets",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 platform performance budget governance baseline. Added typed performance budget registry + verification command (`npm run verify:performance-budgets`) in `scripts/performance-budgets.ts` covering per-workflow AI call caps, external fetch caps, route response targets, query count budgets, expected background-job durations, cache expectations, and escalation triggers/actions. Seeded high-risk workflows across jobs and public/admin read paths with required code/test evidence references and policy validation checks (duplicate ids, numeric budget integrity, evidence path existence, background-job duration requirements). Added rule doc `docs/rules/performance-budgets.md` and unit coverage in `tests/unit/performance-budgets.test.ts`."
-        },
-        {
-          "id": "platform-reliability-local-dev-onboarding",
-          "title": "Local Dev & Agent Onboarding Confidence",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped Wave 5 local onboarding confidence baseline. Added deterministic local fake-provider mode (`LOCAL_FAKE_PROVIDERS=true`) for SEO providers plus synthetic AI responses in OpenAI/Anthropic helpers so first-hour setup works without external keys. Added one-command demo workspace seeding (`npm run seed:demo`, script: `scripts/seed-demo-workspaces.ts`) and one-command core smoke bundle (`npm run smoke:core`). Documented onboarding workflow + environment tiers in `docs/workflows/local-dev-onboarding.md`, linked from codebase overview, and added unit coverage for local mode + fake provider contracts."
-        },
-        {
-          "id": "platform-org-recurring-health-sprint",
-          "title": "Recurring Platform Health Sprint Cadence",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "1-2h",
-          "priority": "P3",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped recurring platform-health cadence contract. Added source-of-truth registry (`data/platform-health-cadence.json`) with 4-6 sprint cadence policy, measurable dimensions, checkpoint evidence links, and Wave 5 baseline metrics. Added verifier command `npm run verify:platform-health-cadence` (`scripts/platform-health-cadence.ts`) with policy/roadmap-link checks, due-window computation, and unit coverage (`tests/unit/platform-health-cadence.test.ts`). Added workflow playbook `docs/workflows/platform-health-cadence.md` and wired cadence audit into `verify-platform`."
-        },
-        {
-          "id": "platform-org-adr-log",
-          "title": "Architecture Decision Record Log",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "1-2h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Create a lightweight ADR log for major architecture choices: background jobs, intelligence slices, feature flags, client/admin route splits, AI dispatch, bounded contexts, and service extraction. Keep entries short: decision, context, alternatives considered, consequences."
-        }
-      ]
-    },
-    {
       "id": "sprint-platform-health-wave6-deferred-polish",
       "name": "Platform Health Wave 6 — Deferred Platform Polish",
       "hours": "16-28",
@@ -1114,6 +1027,95 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave5-product-lifecycle-discipline",
+      "name": "✅ SHIPPED — Platform Health Wave 5 — Product & Lifecycle Discipline",
+      "hours": "14-24",
+      "rationale": "Keep the platform understandable as it grows by managing product surface area, feature flags, deprecations, performance budgets, local onboarding, ADRs, and platform-health cadence.",
+      "items": [
+        {
+          "id": "platform-reliability-product-surface-rationalization",
+          "title": "Product Surface Rationalization",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 product-surface governance baseline. Added typed capability map + report script (`scripts/product-surface-map.ts`) with placement/role/lifecycle/recommendation taxonomy, canonical bounded-context coverage checks, and explicit human-verification queue for non-obvious nav/deprecation decisions. Added test coverage in `tests/unit/product-surface-map.test.ts` and rule doc `docs/rules/product-surface-rationalization.md` that codifies manual approval gates. Added `npm run verify:product-surface` command and documented the capability in FEATURE_AUDIT entry 418."
+        },
+        {
+          "id": "platform-confidence-feature-flag-lifecycle",
+          "title": "Feature Flag Lifecycle Management",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 feature-flag lifecycle management baseline. Expanded `shared/types/feature-flags.ts` into a single source-of-truth catalog with typed lifecycle metadata (owner, createdAt, rolloutTarget, removalCondition, linkedRoadmapItemId, staleAuditCadence, lastReviewedAt), centralized admin grouping/labels, and shared API contract type `FeatureFlagAdminMeta`. Updated server/admin surfaces so `/api/admin/feature-flags` now returns lifecycle context for each flag and FeatureFlagSettings renders that metadata inline. Added lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) plus test coverage (`tests/unit/feature-flag-lifecycle.test.ts`) and refreshed docs (`docs/rules/feature-flag-lifecycle.md`, development/release-safety references)."
+        },
+        {
+          "id": "platform-confidence-feature-flag-sunset-pass",
+          "title": "Feature Flag Promotion & Sunset Pass",
+          "source": "Operator follow-up 2026-05-15",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 promotion/sunset pass for low-risk active flags validated on staging. Promoted and removed `client-wins-surface` and `seo-editor-unified` from `shared/types/feature-flags.ts` and lifecycle catalog metadata; removed runtime gates/fallback branches so promoted paths are now canonical (`InsightsBriefingPage` always renders `WinsSurface`; `SeoEditorWrapper` always renders unified editor). Updated contract/component tests and feature audit wording to remove stale flag references."
+        },
+        {
+          "id": "platform-reliability-deprecation-discipline",
+          "title": "Deprecation Lifecycle Discipline",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 deprecation lifecycle governance baseline. Added typed registry + audit command `npm run verify:deprecations` (`scripts/deprecation-lifecycle.ts`) covering lifecycle states (`deprecated`, `hidden`, `read-only`, `migrated`, `removed`) with state-specific policy checks and required code/test evidence links. Added test coverage (`tests/unit/deprecation-lifecycle.test.ts`) and rule doc `docs/rules/deprecation-lifecycle.md` to codify operating flow and human-verification requirements for deprecated/migrated/removed surfaces."
+        },
+        {
+          "id": "platform-reliability-performance-budgets",
+          "title": "Platform Performance Budgets",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 platform performance budget governance baseline. Added typed performance budget registry + verification command (`npm run verify:performance-budgets`) in `scripts/performance-budgets.ts` covering per-workflow AI call caps, external fetch caps, route response targets, query count budgets, expected background-job durations, cache expectations, and escalation triggers/actions. Seeded high-risk workflows across jobs and public/admin read paths with required code/test evidence references and policy validation checks (duplicate ids, numeric budget integrity, evidence path existence, background-job duration requirements). Added rule doc `docs/rules/performance-budgets.md` and unit coverage in `tests/unit/performance-budgets.test.ts`."
+        },
+        {
+          "id": "platform-reliability-local-dev-onboarding",
+          "title": "Local Dev & Agent Onboarding Confidence",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 local onboarding confidence baseline. Added deterministic local fake-provider mode (`LOCAL_FAKE_PROVIDERS=true`) for SEO providers plus synthetic AI responses in OpenAI/Anthropic helpers so first-hour setup works without external keys. Added one-command demo workspace seeding (`npm run seed:demo`, script: `scripts/seed-demo-workspaces.ts`) and one-command core smoke bundle (`npm run smoke:core`). Documented onboarding workflow + environment tiers in `docs/workflows/local-dev-onboarding.md`, linked from codebase overview, and added unit coverage for local mode + fake provider contracts."
+        },
+        {
+          "id": "platform-org-recurring-health-sprint",
+          "title": "Recurring Platform Health Sprint Cadence",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped recurring platform-health cadence contract. Added source-of-truth registry (`data/platform-health-cadence.json`) with 4-6 sprint cadence policy, measurable dimensions, checkpoint evidence links, and Wave 5 baseline metrics. Added verifier command `npm run verify:platform-health-cadence` (`scripts/platform-health-cadence.ts`) with policy/roadmap-link checks, due-window computation, and unit coverage (`tests/unit/platform-health-cadence.test.ts`). Added workflow playbook `docs/workflows/platform-health-cadence.md` and wired cadence audit into `verify-platform`."
+        },
+        {
+          "id": "platform-org-adr-log",
+          "title": "Architecture Decision Record Log",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped lightweight ADR governance baseline. Added ADR home + six seed architecture decisions in `docs/adr/` covering background jobs, workspace-intelligence slices, feature-flag lifecycle/sunset, client/admin route split, unified AI dispatch, and bounded-context service extraction. Added verifier command `npm run verify:adr-log` (`scripts/adr-log.ts`) with required-section and required-topic coverage checks plus unit tests (`tests/unit/adr-log.test.ts`). Added workflow playbook `docs/workflows/adr-log.md` and wired ADR verification into `verify-platform`."
+        }
+      ],
+      "shippedAt": "2026-05-15"
     },
     {
       "id": "sprint-platform-health-wave4-runtime-operability",

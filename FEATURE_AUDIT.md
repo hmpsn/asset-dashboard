@@ -1,8 +1,19 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **361 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **362 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 362. Wave 5 Architecture Decision Record Log
+**What it does:** Adds a lightweight Architecture Decision Record system under `docs/adr/` with a short authoring contract (`docs/adr/README.md`) and six seed ADRs for major platform architecture choices: background jobs, workspace-intelligence slices, feature-flag lifecycle/sunset governance, client/admin route split, unified AI dispatch, and bounded-context route-to-service extraction. Adds verifier command `npm run verify:adr-log` (`scripts/adr-log.ts`) to enforce required ADR sections and required topic coverage, with test coverage in `tests/unit/adr-log.test.ts`. Also adds the ADR workflow guide at `docs/workflows/adr-log.md` and wires the audit into `verify-platform`.
+
+**Agency value:** Preserves architectural intent in a durable, searchable format so implementation decisions stay consistent even as contributors rotate.
+
+**Client value:** Indirectly improves reliability and delivery speed by reducing decision churn and preventing accidental reversals of proven architecture patterns.
+
+**Mutual:** Converts architecture choices from tribal knowledge into an auditable system that can be validated in CI-era workflows.
 
 ---
 
