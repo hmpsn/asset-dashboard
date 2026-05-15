@@ -14,6 +14,11 @@ import { createLogger } from '../logger.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import {
+  mutationError,
+  runWorkspaceMutation,
+  WorkspaceMutationError,
+} from './workspace-mutation-helper.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -42,30 +47,41 @@ router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('works
     const { name, description, pageType, variables, sections, urlPattern, keywordPattern, titlePattern, metaDescPattern, cmsFieldMap, toneAndStyle } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
-    const template = createTemplate(req.params.workspaceId, {
-      name,
-      description,
-      pageType,
-      variables,
-      sections,
-      urlPattern,
-      keywordPattern,
-      titlePattern,
-      metaDescPattern,
-      cmsFieldMap,
-      toneAndStyle,
+    const template = runWorkspaceMutation({
+      workspaceId: req.params.workspaceId,
+      defaultErrorMessage: 'Failed to create template',
+      mutate: ({ workspaceId }) => createTemplate(workspaceId, {
+        name,
+        description,
+        pageType,
+        variables,
+        sections,
+        urlPattern,
+        keywordPattern,
+        titlePattern,
+        metaDescPattern,
+        cmsFieldMap,
+        toneAndStyle,
+      }),
+      onActivity: ({ workspaceId, result }) => {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Created content template "${result.name}"`,
+          `Page type: ${result.pageType}`,
+          { templateId: result.id, action: 'template_created' },
+        );
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        notifyContentPlanUpdated(workspaceId, { templateId: result.id, action: 'template_created' });
+      },
     });
 
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Created content template "${template.name}"`,
-      `Page type: ${template.pageType}`,
-      { templateId: template.id, action: 'template_created' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, { templateId: template.id, action: 'template_created' });
     res.status(201).json(template);
   } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to create template');
     res.status(500).json({ error: 'Failed to create template' });
   }
@@ -74,18 +90,32 @@ router.post('/api/content-templates/:workspaceId', requireWorkspaceAccess('works
 // Update an existing template
 router.put('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const updated = updateTemplate(req.params.workspaceId, req.params.templateId, req.body);
-    if (!updated) return res.status(404).json({ error: 'Template not found' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Updated content template "${updated.name}"`,
-      undefined,
-      { templateId: updated.id, action: 'template_updated' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, { templateId: updated.id, action: 'template_updated' });
+    const updated = runWorkspaceMutation({
+      workspaceId: req.params.workspaceId,
+      defaultErrorMessage: 'Failed to update template',
+      mutate: ({ workspaceId }) => {
+        const next = updateTemplate(workspaceId, req.params.templateId, req.body);
+        if (!next) throw mutationError(404, 'Template not found');
+        return next;
+      },
+      onActivity: ({ workspaceId, result }) => {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Updated content template "${result.name}"`,
+          undefined,
+          { templateId: result.id, action: 'template_updated' },
+        );
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        notifyContentPlanUpdated(workspaceId, { templateId: result.id, action: 'template_updated' });
+      },
+    });
     res.json(updated);
   } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err, workspaceId: req.params.workspaceId, templateId: req.params.templateId }, 'Failed to update template');
     res.status(500).json({ error: 'Failed to update template' });
   }
@@ -93,37 +123,70 @@ router.put('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAc
 
 // Delete a template
 router.delete('/api/content-templates/:workspaceId/:templateId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const existing = getTemplate(req.params.workspaceId, req.params.templateId);
-  if (!existing) return res.status(404).json({ error: 'Template not found' });
-  const deleted = deleteTemplate(req.params.workspaceId, req.params.templateId);
-  if (!deleted) return res.status(404).json({ error: 'Template not found' });
-  addActivity(
-    req.params.workspaceId,
-    'content_updated',
-    `Deleted content template "${existing.name}"`,
-    undefined,
-    { templateId: existing.id, action: 'template_deleted' },
-  );
-  notifyContentPlanUpdated(req.params.workspaceId, { templateId: existing.id, action: 'template_deleted', deleted: true });
-  res.json({ ok: true });
+  try {
+    runWorkspaceMutation({
+      workspaceId: req.params.workspaceId,
+      defaultErrorMessage: 'Failed to delete template',
+      readBeforeWrite: ({ workspaceId }) => getTemplate(workspaceId, req.params.templateId),
+      mutate: ({ workspaceId, existing }) => {
+        if (!existing) throw mutationError(404, 'Template not found');
+        const deleted = deleteTemplate(workspaceId, req.params.templateId);
+        if (!deleted) throw mutationError(404, 'Template not found');
+        return existing;
+      },
+      onActivity: ({ workspaceId, result }) => {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Deleted content template "${result.name}"`,
+          undefined,
+          { templateId: result.id, action: 'template_deleted' },
+        );
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        notifyContentPlanUpdated(workspaceId, { templateId: result.id, action: 'template_deleted', deleted: true });
+      },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    log.error({ err, workspaceId: req.params.workspaceId, templateId: req.params.templateId }, 'Failed to delete template');
+    res.status(500).json({ error: 'Failed to delete template' });
+  }
 });
 
 // Duplicate a template
 router.post('/api/content-templates/:workspaceId/:templateId/duplicate', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { name } = req.body;
-    const copy = duplicateTemplate(req.params.workspaceId, req.params.templateId, name);
-    if (!copy) return res.status(404).json({ error: 'Template not found' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Duplicated content template "${copy.name}"`,
-      undefined,
-      { templateId: copy.id, sourceTemplateId: req.params.templateId, action: 'template_duplicated' },
-    );
-    notifyContentPlanUpdated(req.params.workspaceId, { templateId: copy.id, action: 'template_duplicated' });
+    const copy = runWorkspaceMutation({
+      workspaceId: req.params.workspaceId,
+      defaultErrorMessage: 'Failed to duplicate template',
+      mutate: ({ workspaceId }) => {
+        const duplicated = duplicateTemplate(workspaceId, req.params.templateId, name);
+        if (!duplicated) throw mutationError(404, 'Template not found');
+        return duplicated;
+      },
+      onActivity: ({ workspaceId, result }) => {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Duplicated content template "${result.name}"`,
+          undefined,
+          { templateId: result.id, sourceTemplateId: req.params.templateId, action: 'template_duplicated' },
+        );
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        notifyContentPlanUpdated(workspaceId, { templateId: result.id, action: 'template_duplicated' });
+      },
+    });
     res.status(201).json(copy);
   } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
     log.error({ err, workspaceId: req.params.workspaceId, templateId: req.params.templateId }, 'Failed to duplicate template');
     res.status(500).json({ error: 'Failed to duplicate template' });
   }
