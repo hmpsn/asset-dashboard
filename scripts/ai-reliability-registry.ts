@@ -36,9 +36,9 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'server/schema/extractors/description.ts',
     ],
     parserOrValidationSignals: [
-      'validateSchemaSitePlan',
-      'validateTransition',
-      'parseJsonSafe',
+      'validateForGoogleRichResults',
+      'validateLeanSchema',
+      'schemaPlanFeedbackSchema',
     ],
     writeSideEffects: [
       'saveSchemaPlan',
@@ -78,6 +78,7 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'server/ai.ts',
       'server/content-brief.ts',
       'server/content-posts-ai.ts',
+      'server/content-posts-db.ts',
     ],
     parserOrValidationSignals: [
       'zod schema validation',
@@ -334,7 +335,7 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     parserOrValidationSignals: [
       'researchMode: true',
       'sanitizeErrorMessage',
-      'human-review required',
+      'human source review required',
     ],
     writeSideEffects: [
       'addActivity',
