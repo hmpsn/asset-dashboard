@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, IconButton } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -694,15 +694,19 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             <div className="t-caption font-medium text-accent-brand">Report saved! Share this link with clients:</div>
             <div className="t-caption text-[var(--brand-text-bright)] truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]">
-            <Icon as={Copy} size="sm" /> {copied ? 'Copied!' : 'Copy'}
-          </button>
+          <Button onClick={copyShareUrl} icon={Copy} size="sm" className="bg-teal-400 text-[#0f1219] hover:bg-teal-300">
+            {copied ? 'Copied!' : 'Copy'}
+          </Button>
           <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-[var(--radius-md)] hover:bg-white/10 text-accent-brand">
             <Icon as={ExternalLink} size="md" />
           </a>
-          <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss share URL">
-            <Icon as={X} size="md" className="text-[var(--brand-text)]" />
-          </button>
+          <IconButton
+            onClick={() => setShareUrl(null)}
+            icon={X}
+            label="Dismiss share URL"
+            size="sm"
+            className="hover:bg-white/10 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
+          />
         </div>
       )}
 
