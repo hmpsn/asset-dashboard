@@ -132,8 +132,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Add recovery confidence practices for SQLite-backed customer-visible state: DB integrity check script, backup/restore drill notes, migration rollback notes, orphaned-row detector, cross-table consistency checks, and a map of which generated artifacts can be rebuilt from source vs must be preserved."
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added repeatable data integrity and recovery tooling (npm run verify:data-integrity) with SQLite quick/integrity checks, foreign-key violation reporting, workspace-orphan detection across workspace-scoped tables, explicit cross-table consistency checks, and a canonical artifact preserve-vs-rebuild map. Added recovery runbook notes covering backup/restore drills and restore-based migration rollback flow, plus unit coverage for healthy and corrupted database scenarios.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-reliability-observability-layer",
