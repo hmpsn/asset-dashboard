@@ -134,17 +134,19 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
       {/* Version history */}
       {versions.length > 0 && (
         <div>
-          <button
+          <Button
             type="button"
             onClick={() => setHistoryOpen(prev => !prev)}
-            className="flex items-center gap-2 t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide hover:text-[var(--brand-text-bright)] transition-colors w-full text-left"
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-2 t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide hover:text-[var(--brand-text-bright)] transition-colors w-full text-left px-0 py-0 h-auto justify-start"
             aria-expanded={historyOpen}
             aria-controls="version-history-list"
           >
             <Icon as={History} size="sm" />
             <span>Version History ({versions.length})</span>
             {historyOpen ? <Icon as={ChevronUp} size="sm" className="ml-auto" /> : <Icon as={ChevronDown} size="sm" className="ml-auto" />}
-          </button>
+          </Button>
 
           {historyOpen && (
             <ul
@@ -157,10 +159,12 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                 const isActive = idx === selectedVersionIndex;
                 return (
                   <li key={idx} role="option" aria-selected={isActive}>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => { onSelectVersion(idx); setSelectedVersionIndex(idx); }}
                       title={v.steeringNotes}
+                      variant="ghost"
+                      size="sm"
                       className={cn(
                         'w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-colors flex items-start gap-3',
                         isActive
@@ -182,7 +186,7 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                       {isActive && (
                         <span className="shrink-0 t-caption text-teal-400 font-medium self-center">active</span>
                       )}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Icon } from './ui';
+import { Icon, IconButton } from './ui';
 import { Monitor, X } from 'lucide-react';
 
 /**
@@ -36,13 +36,14 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
                 <span className="text-amber-400/80">Editing tools are limited on mobile.</span>
               </p>
             </div>
-            <button
+            <IconButton
               onClick={dismiss}
-              className="p-1 rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex-shrink-0"
-              aria-label="Dismiss mobile warning"
-            >
-              <Icon as={X} size="md" />
-            </button>
+              icon={X}
+              label="Dismiss mobile warning"
+              variant="ghost"
+              size="sm"
+              className="text-amber-400/60 hover:text-amber-300 hover:bg-amber-500/10 flex-shrink-0"
+            />
           </div>
         </div>
       )}

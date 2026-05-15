@@ -4,6 +4,7 @@ import { INSIGHT_FILTER_KEYS, type InsightDomain } from '../../../shared/types/a
 import { InsightFeedItem } from './InsightFeedItem.js';
 import { InsightSkeleton } from './InsightSkeleton.js';
 import { SummaryPills } from './SummaryPills.js';
+import { Button } from '../ui';
 
 interface InsightFeedProps {
   feed: FeedInsight[];
@@ -54,15 +55,17 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
       {showFilterChips && (
         <div className="flex gap-1.5">
           {FILTER_CHIPS.map(chip => (
-            <button
+            <Button
               key={chip.key ?? 'all'}
               onClick={() => setActiveFilter(chip.key)}
+              variant="ghost"
+              size="sm"
               className={`px-3 py-1 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                 activeFilter === chip.key ? 'bg-teal-600 text-white' : 'bg-[var(--surface-3)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {chip.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -81,23 +84,23 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
       )}
       {onViewAll && totalFiltered > (limit ?? Infinity) && !expanded && (
         <div className="text-center pt-1">
-          <button onClick={onViewAll} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
+          <Button onClick={onViewAll} variant="ghost" size="sm" className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors !px-0 !py-0">
             View all {totalFiltered} insights →
-          </button>
+          </Button>
         </div>
       )}
       {!onViewAll && hasMore && (
         <div className="text-center pt-1">
-          <button onClick={() => setExpanded(true)} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
+          <Button onClick={() => setExpanded(true)} variant="ghost" size="sm" className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors !px-0 !py-0">
             Show all {totalFiltered} insights →
-          </button>
+          </Button>
         </div>
       )}
       {expanded && limit && totalFiltered > limit && (
         <div className="text-center pt-1">
-          <button onClick={() => setExpanded(false)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+          <Button onClick={() => setExpanded(false)} variant="ghost" size="sm" className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors !px-0 !py-0">
             Show less
-          </button>
+          </Button>
         </div>
       )}
     </div>

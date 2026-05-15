@@ -9,7 +9,7 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
-import { SectionCard, Icon, Modal, Button } from './ui';
+import { SectionCard, Icon, Modal, Button, IconButton } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
@@ -361,13 +361,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           {editingTitle ? (
             <div className="flex items-center gap-2">
               <input value={titleBuffer} onChange={e => setTitleBuffer(e.target.value)} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
-              <button onClick={saveTitleEdit} className="p-1.5 rounded-[var(--radius-sm)] bg-teal-600/20 text-teal-300 hover:bg-teal-600/30"><Icon as={Check} size="md" /></button>
-              <button onClick={() => setEditingTitle(false)} className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>
+              <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
+              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTitle(false)} />
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
               <h2 className="text-lg font-semibold text-[var(--brand-text-bright)] truncate">{post.title}</h2>
-              <button onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }} className="opacity-0 group-hover:opacity-100 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all"><Icon as={Pencil} size="sm" /></button>
+              <IconButton
+                icon={Pencil}
+                label="Edit title"
+                size="sm"
+                variant="ghost"
+                className="opacity-0 group-hover:opacity-100 transition-all"
+                onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }}
+              />
             </div>
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -390,48 +397,65 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!isGenerating && (
             <>
-              <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
-                <Icon as={Eye} size="sm" /> Preview
-              </button>
-              <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={copied ? Check : Copy} size="sm" className={copied ? 'text-emerald-400' : ''} /> {copied ? 'Copied' : 'Copy'}
-              </button>
-              <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={Download} size="sm" /> .md
-              </button>
-              <button onClick={exportHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={Download} size="sm" /> .html
-              </button>
-              <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                <Icon as={Download} size="sm" /> Export PDF
-              </button>
-              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
-                <Icon as={History} size="sm" /> History
-              </button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Eye}
+                onClick={() => setShowPreview(!showPreview)}
+                className={showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                Preview
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={copied ? Check : Copy}
+                onClick={copyAllHTML}
+                className={copied ? 'text-emerald-400 hover:text-emerald-300' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportMarkdown} className="text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+                .md
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportHTML} className="text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+                .html
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportPDF} className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30">
+                Export PDF
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={History}
+                onClick={() => setShowVersions(!showVersions)}
+                className={showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                History
+              </Button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
                 post.publishedAt ? (
                   <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <Icon as={Check} size="sm" /> Published {post.publishedSlug && <Icon as={ExternalLink} size="sm" className="ml-0.5" />}
                   </span>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => setPublishConfirm(true)}
                     disabled={publishing}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                    size="sm"
+                    variant="secondary"
+                    loading={publishing}
+                    icon={Globe}
+                    className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                   >
-                    <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
                     {publishing ? 'Publishing...' : 'Publish to Webflow'}
-                  </button>
+                  </Button>
                 )
               )}
             </>
           )}
-          <button onClick={() => setDeleteConfirm(true)} className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
-            <Icon as={Trash2} size="md" />
-          </button>
-          <button onClick={onClose} className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-            <Icon as={X} size="md" />
-          </button>
+          <IconButton icon={Trash2} label="Delete post" variant="danger" size="sm" onClick={() => setDeleteConfirm(true)} />
+          <IconButton icon={X} label="Close editor" variant="ghost" size="sm" onClick={onClose} />
         </div>
       </div>
 
@@ -505,9 +529,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.introduction)}w</span>}
               </div>
               {post.introduction && !editingIntro && (
-                <button onClick={() => setEditingIntro(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-                  <Icon as={Pencil} size="sm" /> Edit
-                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  onClick={() => setEditingIntro(true)}
+                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
+                >
+                  Edit
+                </Button>
               )}
             </div>
             <div className="px-4 py-3">
@@ -520,12 +550,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     onChange={scheduleIntroSave}
                   />
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={async () => { await flushIntro(); setEditingIntro(false); }}
-                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
-                      <Icon as={Check} size="sm" /> Done
-                    </button>
+                      Done
+                    </Button>
                     {introSaveStatus === 'saving' && (
                       <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
@@ -568,9 +601,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.conclusion)}w</span>}
               </div>
               {post.conclusion && !editingConclusion && (
-                <button onClick={() => setEditingConclusion(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-                  <Icon as={Pencil} size="sm" /> Edit
-                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  onClick={() => setEditingConclusion(true)}
+                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
+                >
+                  Edit
+                </Button>
               )}
             </div>
             <div className="px-4 py-3">
@@ -583,12 +622,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     onChange={scheduleConclusionSave}
                   />
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
-                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
-                      <Icon as={Check} size="sm" /> Done
-                    </button>
+                      Done
+                    </Button>
                     {conclusionSaveStatus === 'saving' && (
                       <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
@@ -627,28 +669,36 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => handlePublish(false)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
+              size="sm"
+              variant="primary"
+              loading={publishing}
+              icon={Globe}
+              className="bg-teal-600 hover:bg-teal-500"
             >
-              <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update' : 'Publish'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePublish(true)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+              size="sm"
+              variant="secondary"
+              loading={publishing}
+              icon={Sparkles}
+              className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
             >
-              <Icon as={publishing ? Loader2 : Sparkles} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update + New Image' : 'Publish + Generate Image'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => { setPublishConfirm(false); setPublishError(''); }}
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+              size="sm"
+              variant="ghost"
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

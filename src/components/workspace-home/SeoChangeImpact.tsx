@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChartLine, Clock, Pencil } from 'lucide-react';
-import { SectionCard, EmptyState, TrendBadge, Icon } from '../ui';
+import { SectionCard, EmptyState, TrendBadge, Icon, Button } from '../ui';
 import { getOptional } from '../../api/client';
 import { normalizePageUrl } from '../../lib/pathUtils';
 
@@ -93,12 +93,15 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
   if (changes.length === 0) return null;
 
   const actionButton = hasGsc && !showImpact ? (
-    <button
+    <Button
       onClick={loadImpact}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+      variant="secondary"
+      size="sm"
+      icon={ChartLine}
+      className="t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border-teal-500/20"
     >
-      <Icon as={ChartLine} size="sm" /> Compare GSC Impact
-    </button>
+      Compare GSC Impact
+    </Button>
   ) : null;
 
   const innerContent = (

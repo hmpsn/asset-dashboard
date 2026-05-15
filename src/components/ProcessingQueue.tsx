@@ -1,5 +1,5 @@
 import { Loader2, CheckCircle2, AlertCircle, Sparkles, Upload, Copy } from 'lucide-react';
-import { EmptyState, Icon, cn } from './ui';
+import { EmptyState, Icon, IconButton, cn } from './ui';
 
 export interface QueueItem {
   id: string;
@@ -86,13 +86,15 @@ export function ProcessingQueue({ items }: Props) {
             </div>
 
             {item.status === 'done' && item.fileName && (
-              <button
+              <IconButton
+                icon={Copy}
+                label="Copy filename"
+                size="sm"
+                variant="ghost"
                 onClick={() => copyToClipboard(item.fileName)}
-                className="p-1.5 hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-md)] transition-colors shrink-0"
+                className="hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-md)] shrink-0"
                 title="Copy filename"
-              >
-                <Icon as={Copy} size="md" className="text-[var(--brand-text-muted)]" />
-              </button>
+              />
             )}
           </div>
         );

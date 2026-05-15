@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, BarChart3, Users, Package, Trash2, AlertTriangle } from 'lucide-react';
 import { get, del } from '../api/client';
-import { SectionCard, EmptyState, TrendBadge, Icon, cn, PageHeader } from './ui';
+import { SectionCard, EmptyState, TrendBadge, Icon, cn, PageHeader, Button, IconButton } from './ui';
 
 interface RevenueSummary {
   totalRevenue: number;
@@ -106,17 +106,24 @@ export function RevenueDashboard() {
         icon={<Icon as={DollarSign} size="lg" className="text-accent-brand" />}
         actions={
           !confirmPurge ? (
-            <button
+            <Button
               onClick={() => setConfirmPurge(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-danger hover:text-accent-danger hover:bg-red-500/10 border border-red-500/20 transition-all"
+              variant="secondary"
+              size="sm"
+              icon={Trash2}
+              className="text-accent-danger hover:text-accent-danger hover:bg-red-500/10 border-red-500/20"
             >
-              <Icon as={Trash2} size="sm" /> Purge All
-            </button>
+              Purge All
+            </Button>
           ) : (
             <div className="flex items-center gap-2">
               <span className="t-caption-sm text-accent-danger flex items-center gap-1"><Icon as={AlertTriangle} size="sm" /> Delete all {data.totalTransactions} records?</span>
-              <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-semibold text-accent-danger bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
-              <button onClick={() => setConfirmPurge(false)} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--surface-3)] transition-all">Cancel</button>
+              <Button onClick={handlePurgeAll} variant="secondary" size="sm" className="font-semibold text-accent-danger bg-red-500/20 hover:bg-red-500/30 border-red-500/30">
+                Yes, purge
+              </Button>
+              <Button onClick={() => setConfirmPurge(false)} variant="secondary" size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border-[var(--surface-3)]">
+                Cancel
+              </Button>
             </div>
           )
         }
@@ -223,14 +230,16 @@ export function RevenueDashboard() {
                     <td className="py-2 text-accent-brand font-medium text-right">{fmtCents(tx.amount)}</td>
                     <td className="py-2 text-[var(--brand-text-muted)] text-right">{new Date(tx.paidAt).toLocaleDateString()}</td>
                     <td className="py-2 text-right">
-                      <button
+                      <IconButton
+                        icon={Trash2}
+                        label="Delete this transaction"
+                        title="Delete this transaction"
+                        size="sm"
+                        variant="ghost"
                         onClick={() => handleDelete(tx.id)}
                         disabled={deleting === tx.id}
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--brand-border-hover)] hover:text-accent-danger hover:bg-red-500/10 transition-all disabled:opacity-50"
-                        title="Delete this transaction"
-                      >
-                        <Icon as={Trash2} size="sm" />
-                      </button>
+                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-border-hover)] hover:text-accent-danger hover:bg-red-500/10 disabled:opacity-50"
+                      />
                     </td>
                   </tr>
                 ))}

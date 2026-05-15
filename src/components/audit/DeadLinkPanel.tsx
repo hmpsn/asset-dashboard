@@ -4,7 +4,7 @@ import { Link2Off, Download, ArrowRight, Wrench, Plus, X } from 'lucide-react';
 import { redirects as redirectsApi } from '../../api/misc';
 import { adminPath, type Page } from '../../routes';
 import type { DeadLinkItem } from './types';
-import { Icon, SectionCard, cn } from '../ui';
+import { Button, Icon, IconButton, SectionCard, cn } from '../ui';
 
 interface DeadLinkPanelProps {
   deadLinkDetails: DeadLinkItem[];
@@ -68,12 +68,16 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
             </span>
           )}
         </div>
-        <button
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
           onClick={exportDeadLinksCSV}
-          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+          icon={Download}
+          className="gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20"
         >
-          <Icon as={Download} size="sm" /> Export CSV
-        </button>
+          Export CSV
+        </Button>
       </div>
       <div className="space-y-1.5">
         {deadLinkDetails.map((link, idx) => {
@@ -111,17 +115,24 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {workspaceId && link.type === 'internal' && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
                       onClick={() => navigate(adminPath(workspaceId, 'seo-editor' as Page), {
                         state: { fixContext: { targetRoute: 'seo-editor', pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
                       })}
-                      className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+                      icon={Wrench}
+                      className="gap-0.5 t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20"
                       title="Open source page in SEO Editor"
                     >
-                      <Icon as={Wrench} size="sm" /> Fix
-                    </button>
+                      Fix
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => {
                       if (isFormOpen) {
                         setRedirectFormUrl(null);
@@ -131,11 +142,12 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                         setRedirectFormTo(hasRedirect ? pendingRedirects.get(link.url)! : '');
                       }
                     }}
-                    className={cn('flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border transition-colors', hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] border-[var(--brand-border)]')}
+                    icon={Plus}
+                    className={cn('gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border', hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] border-[var(--brand-border)]')}
                     title="Create a redirect for this URL"
                   >
-                    <Icon as={Plus} size="sm" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
-                  </button>
+                    {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
+                  </Button>
                 </div>
               </div>
               {isFormOpen && (
@@ -153,19 +165,25 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption text-[var(--brand-text-bright)] placeholder-zinc-600 focus:outline-none focus:border-teal-500"
                     autoFocus
                   />
-                  <button
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => saveRedirect(link.url)}
                     disabled={!redirectFormTo.trim() || savingRedirect}
-                    className="px-2.5 py-1 rounded t-caption font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                    className="px-2.5 py-1 rounded t-caption font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50"
                   >
                     {savingRedirect ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
+                  </Button>
+                  <IconButton
+                    type="button"
+                    icon={X}
+                    label="Cancel redirect"
+                    size="sm"
+                    variant="ghost"
                     onClick={() => { setRedirectFormUrl(null); setRedirectFormTo(''); }}
                     className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
-                  >
-                    <Icon as={X} size="sm" />
-                  </button>
+                  />
                 </div>
               )}
             </div>

@@ -6,7 +6,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { Button, ErrorState, Icon, NextStepsCard, ProgressIndicator } from '../ui';
+import { Button, ClickableRow, ErrorState, Icon, NextStepsCard, ProgressIndicator } from '../ui';
 import type { FixQueueItem } from './pageIntelligenceData';
 import type { BulkProgress, SortBy, SortDir } from './pageIntelligenceTypes';
 
@@ -147,7 +147,7 @@ export function PageIntelligencePagesHeader({
           </div>
           <div className="space-y-1.5">
             {fixQueue.map((item, i) => (
-              <button
+              <ClickableRow
                 key={item.page.id}
                 onClick={() => onToggleFixQueuePage(item.page.id)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]/50 transition-colors text-left"
@@ -167,7 +167,7 @@ export function PageIntelligencePagesHeader({
                   {item.score}/100
                 </span>
                 <span className="text-[10px] text-accent-warning font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
-              </button>
+              </ClickableRow>
             ))}
           </div>
         </div>
@@ -186,16 +186,18 @@ export function PageIntelligencePagesHeader({
         </div>
         <div className="flex items-center gap-1">
           {(['priority', 'position', 'volume', 'score'] as const).map(option => (
-            <button
+            <Button
               key={option}
               onClick={() => onSortChange(option)}
+              variant="secondary"
+              size="sm"
               className={`px-2 py-1 rounded t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
                 sortBy === option ? 'bg-teal-500/20 text-accent-brand border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {option === 'priority' ? 'Priority' : option === 'score' ? 'Score' : option.charAt(0).toUpperCase() + option.slice(1)}
               {sortBy === option && (sortDir === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUp className="w-2.5 h-2.5" />)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

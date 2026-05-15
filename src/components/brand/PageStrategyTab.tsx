@@ -204,20 +204,22 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
                 </div>
               </div>
 
-              <button
+              <Button
                 onClick={e => {
                   e.stopPropagation();
                   setConfirmDeleteBp(bp);
                 }}
                 disabled={deletingId === bp.id}
-                className="opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="ghost"
+                size="sm"
                 aria-label={`Delete ${bp.name}`}
+                className="opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deletingId === bp.id
                   ? <Icon as={Loader2} size="md" className="animate-spin" />
                   : <Icon as={Trash2} size="md" />
                 }
-              </button>
+              </Button>
 
               <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
             </div>

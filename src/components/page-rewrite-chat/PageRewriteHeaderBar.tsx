@@ -1,6 +1,6 @@
 import { ArrowLeft, FileText, Loader2, Maximize2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
-import { Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 import { normalizePageUrl } from '../../lib/pathUtils';
 import { getIndentLevel, type PageData, type SitemapPage } from './pageRewriteChatModel';
 
@@ -51,13 +51,16 @@ export function PageRewriteHeaderBar({
 }: PageRewriteHeaderBarProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/80 backdrop-blur-sm flex-shrink-0">
-      <button
+      <IconButton
+        type="button"
+        icon={ArrowLeft}
+        label="Back"
+        size="sm"
+        variant="ghost"
         onClick={onBack}
-        className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
+        className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]"
         title="Back"
-      >
-        <Icon as={ArrowLeft} size="md" />
-      </button>
+      />
       <div className="flex items-center gap-2">
         <Icon as={Sparkles} size="md" className="text-accent-brand" />
         <h1 className="text-sm font-semibold text-[var(--brand-text-bright)]">AI Page Rewriter</h1>
@@ -68,19 +71,30 @@ export function PageRewriteHeaderBar({
           <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
             <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
             <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? normalizePageUrl(pageData.slug) : pageUrl}</span>
-            <button onClick={onOpenCombo} className={"text-[10px] text-accent-brand hover:text-accent-brand font-medium flex-shrink-0" // arbitrary-text-ok
-            }>Change</button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onOpenCombo}
+              className={"text-[10px] text-accent-brand hover:text-accent-brand font-medium flex-shrink-0 px-0 py-0 bg-transparent hover:bg-transparent" // arbitrary-text-ok
+              }
+            >
+              Change
+            </Button>
           </div>
         )}
 
         {!pageData && !comboOpen && (
-          <button
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
             onClick={onOpenCombo}
-            className="w-full flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-muted)] hover:border-teal-500/50 hover:text-[var(--brand-text-bright)] transition-colors"
+            className="w-full justify-start gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-muted)] hover:border-teal-500/50 hover:text-[var(--brand-text-bright)]"
           >
             <Icon as={FileText} size="sm" />
             Search pages or paste a URL…
-          </button>
+          </Button>
         )}
 
         {comboOpen && (
@@ -105,26 +119,32 @@ export function PageRewriteHeaderBar({
 
             {comboQueryIsUrl && (
               <div className="px-3 py-2">
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={onLoadTypedUrl}
-                  className="text-xs text-accent-brand hover:text-accent-brand"
+                  className="text-xs text-accent-brand hover:text-accent-brand px-0 py-0 bg-transparent hover:bg-transparent"
                 >
                   Load {comboQuery.length > 60 ? `${comboQuery.slice(0, 60)}…` : comboQuery}
-                </button>
+                </Button>
               </div>
             )}
 
             {!comboQueryIsUrl && filteredPages.length > 0 && (
               <div className="max-h-[240px] overflow-y-auto">
                 {filteredPages.map((page, i) => (
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     key={`${page.slug}-${page.url}`}
                     id={`combo-opt-${i}`}
                     role="option"
                     aria-selected={i === comboIdx}
                     onClick={() => onSelectPage(page)}
                     onMouseEnter={() => onSetComboIdx(i)}
-                    className={`w-full flex items-center gap-2 py-1.5 text-xs text-left transition-colors border-l-2 ${
+                    className={`w-full justify-start gap-2 py-1.5 text-xs text-left border-l-2 rounded-none ${
                       i === comboIdx
                         ? 'bg-teal-500/10 text-[var(--brand-text-bright)] border-teal-500'
                         : 'text-[var(--brand-text)] hover:bg-[var(--surface-1)]/50 hover:text-[var(--brand-text-bright)] border-transparent'
@@ -133,7 +153,7 @@ export function PageRewriteHeaderBar({
                   >
                     <FileText className="w-3 h-3 flex-shrink-0" />
                     <span className="truncate">{page.slug || '/'}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -148,8 +168,12 @@ export function PageRewriteHeaderBar({
       </div>
 
       {onFocusModeToggle && (
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={onFocusModeToggle}
+          aria-label={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
           title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
           className={`p-1.5 rounded-[var(--radius-lg)] transition-colors flex-shrink-0 ${
             focusMode
@@ -158,7 +182,7 @@ export function PageRewriteHeaderBar({
           }`}
         >
           <Icon as={Maximize2} size="md" className={`transition-transform ${focusMode ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
       )}
     </div>
   );

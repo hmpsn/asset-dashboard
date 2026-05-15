@@ -2,7 +2,7 @@ import {
   ChevronDown, ChevronUp, FileText, Copy, Download, Trash2, Search,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { EmptyState, Icon } from '../ui';
+import { EmptyState, Button, IconButton } from '../ui';
 import type { ContentBrief } from '../../../shared/types/content';
 
 interface ContentTopicRequest {
@@ -88,7 +88,9 @@ export function BriefList({
         <EmptyState icon={FileText} title="No standalone briefs yet" description="Generate a brief above, or briefs linked to requests will appear in the request cards" className="py-12" />
       ) : standaloneBriefs.length === 0 && briefSearch.trim() ? (
         <EmptyState icon={Search} title={`No briefs match \u201c${briefSearch}\u201d`} className="py-8" action={
-          <button onClick={() => onSetBriefSearch('')} className="text-xs text-teal-400 hover:underline">Clear search</button>
+          <Button variant="link" size="sm" onClick={() => onSetBriefSearch('')} className="!text-xs text-teal-400 hover:underline">
+            Clear search
+          </Button>
         } />
       ) : (
         <div className="space-y-2">
@@ -96,9 +98,11 @@ export function BriefList({
             <div key={brief.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden group/brief" style={{ borderRadius: 'var(--radius-signature)' }}>
               {/* Brief header row */}
               <div className="flex items-center gap-3 px-4 py-3">
-                <button
+                <Button
                   onClick={() => onSetExpanded(expanded === brief.id ? null : brief.id)}
-                  className="flex-1 min-w-0 text-left"
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 min-w-0 !px-0 !py-0 !justify-start text-left bg-transparent hover:bg-transparent"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{brief.targetKeyword}</span>
@@ -107,7 +111,7 @@ export function BriefList({
                     )}
                   </div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate">{brief.suggestedTitle}</div>
-                </button>
+                </Button>
                 {/* At-a-glance metrics */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">{brief.wordCountTarget.toLocaleString()} words</span>
@@ -116,21 +120,44 @@ export function BriefList({
                 </div>
                 {/* Quick actions */}
                 <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); onCopyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors">
-                    <Icon as={Copy} size="md" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); onExportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors">
-                    <Icon as={Download} size="md" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); onConfirmDeleteBrief(brief); }} title="Delete brief" className="p-1.5 rounded hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">
-                    <Icon as={Trash2} size="md" />
-                  </button>
+                  <IconButton
+                    icon={Copy}
+                    label="Copy for AI tool"
+                    title="Copy for AI tool"
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); onCopyAsMarkdown(brief); }}
+                    className="rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400"
+                  />
+                  <IconButton
+                    icon={Download}
+                    label="Export PDF"
+                    title="Export PDF"
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); onExportClientHTML(brief); }}
+                    className="rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400"
+                  />
+                  <IconButton
+                    icon={Trash2}
+                    label="Delete brief"
+                    title="Delete brief"
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); onConfirmDeleteBrief(brief); }}
+                    className="rounded hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400"
+                  />
                 </div>
                 {/* Date + expand */}
                 <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
-                <button onClick={() => onSetExpanded(expanded === brief.id ? null : brief.id)} className="flex-shrink-0 p-1 rounded hover:bg-[var(--surface-3)] transition-colors">
-                  <Icon as={expanded === brief.id ? ChevronUp : ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
-                </button>
+                <IconButton
+                  icon={expanded === brief.id ? ChevronUp : ChevronDown}
+                  label={expanded === brief.id ? 'Collapse brief' : 'Expand brief'}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onSetExpanded(expanded === brief.id ? null : brief.id)}
+                  className="flex-shrink-0 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
+                />
               </div>
 
               {/* Brief details */}

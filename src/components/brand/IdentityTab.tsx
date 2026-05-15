@@ -138,17 +138,19 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
           <div className="space-y-1">
             <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
             {showToggle && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setExpanded(prev => !prev)}
-                className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                variant="ghost"
+                size="sm"
+                className="gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0 py-0 bg-transparent hover:bg-transparent"
               >
                 {expanded ? (
                   <><Icon as={ChevronUp} size="md" /> Show less</>
                 ) : (
                   <><Icon as={ChevronDown} size="md" /> Show more</>
                 )}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -345,13 +347,15 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     return (
       <div className="text-sm text-[var(--brand-text-muted)] py-8 text-center">
         Failed to load brand deliverables.{' '}
-        <button
+        <Button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) })}
-          className="text-teal-400 hover:underline"
+          variant="link"
+          size="sm"
+          className="text-teal-400 hover:underline align-baseline"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

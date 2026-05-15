@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, RotateCcw, Loader2 } from 'lucide-react';
 import { put, get } from '../api/client';
 import { useToast } from './Toast';
-import { Icon, Toggle } from './ui';
+import { Icon, IconButton, Toggle } from './ui';
 import { queryKeys } from '../lib/queryKeys';
 import {
   FEATURE_FLAG_GROUPS,
@@ -158,14 +158,16 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
       </span>
 
       {isOverridden ? (
-        <button
+        <IconButton
           onClick={onReset}
           disabled={disabled}
+          icon={RotateCcw}
+          label="Reset override"
+          variant="ghost"
+          size="sm"
           title="Remove DB override (revert to env var or default)"
-          className="p-1 rounded hover:bg-white/5 transition-colors disabled:opacity-50 shrink-0"
-        >
-          <Icon as={RotateCcw} size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />
-        </button>
+          className="rounded hover:bg-white/5 disabled:opacity-50 shrink-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+        />
       ) : (
         <div className="w-5 shrink-0" />
       )}

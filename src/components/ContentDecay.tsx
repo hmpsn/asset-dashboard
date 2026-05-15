@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp, Send, Check, Loader2 } from 'lucide-react';
+import { RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp, Send, Check } from 'lucide-react';
 import { contentDecay } from '../api/content';
 import { clientActions } from '../api/clientActions';
-import { EmptyState, Icon, Button } from './ui';
+import { EmptyState, Icon, Button, ClickableRow } from './ui';
 
 interface DecayingPage {
   page: string;
@@ -162,22 +162,26 @@ export default function ContentDecay({ workspaceId }: Props) {
               const cfg = SEV_CONFIG[sev];
               const count = analysis.summary[sev];
               return (
-                <button key={sev} onClick={() => setSeverityFilter(severityFilter === sev ? 'all' : sev)}
+                <Button key={sev} onClick={() => setSeverityFilter(severityFilter === sev ? 'all' : sev)}
+                  size="md"
+                  variant="ghost"
                   className={`border p-4 text-center transition-colors rounded-[var(--radius-signature)] ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
                   <div className={`t-stat ${cfg.text}`}>{count}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{cfg.label}</div>
-                </button>
+                </Button>
               );
             })}
           </div>
 
           {/* AI recommendations button - styleguide brand accent */}
           {analysis.summary.totalDecaying > 0 && !analysis.decayingPages.some(p => p.refreshRecommendation) && (
-            <button onClick={generateRecommendations} disabled={generatingRecs}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-accent-brand-soft border border-accent-brand-soft text-accent-brand hover:bg-accent-brand-soft transition-colors t-caption-sm font-medium disabled:opacity-50">
-              <Icon as={Sparkles} size="md" className={generatingRecs ? 'animate-pulse' : ''} />
+            <Button onClick={generateRecommendations} disabled={generatingRecs}
+              icon={Sparkles}
+              size="md"
+              variant="secondary"
+              className="w-full px-4 py-3 rounded-[var(--radius-lg)] bg-accent-brand-soft border border-accent-brand-soft text-accent-brand hover:bg-accent-brand-soft t-caption-sm font-medium disabled:opacity-50">
               {generatingRecs ? 'Generating AI refresh recommendations...' : 'Generate AI Refresh Recommendations'}
-            </button>
+            </Button>
           )}
 
           {/* Decaying pages list */}
@@ -196,7 +200,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                   const isExpanded = expandedPages.has(page.page);
                   return (
                     <div key={page.page}>
-                      <button onClick={() => togglePage(page.page)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left">
+                      <ClickableRow onClick={() => togglePage(page.page)} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 text-left rounded-none">
                         <div className={`w-6 h-6 rounded-[var(--radius-md)] flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
                           <cfg.icon className={`w-3.5 h-3.5 ${cfg.text}`} />
                         </div>
@@ -221,7 +225,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                           </div>
                           <span className={`t-micro font-medium px-2 py-0.5 rounded-[var(--radius-sm)] ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
                         </div>
-                      </button>
+                      </ClickableRow>
                       {isExpanded && (
                         <div className="px-4 pb-3 pl-13 space-y-2">
                           <div className="grid grid-cols-3 gap-2 text-center">
@@ -247,18 +251,17 @@ export default function ContentDecay({ workspaceId }: Props) {
                                 <div className="flex items-center gap-1.5 t-caption-sm font-medium text-accent-brand">
                                   <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
                                 </div>
-                                <button
+                                <Button
                                   onClick={() => sendPageToClient(page)}
                                   disabled={sendingPage === page.page || sentPages.has(page.page)}
-                                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] bg-teal-600/15 border border-teal-500/20 text-teal-300 hover:bg-teal-600/25 t-caption-sm font-medium transition-colors disabled:opacity-60"
+                                  icon={sentPages.has(page.page) ? Check : Send}
+                                  loading={sendingPage === page.page}
+                                  size="sm"
+                                  variant="secondary"
+                                  className="px-2 py-1 rounded-[var(--radius-md)] bg-teal-600/15 border border-teal-500/20 text-teal-300 hover:bg-teal-600/25 t-caption-sm font-medium disabled:opacity-60"
                                 >
-                                  {sendingPage === page.page
-                                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                                    : sentPages.has(page.page)
-                                      ? <Icon as={Check} size="sm" className="text-emerald-400" />
-                                      : <Icon as={Send} size="sm" />}
                                   {sentPages.has(page.page) ? 'Sent' : 'Send to Client'}
-                                </button>
+                                </Button>
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
                               {!sentPages.has(page.page) && (

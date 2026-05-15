@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 import { FileText, Sparkles, BarChart3, Eye, Swords, ArrowUpRight, MessageCircleQuestion } from 'lucide-react';
 import { TrendBadge } from '../ui/TrendBadge';
 import { adminPath } from '../../routes';
@@ -104,18 +104,22 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 </div>
                 {workspaceId && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
+                    <Button
                       onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
                     >
                       <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40"
                     >
                       <Icon as={Sparkles} size="sm" className="text-teal-300" /> Generate Brief
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>

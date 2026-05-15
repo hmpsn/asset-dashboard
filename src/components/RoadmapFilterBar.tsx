@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { SprintData } from '../../shared/types/roadmap';
-import { Icon } from './ui';
+import { Button } from './ui';
 
 const PRIORITY_OPTIONS = [
   { value: 'all', label: 'All Priorities' },
@@ -91,13 +91,16 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
       )}
 
       {hasActiveFilter && (
-        <button
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
           onClick={clearAll}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
+          icon={X}
+          className="gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]"
         >
-          <Icon as={X} size="sm" />
           Clear filters
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import {
   RefreshCw, Link2Off, Check, Download,
 } from 'lucide-react';
 import { get, getOptional } from '../api/client';
-import { Icon, cn } from './ui';
+import { Icon, cn, Button } from './ui';
 
 interface DeadLink {
   url: string;
@@ -123,13 +123,15 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
             </select>
           </div>
         )}
-        <button
+        <Button
           onClick={runCheck}
           disabled={!selectedDomain}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
+          size="md"
+          variant="secondary"
+          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-body font-medium text-white border-0"
         >
           Run Link Check
-        </button>
+        </Button>
       </div>
     );
   }
@@ -184,43 +186,55 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="flex bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
-          <button
+          <Button
             onClick={() => setTab('dead')}
+            size="sm"
+            variant="ghost"
             className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors', tab === 'dead' ? 'bg-red-500/20 text-red-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
           >
             Dead Links ({data.deadLinks.length})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setTab('redirects')}
+            size="sm"
+            variant="ghost"
             className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors', tab === 'redirects' ? 'bg-amber-500/20 text-amber-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
           >
             Redirects ({data.redirects.length})
-          </button>
+          </Button>
         </div>
         <div className="flex bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
           {(['all', 'internal', 'external'] as const).map(t => (
-            <button
+            <Button
               key={t}
               onClick={() => setTypeFilter(t)}
+              size="sm"
+              variant="ghost"
               className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors capitalize', typeFilter === t ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
             >
               {t}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex-1" />
-        <button
+        <Button
           onClick={exportCsv}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+          icon={Download}
+          size="sm"
+          variant="secondary"
+          className="bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium"
         >
-          <Icon as={Download} size="sm" /> Export CSV
-        </button>
-        <button
+          Export CSV
+        </Button>
+        <Button
           onClick={runCheck}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+          icon={RefreshCw}
+          size="sm"
+          variant="secondary"
+          className="bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium"
         >
-          <Icon as={RefreshCw} size="sm" /> Re-check
-        </button>
+          Re-check
+        </Button>
       </div>
 
       {/* Link list */}

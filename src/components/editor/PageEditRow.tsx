@@ -3,10 +3,10 @@
  * Extracted from SeoEditor.tsx page list rendering.
  */
 import {
-  Loader2, Save, Sparkles, ChevronDown, ChevronRight,
+  Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X, Search,
 } from 'lucide-react';
-import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon } from '../ui';
+import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon, Button, ClickableRow } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 import { resolvePagePath } from '../../lib/pathUtils';
 import type {
@@ -79,16 +79,21 @@ export function PageEditRow({
     >
       <div className="flex items-center">
         {showApprovalCheckbox && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={(e) => { e.stopPropagation(); onToggleApprovalSelect(page.id); }}
-            className="pl-4 pr-1 py-3 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
+            className="pl-4 pr-1 py-3 rounded-none text-[var(--brand-text-muted)] hover:text-teal-400"
+            aria-pressed={isSelected}
+            title={isSelected ? 'Deselect page' : 'Select page'}
           >
             {isSelected ? <Icon as={CheckSquare} size="md" className="text-teal-400" /> : <Icon as={Square} size="md" />}
-          </button>
+          </Button>
         )}
-      <button
+      <ClickableRow
         onClick={() => onToggleExpand(page.id)}
-        className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
+        className="flex-1 flex items-center gap-3 px-4 py-3 rounded-none bg-transparent hover:bg-[var(--surface-2)]/50 text-left"
       >
         {expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         <div className="flex-1 min-w-0">
@@ -112,13 +117,16 @@ export function PageEditRow({
         <div className="flex items-center gap-2">
           <StatusBadge status={pageState?.status as any} size="sm" />
           {pageState?.status && onClearTracking && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => { e.stopPropagation(); onClearTracking(page.id); }}
-              className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="gap-0.5 t-caption-sm px-1.5 py-0.5 rounded text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10"
               title="Clear page tracking status"
             >
               <Icon as={X} size="sm" /> clear
-            </button>
+            </Button>
           )}
           {hasRecFlag && (
             <span className="flex items-center gap-1 t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
@@ -130,14 +138,17 @@ export function PageEditRow({
           {!hasSeoDesc && !hasRecFlag && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">Missing meta</span>}
           {edit?.dirty && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
         </div>
-      </button>
-      <button
+      </ClickableRow>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => onTogglePreview?.(page.id)}
-        className="flex items-center gap-1 px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+        className="gap-1 px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
         title="Toggle preview"
       >
         👁️ Preview
-      </button>
+      </Button>
       </div>
 
       {expanded && edit && (
@@ -186,15 +197,19 @@ export function PageEditRow({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {onAnalyzePage && (
-                <button
+                <Button
+                  type="button"
                   onClick={() => onAnalyzePage(page.id)}
                   disabled={isAnalyzing}
-                  className="flex items-center gap-1 px-2 py-1 t-caption-sm bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  loading={isAnalyzing}
+                  icon={isAnalyzing ? undefined : Search}
+                  className="gap-1 px-2 py-1 t-caption-sm bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded"
                   title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
                 >
-                  <Icon as={isAnalyzing ? Loader2 : Search} size="sm" className={isAnalyzing ? 'animate-spin' : ''} />
                   {hasAnalysis ? 'Re-analyze' : 'Analyze Page'}
-                </button>
+                </Button>
               )}
               {hasAnalysis && (
                 <span className="t-caption-sm text-emerald-400/70 flex items-center gap-1">
@@ -202,15 +217,19 @@ export function PageEditRow({
                 </span>
               )}
             </div>
-            <button
+            <Button
+              type="button"
               onClick={() => onAiRewrite(page.id, 'both')}
               disabled={!!isAiLoading}
-              className="flex items-center gap-1 t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded transition-colors disabled:opacity-50"
+              variant="secondary"
+              size="sm"
+              loading={isAiLoading === 'both'}
+              icon={isAiLoading === 'both' ? undefined : Sparkles}
+              className="gap-1 t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded"
               title={hasAnalysis ? 'Generate paired title + description (using page analysis)' : 'Generate paired title + description'}
             >
-              <Icon as={isAiLoading === 'both' ? Loader2 : Sparkles} size="sm" className={isAiLoading === 'both' ? 'animate-spin' : ''} />
               AI Generate Both
-            </button>
+            </Button>
           </div>
 
           {/* Paired variation picker (when both were generated together) */}
@@ -221,14 +240,14 @@ export function PageEditRow({
                 const descV = variations.descOptions![i] || '';
                 const isSelected = edit.seoTitle === titleV && edit.seoDescription === descV;
                 return (
-                  <button
+                  <ClickableRow
                     key={i}
                     onClick={() => {
                       onSelectVariation(page.id, 'seoTitle', titleV);
                       onSelectVariation(page.id, 'seoDescription', descV);
                       onClearVariations(page.id);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-[var(--radius-lg)] text-xs border transition-colors ${
+                    className={`w-full px-3 py-2 rounded-[var(--radius-lg)] text-xs border ${
                       isSelected
                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                         : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -245,7 +264,7 @@ export function PageEditRow({
                       <span className="flex-1 text-[var(--brand-text)]">{descV}</span>
                       <CharacterCounter current={descV.length} max={160} size="sm" />
                     </div>
-                  </button>
+                  </ClickableRow>
                 );
               })}
             </div>
@@ -257,15 +276,19 @@ export function PageEditRow({
               <label className="text-xs font-medium text-[var(--brand-text)]">SEO Title</label>
               <div className="flex items-center gap-1">
                 <CharacterCounter current={edit.seoTitle.length} max={60} size="sm" />
-                <button
+                <Button
+                  type="button"
                   onClick={() => onAiRewrite(page.id, 'title')}
                   disabled={!!isAiLoading}
-                  className="flex items-center gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  loading={isAiLoading === 'title'}
+                  icon={isAiLoading === 'title' ? undefined : Sparkles}
+                  className="gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded"
                   title="AI rewrite title only"
                 >
-                  <Icon as={isAiLoading === 'title' ? Loader2 : Sparkles} size="sm" className={isAiLoading === 'title' ? 'animate-spin' : ''} />
                   AI
-                </button>
+                </Button>
               </div>
             </div>
             <input
@@ -279,10 +302,10 @@ export function PageEditRow({
               <div className="mt-1.5 space-y-1">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                 {variations.options.map((v, i) => (
-                  <button
+                  <ClickableRow
                     key={i}
                     onClick={() => { onSelectVariation(page.id, 'seoTitle', v); onClearVariations(page.id); }}
-                    className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
+                    className={`w-full px-3 py-1.5 rounded text-xs border ${
                       edit.seoTitle === v
                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                         : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -290,7 +313,7 @@ export function PageEditRow({
                   >
                     <span className="text-[var(--brand-text-muted)] mr-1.5">{i + 1}.</span>{v}
                     <CharacterCounter current={v.length} max={60} size="sm" className="ml-2" />
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )}
@@ -302,15 +325,19 @@ export function PageEditRow({
               <label className="text-xs font-medium text-[var(--brand-text)]">Meta Description</label>
               <div className="flex items-center gap-1">
                 <CharacterCounter current={edit.seoDescription.length} max={160} size="sm" />
-                <button
+                <Button
+                  type="button"
                   onClick={() => onAiRewrite(page.id, 'description')}
                   disabled={!!isAiLoading}
-                  className="flex items-center gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  loading={isAiLoading === 'description'}
+                  icon={isAiLoading === 'description' ? undefined : Sparkles}
+                  className="gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded"
                   title="AI rewrite description only"
                 >
-                  <Icon as={isAiLoading === 'description' ? Loader2 : Sparkles} size="sm" className={isAiLoading === 'description' ? 'animate-spin' : ''} />
                   AI
-                </button>
+                </Button>
               </div>
             </div>
             <textarea
@@ -324,10 +351,10 @@ export function PageEditRow({
               <div className="mt-1.5 space-y-1">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                 {variations.options.map((v, i) => (
-                  <button
+                  <ClickableRow
                     key={i}
                     onClick={() => { onSelectVariation(page.id, 'seoDescription', v); onClearVariations(page.id); }}
-                    className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
+                    className={`w-full px-3 py-1.5 rounded text-xs border ${
                       edit.seoDescription === v
                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                         : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -335,7 +362,7 @@ export function PageEditRow({
                   >
                     <span className="text-[var(--brand-text-muted)] mr-1.5">{i + 1}.</span>{v}
                     <CharacterCounter current={v.length} max={160} size="sm" className="ml-2" />
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )}
@@ -344,40 +371,52 @@ export function PageEditRow({
           {/* Action buttons */}
           <div className="flex justify-end gap-2">
             {showApprovalCheckbox && (
-              <button
+              <Button
+                type="button"
                 onClick={() => onSendToClient(page.id)}
                 disabled={!hasChanges || isSendingToClient}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+                variant="secondary"
+                size="sm"
+                loading={isSendingToClient}
+                icon={isSendingToClient ? undefined : isSentToClient ? Check : Send}
+                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
                   isSentToClient ? 'bg-emerald-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
-                <Icon as={isSendingToClient ? Loader2 : isSentToClient ? Check : Send} size="sm" className={isSendingToClient ? 'animate-spin' : ''} />
                 {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to client'}
-              </button>
+              </Button>
             )}
             {onSaveDraft && (
-              <button
+              <Button
+                type="button"
                 onClick={() => onSaveDraft(page.id)}
                 disabled={!edit.dirty || isDraftSaving}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+                variant="secondary"
+                size="sm"
+                loading={isDraftSaving}
+                icon={isDraftSaving ? undefined : isDraftSaved ? Check : Save}
+                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
                   isDraftSaved ? 'bg-blue-600 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
-                <Icon as={isDraftSaving ? Loader2 : isDraftSaved ? Check : Save} size="sm" className={isDraftSaving ? 'animate-spin' : ''} />
                 {isDraftSaved ? 'Draft Saved!' : isDraftSaving ? 'Saving...' : 'Save Draft'}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              type="button"
               onClick={() => onSave?.(page.id)}
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+              variant="secondary"
+              size="sm"
+              loading={isSaving}
+              icon={isSaving ? undefined : isSaved ? Check : Save}
+              className={`gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
                 isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
-              <Icon as={isSaving ? Loader2 : isSaved ? Check : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />
               {isSaved ? 'Saved!' : isSaving ? 'Saving...' : 'Save to Webflow'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -387,12 +426,15 @@ export function PageEditRow({
         <div className="border-t border-[var(--brand-border)] p-4 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium text-[var(--brand-text-bright)]">Preview</h4>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => onTogglePreview?.(page.id)}
-              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] text-xs"
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] text-xs px-1.5 py-0.5"
             >
               Hide
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -24,7 +24,7 @@ import {
   useGenerateCopy,
   useSendEntryToClientReview,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, IconButton } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopySection, QualityFlag } from '../../../shared/types/copy-pipeline';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
@@ -137,13 +137,14 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
         </div>
       }
       action={
-        <button
+        <IconButton
           onClick={() => setExpanded(v => !v)}
+          icon={Chevron}
+          label={expanded ? `Collapse section ${sectionLabel}` : `Expand section ${sectionLabel}`}
+          variant="ghost"
+          size="sm"
           className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-          aria-label={expanded ? `Collapse section ${sectionLabel}` : `Expand section ${sectionLabel}`}
-        >
-          <Icon as={Chevron} size="md" />
-        </button>
+        />
       }
     >
       {expanded && (
@@ -194,17 +195,18 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 <p className="text-sm text-[var(--brand-text-muted)] italic">No copy generated yet.</p>
               )}
               {section.generatedCopy && (
-                <button
+                <IconButton
                   onClick={() => {
                     setEditText(section.generatedCopy ?? '');
                     setEditMode(true);
                   }}
+                  icon={Pencil}
+                  label={`Edit copy for ${sectionLabel}`}
+                  variant="ghost"
+                  size="sm"
                   className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-all"
-                  aria-label={`Edit copy for ${sectionLabel}`}
                   tabIndex={0}
-                >
-                  <Icon as={Pencil} size="md" />
-                </button>
+                />
               )}
             </div>
           )}

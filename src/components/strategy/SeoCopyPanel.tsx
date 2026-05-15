@@ -1,6 +1,6 @@
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 import {
-  Loader2, RefreshCw, Wand2, Check, Copy, Link, MessageSquare,
+  RefreshCw, Wand2, Check, Copy, Link, MessageSquare,
 } from 'lucide-react';
 
 interface SeoCopy {
@@ -43,30 +43,34 @@ export function SeoCopyPanel({
   return (
     <div className="mt-3 pt-2 border-t border-[var(--brand-border)]">
       {!seoCopyResults.has(page.pagePath) ? (
-        <button
+        <Button
           onClick={(e) => { e.stopPropagation(); onGenerateSeoCopy(page); }}
           disabled={generatingCopy === page.pagePath}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 disabled:opacity-50 text-teal-300 t-caption-sm font-medium transition-colors"
+          loading={generatingCopy === page.pagePath}
+          icon={Wand2}
+          variant="ghost"
+          size="sm"
+          className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 disabled:opacity-50 text-teal-300 t-caption-sm font-medium transition-colors"
         >
-          {generatingCopy === page.pagePath ? (
-            <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating SEO Copy...</>
-          ) : (
-            <><Icon as={Wand2} size="sm" className="text-teal-300" /> Generate SEO Copy</>
-          )}
-        </button>
+          {generatingCopy === page.pagePath ? 'Generating SEO Copy...' : 'Generate SEO Copy'}
+        </Button>
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h5 className="t-caption-sm font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
               <Icon as={Wand2} size="sm" className="text-teal-300" /> Generated SEO Copy
             </h5>
-            <button
+            <Button
               onClick={(e) => { e.stopPropagation(); onGenerateSeoCopy(page); }}
               disabled={generatingCopy === page.pagePath}
-              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
+              loading={generatingCopy === page.pagePath}
+              icon={RefreshCw}
+              variant="ghost"
+              size="sm"
+              className="px-0 py-0 h-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
-              {generatingCopy === page.pagePath ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />} Regenerate
-            </button>
+              Regenerate
+            </Button>
           </div>
           {(() => {
             const copy = seoCopyResults.get(page.pagePath)!;
@@ -76,10 +80,15 @@ export function SeoCopyPanel({
                 <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">SEO Title</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'seoTitle' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); onCopyText(copy.seoTitle, 'seoTitle'); }}
+                      icon={copiedField === 'seoTitle' ? Check : Copy}
+                      variant="ghost"
+                      size="sm"
+                      className={`px-0 py-0 h-auto t-caption-sm hover:text-teal-400 ${copiedField === 'seoTitle' ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}
+                    >
                       {copiedField === 'seoTitle' ? 'Copied!' : 'Copy'}
-                    </button>
+                    </Button>
                   </div>
                   <p className="t-caption text-[var(--brand-text-bright)]">{copy.seoTitle}</p>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 block">{copy.seoTitle.length} chars</span>
@@ -88,10 +97,15 @@ export function SeoCopyPanel({
                 <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Meta Description</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'metaDesc' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); onCopyText(copy.metaDescription, 'metaDesc'); }}
+                      icon={copiedField === 'metaDesc' ? Check : Copy}
+                      variant="ghost"
+                      size="sm"
+                      className={`px-0 py-0 h-auto t-caption-sm hover:text-teal-400 ${copiedField === 'metaDesc' ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}
+                    >
                       {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
-                    </button>
+                    </Button>
                   </div>
                   <p className="t-caption text-[var(--brand-text-bright)]">{copy.metaDescription}</p>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 block">{copy.metaDescription.length} chars</span>
@@ -100,10 +114,15 @@ export function SeoCopyPanel({
                 <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested H1</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'h1' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); onCopyText(copy.h1, 'h1'); }}
+                      icon={copiedField === 'h1' ? Check : Copy}
+                      variant="ghost"
+                      size="sm"
+                      className={`px-0 py-0 h-auto t-caption-sm hover:text-teal-400 ${copiedField === 'h1' ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}
+                    >
                       {copiedField === 'h1' ? 'Copied!' : 'Copy'}
-                    </button>
+                    </Button>
                   </div>
                   <p className="t-caption font-medium text-[var(--brand-text-bright)]">{copy.h1}</p>
                 </div>
@@ -111,10 +130,15 @@ export function SeoCopyPanel({
                 <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Intro Paragraph</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'intro' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); onCopyText(copy.introParagraph, 'intro'); }}
+                      icon={copiedField === 'intro' ? Check : Copy}
+                      variant="ghost"
+                      size="sm"
+                      className={`px-0 py-0 h-auto t-caption-sm hover:text-teal-400 ${copiedField === 'intro' ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}
+                    >
                       {copiedField === 'intro' ? 'Copied!' : 'Copy'}
-                    </button>
+                    </Button>
                   </div>
                   <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">{copy.introParagraph}</p>
                 </div>

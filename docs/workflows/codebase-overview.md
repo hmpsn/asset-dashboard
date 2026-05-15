@@ -15,6 +15,7 @@ This document is a quick orientation guide. For ownership and implementation pla
 - `docs/workflows/feature-class-definition-of-done.md` — completion gates by feature class.
 - `docs/workflows/local-dev-onboarding.md` — first-hour setup, demo seeding, smoke commands, and env tiers.
 - `docs/workflows/platform-health-cadence.md` — recurring 4-6 sprint health checkpoint contract and measurable dimensions.
+- `docs/workflows/adr-log.md` — lightweight architecture decision record workflow and verification.
 
 ## Current Shape
 

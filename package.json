@@ -34,6 +34,7 @@
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
     "verify:platform-health-cadence": "tsx scripts/platform-health-cadence.ts",
+    "verify:adr-log": "tsx scripts/adr-log.ts",
     "verify:style-drift": "tsx scripts/report-style-drift.ts",
     "report:style-drift": "tsx scripts/report-style-drift.ts --json --output reports/style-drift-report.json",
     "verify:performance-budgets": "tsx scripts/performance-budgets.ts",

@@ -9,7 +9,7 @@ import {
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
 } from 'lucide-react';
-import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
+import { Button, ClickableRow, MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
 import { timeAgo } from '../lib/timeAgo';
@@ -96,21 +96,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         icon={<Icon as={Rocket} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
-              <Icon as={FileSearch} size="sm" /> Prospect
-            </button>
-            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
-              <Icon as={Map} size="sm" /> Roadmap
-            </button>
-            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
-              <Icon as={Zap} size="sm" /> AI Usage
-            </button>
-            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
-              <Icon as={DollarSign} size="sm" /> Revenue
-            </button>
-            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
-              <Icon as={Layers} size="sm" /> Features
-            </button>
+            <Button variant="secondary" size="sm" icon={FileSearch} onClick={() => navigate('/prospect')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Prospect</Button>
+            <Button variant="secondary" size="sm" icon={Map} onClick={() => navigate('/roadmap')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Roadmap</Button>
+            <Button variant="secondary" size="sm" icon={Zap} onClick={() => navigate('/ai-usage')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20">AI Usage</Button>
+            <Button variant="secondary" size="sm" icon={DollarSign} onClick={() => navigate('/revenue')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20">Revenue</Button>
+            <Button variant="secondary" size="sm" icon={Layers} onClick={() => navigate('/features')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20">Features</Button>
           </div>
         }
       />
@@ -195,7 +185,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             const onlineUsers = presence[ws.id] || [];
 
             return (
-              <button
+              <ClickableRow
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
                 className={cn(
@@ -358,7 +348,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     </>
                   )}
                 </div>
-              </button>
+              </ClickableRow>
             );
           })}
         </div>

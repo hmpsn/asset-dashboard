@@ -5,6 +5,7 @@ import {
   CheckCircle2, ChevronDown, ArrowRight, Sparkles,
   MessageSquare, Clock,
 } from 'lucide-react';
+import { Button } from './ui';
 
 /* ═══════════════════════════════════════════════════════════
    Landing Page
@@ -423,10 +424,15 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-[var(--brand-border)]">
-      <button onClick={() => setOpen(!open)} className="w-full py-5 flex items-center justify-between text-left group">
+      <Button
+        onClick={() => setOpen(!open)}
+        variant="ghost"
+        size="sm"
+        className="w-full px-0 py-5 flex items-center justify-between text-left group rounded-none hover:bg-transparent"
+      >
         <span className="text-sm font-medium text-[var(--brand-text)] group-hover:text-[var(--brand-text-bright)] pr-4">{q}</span>
         <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
       {open && (
         <div className="pb-5 -mt-1">
           <p className="text-sm text-[var(--brand-text)] leading-relaxed">{a}</p>

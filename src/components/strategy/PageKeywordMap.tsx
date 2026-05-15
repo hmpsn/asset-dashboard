@@ -1,4 +1,4 @@
-import { Icon } from '../ui';
+import { Icon, Button, IconButton, ClickableRow } from '../ui';
 import {
   ChevronDown, ChevronRight, Loader2, Pencil, Check, X,
   Search, BarChart3, Shield, DollarSign, ArrowUp, ArrowDown,
@@ -112,16 +112,18 @@ export function PageKeywordMapPanel({
           </div>
           <div className="flex items-center gap-1">
             {(['opportunity', 'position', 'impressions', 'volume'] as const).map(s => (
-              <button
+              <Button
                 key={s}
                 onClick={() => { if (sortBy === s) onSetSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { onSetSortBy(s); onSetSortDir(() => 'desc'); } }}
+                variant="ghost"
+                size="sm"
                 className={`px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
                   sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
                 {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
                 {sortBy === s && (sortDir === 'desc' ? <Icon as={ArrowDown} size="sm" /> : <Icon as={ArrowUp} size="sm" />)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -133,9 +135,10 @@ export function PageKeywordMapPanel({
 
         return (
           <div key={realIdx} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-            <button
+            <ClickableRow
               onClick={() => onTogglePage(realIdx)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
+              active={isExpanded}
+              className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 text-left bg-transparent"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Icon as={isExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -185,7 +188,7 @@ export function PageKeywordMapPanel({
                   <span className="t-mono text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} imp</span>
                 )}
               </div>
-            </button>
+            </ClickableRow>
 
             {isExpanded && (
               <div className="px-4 pb-4 pl-10 space-y-2">
@@ -196,13 +199,15 @@ export function PageKeywordMapPanel({
                         <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Primary Keyword</span>
                         <p className="t-caption text-[var(--brand-text-bright)] mt-0.5">{page.primaryKeyword}</p>
                       </div>
-                      <button
+                      <IconButton
                         onClick={(e) => { e.stopPropagation(); onStartEdit(realIdx); }}
+                        icon={Pencil}
+                        label="Edit keywords"
+                        variant="ghost"
+                        size="sm"
                         className="p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
                         title="Edit keywords"
-                      >
-                        <Icon as={Pencil} size="sm" />
-                      </button>
+                      />
                     </div>
                     <div>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Secondary Keywords</span>
@@ -296,19 +301,23 @@ export function PageKeywordMapPanel({
                       />
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         onClick={onSaveEdit}
                         disabled={saving}
+                        variant="ghost"
+                        size="sm"
                         className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption-sm font-medium"
                       >
                         {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Check} size="sm" />} Save
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => onSetEditingPage(null)}
+                        variant="ghost"
+                        size="sm"
                         className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] t-caption-sm font-medium"
                       >
                         <Icon as={X} size="sm" /> Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}

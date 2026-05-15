@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, IconButton } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, ClickableRow, IconButton } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -381,37 +381,43 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
         { id: 'history' as const, label: 'History', icon: Clock },
       ] as const).map(t => (
-        <button
+        <Button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
-        </button>
+        </Button>
       ))}
       <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
       {([
         { id: 'content-decay' as const, label: 'Content Health', icon: TrendingDown },
         { id: 'aeo-review' as const, label: 'AI Search Ready', icon: Sparkles },
       ] as const).map(t => (
-        <button
+        <Button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
-        </button>
+        </Button>
       ))}
       <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
-      <button
+      <Button
         onClick={() => setAuditSubTab('guide')}
-        className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+        variant="ghost"
+        size="sm"
+        className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === 'guide' ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
       >
         <Icon as={BookOpen} size="md" />
         Guide
-      </button>
+      </Button>
     </div>
   );
 
@@ -448,12 +454,13 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)] max-w-md text-center">
             Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
           </p>
-          <button
+          <Button
             onClick={runAudit}
-            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
+            size="lg"
+            className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium"
           >
             Run SEO Audit
-          </button>
+          </Button>
           <label className="flex items-center gap-2 t-caption text-[var(--brand-text-muted)] cursor-pointer select-none">
             <input
               type="checkbox"
@@ -768,9 +775,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
           return (
             <div key={page.slug || page.page} className={cn('bg-[var(--surface-2)] border', trackBorder || 'border-[var(--brand-border)]')} style={{ borderRadius: 'var(--radius-signature)' }}>
-              <button
+              <ClickableRow
                 onClick={() => toggleExpand(page.page)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 text-left"
               >
                 {isExpanded ? (
                   <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -796,7 +803,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                   {page.issues.length === 0 && <Icon as={CheckCircle} size="md" className="text-accent-success" />}
                   <span className={cn('t-body font-bold tabular-nums', scoreColorClass(page.score))}>{page.score}</span>
                 </div>
-              </button>
+              </ClickableRow>
 
               {isExpanded && (
                 <div className="ml-8 mb-2 space-y-1">

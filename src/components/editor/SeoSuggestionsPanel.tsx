@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sparkles, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import type { SeoSuggestionClient } from '../../api/seo';
 import { seoSuggestions } from '../../api/seo';
-import { Icon } from '../ui';
+import { Button, ClickableRow, Icon } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -90,22 +90,26 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
         </div>
         <div className="flex items-center gap-2">
           {readyToApply > 0 && (
-            <button
+            <Button
               onClick={(e) => { e.stopPropagation(); handleApply(); }}
               disabled={applying}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-50"
+              size="sm"
+              variant="secondary"
+              className="text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white border-transparent disabled:opacity-50"
             >
               <Icon as={applying ? Loader2 : Check} size="sm" className={applying ? 'animate-spin' : ''} />
               Apply {readyToApply} to Webflow
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
             disabled={dismissing}
-            className="text-xs text-[var(--brand-text-muted)] hover:text-red-400 transition-colors px-2 py-1"
+            size="sm"
+            variant="ghost"
+            className="text-xs text-[var(--brand-text-muted)] hover:text-red-400 !px-2 !py-1"
           >
             {dismissing ? <Icon as={Loader2} size="sm" className="animate-spin" /> : 'Dismiss All'}
-          </button>
+          </Button>
           <Icon as={collapsed ? ChevronDown : ChevronUp} size="md" className="text-[var(--brand-text-muted)]" />
         </div>
       </div>
@@ -167,7 +171,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
           const charCount = v.length;
           const isOver = charCount > maxLen;
           return (
-            <button
+            <ClickableRow
               key={i}
               onClick={() => onSelect(i)}
               disabled={isSelecting}
@@ -186,7 +190,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
               <span className={`shrink-0 t-caption-sm mt-0.5 ${isOver ? 'text-red-400/80' : 'text-[var(--brand-text-muted)]'}`}>
                 {charCount}
               </span>
-            </button>
+            </ClickableRow>
           );
         })}
       </div>

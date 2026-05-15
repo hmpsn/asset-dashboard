@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, IconButton } from '../ui';
 
 export interface ValidationRecord {
   id: string;
@@ -65,12 +65,15 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
     <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature)]">
       <div className="flex items-center gap-3 px-3 py-2.5 bg-[var(--surface-2)]">
         {hasDetails && (
-          <button
+          <IconButton
             onClick={() => setExpanded(e => !e)}
+            icon={expanded ? ChevronDown : ChevronRight}
+            label={expanded ? 'Collapse validation details' : 'Expand validation details'}
+            title={expanded ? 'Collapse details' : 'Expand details'}
+            variant="ghost"
+            size="sm"
             className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors flex-shrink-0"
-          >
-            {expanded ? <Icon as={ChevronDown} size="md" /> : <Icon as={ChevronRight} size="md" />}
-          </button>
+          />
         )}
         {!hasDetails && <span className="w-4 flex-shrink-0" />}
 
@@ -88,13 +91,15 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
             <span className="t-caption text-[var(--brand-text-muted)]">+{record.richResults.length - 3}</span>
           )}
           <ValidationBadge status={record.status} />
-          <button
+          <IconButton
             onClick={() => onRevalidate(record.pageId)}
+            icon={RefreshCw}
+            label="Re-validate schema"
             className="p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             title="Re-validate"
-          >
-            <Icon as={RefreshCw} size="md" />
-          </button>
+            variant="ghost"
+            size="sm"
+          />
         </div>
       </div>
 

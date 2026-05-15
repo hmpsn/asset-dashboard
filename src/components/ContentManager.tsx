@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EmptyState, MetricRing, Icon, PageHeader } from './ui';
+import { EmptyState, MetricRing, Icon, PageHeader, Button, IconButton } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -130,12 +130,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   if (activePostId) {
     return (
       <div className="space-y-8">
-        <button
+        <Button
           onClick={() => { setActivePostId(null); invalidatePosts(); }}
-          className="flex items-center gap-1.5 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          variant="link"
+          size="sm"
+          className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
         >
           ← Back to Content
-        </button>
+        </Button>
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <PostEditor
             workspaceId={workspaceId}
@@ -170,9 +172,11 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
           const cfg = STATUS_CONFIG[status];
           const StatusIcon = cfg.icon;
           return (
-            <button
+            <Button
               key={status}
               onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
+              variant="ghost"
+              size="sm"
               style={{ borderRadius: 'var(--radius-signature)' }}
               className={`border px-4 py-3 text-left transition-colors ${
                 statusFilter === status ? `${cfg.bg} border-opacity-100` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
@@ -183,7 +187,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                 <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium">{cfg.label}</span>
               </div>
               <span className="text-lg font-semibold text-[var(--brand-text-bright)]">{statusCounts[status]}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -199,23 +203,23 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
-              <Icon as={X} size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]" />
-            </button>
+            <IconButton onClick={() => setSearch('')} icon={X} label="Clear search" variant="ghost" size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]" />
           )}
         </div>
         <div className="flex items-center gap-1">
           {(['date', 'title', 'status', 'words'] as const).map(f => (
-            <button
+            <Button
               key={f}
               onClick={() => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(false); } }}
+              variant="ghost"
+              size="sm"
               className={`px-2 py-1.5 t-caption-sm rounded-[var(--radius-md)] transition-colors ${
                 sortField === f ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
               {sortField === f && <Icon as={ArrowUpDown} size="sm" className="ml-0.5" />}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -228,7 +232,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       {/* Filtered empty state */}
       {posts.length > 0 && filtered.length === 0 && (
         <EmptyState icon={Filter} title="No content matches your filters" className="py-8" action={
-          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="t-caption-sm text-accent-brand hover:text-accent-brand">Clear filters</button>
+          <Button onClick={() => { setSearch(''); setStatusFilter('all'); }} variant="link" size="sm" className="t-caption-sm text-accent-brand hover:text-accent-brand no-underline">Clear filters</Button>
         } />
       )}
 
@@ -250,8 +254,16 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
               <div className="px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: title + meta */}
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setActivePostId(post.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setActivePostId(post.id);
+                      }
+                    }}
                     className="flex-1 min-w-0 text-left group"
                   >
                     <div className="text-sm font-medium text-[var(--brand-text-bright)] group-hover:text-accent-brand transition-colors truncate">
@@ -281,18 +293,20 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       {post.voiceScore != null && (
                         <>
                           <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
-                          <button
+                          <Button
                             onClick={(e) => { e.stopPropagation(); setExpandedVoice(expandedVoice === post.id ? null : post.id); }}
-                            className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                            variant="ghost"
+                            size="sm"
+                            className="flex items-center gap-1 p-0 hover:opacity-80 transition-opacity"
                             title={`Voice match: ${post.voiceScore}/100 — click for details`}
                           >
                             <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
                             <span className="t-caption-sm text-accent-info font-medium">Voice {post.voiceScore}</span>
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>
-                  </button>
+                  </div>
 
                   {/* Right: status + actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -305,36 +319,42 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {!isGenerating && (
                       <div className="flex items-center gap-1">
                         {post.status === 'draft' && (
-                          <button
+                          <Button
                             onClick={() => updateStatus(post.id, 'review')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+                            icon={Send}
+                            variant="ghost"
+                            size="sm"
+                            className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan hover:bg-cyan-500/20 disabled:opacity-50"
                             title="Send for review"
                           >
-                            <Icon as={Send} size="sm" />
                             Review
-                          </button>
+                          </Button>
                         )}
                         {post.status === 'review' && (
-                          <button
+                          <Button
                             onClick={() => updateStatus(post.id, 'approved')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                            icon={CheckCircle2}
+                            variant="ghost"
+                            size="sm"
+                            className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success hover:bg-emerald-500/20 disabled:opacity-50"
                             title="Approve content"
                           >
-                            <Icon as={CheckCircle2} size="sm" />
                             Approve
-                          </button>
+                          </Button>
                         )}
                         {post.status === 'review' && (
-                          <button
+                          <Button
                             onClick={() => updateStatus(post.id, 'draft')}
                             disabled={updatingStatus === post.id}
-                            className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
+                            variant="ghost"
+                            size="sm"
+                            className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] disabled:opacity-50"
                             title="Move back to draft"
                           >
                             ↩ Draft
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
@@ -346,58 +366,64 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <Icon as={Check} size="sm" /> Published
                         </span>
                       ) : (
-                        <button
+                        <Button
                           onClick={() => publishPost(post.id)}
                           disabled={publishingPost === post.id}
-                          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-teal-500/10 border border-teal-500/20 text-accent-brand hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
+                          icon={publishingPost === post.id ? Loader2 : Globe}
+                          variant="ghost"
+                          size="sm"
+                          className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-teal-500/10 border border-teal-500/20 text-accent-brand hover:bg-teal-500/20 disabled:opacity-50 font-medium"
                           title="Publish to Webflow CMS"
                         >
-                          <Icon as={publishingPost === post.id ? Loader2 : Globe} size="sm" className={publishingPost === post.id ? 'animate-spin' : ''} />
                           Publish
-                        </button>
+                        </Button>
                       )
                     )}
 
                     {/* Score Voice */}
                     {!isGenerating && !post.voiceScore && (
-                      <button
+                      <Button
                         onClick={() => scoreVoice(post.id)}
                         disabled={scoringVoice === post.id}
-                        className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 border border-blue-500/20 text-accent-info hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                        icon={scoringVoice === post.id ? Loader2 : Sparkles}
+                        variant="ghost"
+                        size="sm"
+                        className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 border border-blue-500/20 text-accent-info hover:bg-blue-500/20 disabled:opacity-50"
                         title="Score brand voice match"
                       >
-                        <Icon as={scoringVoice === post.id ? Loader2 : Sparkles} size="sm" className={scoringVoice === post.id ? 'animate-spin' : ''} />
                         Score Voice
-                      </button>
+                      </Button>
                     )}
 
                     {/* Export */}
                     {!isGenerating && (
-                      <a
-                        href={`/api/content-posts/${workspaceId}/${post.id}/export/html`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors p-1"
+                      <IconButton
+                        label="Export HTML"
+                        icon={Download}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(`/api/content-posts/${workspaceId}/${post.id}/export/html`, '_blank', 'noopener,noreferrer')}
+                        className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                         title="Export HTML"
-                      >
-                        <Icon as={Download} size="md" />
-                      </a>
+                      />
                     )}
 
                     {/* Delete */}
                     {deleteConfirm === post.id ? (
                       <div className="flex items-center gap-1">
-                        <button onClick={() => deletePost(post.id)} className="t-caption-sm px-2 py-1 rounded bg-red-500/20 text-accent-danger hover:bg-red-500/30">Delete</button>
-                        <button onClick={() => setDeleteConfirm(null)} className="t-caption-sm px-2 py-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
+                        <Button onClick={() => deletePost(post.id)} variant="ghost" size="sm" className="t-caption-sm px-2 py-1 rounded bg-red-500/20 text-accent-danger hover:bg-red-500/30">Delete</Button>
+                        <Button onClick={() => setDeleteConfirm(null)} variant="ghost" size="sm" className="t-caption-sm px-2 py-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</Button>
                       </div>
                     ) : (
-                      <button
+                      <IconButton
                         onClick={() => setDeleteConfirm(post.id)}
-                        className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors p-1"
+                        icon={Trash2}
+                        label="Delete post"
+                        variant="ghost"
+                        size="sm"
+                        className="text-[var(--brand-text-muted)] hover:text-accent-danger"
                         title="Delete"
-                      >
-                        <Icon as={Trash2} size="md" />
-                      </button>
+                      />
                     )}
                   </div>
                 </div>
@@ -412,14 +438,16 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Brand Voice Match</div>
                       <div className="text-xs text-[var(--brand-text-bright)] font-semibold">{post.voiceScore}/100</div>
                     </div>
-                    <button
+                    <Button
                       onClick={() => scoreVoice(post.id)}
                       disabled={scoringVoice === post.id}
-                      className="ml-auto t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-accent-info hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                      loading={scoringVoice === post.id}
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto t-caption-sm px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-accent-info hover:bg-blue-500/10 disabled:opacity-50"
                     >
-                      {scoringVoice === post.id ? <Icon as={Loader2} size="sm" className="animate-spin mr-1" /> : null}
                       Re-score
-                    </button>
+                    </Button>
                   </div>
                   <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]/50">
                     {post.voiceFeedback}

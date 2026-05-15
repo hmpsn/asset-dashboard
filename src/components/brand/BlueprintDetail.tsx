@@ -26,7 +26,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar, Icon, Button, cn, ConfirmDialog } from '../ui/index';
+import { TabBar, Icon, Button, IconButton, cn, ConfirmDialog } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -124,13 +124,14 @@ function EntryCard({
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden">
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <button
+        <IconButton
           onClick={onToggle}
+          icon={ChevronIcon}
+          label={expanded ? 'Collapse entry' : 'Expand entry'}
+          variant="ghost"
+          size="sm"
           className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors shrink-0"
-          aria-label={expanded ? 'Collapse entry' : 'Expand entry'}
-        >
-          <Icon as={ChevronIcon} size="md" />
-        </button>
+        />
 
         <Icon as={Layout} size="md" className="text-[var(--brand-text)] shrink-0" />
 
@@ -164,9 +165,11 @@ function EntryCard({
         )}
 
         {/* Scope toggle */}
-        <button
+        <Button
           onClick={onScopeToggle}
           disabled={isScopeToggling}
+          variant="ghost"
+          size="sm"
           className={cn(
             'shrink-0 px-2 py-0.5 t-caption rounded-[var(--radius-sm)] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
             isIncluded
@@ -180,21 +183,23 @@ function EntryCard({
           ) : (
             isIncluded ? 'Included' : 'Upsell'
           )}
-        </button>
+        </Button>
 
         {/* Remove */}
-        <button
+        <IconButton
           onClick={onRemove}
           disabled={isRemoving}
-          className="shrink-0 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          aria-label={`Remove ${entry.name}`}
-        >
-          {isRemoving ? (
-            <Icon as={Loader2} size="md" className="animate-spin" />
-          ) : (
-            <Icon as={Trash2} size="md" />
+          icon={isRemoving ? Loader2 : Trash2}
+          label={`Remove ${entry.name}`}
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'shrink-0 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            isRemoving && '[&_svg]:animate-spin',
           )}
-        </button>
+          title={`Remove ${entry.name}`}
+          aria-busy={isRemoving || undefined}
+        />
       </div>
 
       {/* Expanded: section plan */}
@@ -306,11 +311,12 @@ function CopyActionButtons({
   return (
     <>
       {hasCopy ? (
-        // pr-check-disable-next-line -- toggle CTA conditionally applies the gradient only when !isReviewing; Button primitive's primary variant does not support a two-state conditional gradient
-        <button
+        <Button
           onClick={isReviewing ? onCloseReview : onReviewCopy}
+          variant="ghost"
+          size="sm"
           className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium transition-colors',
+            'px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium transition-colors',
             isReviewing
               ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]/80'
               : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90'
@@ -327,7 +333,7 @@ function CopyActionButtons({
               Review Copy
             </>
           )}
-        </button>
+        </Button>
       ) : (
         <Button
           variant="primary"
@@ -497,12 +503,13 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
     return (
       <div className="space-y-3 py-8">
         <p className="t-body text-[var(--brand-text)]">Blueprint not found or failed to load.</p>
-        <button
+        <Button
           onClick={onBack}
-          className="t-body text-teal-400 hover:text-teal-300 transition-colors"
+          variant="link"
+          className="t-body text-teal-400 hover:text-teal-300 transition-colors p-0"
         >
           &larr; Back to blueprints
-        </button>
+        </Button>
       </div>
     );
   }
@@ -512,13 +519,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
       {/* Top bar */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <button
+          <IconButton
             onClick={onBack}
+            icon={ArrowLeft}
+            label="Back to blueprints"
+            title="Back to blueprints"
+            variant="ghost"
+            size="sm"
             className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded-[var(--radius-sm)]"
-            aria-label="Back to blueprints"
-          >
-            <Icon as={ArrowLeft} size="md" />
-          </button>
+          />
           <div>
             <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{blueprint.name}</h2>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
@@ -558,13 +567,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                 In Scope ({inScope.length})
               </h3>
               {!showAddForm && (
-                <button
+                <Button
                   onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-1 t-caption text-teal-400 hover:text-teal-300 transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption text-teal-400 hover:text-teal-300 transition-colors px-0 py-0 h-auto"
                 >
                   <Icon as={Plus} size="md" />
                   Add page
-                </button>
+                </Button>
               )}
             </div>
 
@@ -617,17 +628,19 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                   >
                     {addEntryMutation.isPending ? 'Adding...' : 'Add Page'}
                   </Button>
-                  <button
+                  <Button
                     onClick={() => {
                       setShowAddForm(false);
                       setNewEntryName('');
                       setNewEntryType('service');
                     }}
                     disabled={addEntryMutation.isPending}
+                    variant="ghost"
+                    size="sm"
                     className="px-3 py-1.5 text-[var(--brand-text-muted)] t-body hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

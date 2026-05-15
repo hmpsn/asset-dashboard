@@ -5,7 +5,7 @@
 import {
   Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button, ClickableRow } from '../ui';
 import { RichTextEditor } from './RichTextEditor';
 
 interface PostSection {
@@ -47,7 +47,7 @@ export function SectionEditor({
 }: SectionEditorProps) {
   return (
     <SectionCard noPadding className={`overflow-hidden ${section.status === 'error' ? '!border-red-500/30' : section.status === 'generating' ? '!border-amber-500/20' : ''}`}>
-      <button onClick={() => onToggleExpand(section.index)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--surface-3)]/30 transition-colors">
+      <ClickableRow onClick={() => onToggleExpand(section.index)} className="px-4 py-3 flex items-center justify-between hover:bg-[var(--surface-3)]/30 rounded-none">
         <div className="flex items-center gap-2">
           {section.status === 'generating' ? <Icon as={Loader2} size="md" className="animate-spin text-amber-400/80" /> :
            section.status === 'error' ? <Icon as={AlertTriangle} size="md" className="text-red-400/80" /> :
@@ -66,7 +66,7 @@ export function SectionEditor({
           )}
           {expanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
         </div>
-      </button>
+      </ClickableRow>
       {expanded && (
         <div className="border-t border-[var(--brand-border)]/50 px-4 py-3">
           {section.status === 'pending' && isGenerating ? (
@@ -76,9 +76,17 @@ export function SectionEditor({
           ) : section.status === 'error' ? (
             <div className="space-y-2">
               <div className="text-xs text-red-400/80">{section.error || 'Generation failed'}</div>
-              <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                <Icon as={regenerating ? Loader2 : RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} /> Retry
-              </button>
+              <Button
+                onClick={() => onRegenerate(section.index)}
+                disabled={regenerating}
+                loading={regenerating}
+                icon={RefreshCw}
+                size="sm"
+                variant="secondary"
+                className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
+              >
+                Retry
+              </Button>
             </div>
           ) : editing ? (
             <div className="space-y-2">
@@ -87,12 +95,15 @@ export function SectionEditor({
                 onChange={onChange}
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={onDone}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                  icon={Check}
+                  size="sm"
+                  variant="secondary"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                 >
-                  <Check className="w-3 h-3" /> Done
-                </button>
+                  Done
+                </Button>
                 {saveStatus === 'saving' && (
                   <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                     <Loader2 className="w-3 h-3 animate-spin" /> Saving…
@@ -107,10 +118,26 @@ export function SectionEditor({
             <div>
               <div className="text-xs text-[var(--brand-text)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
               <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--brand-border)]/50">
-                <button onClick={() => onStartEdit(section.index)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"><Icon as={Pencil} size="sm" /> Edit</button>
-                <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 transition-colors disabled:opacity-50">
-                  <Icon as={regenerating ? Loader2 : RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} /> Regenerate
-                </button>
+                <Button
+                  onClick={() => onStartEdit(section.index)}
+                  icon={Pencil}
+                  size="sm"
+                  variant="ghost"
+                  className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => onRegenerate(section.index)}
+                  disabled={regenerating}
+                  loading={regenerating}
+                  icon={RefreshCw}
+                  size="sm"
+                  variant="ghost"
+                  className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-transparent"
+                >
+                  Regenerate
+                </Button>
               </div>
             </div>
           )}

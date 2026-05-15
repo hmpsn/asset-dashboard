@@ -10,7 +10,7 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { Icon } from './ui';
+import { ClickableRow, Icon } from './ui';
 
 interface PaletteItem {
   id: string;
@@ -289,7 +289,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     const ItemIcon = item.icon;
     const isSelected = idx === selectedIndex;
     return (
-      <button
+      <ClickableRow
         key={item.id + (item.type === 'recent' ? '-recent' : '')}
         onClick={() => { item.action(); setOpen(false); }}
         onMouseEnter={() => setSelectedIndex(idx)}
@@ -304,7 +304,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         </div>
         {item.type === 'workspace' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">workspace</span>}
         {item.type === 'action' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">action</span>}
-      </button>
+      </ClickableRow>
     );
   };
 

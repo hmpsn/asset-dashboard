@@ -4,7 +4,7 @@ import {
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
   AlertTriangle, Copy, Check, LayoutList, List, Send,
 } from 'lucide-react';
-import { PageHeader, StatCard, Icon, Button } from './ui';
+import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow } from './ui';
 import { webflow } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 
@@ -239,15 +239,15 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       {data.orphanCount && data.orphanCount > 0 && (
         // pr-check-disable-next-line -- brand asymmetric signature on orphan-links callout; intentional non-SectionCard chrome
         <div className="bg-[var(--surface-2)] border border-orange-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
-          <button
+          <ClickableRow
             onClick={() => setShowOrphans(!showOrphans)}
-            className="w-full px-4 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors"
+            className="px-4 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30"
           >
             {showOrphans ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
             <Icon as={AlertTriangle} size="md" className="text-orange-400" />
             <span className="text-sm font-medium text-orange-300 flex-1 text-left">{data.orphanCount} Orphan Pages</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">No internal links point to these pages</span>
-          </button>
+          </ClickableRow>
           {showOrphans && data.pageHealth && (
             <div className="px-4 pb-3 border-t border-[var(--brand-border)] pt-2 space-y-1 max-h-[250px] overflow-y-auto">
               {data.pageHealth.filter(p => p.isOrphan).map((p, i) => (
@@ -272,9 +272,11 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             { id: 'medium', label: `Medium (${counts.medium})` },
             { id: 'low', label: `Low (${counts.low})` },
           ] as Array<{ id: PriorityFilter; label: string }>).map(f => (
-            <button
+            <Button
               key={f.id}
               onClick={() => setFilter(f.id)}
+              variant="ghost"
+              size="sm"
               className={`px-2.5 py-1 rounded t-caption-sm font-medium transition-colors ${
                 filter === f.id
                   ? 'bg-teal-500/10 text-teal-400'
@@ -282,7 +284,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
               }`}
             >
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex-1 relative">
@@ -296,12 +298,24 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           />
         </div>
         <div className="flex items-center gap-0.5 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
-          <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="List view">
-            <Icon as={List} size="md" />
-          </button>
-          <button onClick={() => setViewMode('grouped')} className={`p-1.5 rounded ${viewMode === 'grouped' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="Group by page">
-            <Icon as={LayoutList} size="md" />
-          </button>
+          <IconButton
+            icon={List}
+            label="List view"
+            title="List view"
+            size="sm"
+            variant="ghost"
+            onClick={() => setViewMode('list')}
+            className={viewMode === 'list' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}
+          />
+          <IconButton
+            icon={LayoutList}
+            label="Group by page"
+            title="Group by page"
+            size="sm"
+            variant="ghost"
+            onClick={() => setViewMode('grouped')}
+            className={viewMode === 'grouped' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}
+          />
         </div>
       </div>
 
@@ -339,13 +353,15 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                       <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[160px]">{s.toPage}</span>
                       <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[180px]">"{s.anchorText}"</span>
                       <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(i); setTimeout(() => setCopied(null), 2000); }}
-                        className="ml-auto text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+                      <IconButton
+                        icon={copied === i ? Check : Copy}
+                        label="Copy HTML link"
                         title="Copy HTML link"
-                      >
-                        {copied === i ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
-                      </button>
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(i); setTimeout(() => setCopied(null), 2000); }}
+                        className={`ml-auto ${copied === i ? 'text-emerald-400 hover:text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+                      />
                     </div>
                   );
                 })}
@@ -359,9 +375,9 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
             return (
               <div key={idx} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-                <button
+                <ClickableRow
                   onClick={() => toggleExpanded(idx)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/20"
                 >
                   {isExpanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -376,15 +392,17 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
                       {cfg.label}
                     </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(idx); setTimeout(() => setCopied(null), 2000); }}
-                      className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+                    <IconButton
+                      icon={copied === idx ? Check : Copy}
+                      label="Copy HTML link"
                       title="Copy HTML link"
-                    >
-                      {copied === idx ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
-                    </button>
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(idx); setTimeout(() => setCopied(null), 2000); }}
+                      className={copied === idx ? 'text-emerald-400 hover:text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}
+                    />
                   </div>
-                </button>
+                </ClickableRow>
                 {isExpanded && (
                   <div className="px-4 pb-3 pl-10 space-y-2">
                     <div className="grid grid-cols-2 gap-4">

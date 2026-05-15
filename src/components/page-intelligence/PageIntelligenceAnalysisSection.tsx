@@ -11,7 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { scoreBgBarClass, scoreColorClass, Icon, MetricRing } from '../ui';
+import { scoreBgBarClass, scoreColorClass, Button, Icon, MetricRing } from '../ui';
 import {
   difficultyTextColor,
   intentIcon,
@@ -44,10 +44,15 @@ export function PageIntelligenceAnalysisSection({
     <div className="space-y-3 pt-2 border-t border-[var(--brand-border)]">
       <div className="flex items-center justify-between">
         <span className="t-label text-[var(--brand-text-muted)]">AI Analysis</span>
-        <button onClick={() => onAnalyzePage(page)} disabled={isAnalyzing}
-          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand flex items-center gap-1 transition-colors disabled:opacity-50">
+        <Button
+          onClick={() => onAnalyzePage(page)}
+          disabled={isAnalyzing}
+          variant="ghost"
+          size="sm"
+          className="px-0 py-0 h-auto min-h-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand gap-1 disabled:opacity-50"
+        >
           {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />} Re-analyze
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">

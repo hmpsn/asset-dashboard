@@ -5,7 +5,7 @@ import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
-import { Icon, cn } from './ui';
+import { Button, Icon, cn } from './ui';
 
 const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
 
@@ -46,14 +46,16 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
         {TABS.map(t => {
           const active = activeTab === t.id;
           return (
-            <button
+            <Button
               key={t.id}
               onClick={() => handleTabChange(t.id)}
+              variant="ghost"
+              size="sm"
               className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
             >
               <Icon as={t.icon} size="md" />
               {t.label}
-            </button>
+            </Button>
           );
         })}
       </div>

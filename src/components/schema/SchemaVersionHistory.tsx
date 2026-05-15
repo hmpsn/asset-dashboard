@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { getSafe, post } from '../../api/client';
 import { Loader2, RotateCcw, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
-import { Icon } from '../ui';
+import { Icon, Button } from '../ui';
 
 interface PublishEntry {
   id: string;
@@ -84,9 +84,11 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
         return (
           <div key={entry.id} className="border border-[var(--brand-border)] bg-[var(--surface-1)] overflow-hidden rounded-[var(--radius-signature)]">
             <div className="flex items-center gap-2 px-3 py-2">
-              <button
+              <Button
                 onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                className="flex items-center gap-1.5 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                variant="ghost"
+                size="sm"
+                className="flex-1 min-w-0 justify-start h-auto px-0 py-0 text-left hover:opacity-80 hover:bg-transparent"
               >
                 {isExpanded
                   ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -99,19 +101,20 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                     current
                   </span>
                 )}
-              </button>
+              </Button>
               {!isLatest && !isRestored && (
-                <button
+                <Button
                   onClick={() => handleRollback(entry)}
                   disabled={rollingBack !== null}
-                  className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium transition-colors disabled:opacity-50 bg-amber-500/8 text-amber-400/80 border border-amber-500/20 hover:bg-amber-500/15"
+                  loading={rollingBack === entry.id}
+                  icon={RotateCcw}
+                  size="sm"
+                  variant="secondary"
+                  className="px-2 py-1 rounded t-caption-sm font-medium disabled:opacity-50 bg-amber-500/8 text-amber-400/80 border border-amber-500/20 hover:bg-amber-500/15"
                   title="Restore this version"
                 >
-                  {rollingBack === entry.id
-                    ? <Icon as={Loader2} size="sm" className="animate-spin" />
-                    : <Icon as={RotateCcw} size="sm" />}
                   Restore
-                </button>
+                </Button>
               )}
               {isRestored && (
                 <span className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">

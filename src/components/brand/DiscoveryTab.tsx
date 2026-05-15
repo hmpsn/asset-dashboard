@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, ConfirmDialog } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, IconButton, cn, ConfirmDialog } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
@@ -242,14 +242,16 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
     <div className="space-y-5">
       {/* Back navigation */}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
           onClick={onBack}
           aria-label="Back to sources"
-          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+          variant="ghost"
+          size="sm"
+          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors px-0 py-0 h-auto"
         >
           ← All sources
-        </button>
+        </Button>
         <span className="text-[var(--brand-border-hover)]">/</span>
         <span className="text-sm font-semibold text-[var(--brand-text)] truncate">{source.filename}</span>
         <SourceTypeBadge sourceType={source.sourceType} />
@@ -265,10 +267,12 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
         <Icon as={Filter} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
         <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1">
           {filters.map(f => (
-            <button
+            <Button
               key={f.value}
               type="button"
               onClick={() => setStatusFilter(f.value)}
+              variant="ghost"
+              size="sm"
               className={cn(
                 'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                 statusFilter === f.value
@@ -277,7 +281,7 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
               )}
             >
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -617,19 +621,21 @@ function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing,
         )}
 
         {/* Delete button */}
-        <button
+        <IconButton
           type="button"
           onClick={() => onDelete(source)}
           disabled={isDeleting}
-          aria-label="Delete source"
-          className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50"
-        >
-          {isDeleting ? (
-            <Icon as={Loader2} size="md" className="animate-spin" />
-          ) : (
-            <Icon as={Trash2} size="md" />
+          icon={isDeleting ? Loader2 : Trash2}
+          label="Delete source"
+          title="Delete source"
+          variant="ghost"
+          size="sm"
+          aria-busy={isDeleting || undefined}
+          className={cn(
+            'text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50',
+            isDeleting && '[&_svg]:animate-spin',
           )}
-        </button>
+        />
       </div>
     </div>
   );
@@ -652,26 +658,30 @@ function UploadPanel({ workspaceId, onUploaded, onCancel }: UploadPanelProps) {
     <div className="space-y-4">
       {/* Mode toggle */}
       <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1 w-fit">
-        <button
+        <Button
           type="button"
           onClick={() => setMode('file')}
+          variant="ghost"
+          size="sm"
           className={cn(
             'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
             mode === 'file' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
           Upload file
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setMode('text')}
+          variant="ghost"
+          size="sm"
           className={cn(
             'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
             mode === 'text' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
           Paste text
-        </button>
+        </Button>
       </div>
 
       {mode === 'file' ? (

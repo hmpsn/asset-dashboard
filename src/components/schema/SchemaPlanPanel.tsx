@@ -10,7 +10,7 @@ import {
 import { schemaPlan } from '../../api/seo';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
-import { Icon, cn } from '../ui';
+import { Icon, cn, Button } from '../ui';
 
 interface Props {
   siteId: string;
@@ -203,14 +203,17 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             <Icon as={AlertCircle} size="sm" /> {error}
           </div>
         )}
-        <button
+        <Button
           onClick={handleGenerate}
           disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+          loading={generating}
+          icon={Sparkles}
+          size="md"
+          variant="secondary"
+          className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-white border-0 font-medium disabled:opacity-50"
         >
-          {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
           {generating ? 'Analyzing site...' : 'Generate Site Plan'}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -224,9 +227,10 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
   return (
     <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
       {/* Header */}
-      <button
+      <Button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
+        variant="ghost"
+        className="w-full h-auto rounded-none flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30"
       >
         <div className="flex items-center gap-2">
           <Icon as={Globe} size="md" className="text-teal-400" />
@@ -240,7 +244,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
           {dirty && <span className="t-caption-sm text-amber-400/80">Unsaved changes</span>}
           {expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         </div>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="border-t border-[var(--brand-border)] px-4 py-3 space-y-4">
@@ -258,49 +262,61 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
 
           {/* Actions bar */}
           <div className="flex items-center gap-2 flex-wrap">
-            <button
+            <Button
               onClick={handleGenerate}
               disabled={generating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border)] transition-colors disabled:opacity-50"
+              loading={generating}
+              icon={Sparkles}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-md)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border)] font-medium disabled:opacity-50"
             >
-              {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
               {generating ? 'Regenerating...' : 'Regenerate'}
-            </button>
+            </Button>
             {dirty && (
-              <button
+              <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                loading={saving}
+                icon={CheckCircle}
+                size="sm"
+                variant="secondary"
+                className="rounded-[var(--radius-md)] bg-teal-600 hover:bg-teal-500 text-white border-0 font-medium disabled:opacity-50"
               >
-                {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={CheckCircle} size="sm" />}
                 Save Changes
-              </button>
+              </Button>
             )}
             {plan.status === 'draft' && (
-              <button
+              <Button
                 onClick={handleSendToClient}
                 disabled={sending || dirty}
                 title={dirty ? 'Save changes first' : 'Send strategy preview to client for approval'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 transition-colors disabled:opacity-50"
+                loading={sending}
+                icon={Send}
+                size="sm"
+                variant="secondary"
+                className="rounded-[var(--radius-md)] bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 font-medium disabled:opacity-50"
               >
-                {sending ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Send} size="sm" />}
                 Send to Client
-              </button>
+              </Button>
             )}
             {(plan.status === 'draft' || plan.status === 'client_approved') && (
-              <button
+              <Button
                 onClick={handleActivate}
                 disabled={activating || dirty}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 transition-colors disabled:opacity-50"
+                loading={activating}
+                icon={Zap}
+                size="sm"
+                variant="secondary"
+                className="rounded-[var(--radius-md)] bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 font-medium disabled:opacity-50"
               >
-                {activating ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Zap} size="sm" />}
                 Activate Plan
-              </button>
+              </Button>
             )}
             {confirmRetract ? (
               <div className="flex items-center gap-2">
                 <span className="t-caption-sm text-red-400/80">Delete this plan?</span>
-                <button
+                <Button
                   onClick={async () => {
                     setRetracting(true);
                     setError(null);
@@ -316,25 +332,33 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                     setConfirmRetract(false);
                   }}
                   disabled={retracting}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+                  loading={retracting}
+                  icon={Trash2}
+                  size="sm"
+                  variant="secondary"
+                  className="px-2 py-1 rounded-[var(--radius-md)] bg-red-600 hover:bg-red-500 text-white border-0 font-medium disabled:opacity-50"
                 >
-                  {retracting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Trash2} size="sm" />}
                   Yes, delete
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setConfirmRetract(false)}
-                  className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
+                  size="sm"
+                  variant="secondary"
+                  className="px-2 py-1 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button
                 onClick={() => setConfirmRetract(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 transition-colors"
+                icon={Trash2}
+                size="sm"
+                variant="secondary"
+                className="rounded-[var(--radius-md)] bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 font-medium"
               >
-                <Icon as={Trash2} size="sm" /> Retract Plan
-              </button>
+                Retract Plan
+              </Button>
             )}
           </div>
 
@@ -352,14 +376,16 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
 
           {/* Page Type Guide */}
           <div>
-            <button
+            <Button
               onClick={() => setShowGuide(!showGuide)}
-              className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              icon={HelpCircle}
+              size="sm"
+              variant="ghost"
+              className="h-auto px-0 py-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
             >
-              <Icon as={HelpCircle} size="sm" />
               {showGuide ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
               Page Type Guide
-            </button>
+            </Button>
             {showGuide && (
               <div className="mt-2 bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[320px] overflow-y-auto">
                 {ROLE_OPTIONS.map(role => {
@@ -387,13 +413,15 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
           {/* Canonical entities */}
           {plan.canonicalEntities.length > 0 && (
             <div>
-              <button
+              <Button
                 onClick={() => setShowEntities(!showEntities)}
-                className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                size="sm"
+                variant="ghost"
+                className="h-auto px-0 py-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
               >
                 {showEntities ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                 Canonical Entities ({plan.canonicalEntities.length})
-              </button>
+              </Button>
               {showEntities && (
                 <div className="mt-2 space-y-1.5">
                   {plan.canonicalEntities.map((entity, i) => (

@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx.
  */
 import { Loader2, CheckCircle, ClipboardList, EyeOff } from 'lucide-react';
-import { Icon, cn } from '../ui';
+import { Icon, Button, cn } from '../ui';
 import type { SeoAuditResult, Severity, CheckCategory } from './types';
 
 interface Props {
@@ -43,30 +43,34 @@ export function AuditBatchActions({
           return (
             <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
               <Icon as={EyeOff} size="sm" /> {label}
-              <button onClick={onUnsuppressAll} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] underline ml-0.5" title="Remove all suppressions">clear</button>
+              <Button onClick={onUnsuppressAll} variant="link" size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] underline ml-0.5" title="Remove all suppressions">clear</Button>
             </span>
           );
         })()}
         {(severityFilter !== 'all' || categoryFilter !== 'all') && (
-          <button onClick={onClearFilters} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] underline">
+          <Button onClick={onClearFilters} variant="link" size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] underline">
             Clear filters
-          </button>
+          </Button>
         )}
         {hasTraffic && (
           <div className="flex items-center gap-1 ml-2">
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Sort:</span>
-            <button
+            <Button
               onClick={() => onSetSortMode('issues')}
+              variant="ghost"
+              size="sm"
               className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'issues' ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]')}
             >
               Issues
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => onSetSortMode('traffic')}
+              variant="ghost"
+              size="sm"
               className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'traffic' ? 'border-teal-500/50 bg-teal-500/10 text-teal-400' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]')}
             >
               Traffic Impact
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -83,29 +87,35 @@ export function AuditBatchActions({
             </span>
           ) : (
             <div className="flex items-center gap-1">
-              <button
+              <Button
                 onClick={() => onBatchCreateTasks('errors')}
-                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-red-500/8 border border-red-500/20 text-red-400/80 hover:bg-red-500/15 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="px-2 py-1 rounded t-caption-sm font-medium bg-red-500/8 border border-red-500/20 text-red-400/80 hover:bg-red-500/15 transition-colors"
                 title="Add all errors to tasks"
               >
                 <Icon as={ClipboardList} size="sm" /> Add Errors to Tasks ({effectiveData.errors})
-              </button>
+              </Button>
               {(severityFilter !== 'all' || categoryFilter !== 'all') && (
-                <button
+                <Button
                   onClick={() => onBatchCreateTasks('filtered')}
-                  className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors"
                   title="Add currently filtered issues to tasks"
                 >
                   <Icon as={ClipboardList} size="sm" /> Add Filtered to Tasks
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={() => onBatchCreateTasks('all')}
-                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
+                variant="ghost"
+                size="sm"
+                className="px-2 py-1 rounded t-caption-sm font-medium bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
                 title="Add ALL findings to tasks"
               >
                 <Icon as={ClipboardList} size="sm" /> Add All to Tasks ({effectiveData.errors + effectiveData.warnings + effectiveData.infos})
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import {
   AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
   Zap, Link2,
 } from 'lucide-react';
-import { SectionCard, StatCard, Badge, EmptyState, PageHeader, Icon, Button } from './ui';
+import { SectionCard, StatCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow } from './ui';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
@@ -118,9 +118,9 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
 
   return (
     <div>
-      <button
+      <ClickableRow
         onClick={() => hasChildren && setExpanded(!expanded)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left rounded-[var(--radius-lg)] transition-colors group ${
+        className={`flex items-center gap-2 px-3 py-2 text-left rounded-[var(--radius-lg)] group ${
           hasChildren ? 'hover:bg-[var(--surface-3)]/50 cursor-pointer' : 'cursor-default'
         } ${!node.hasContent ? 'opacity-60' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 12}px` }}
@@ -163,7 +163,7 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
             {node.children.length}
           </span>
         )}
-      </button>
+      </ClickableRow>
 
       {expanded && hasChildren && (
         <div>
@@ -407,17 +407,20 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
             />
             <div className="flex items-center gap-1">
               {(['all', 'existing', 'planned', 'strategy', 'gap'] as const).map(f => (
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`t-caption-sm px-2 py-1 rounded-[var(--radius-md)] font-medium transition-colors ${
+                  className={`t-caption-sm px-2 py-1 rounded-[var(--radius-md)] font-medium ${
                     filter === f
                       ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
                       : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
                   }`}
                 >
                   {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

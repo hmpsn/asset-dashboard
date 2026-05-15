@@ -117,9 +117,11 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                       { value: 'wrong' as const, label: 'Wrong', activeClass: 'bg-red-600 text-white' },
                     ] as const
                   ).map(({ value, label, activeClass }) => (
-                    <button
+                    <Button
                       key={value}
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       aria-pressed={rating === value}
                       onClick={() => setLocalRatings(prev => ({ ...prev, [i]: value }))}
                       className={cn(
@@ -130,7 +132,7 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                       )}
                     >
                       {label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 

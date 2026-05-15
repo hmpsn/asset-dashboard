@@ -8,7 +8,7 @@
  */
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Database } from 'lucide-react';
-import { Icon, cn } from '../ui';
+import { Icon, cn, Button } from '../ui';
 import type { CmsCollectionImageInfo } from '../../../shared/types/cms-images';
 
 /** Patterns that indicate a meta/OG/preview image field (not a content field) */
@@ -90,15 +90,17 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
   return (
     <div className="rounded-[var(--radius-md)] border border-blue-800/40 bg-blue-950/20 overflow-hidden">
       {/* Header toggle */}
-      <button
+      <Button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-300 hover:text-blue-200 hover:bg-blue-950/30 transition-colors"
+        variant="ghost"
+        size="sm"
+        className="w-full justify-start h-auto px-3 py-2 text-sm text-blue-300 hover:text-blue-200 hover:bg-blue-950/30 rounded-none"
       >
         <Icon as={Database} size="md" className="text-blue-400 shrink-0" />
         <span className="flex-1 text-left font-medium">CMS Field Selection</span>
         <span className="text-xs text-blue-500">{selectedCount}/{totalFields} fields</span>
         <Icon as={open ? ChevronDown : ChevronRight} size="md" className="text-blue-500" />
-      </button>
+      </Button>
 
       {open && (
         <div className="px-3 pb-3 space-y-3">
@@ -123,14 +125,16 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
                     onChange={e => toggleCollection(coll, e.target.checked)}
                     className="rounded accent-teal-500 shrink-0"
                   />
-                  <button
+                  <Button
                     onClick={() => toggleExpanded(coll.collectionId)}
-                    className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-0 py-0 text-xs font-semibold text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
                   >
                     <Icon as={isExpanded ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
                     {coll.collectionName}
                     <span className="text-[var(--brand-text-dim)] font-normal">({coll.imageFields.length})</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Individual field checkboxes */}
