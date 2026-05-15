@@ -2,6 +2,9 @@ import type { Tool } from '@modelcontextprotocol/sdk/types';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { getWorkspace } from '../../workspaces.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-tools-intelligence');
 
 const ALL_INTELLIGENCE_SLICES: IntelligenceSlice[] = [
   'seoContext',
@@ -51,7 +54,7 @@ export async function handleIntelligenceTool(
   }
 
   const requestedSlices = Array.isArray(args.slices)
-    ? (args.slices as IntelligenceSlice[])
+    ? (args.slices as string[]).filter((s): s is IntelligenceSlice => ALL_INTELLIGENCE_SLICES.includes(s as IntelligenceSlice))
     : ALL_INTELLIGENCE_SLICES;
 
   try {
@@ -66,6 +69,7 @@ export async function handleIntelligenceTool(
     const intel = await buildWorkspaceIntelligence(workspaceId, { slices: requestedSlices });
     return { content: [{ type: 'text' as const, text: JSON.stringify(intel) }] };
   } catch (err) {
+    log.error({ err, workspaceId, slices: requestedSlices }, 'Intelligence assembly failed');
     const message = err instanceof Error ? err.message : String(err);
     return {
       isError: true,

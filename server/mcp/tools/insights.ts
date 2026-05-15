@@ -2,6 +2,9 @@ import type { Tool } from '@modelcontextprotocol/sdk/types';
 import { getInsights } from '../../analytics-insights-store.js';
 import { getWorkspace } from '../../workspaces.js';
 import type { InsightType } from '../../../shared/types/analytics.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-tools-insights');
 
 export const insightTools: Tool[] = [
   {
@@ -65,7 +68,7 @@ export async function handleInsightTool(
 
     if (name === 'get_insights') {
       const type = typeof args.type === 'string' ? (args.type as InsightType) : undefined;
-      const limit = typeof args.limit === 'number' ? args.limit : 20;
+      const limit = typeof args.limit === 'number' ? Math.max(0, Math.floor(args.limit)) : 20;
       const insights = getInsights(workspaceId, type).slice(0, limit);
       return { content: [{ type: 'text' as const, text: JSON.stringify(insights) }] };
     }
@@ -84,6 +87,7 @@ export async function handleInsightTool(
       content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
     };
   } catch (err) {
+    log.error({ err, tool: name, workspaceId }, 'MCP tool error');
     const message = err instanceof Error ? err.message : String(err);
     return {
       isError: true,

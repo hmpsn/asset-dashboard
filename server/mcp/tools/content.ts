@@ -6,6 +6,9 @@ import { listCannibalizationIssues } from '../../cannibalization-issues.js';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { getWorkspace } from '../../workspaces.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-tools-content');
 
 export const contentTools: Tool[] = [
   {
@@ -71,7 +74,7 @@ export async function handleContentTool(
     }
 
     if (name === 'get_content_decay') {
-      const limit = typeof args.limit === 'number' ? args.limit : 20;
+      const limit = typeof args.limit === 'number' ? Math.max(0, Math.floor(args.limit)) : 20;
       const decayInsights = getInsights(workspaceId, 'content_decay')
         .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
         .slice(0, limit)
@@ -102,6 +105,7 @@ export async function handleContentTool(
 
     return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
   } catch (err) {
+    log.error({ err, tool: name, workspaceId }, 'MCP tool error');
     const message = err instanceof Error ? err.message : String(err);
     return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
   }

@@ -4,7 +4,11 @@ import { listBatches } from '../../approvals.js';
 import { listRequests } from '../../requests.js';
 import { listClientActions, countPendingClientActions } from '../../client-actions.js';
 import { getWorkspace, listWorkspaces } from '../../workspaces.js';
+import { pendingCounts } from './workspaces.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-tools-clients');
 
 const CLIENT_SIGNALS_SLICE: readonly IntelligenceSlice[] = ['clientSignals'];
 
@@ -80,12 +84,7 @@ export async function handleClientTool(
         const approvalBatches = listBatches(workspaceId);
         const requests = listRequests(workspaceId);
         const clientActions = listClientActions(workspaceId);
-
-        const pendingApprovals = approvalBatches
-          .flatMap(b => b.items)
-          .filter(i => i.status === 'pending').length;
-        const pendingRequests = requests.filter(r => r.status === 'new').length;
-        const pendingActions = countPendingClientActions(workspaceId);
+        const { pendingApprovals, pendingRequests, pendingActions } = pendingCounts(workspaceId);
 
         return {
           content: [{
@@ -138,6 +137,7 @@ export async function handleClientTool(
       content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
     };
   } catch (err) {
+    log.error({ err, tool: name }, 'MCP tool error');
     const message = err instanceof Error ? err.message : String(err);
     return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
   }

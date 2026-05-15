@@ -3,6 +3,9 @@ import { getWorkspace, listWorkspaces } from '../../workspaces.js';
 import { listBatches } from '../../approvals.js';
 import { listRequests } from '../../requests.js';
 import { countPendingClientActions } from '../../client-actions.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-tools-workspaces');
 
 export const workspaceTools: Tool[] = [
   {
@@ -37,7 +40,7 @@ function pendingRequestsCount(workspaceId: string): number {
   return listRequests(workspaceId).filter(r => r.status === 'new').length;
 }
 
-function pendingCounts(workspaceId: string) {
+export function pendingCounts(workspaceId: string) {
   const pendingApprovals = pendingApprovalsCount(workspaceId);
   const pendingRequests = pendingRequestsCount(workspaceId);
   const pendingActions = countPendingClientActions(workspaceId);
@@ -103,6 +106,7 @@ export async function handleWorkspaceTool(
         return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
     }
   } catch (err) {
+    log.error({ err, tool: name }, 'MCP tool error');
     const message = err instanceof Error ? err.message : String(err);
     return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
   }

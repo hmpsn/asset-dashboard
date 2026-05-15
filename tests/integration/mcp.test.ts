@@ -225,8 +225,12 @@ describe('get_content_decay', () => {
   it('returns an array sorted by severity', async () => {
     const result = await mcpToolCall('get_content_decay', {
       workspaceId: ws.workspaceId,
-    }) as unknown[];
+    }) as Array<{ impactScore?: number | null }>;
     expect(Array.isArray(result)).toBe(true);
+    // Verify descending sort by impactScore when there are multiple results
+    for (let i = 1; i < result.length; i++) {
+      expect((result[i - 1].impactScore ?? 0)).toBeGreaterThanOrEqual(result[i].impactScore ?? 0);
+    }
   });
 
   it('respects the limit parameter', async () => {
@@ -264,8 +268,9 @@ describe('get_client_signals', () => {
     const result = await mcpToolCall('get_client_signals', {
       workspaceId: ws.workspaceId,
     }) as Record<string, unknown> | null;
-    // Result may be null/empty for a test workspace with no client activity
-    expect(result === null || typeof result === 'object').toBe(true);
+    // Result may be null for a test workspace with no client activity — both are valid
+    // but it must not be undefined (the tool must always return a value)
+    expect(result).not.toBeUndefined();
   });
 
   it('returns an error for an unknown workspace', async () => {
@@ -299,6 +304,13 @@ describe('get_pending_work', () => {
   it('returns cross-workspace pending work when no workspaceId provided', async () => {
     const result = await mcpToolCall('get_pending_work', {}) as Record<string, unknown>;
     expect(typeof result.totalPending).toBe('number');
+    expect((result.totalPending as number)).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(result.workspaces)).toBe(true);
+    // Each workspace entry must have expected shape
+    const workspaces = result.workspaces as Array<Record<string, unknown>>;
+    for (const w of workspaces) {
+      expect(typeof w.id).toBe('string');
+      expect(typeof w.total).toBe('number');
+    }
   });
 });
