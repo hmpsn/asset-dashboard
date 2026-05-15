@@ -77,7 +77,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
               {COLORS.map(c => (
                 <button key={c} onClick={() => setNewAnn(p => ({ ...p, color: c }))}
                   className={cn(
-                    'w-6 h-6 rounded-full border-2 transition-all',
+                    'w-6 h-6 rounded-[var(--radius-pill)] border-2 transition-all',
                     newAnn.color === c ? 'border-white scale-110' : 'border-[var(--brand-border-hover)] hover:border-[var(--brand-text-muted)]',
                   )}
                   style={{ backgroundColor: c }} />
@@ -111,7 +111,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-2">
           {annotations.sort((a, b) => b.date.localeCompare(a.date)).map(ann => (
             <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] border border-[var(--brand-border)] group hover:border-[var(--brand-border-hover)] transition-colors rounded-[var(--radius-signature)]">
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
+              <span className="w-3 h-3 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
               <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
               <div className="flex-1 min-w-0">
                 <span className="text-xs text-[var(--brand-text-bright)] font-medium">{ann.label}</span>

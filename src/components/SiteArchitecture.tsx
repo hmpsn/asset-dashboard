@@ -134,7 +134,7 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
         <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate flex-1">{node.name}</span>
 
         {node.keyword && (
-          <span className="text-[10px] text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
             <Icon as={Target} size="sm" className="mr-0.5 -mt-px" />{node.keyword}
           </span>
         )}
@@ -143,23 +143,23 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
 
         {cov && (
           cov.hasSchema ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" /* arbitrary-text-ok */ title={`Schema: ${cov.schemaTypes.join(', ')}`}>
+            <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
               <Icon as={CheckCircle2} size="sm" />
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 text-[10px] text-[var(--brand-text-dim)]" title="No schema">
+            <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-dim)]" title="No schema">
               <Icon as={XCircle} size="sm" />
             </span>
           )
         )}
 
-        <span className="text-[10px] text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
+        <span className="t-caption-sm text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
           {node.path}
         </span>
 
         {hasChildren && (
-          <span className="text-[10px] text-[var(--brand-text-dim)] flex-shrink-0">
+          <span className="t-caption-sm text-[var(--brand-text-dim)] flex-shrink-0">
             {node.children.length}
           </span>
         )}
@@ -186,14 +186,14 @@ function DepthChart({ distribution }: { distribution: Record<number, number> }) 
     <div className="space-y-1.5">
       {entries.map(e => (
         <div key={e.depth} className="flex items-center gap-2">
-          <span className="text-[10px] text-[var(--brand-text-muted)] w-16 text-right flex-shrink-0">Depth {e.depth}</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] w-16 text-right flex-shrink-0">Depth {e.depth}</span>
           <div className="flex-1 h-4 bg-[var(--surface-3)] rounded overflow-hidden">
             <div
               className="h-full bg-teal-500/30 rounded"
               style={{ width: `${(e.count / maxCount) * 100}%` }}
             />
           </div>
-          <span className="text-[10px] text-[var(--brand-text)] w-8 text-right tabular-nums">{e.count}</span>
+          <span className="t-caption-sm text-[var(--brand-text)] w-8 text-right tabular-nums">{e.count}</span>
         </div>
       ))}
     </div>
@@ -462,10 +462,10 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                     <span className="text-xs text-[var(--brand-text-bright)] truncate flex-1" title={p.path}>{p.name}</span>
                     <Badge label={pb.label} color={pb.color} />
                     {p.isOrphan && (
-                      <span className="text-[10px] text-red-400" /* arbitrary-text-ok */ title="Orphan page — no inbound links">orphan</span>
+                      <span className="t-caption-sm text-red-400" title="Orphan page — no inbound links">orphan</span>
                     )}
                     {p.inboundLinks !== null && !p.isOrphan && (
-                      <span className="text-[10px] text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
+                      <span className="t-caption-sm text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
                         {p.inboundLinks} in
                       </span>
                     )}

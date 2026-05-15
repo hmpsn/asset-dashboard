@@ -93,7 +93,7 @@ export function OnboardingChecklist({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--brand-overlay)] backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboarding-checklist-title"
@@ -106,8 +106,9 @@ export function OnboardingChecklist({
         ref={panelRef}
         tabIndex={-1}
         onKeyDown={handlePanelKeyDown}
-        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 shadow-2xl outline-none"
-        style={{ borderRadius: '10px 24px 10px 24px' }}
+        className="relative w-full max-w-lg bg-[var(--surface-2)] border border-[var(--brand-border)] shadow-2xl outline-none"
+        // pr-check-disable-next-line -- Onboarding checklist dialog intentionally mirrors SectionCard signature radius.
+        style={{ borderRadius: 'var(--radius-signature-lg)' }}
       >
         {allComplete ? (
           /* Completion celebration */
@@ -115,8 +116,8 @@ export function OnboardingChecklist({
             <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-teal-400" />
             </div>
-            <h2 id="onboarding-checklist-title" className="text-lg font-semibold text-zinc-200">You're all set!</h2>
-            <p className="text-sm text-zinc-400 text-center">
+            <h2 id="onboarding-checklist-title" className="text-lg font-semibold text-[var(--brand-text-bright)]">You're all set!</h2>
+            <p className="text-sm text-[var(--brand-text-muted)] text-center">
               All setup steps are complete. Your workspace is ready to go.
             </p>
           </div>
@@ -124,10 +125,10 @@ export function OnboardingChecklist({
           <>
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h2 id="onboarding-checklist-title" className="text-base font-semibold text-zinc-200">{title}</h2>
+              <h2 id="onboarding-checklist-title" className="text-base font-semibold text-[var(--brand-text-bright)]">{title}</h2>
               <button
                 onClick={onDismiss}
-                className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                className="p-1 rounded-[var(--radius-lg)] text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
                 aria-label="Close onboarding checklist"
               >
                 <X className="w-4 h-4" />
@@ -137,14 +138,14 @@ export function OnboardingChecklist({
             {/* Progress bar — blue for data (read-only metric) */}
             <div className="px-5 pb-4">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-[var(--brand-text-muted)]">
                   {completedCount} of {totalCount} steps completed
                 </span>
                 <span className="text-xs font-medium text-blue-400">
                   {Math.round(progressPct)}%
                 </span>
               </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${progressPct}%` }}
@@ -158,7 +159,7 @@ export function OnboardingChecklist({
                 <button
                   key={step.id}
                   onClick={step.onClick}
-                  className="w-full flex items-start gap-3 px-3 py-3 rounded-lg text-left hover:bg-zinc-800/60 transition-colors group"
+                  className="w-full flex items-start gap-3 px-3 py-3 rounded-[var(--radius-lg)] text-left hover:bg-[var(--surface-3)]/60 transition-colors group"
                   aria-label={`${step.completed ? 'Completed: ' : ''}${step.label}`}
                 >
                   {/* Check indicator — teal for completed (action/active state) */}
@@ -166,7 +167,7 @@ export function OnboardingChecklist({
                     {step.completed ? (
                       <CheckCircle className="w-5 h-5 text-teal-400" />
                     ) : (
-                      <Circle className="w-5 h-5 text-zinc-600 group-hover:text-zinc-500 transition-colors" />
+                      <Circle className="w-5 h-5 text-[var(--brand-text-disabled)] group-hover:text-[var(--brand-text-dim)] transition-colors" />
                     )}
                   </div>
 
@@ -176,14 +177,14 @@ export function OnboardingChecklist({
                       <span
                         className={`text-sm font-medium ${
                           step.completed
-                            ? 'text-zinc-500 line-through'
-                            : 'text-zinc-200 group-hover:text-zinc-100'
+                            ? 'text-[var(--brand-text-dim)] line-through'
+                            : 'text-[var(--brand-text-bright)] group-hover:text-[var(--brand-text)]'
                         } transition-colors`}
                       >
                         {step.label}
                       </span>
                       {step.estimatedTime && !step.completed && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-zinc-500 bg-zinc-800">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-dim)] bg-[var(--surface-3)]">
                           <Clock className="w-3 h-3" />
                           {step.estimatedTime}
                         </span>
@@ -191,7 +192,7 @@ export function OnboardingChecklist({
                     </div>
                     <p
                       className={`text-xs mt-0.5 ${
-                        step.completed ? 'text-zinc-600' : 'text-zinc-400'
+                        step.completed ? 'text-[var(--brand-text-disabled)]' : 'text-[var(--brand-text-muted)]'
                       }`}
                     >
                       {step.description}
@@ -202,10 +203,10 @@ export function OnboardingChecklist({
             </div>
 
             {/* Footer */}
-            <div className="px-5 pb-5 pt-2 border-t border-zinc-800">
+            <div className="px-5 pb-5 pt-2 border-t border-[var(--brand-border)]">
               <button
                 onClick={onDismiss}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-xs text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors"
               >
                 Dismiss for now
               </button>

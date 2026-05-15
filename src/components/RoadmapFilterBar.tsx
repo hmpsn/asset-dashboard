@@ -53,7 +53,7 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
 
   const hasActiveFilter = [priority, status, sprint, feature, tags].some(v => v !== 'all');
 
-  const cls = 'px-2.5 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)] cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors';
+  const cls = 'px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)] cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors';
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -93,7 +93,7 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
       {hasActiveFilter && (
         <button
           onClick={clearAll}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
         >
           <Icon as={X} size="sm" />
           Clear filters

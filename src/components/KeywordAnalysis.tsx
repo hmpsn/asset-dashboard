@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, PageHeader } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 import { resolvePagePath } from '../lib/pathUtils';
@@ -207,6 +207,15 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
   return (
     <div className="space-y-8">
+      <PageHeader
+        title="Keyword Analysis"
+        subtitle={
+          pages.some(p => p.source === 'cms')
+            ? `${pages.length} pages · ${pages.filter(p => p.source === 'cms').length} CMS`
+            : `${pages.length} pages`
+        }
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      />
       {/* Stats + Analyze All */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-[var(--brand-text)]">

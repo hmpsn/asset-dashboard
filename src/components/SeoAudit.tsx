@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -415,22 +415,31 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     </div>
   );
 
-  if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
+  const pageHeader = (
+    <PageHeader
+      title="SEO Audit"
+      subtitle="Comprehensive SEO audit for your Webflow site."
+      icon={<Icon as={Globe} size="lg" className="text-accent-brand" />}
+    />
+  );
+
+  if (auditSubTab === 'guide') return <div>{auditTabBar}{pageHeader}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
-    return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
+    return <div>{auditTabBar}{pageHeader}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
   }
 
   if (!hasRun) {
     return (
       <div>
         {auditTabBar}
+        {pageHeader}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
             <Icon as={Globe} size="2xl" className="text-[var(--brand-text-muted)]" />
@@ -463,6 +472,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     return (
       <div>
         {auditTabBar}
+        {pageHeader}
         <LoadingState message="Analyzing site health..." />
       </div>
     );
@@ -471,6 +481,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   if (!data) return (
     <div>
       {auditTabBar}
+      {pageHeader}
       {auditError && (
         <ErrorState
           type="general"
@@ -518,6 +529,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <ErrorBoundary label="SEO Audit">
     <div className="space-y-8">
       {auditTabBar}
+      {pageHeader}
       {showNextSteps && data && (
         <NextStepsCard
           title={`Audit complete: ${(effectiveData?.errors ?? 0) + (effectiveData?.warnings ?? 0)} issues found`}

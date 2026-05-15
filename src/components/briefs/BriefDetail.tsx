@@ -242,7 +242,7 @@ export function BriefDetail({
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.secondaryKeywords.map((kw, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
+              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
             ))}
           </div>
         </div>
@@ -254,7 +254,7 @@ export function BriefDetail({
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.topicalEntities.map((entity, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
+              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
             ))}
           </div>
         </div>
@@ -315,7 +315,7 @@ export function BriefDetail({
               <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Avg Word Count:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{brief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
             </div>
             {brief.serpAnalysis.commonElements.length > 0 && (
-              <div><span className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)]">{el}</span>)}</div></div>
+              <div><span className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)]">{el}</span>)}</div></div>
             )}
             {brief.serpAnalysis.gaps.length > 0 && (
               <div><span className="t-caption-sm text-emerald-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{brief.serpAnalysis.gaps.map((g, i) => <div key={i} className="t-caption-sm text-emerald-300/80 flex items-start gap-1.5"><span className="text-emerald-400 mt-0.5">&rarr;</span>{g}</div>)}</div></div>
@@ -333,7 +333,7 @@ export function BriefDetail({
               <button
                 onClick={() => setShowOutlineRegen(!showOutlineRegen)}
                 disabled={regeneratingOutline === brief.id}
-                className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
               >
                 <Icon as={regeneratingOutline === brief.id ? Loader2 : RefreshCw} size="sm" className={regeneratingOutline === brief.id ? 'animate-spin' : ''} />
                 {regeneratingOutline === brief.id ? 'Regenerating...' : 'Regenerate Outline'}
@@ -376,19 +376,19 @@ export function BriefDetail({
                       <input type="text" defaultValue={section.heading} onBlur={e => { if (e.target.value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: e.target.value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
                       <input type="number" defaultValue={section.wordCount || ''} placeholder="words" onBlur={e => { const v = parseInt(e.target.value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 text-right" />
                     </div>
-                    <textarea defaultValue={section.notes} onBlur={e => { if (e.target.value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: e.target.value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded px-2 py-1.5 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                    <textarea defaultValue={section.notes} onBlur={e => { if (e.target.value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: e.target.value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-sm)] px-2 py-1.5 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-medium text-[var(--brand-text-bright)]">H2: {section.heading}</div>
-                      {section.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{section.wordCount} words</span>}
+                      {section.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{section.wordCount} words</span>}
                     </div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{section.notes}</div>
                   </>
                 )}
                 {section.keywords && section.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
                 )}
               </div>
             ))}
@@ -402,7 +402,7 @@ export function BriefDetail({
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
           <div className="space-y-1">{brief.ctaRecommendations.map((cta, i) => (
             <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
-              <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>
+              <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>
               {editingBrief === brief.id ? (
                 <input type="text" defaultValue={cta} onBlur={e => { if (e.target.value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = e.target.value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
               ) : cta}
@@ -429,7 +429,7 @@ export function BriefDetail({
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
           <div className="flex flex-wrap gap-1.5">
             {brief.internalLinkSuggestions.map((link, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-blue-400">/{link}</span>
+              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-blue-400">/{link}</span>
             ))}
           </div>
         </div>
@@ -462,7 +462,7 @@ export function BriefDetail({
           <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
             {brief.contentChecklist.map((item, i) => (
               <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
-                <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border)] flex-shrink-0" />
+                <div className="w-4 h-4 mt-0.5 rounded-[var(--radius-sm)] border border-[var(--brand-border)] flex-shrink-0" />
                 <span className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{item}</span>
               </div>
             ))}
@@ -478,7 +478,7 @@ export function BriefDetail({
             {brief.schemaRecommendations.map((schema, i) => (
               <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                  <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
                 </div>
                 <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{schema.notes}</div>
               </div>

@@ -1,6 +1,6 @@
-import { TrendingUp, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { TrendingUp } from 'lucide-react'; // trend-icon-ok — title/empty-state icon is decorative context, not a metric trend badge.
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, EmptyState, Icon } from '../ui';
+import { SectionCard, EmptyState, Icon, TrendBadge } from '../ui';
 import { adminPath } from '../../routes';
 
 interface RankEntry {
@@ -33,13 +33,16 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
             <div key={i} className="flex items-center gap-2.5 px-4 py-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate flex-1">{r.query}</span>
               <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] tabular-nums w-6 text-right">{Math.round(r.position)}</span>
-              {r.change != null && r.change !== 0 && (
-                <span className={`flex items-center t-caption-sm font-medium w-8 justify-end ${r.change > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-                  {r.change > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
-                  {Math.abs(Math.round(r.change))}
-                </span>
+              {r.change != null ? (
+                <TrendBadge
+                  value={Math.round(r.change)}
+                  suffix=""
+                  hideOnZero={false}
+                  className="t-caption-sm w-8 justify-end"
+                />
+              ) : (
+                <TrendBadge value={0} hideOnZero={false} iconOnly className="t-caption-sm w-8 justify-end" />
               )}
-              {(r.change == null || r.change === 0) && <span className="w-8 flex justify-end"><Minus className="w-2.5 h-2.5 text-zinc-600" /></span>}
             </div>
           ))}
         </div>

@@ -106,9 +106,9 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       {/* Progress bar */}
       {items.length > 0 && (
         <div className="px-4 pt-3">
-          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-[var(--surface-2)]">
-            {counts.completed > 0 && <div className="bg-emerald-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
-            {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-full" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
+          <div className="flex gap-1 h-1.5 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-2)]">
+            {counts.completed > 0 && <div className="bg-emerald-500 rounded-[var(--radius-pill)]" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
+            {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-[var(--radius-pill)]" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
           </div>
         </div>
       )}
@@ -136,9 +136,9 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
                 <button
                   key={p}
                   onClick={() => setNewPriority(p)}
-                  className={cn('px-2 py-1 rounded t-caption font-medium border', newPriority === p ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-transparent text-[var(--brand-text-muted)]')}
+                  className={cn('px-2 py-1 rounded-[var(--radius-sm)] t-caption font-medium border', newPriority === p ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-transparent text-[var(--brand-text-muted)]')}
                 >
-                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', PRIORITY_CONFIG[p].dot)} />
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-[var(--radius-pill)] mr-1', PRIORITY_CONFIG[p].dot)} />
                   {PRIORITY_CONFIG[p].label}
                 </button>
               ))}
@@ -173,7 +173,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
                 {item.description && <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{item.description}</div>}
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[item.priority]?.dot || 'bg-[var(--brand-text-muted)]')} title={item.priority} />
+                <span className={cn('w-1.5 h-1.5 rounded-[var(--radius-pill)]', PRIORITY_CONFIG[item.priority]?.dot || 'bg-[var(--brand-text-muted)]')} title={item.priority} />
                 <button onClick={() => deleteItem(item.id)} className="text-[var(--brand-text-muted)] hover:text-red-400">
                   <Icon as={Trash2} size="sm" />
                 </button>

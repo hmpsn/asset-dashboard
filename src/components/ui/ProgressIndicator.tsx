@@ -47,19 +47,19 @@ export function ProgressIndicator({
   const isIndeterminate = percent === undefined;
 
   return (
-    <div className={`space-y-2 px-4 py-3 bg-zinc-900 border border-blue-500/20 rounded-xl ${className}`}>
+    <div className={`space-y-2 px-4 py-3 bg-[var(--surface-2)] border border-blue-500/20 rounded-[var(--radius-xl)] ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          {step && <span className="text-xs font-medium text-zinc-300">{step}</span>}
+          {step && <span className="text-xs font-medium text-[var(--brand-text)]">{step}</span>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {!isIndeterminate && (
-            <span className="text-[11px] text-zinc-500 font-mono">{Math.round(percent)}%</span>
+            <span className="text-xs text-[var(--brand-text-dim)] font-mono">{Math.round(percent)}%</span>
           )}
           {onCancel && (
             <button
               onClick={onCancel}
-              className="p-0.5 rounded text-zinc-500 hover:text-red-400 transition-colors"
+              className="p-0.5 rounded-[var(--radius-sm)] text-[var(--brand-text-dim)] hover:text-red-400 transition-colors"
               aria-label="Cancel"
             >
               <X className="w-3 h-3" />
@@ -70,7 +70,7 @@ export function ProgressIndicator({
 
       {/* Progress bar - BLUE (data color, not teal) */}
       <div
-        className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden"
+        className="w-full bg-[var(--surface-3)] rounded-full h-1.5 overflow-hidden"
         role="progressbar"
         aria-valuenow={isIndeterminate ? undefined : Math.round(percent!)}
         aria-valuemin={0}
@@ -86,7 +86,7 @@ export function ProgressIndicator({
         )}
       </div>
 
-      {detail && <p className="text-xs text-zinc-500">{detail}</p>}
+      {detail && <p className="text-xs text-[var(--brand-text-dim)]">{detail}</p>}
     </div>
   );
 }

@@ -40,15 +40,15 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             <div className="flex items-center justify-between">
               <span className="t-ui font-medium text-[var(--brand-text-bright)] capitalize">{cluster.topic}</span>
               <div className="flex items-center gap-2">
-                <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded border ${coverageColor(cluster.coveragePercent)}`}>
+                <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${coverageColor(cluster.coveragePercent)}`}>
                   {cluster.coveragePercent}% coverage
                 </span>
                 <span className="t-micro text-[var(--brand-text-muted)]">{cluster.ownedCount}/{cluster.totalCount} kws</span>
               </div>
             </div>
             {/* Coverage bar */}
-            <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${coverageBarColor(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
+            <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+              <div className={`h-full rounded-[var(--radius-pill)] transition-all ${coverageBarColor(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
             </div>
             <div className="flex items-center justify-between mt-1.5">
               <div className="flex items-center gap-2 flex-wrap">
@@ -67,7 +67,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             {cluster.gap.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {cluster.gap.slice(0, 5).map((kw, ki) => (
-                  <span key={ki} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                  <span key={ki} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     {kw}
                   </span>
                 ))}

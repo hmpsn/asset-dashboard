@@ -40,7 +40,7 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
               isActive ? colors.activeBg : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+            <span className={`w-2 h-2 rounded-[var(--radius-pill)] ${colors.dot}`} />
             <span className="text-[var(--brand-text-bright)] font-semibold tabular-nums">{pill.count}</span>
             <span className="text-[var(--brand-text-muted)]">{pill.label}</span>
           </button>

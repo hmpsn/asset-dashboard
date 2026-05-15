@@ -274,17 +274,17 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
           <div className="flex items-center gap-2">
             {ws?.hasPassword ? (
               <>
-                <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)] flex items-center gap-1">
                   <Icon as={Lock} size="xs" /> Password Protected
                 </span>
                 <button onClick={() => { setEditingPassword(true); setNewPassword(''); }}
-                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-1.5 py-1 rounded transition-colors">Change</button>
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-1.5 py-1 rounded-[var(--radius-sm)] transition-colors">Change</button>
                 <button onClick={removePassword} disabled={savingPassword}
-                  className="t-caption-sm text-red-400/60 hover:text-red-400 px-1.5 py-1 rounded transition-colors">Remove</button>
+                  className="t-caption-sm text-red-400/60 hover:text-red-400 px-1.5 py-1 rounded-[var(--radius-sm)] transition-colors">Remove</button>
               </>
             ) : (
               <button onClick={() => { setEditingPassword(true); setNewPassword(''); }}
-                className="flex items-center gap-1 t-caption-sm text-amber-400/70 bg-amber-500/10 px-2 py-1 rounded-full hover:bg-amber-500/15 transition-colors">
+                className="flex items-center gap-1 t-caption-sm text-amber-400/70 bg-amber-500/10 px-2 py-1 rounded-[var(--radius-pill)] hover:bg-amber-500/15 transition-colors">
                 <Icon as={KeyRound} size="xs" /> Set Password
               </button>
             )}
@@ -412,7 +412,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 <div key={user.id} className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors">
                   <div className="flex items-center gap-3 px-4 py-3">
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white t-caption-sm font-bold shrink-0">
+                    <div className="w-8 h-8 rounded-[var(--radius-pill)] bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white t-caption-sm font-bold shrink-0">
                       {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
 
@@ -434,7 +434,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{user.name}</span>
-                          <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium ${user.role === 'client_owner' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>
+                          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${user.role === 'client_owner' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>
                             {user.role === 'client_owner' ? 'Owner' : 'Member'}
                           </span>
                         </div>
@@ -451,15 +451,15 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                     {editingUserId !== user.id && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => { setEditingUserId(user.id); setEditUserName(user.name); setEditUserEmail(user.email); }}
-                          title="Edit" className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
+                          title="Edit" className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
                           <Icon as={Pencil} size="xs" />
                         </button>
                         <button onClick={() => { setResetPasswordUserId(resetPasswordUserId === user.id ? null : user.id); setResetPasswordValue(''); }}
-                          title="Reset password" className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
+                          title="Reset password" className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
                           <Icon as={KeyRound} size="xs" />
                         </button>
                         <button onClick={() => deleteClientUser(user.id, user.name)}
-                          title="Remove" className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-3)] transition-colors">
+                          title="Remove" className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-3)] transition-colors">
                           <Icon as={Trash2} size="xs" />
                         </button>
                       </div>
@@ -479,7 +479,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                         Reset
                       </button>
                       <button onClick={() => { setResetPasswordUserId(null); setResetPasswordValue(''); }}
-                        className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                        className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                         <Icon as={X} size="xs" />
                       </button>
                     </div>
@@ -535,7 +535,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Full Post:</span>
                   <span className="t-caption font-semibold text-blue-400">${ws.contentPricing.fullPostPrice}</span>
                 </div>
-                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
               </>
             ) : (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">No pricing set — clients will see "Pricing confirmed after submission"</span>
@@ -663,7 +663,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   {localGroups.sort((a, b) => a.order - b.order).map((g, idx) => (
                     <div key={g.id} className="rounded-[var(--radius-lg)] hover:bg-white/5 mb-1">
                       <div className="flex items-center gap-2 px-2 py-1.5">
-                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                        <div className="w-3 h-3 rounded-[var(--radius-pill)] shrink-0" style={{ backgroundColor: g.color }} />
                         <span className="t-caption flex-1 text-[var(--brand-text)]">{g.name}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">{localEventConfig.filter(c => c.group === g.id).length} events</span>
                         <button onClick={() => moveGroup(g.id, -1)} disabled={idx === 0} className="p-0.5 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] disabled:opacity-30"><Icon as={ArrowUp} size="xs" /></button>
@@ -713,7 +713,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                                   .map(p => {
                                     const checked = (g.allowedPages || []).some(ap => p.path.includes(ap));
                                     return (
-                                      <label key={p.path} className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[var(--brand-border-hover)]/30 cursor-pointer">
+                                      <label key={p.path} className="flex items-center gap-1.5 px-1 py-0.5 rounded-[var(--radius-sm)] hover:bg-[var(--brand-border-hover)]/30 cursor-pointer">
                                         <input type="checkbox" checked={checked}
                                           onChange={() => {
                                             setLocalGroups(prev => prev.map(gr => {
@@ -725,7 +725,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                                               return { ...gr, allowedPages: next.length > 0 ? next : undefined };
                                             }));
                                           }}
-                                          className="w-3 h-3 rounded border-[var(--brand-border)] bg-[var(--surface-3)] text-teal-500 focus:ring-0 focus:ring-offset-0 accent-teal-500" />
+                                          className="w-3 h-3 rounded-[var(--radius-sm)] border-[var(--brand-border)] bg-[var(--surface-3)] text-teal-500 focus:ring-0 focus:ring-offset-0 accent-teal-500" />
                                         <span className="t-caption-sm text-[var(--brand-text)] truncate">{p.path}</span>
                                       </label>
                                     );
@@ -741,7 +741,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                     </div>
                   ))}
                   <div className="flex items-center gap-2 mt-2">
-                    <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-0" />
+                    <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-6 h-6 rounded-[var(--radius-sm)] cursor-pointer bg-transparent border-0" />
                     <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="New group name..."
                       onKeyDown={e => e.key === 'Enter' && addGroup()}
                       className={`flex-1 ${inputClass} py-1.5`} />

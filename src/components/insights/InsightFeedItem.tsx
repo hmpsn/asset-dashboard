@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react'; // trend-icon-ok — used as severity/status glyphs in feed badges, not directional metric trends.
 import { Icon } from '../ui/Icon.js';
 import type { FeedInsight } from '../../../shared/types/insights.js';
 import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';

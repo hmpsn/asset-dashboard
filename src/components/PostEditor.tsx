@@ -9,7 +9,7 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
-import { SectionCard, Icon } from './ui';
+import { SectionCard, Icon, Modal, Button } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
@@ -83,7 +83,7 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
     approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', label: 'Approved' },
   };
   const c = cfg[status] || cfg.draft;
-  return <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${c.color}`}>{c.label}</span>;
+  return <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${c.color}`}>{c.label}</span>;
 }
 
 export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
@@ -344,26 +344,23 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     <div className="space-y-8">
       {/* Delete Confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+        <Modal open={deleteConfirm} onClose={() => setDeleteConfirm(false)} size="sm">
+          <Modal.Header title="Delete Post?" onClose={() => setDeleteConfirm(false)} />
+          <Modal.Body>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-[var(--radius-pill)] bg-red-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={AlertTriangle} size="lg" className="text-red-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete Post?</div>
-                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">This action cannot be undone</div>
+                <div className="text-xs text-[var(--brand-text-muted)]">This action cannot be undone</div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={() => setDeleteConfirm(false)} className="px-4 py-2 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
-              <button onClick={handleDelete} className="px-4 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
-                <Icon as={Trash2} size="md" /> Delete
-              </button>
-            </div>
-          </div>
-        </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="danger" size="sm" icon={Trash2} onClick={handleDelete}>Delete</Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       {/* Header */}
@@ -371,14 +368,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
-              <input value={titleBuffer} onChange={e => setTitleBuffer(e.target.value)} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
-              <button onClick={saveTitleEdit} className="p-1.5 rounded bg-teal-600/20 text-teal-300 hover:bg-teal-600/30"><Icon as={Check} size="md" /></button>
-              <button onClick={() => setEditingTitle(false)} className="p-1.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>
+              <input value={titleBuffer} onChange={e => setTitleBuffer(e.target.value)} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
+              <button onClick={saveTitleEdit} className="p-1.5 rounded-[var(--radius-sm)] bg-teal-600/20 text-teal-300 hover:bg-teal-600/30"><Icon as={Check} size="md" /></button>
+              <button onClick={() => setEditingTitle(false)} className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
               <h2 className="text-lg font-semibold text-[var(--brand-text-bright)] truncate">{post.title}</h2>
-              <button onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all"><Icon as={Pencil} size="sm" /></button>
+              <button onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }} className="opacity-0 group-hover:opacity-100 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all"><Icon as={Pencil} size="sm" /></button>
             </div>
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -386,7 +383,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Hash} size="sm" />{post.targetKeyword}</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={FileText} size="sm" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
             {post.unificationStatus && post.unificationStatus !== 'pending' && (
-              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded border font-medium flex items-center gap-1 ${
+              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border font-medium flex items-center gap-1 ${
                 post.unificationStatus === 'success' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
                 post.unificationStatus === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
                 'text-[var(--brand-text)] bg-[var(--surface-3)]/10 border-[var(--brand-border)]'
@@ -401,34 +398,34 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!isGenerating && (
             <>
-              <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium border transition-colors ${showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
+              <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
                 <Icon as={Eye} size="sm" /> Preview
               </button>
-              <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+              <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={copied ? Check : Copy} size="sm" className={copied ? 'text-emerald-400' : ''} /> {copied ? 'Copied' : 'Copy'}
               </button>
-              <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+              <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={Download} size="sm" /> .md
               </button>
-              <button onClick={exportHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+              <button onClick={exportHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={Download} size="sm" /> .html
               </button>
-              <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+              <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                 <Icon as={Download} size="sm" /> Export PDF
               </button>
-              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium border transition-colors ${showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
+              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
                 <Icon as={History} size="sm" /> History
               </button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
                 post.publishedAt ? (
-                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <Icon as={Check} size="sm" /> Published {post.publishedSlug && <Icon as={ExternalLink} size="sm" className="ml-0.5" />}
                   </span>
                 ) : (
                   <button
                     onClick={() => setPublishConfirm(true)}
                     disabled={publishing}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
                   >
                     <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
                     {publishing ? 'Publishing...' : 'Publish to Webflow'}
@@ -437,10 +434,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               )}
             </>
           )}
-          <button onClick={() => setDeleteConfirm(true)} className="p-1.5 rounded-lg text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
+          <button onClick={() => setDeleteConfirm(true)} className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
             <Icon as={Trash2} size="md" />
           </button>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
             <Icon as={X} size="md" />
           </button>
         </div>
@@ -454,8 +451,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="text-xs font-medium text-amber-300">Generating post... {completedSections}/{totalSections} sections</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{progress}%</span>
           </div>
-          <div className="w-full h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-            <div className="h-full bg-amber-400/60 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div className="w-full h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+            <div className="h-full bg-amber-400/60 rounded-[var(--radius-pill)] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </SectionCard>
       )}
@@ -533,7 +530,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => { await flushIntro(); setEditingIntro(false); }}
-                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
                     >
                       <Icon as={Check} size="sm" /> Done
                     </button>
@@ -596,7 +593,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
-                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
                     >
                       <Icon as={Check} size="sm" /> Done
                     </button>
@@ -633,7 +630,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <p><span className="text-[var(--brand-text-bright)] font-medium">Status:</span> {post.status}</p>
           </div>
           {publishError && (
-            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-3 py-2">
               {publishError}
             </div>
           )}
@@ -641,7 +638,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <button
               onClick={() => handlePublish(false)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
             >
               <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update' : 'Publish'}
@@ -649,14 +646,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <button
               onClick={() => handlePublish(true)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
             >
               <Icon as={publishing ? Loader2 : Sparkles} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update + New Image' : 'Publish + Generate Image'}
             </button>
             <button
               onClick={() => { setPublishConfirm(false); setPublishError(''); }}
-              className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
             >
               Cancel
             </button>

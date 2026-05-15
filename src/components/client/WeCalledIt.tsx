@@ -2,8 +2,8 @@
 // "We recommended X. It was implemented. Here's what happened."
 // Surfaces confirmed wins where a recommendation was acted on and produced a result.
 
-import { TrendingUp, TrendingDown, Minus, Sparkles, Lightbulb, ArrowUpRight } from 'lucide-react';
-import { SectionCard, EmptyState, Skeleton } from '../ui';
+import { Sparkles, Lightbulb, ArrowUpRight } from 'lucide-react';
+import { SectionCard, EmptyState, Skeleton, TrendBadge } from '../ui';
 import { Icon } from '../ui/Icon';
 import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
@@ -13,10 +13,10 @@ import type { OutcomeWinEntry, DeltaSummary, DeltaDirection } from '../../../sha
 
 // --- Helpers -----------------------------------------------------------
 
-function deltaDirectionIcon(direction: DeltaDirection) {
-  if (direction === 'improved') return <Icon as={TrendingUp} size="md" className="text-accent-success flex-shrink-0" />;
-  if (direction === 'declined') return <Icon as={TrendingDown} size="md" className="text-accent-danger flex-shrink-0" />;
-  return <Icon as={Minus} size="md" className="text-[var(--brand-text)] flex-shrink-0" />;
+function deltaTrendValue(direction: DeltaDirection): number {
+  if (direction === 'improved') return 1;
+  if (direction === 'declined') return -1;
+  return 0;
 }
 
 function deltaColor(direction: DeltaDirection): string {
@@ -69,7 +69,13 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
 
       {/* Result */}
       <div className="flex items-center gap-2">
-        {deltaDirectionIcon(entry.delta.direction)}
+        <TrendBadge
+          value={deltaTrendValue(entry.delta.direction)}
+          hideOnZero={false}
+          iconOnly
+          size="md"
+          className="flex-shrink-0"
+        />
         <div className="t-body">
           <span className="text-[var(--brand-text)]">{entry.delta.primary_metric}: </span>
           <span className={`font-semibold ${deltaColor(entry.delta.direction)}`}>

@@ -163,13 +163,19 @@ explicit justification.
 | send-for-review-anti-pattern | backfill-complete | Pattern `Send for Review\|Flag for Client`; pathFilter `src/`; `*.tsx` files only. Pre-existing violations in `src/components/matrix/CellDetailPanel.tsx:274` and `src/components/matrix/MatrixGrid.tsx:259` suppressed with `// send-for-review-anti-pattern-ok` hatch (matrix component predates Admin Send Convention; will be migrated separately). Hatch `send-for-review-anti-pattern-ok`. Rule reports ✓ on full-repo scan after hatch comments added. |
 | prediction-showcase-ungated | customCheck-fixture | customCheck scans `src/**/*.tsx` for `<PredictionShowcaseCard` on non-comment lines and checks whether `!winsEnabled` appears on the same line or within 2 preceding lines. Pre-existing usage in `src/components/client/OverviewTab.tsx:331` suppressed with `{/* prediction-showcase-ungated-ok */}` on the immediately preceding line. Hatch `prediction-showcase-ungated-ok`. Fixture tests (Task 5) cover: bare usage trigger, guarded usage negative, hatch suppression. Rule reports ✓ on full-repo scan. |
 | inbox-action-queue-strip | backfill-complete | Pattern `ActionQueueStrip`; restricted to files named exactly `InboxTab.tsx`. Pre-existing JSDoc comment reference in `src/components/client/InboxTab.tsx:36` suppressed with `inbox-action-queue-strip-ok` appended to the comment line (pattern-based grep matches the comment; hatch is placed inline on the matched line). Hatch `inbox-action-queue-strip-ok`. Rule reports ✓ on full-repo scan after hatch comment added. |
+| Page component missing PageHeader | backfill-complete | Styleguide migration Wave 1 added `<PageHeader>` across remaining admin/client pages and fixed deep-link wiring in `Performance.tsx`. `npx tsx scripts/pr-check.ts --all` now reports ✓ for the rule. |
+| Hand-rolled gradient CTA button | backfill-complete | Wave 2 migrated remaining gradient action buttons to the shared `Button` primitive (notably `ConfirmDialog`) and added explicit hatches only where intentional legacy surfaces remain. Rule now reports ✓ on full-repo scan. |
+| Raw text-zinc-N (use --brand-text-* token) | backfill-complete | Wave 2 tokenized remaining raw text zinc classes to `--brand-text-*` variables across admin and client surfaces. Full-repo `--all` scan reports ✓. |
+| Raw bg-zinc-N (use --surface-* token) | backfill-complete | Wave 2 migrated remaining raw zinc backgrounds to `--surface-*` tokens. Full-repo `--all` scan reports ✓. |
+| Raw border-zinc-N (use --brand-border token) | backfill-complete | Wave 2 migrated remaining raw zinc border classes to `--brand-border` token usage. Full-repo `--all` scan reports ✓. |
+| Raw rounded-* literal (use --radius-* token) | backfill-complete | Wave 2 tokenized remaining rounded literals to `--radius-*` tokens and used explicit `radius-signature-lg-ok` hatches for intentional signatures. Full-repo `--all` scan reports ✓. |
+| Trend icon import outside TrendBadge | backfill-complete | Wave 1/2 migration replaced remaining up/down trend icon pairs with `TrendBadge` and added `trend-icon-ok` hatches for non-trend decorative icons. Rule now reports ✓ on full-repo scan. |
+| Hand-rolled fixed inset-0 outside overlay | backfill-complete | Wave 2 replaced remaining fixed inset overlays with shared overlay primitives (`Modal`/`Popover`/`Tooltip`) or intentional hatches on approved exceptions. Rule now reports ✓ on full-repo scan. |
 
-**Count: 99 verified-clean rules.**
+**Count: 107 verified-clean rules.**
 
-> Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
-> warn severity because a full-repo `--all` scan finds ~11 remaining
-> hand-rolled gradient CTAs across older surfaces. Promote to error in a
-> follow-up PR after the dedicated migration sweep clears the backlog.
+> Note: `Hand-rolled gradient CTA button` remains warn severity by policy so
+> intentional legacy exceptions can be hatched while migration continues.
 
 ---
 

@@ -68,7 +68,9 @@ describe('Breadcrumbs', () => {
   it('does not show tab breadcrumb segment on home', () => {
     const { container } = renderBreadcrumbs({ tab: 'home' });
     // On home tab, there should be no second '/' separator after workspace name
-    const separators = container.querySelectorAll('span.text-zinc-700');
+    const separators = Array.from(container.querySelectorAll('span')).filter(
+      (el) => el.textContent?.trim() === '/',
+    );
     // Only 1 separator: Command Center / workspace
     expect(separators).toHaveLength(1);
   });

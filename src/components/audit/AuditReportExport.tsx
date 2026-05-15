@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx to keep the orchestrator lean.
  */
 import { FileText, Download, X } from 'lucide-react';
-import { Icon } from '../ui';
+import { Icon, Modal, Button } from '../ui';
 import type { SeoAuditResult } from './types';
 
 // ── Pure helpers ────────────────────────────────────────────────────
@@ -161,38 +161,36 @@ interface ReportModalProps {
 
 export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalProps) {
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
-      {/* pr-check-disable-next-line -- modal dialog */}
-      <div className="relative max-w-md w-full mx-4 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-6" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
-          <Icon as={X} size="md" />
-        </button>
-        <h3 className="t-body font-semibold mb-1">Export SEO Report</h3>
-        <p className="t-caption text-[var(--brand-text-muted)] mb-5">Choose a format to view the audit results</p>
-        <div className="space-y-3">
-          <button
-            onClick={onExportHtml}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] transition-colors text-left"
-          >
-            <Icon as={FileText} size="lg" />
-            <div>
-              <div className="t-body font-medium">HTML Report</div>
-              <div className="t-caption text-teal-200">Beautifully formatted, client-ready report. Print to PDF.</div>
-            </div>
-          </button>
-          <button
-            onClick={onExportCsv}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-lg)] transition-colors text-left"
-          >
-            <Icon as={Download} size="lg" />
-            <div>
-              <div className="t-body font-medium">CSV Spreadsheet</div>
-              <div className="t-caption text-[var(--brand-text-muted)]">Raw data for analysis in Excel or Google Sheets.</div>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal open onClose={onClose} size="md">
+      <Modal.Header title="Export SEO Report" onClose={onClose} />
+      <Modal.Body className="space-y-3">
+        <p className="t-caption text-[var(--brand-text-muted)]">Choose a format to view the audit results</p>
+        <Button
+          onClick={onExportHtml}
+          variant="primary"
+          size="md"
+          icon={FileText}
+          className="w-full !justify-start text-left !h-auto !py-3"
+        >
+          <span className="flex flex-col items-start">
+            <span className="t-body font-medium">HTML Report</span>
+            <span className="t-caption text-teal-200">Beautifully formatted, client-ready report. Print to PDF.</span>
+          </span>
+        </Button>
+        <Button
+          onClick={onExportCsv}
+          variant="secondary"
+          size="md"
+          icon={Download}
+          className="w-full !justify-start text-left !h-auto !py-3"
+        >
+          <span className="flex flex-col items-start">
+            <span className="t-body font-medium">CSV Spreadsheet</span>
+            <span className="t-caption text-[var(--brand-text-muted)]">Raw data for analysis in Excel or Google Sheets.</span>
+          </span>
+        </Button>
+      </Modal.Body>
+    </Modal>
   );
 }
 
@@ -206,7 +204,7 @@ interface ReportViewerProps {
 
 export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col bg-black/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col bg-black/90 backdrop-blur-sm">{/* // fixed-inset-ok — intentional fullscreen report viewer surface, not a dialog modal */}
       <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface-2)] border-b border-[var(--brand-border)]">
         <div className="t-body font-medium text-[var(--brand-text-bright)]">
           {reportView === 'html' ? 'SEO Audit Report' : 'CSV Export'}

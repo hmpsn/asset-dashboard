@@ -6,7 +6,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
+import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -272,41 +272,42 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       />
       {strategyTab === 'guide' && <KeywordStrategyGuide />}
       {strategyTab === 'analysis' && <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Keyword Strategy</h3>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-            {isRealStrategy
-              ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
-              : 'AI-powered keyword mapping for your entire site'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isRealStrategy && (
-            <button
-              onClick={() => generateStrategy('incremental')}
-              disabled={generating}
-              title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
-            >
-              Update changed pages
-            </button>
-          )}
-          <button
-            onClick={() => generateStrategy('full')}
-            disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption font-medium transition-colors"
-          >
-            {generating ? (
-              <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
-            ) : isRealStrategy ? (
-              <><Icon as={RefreshCw} size="sm" /> Regenerate</>
-            ) : (
-              <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
+      <PageHeader
+        title="Keyword Strategy"
+        subtitle={
+          isRealStrategy
+            ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
+            : 'AI-powered keyword mapping for your entire site'
+        }
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {isRealStrategy && (
+              <button
+                onClick={() => generateStrategy('incremental')}
+                disabled={generating}
+                title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+              >
+                Update changed pages
+              </button>
             )}
-          </button>
-        </div>
-      </div>
+            <button
+              onClick={() => generateStrategy('full')}
+              disabled={generating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption font-medium transition-colors"
+            >
+              {generating ? (
+                <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
+              ) : isRealStrategy ? (
+                <><Icon as={RefreshCw} size="sm" /> Regenerate</>
+              ) : (
+                <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
+              )}
+            </button>
+          </div>
+        }
+      />
 
       {!isRealStrategy && !generating && (
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />

@@ -22,7 +22,7 @@ export function LoadingState({ message = 'Loading...', size = 'md', className = 
   return (
     <div className={`flex flex-col items-center justify-center ${containerClasses[size]} ${className}`}>
       <Loader2 className={`animate-spin text-teal-400 ${sizeClasses[size]} mb-3`} />
-      <p className="text-sm text-zinc-500">{message}</p>
+      <p className="text-sm text-[var(--brand-text-dim)]">{message}</p>
     </div>
   );
 }
@@ -38,7 +38,7 @@ export function Skeleton({ lines = 3, className = '' }: SkeletonProps) {
       {Array.from({ length: lines }).map((_, i) => (
         <div 
           key={i}
-          className="h-4 bg-zinc-800 rounded animate-pulse"
+          className="h-4 bg-[var(--surface-3)] rounded-[var(--radius-sm)] animate-pulse"
           style={{ 
             width: i === lines - 1 ? '60%' : '100%',
             animationDelay: `${i * 0.1}s`
@@ -63,7 +63,7 @@ export function TableSkeleton({ rows = 5, columns = 4, className = '' }: TableSk
           {Array.from({ length: columns }).map((_, colIndex) => (
             <div 
               key={colIndex}
-              className="h-3 bg-zinc-800 rounded animate-pulse flex-1"
+              className="h-3 bg-[var(--surface-3)] rounded-[var(--radius-sm)] animate-pulse flex-1"
               style={{ 
                 width: colIndex === 0 ? '40%' : colIndex === columns - 1 ? '20%' : '100%',
                 animationDelay: `${(rowIndex * columns + colIndex) * 0.05}s`

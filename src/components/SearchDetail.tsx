@@ -294,7 +294,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium">
                           {q.query}
                           {badge && (
-                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
@@ -322,7 +322,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>
                           {badge && (
-                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
@@ -363,8 +363,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <span className="text-[var(--brand-text-bright)] capitalize">{d.device.toLowerCase()}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}% · pos {d.position}</span>
                           </div>
-                          <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
                           <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
                             <span>{d.clicks.toLocaleString()} clicks</span>
@@ -381,7 +381,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 <SectionCard title="Top Countries">
                   <div className="space-y-1.5">
                     {countries.slice(0, 8).map((c, i) => (
-                      <div key={c.country} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)]/30">
+                      <div key={c.country} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                         <div className="flex items-center gap-2">
                           <span className="text-[var(--brand-text-dim)] w-3 text-right">{i + 1}</span>
                           <span className="text-[var(--brand-text-bright)]">{c.country}</span>
@@ -408,8 +408,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <span className="text-[var(--brand-text-bright)] capitalize">{st.searchType}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}%</span>
                           </div>
-                          <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
                           <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
                             <span>{st.clicks.toLocaleString()} clicks · {st.impressions.toLocaleString()} imp</span>

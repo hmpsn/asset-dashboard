@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'; // trend-icon-ok — these are severity glyphs, not directional metric trend badges.
 import { useAnomalyAlerts } from '../hooks/admin';
 import { post } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryKeys';
 import { timeAgo } from '../lib/timeAgo';
-import { Icon, Tooltip } from './ui';
+import { Icon, Tooltip, TrendBadge } from './ui';
 
 interface AnomalyAlertsProps {
   workspaceId: string;
@@ -193,9 +193,13 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                           <span className="text-[var(--brand-text-muted)]">Current: </span>
                           <span className="text-[var(--brand-text-bright)] font-medium">{anomaly.currentValue.toLocaleString()}</span>
                         </div>
-                        <div className={`t-caption-sm font-medium ${anomaly.changePct > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-                          {anomaly.changePct > 0 ? '+' : ''}{anomaly.changePct}%
-                        </div>
+                        <TrendBadge
+                          value={anomaly.changePct}
+                          suffix="%"
+                          showSign
+                          hideOnZero={false}
+                          className="t-caption-sm"
+                        />
                       </div>
                       {isAdmin && !anomaly.acknowledgedAt && (
                         <button onClick={() => handleAcknowledge(anomaly.id)}
