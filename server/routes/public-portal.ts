@@ -50,6 +50,7 @@ import {
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
+import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 
 const log = createLogger('public-portal');
 
@@ -72,49 +73,11 @@ router.get('/api/public/workspace/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
-  // Only expose safe fields for client view
-  res.json({
-    id: ws.id,
-    name: ws.name,
-    webflowSiteId: ws.webflowSiteId,
-    webflowSiteName: ws.webflowSiteName,
-    gscPropertyUrl: ws.gscPropertyUrl,
-    ga4PropertyId: ws.ga4PropertyId,
-    liveDomain: ws.liveDomain,
-    eventConfig: ws.eventConfig || [],
-    eventGroups: ws.eventGroups || [],
-    requiresPassword: !!ws.clientPassword,
-    // Feature toggles
-    clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
-    seoClientView: !!ws.seoClientView,
-    analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
-    siteIntelligenceClientView: ws.siteIntelligenceClientView != null ? !!ws.siteIntelligenceClientView : true,
-    // Business profile — safe to expose to client portal
-    businessProfile: ws.businessProfile || null,
-    autoReports: !!ws.autoReports,
-    // Branding
-    brandLogoUrl: ws.brandLogoUrl || '',
-    brandAccentColor: ws.brandAccentColor || '',
-    // Content pricing
-    contentPricing: ws.contentPricing || null,
-    // Monetization — trial-resolved tier
-    tier: computeEffectiveTier(ws),
-    baseTier: ws.tier || 'free',
-    isTrial: computeEffectiveTier(ws) === 'growth' && (ws.tier || 'free') === 'free',
-    trialDaysRemaining: ws.trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      : 0,
-    trialEndsAt: ws.trialEndsAt || null,
+  res.json(toPublicWorkspaceView(ws, {
     stripeEnabled: isStripeConfigured(),
-    billingMode: ws.billingMode || 'platform',
-    // Onboarding
-    onboardingEnabled: ws.onboardingEnabled ?? false,
-    onboardingCompleted: ws.onboardingCompleted ?? false,
-    // Auth mode
     hasClientUsers: hasClientUsers(req.params.id),
-    // Studio-level settings exposed to client portal
     bookingUrl: getBookingUrl() ?? null,
-  });
+  }));
 });
 
 // Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
