@@ -5565,3 +5565,16 @@ Bug hardening included:
 **Mutual:** Shared rails reduce regression risk during future endpoint migrations because fetch behavior, logging, and safety checks are centralized and tested once.
 
 **Files:** `server/external-fetch.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/sales-audit.ts`; `server/web-scraper.ts`; `server/routes/webflow-alt-text.ts`; `server/routes/rewrite-chat.ts`; `server/webflow-pages.ts`; `server/internal-links.ts`; `tests/unit/external-fetch-helper.test.ts`; `tests/integration/rewrite-chat-pages.test.ts`.
+
+---
+
+### 410. Workspace Mutation Helper Graduation
+**What it does:** Graduates the shared `runWorkspaceMutation` route helper from content-plan pilot usage into inbox client-action mutations. `server/routes/client-actions.ts` now routes create, admin update, and public respond writes through one helper lifecycle with explicit read-before-write guards, transaction boundaries, mapped transition/not-found error behavior, and post-mutation activity/broadcast hooks.
+
+**Agency value:** High-churn workspace-scoped writes now share one mutation lifecycle surface instead of duplicating side-effect sequencing and error-mapping logic per route branch.
+
+**Client value:** No API contract changes; client action lifecycle behavior stays the same while reducing risk of missing activity or broadcast feedback-loop regressions.
+
+**Mutual:** A contract test now guards helper adoption across the highest-churn routes so future refactors don't silently drift away from the lifecycle rails.
+
+**Files:** `server/routes/client-actions.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/integration/workspace-mutation-helper-pilot.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.

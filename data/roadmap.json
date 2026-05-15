@@ -153,8 +153,9 @@
           "source": "Product engineering base-layer review 2026-05-13",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive."
+          "status": "done",
+          "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive.\nShipped 2026-05-15: promoted `runWorkspaceMutation` beyond the content-plan pilot by migrating `server/routes/client-actions.ts` admin/client mutation paths (create, admin update, public respond) to the shared lifecycle helper with route-specific error mapping and explicit read-before-write guards. Added helper-adoption contract coverage (`tests/contract/workspace-mutation-helper-adoption.test.ts`) and refreshed integration helper coverage naming (`tests/integration/workspace-mutation-helper-pilot.test.ts`) to keep the pattern auditable in high-churn workspace-scoped writes.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "seo-editor-job-safety-page-state-wiring",

@@ -128,7 +128,7 @@ afterAll(async () => {
   }
 });
 
-describe('workspace mutation helper pilot (content templates + content matrices)', () => {
+describe('workspace mutation helper (content templates + content matrices)', () => {
   it('template create success writes state, activity, and one content update broadcast', async () => {
     const res = await postJson(`/api/content-templates/${workspaceA}`, {
       name: 'Pilot Template',
