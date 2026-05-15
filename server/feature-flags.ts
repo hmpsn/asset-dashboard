@@ -1,4 +1,11 @@
-import { FEATURE_FLAGS, type FeatureFlagKey } from '../shared/types/feature-flags.js';
+import {
+  FEATURE_FLAGS,
+  FEATURE_FLAG_CATALOG,
+  FEATURE_FLAG_KEYS,
+  type FeatureFlagAdminMeta,
+  type FeatureFlagKey,
+  type FeatureFlagValueSource,
+} from '../shared/types/feature-flags.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
@@ -21,7 +28,7 @@ const log = createLogger('feature-flags');
 
 const envOverrides: Partial<Record<FeatureFlagKey, boolean>> = {};
 
-for (const key of Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]) {
+for (const key of FEATURE_FLAG_KEYS) {
   const envKey = `FEATURE_${key.toUpperCase().replace(/-/g, '_')}`;
   const val = process.env[envKey];
   if (val !== undefined) {
@@ -85,7 +92,7 @@ export function isFeatureEnabled(flag: FeatureFlagKey): boolean {
 export function getAllFlags(): Record<FeatureFlagKey, boolean> {
   const dbOverrides = loadDbOverrides(); // single DB read shared across all flags
   const result = {} as Record<FeatureFlagKey, boolean>;
-  for (const key of Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]) {
+  for (const key of FEATURE_FLAG_KEYS) {
     result[key] = resolveFlag(key, dbOverrides);
   }
   return result;
@@ -95,15 +102,10 @@ export function getAllFlags(): Record<FeatureFlagKey, boolean> {
  * Returns all flags with source metadata for the admin UI.
  * Source indicates where the current value came from.
  */
-export function getAllFlagsWithMeta(): Array<{
-  key: FeatureFlagKey;
-  enabled: boolean;
-  source: 'db' | 'env' | 'default';
-  default: boolean;
-}> {
+export function getAllFlagsWithMeta(): FeatureFlagAdminMeta[] {
   const dbOverrides = loadDbOverrides(); // single DB read shared across all flags and source checks
-  return (Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]).map(key => {
-    let source: 'db' | 'env' | 'default';
+  return FEATURE_FLAG_KEYS.map(key => {
+    let source: FeatureFlagValueSource;
     if (key in dbOverrides) source = 'db';
     else if (key in envOverrides) source = 'env';
     else source = 'default';
@@ -113,6 +115,9 @@ export function getAllFlagsWithMeta(): Array<{
       enabled: resolveFlag(key, dbOverrides),
       source,
       default: FEATURE_FLAGS[key],
+      label: FEATURE_FLAG_CATALOG[key].label,
+      group: FEATURE_FLAG_CATALOG[key].group,
+      lifecycle: FEATURE_FLAG_CATALOG[key].lifecycle,
     };
   });
 }

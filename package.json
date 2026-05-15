@@ -29,6 +29,7 @@
     "verify:product-surface": "tsx scripts/product-surface-map.ts",
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
     "verify:observability": "tsx scripts/report-platform-observability.ts",
+    "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",

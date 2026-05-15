@@ -4,156 +4,20 @@ import { put, get } from '../api/client';
 import { useToast } from './Toast';
 import { Icon, Toggle } from './ui';
 import { queryKeys } from '../lib/queryKeys';
+import {
+  FEATURE_FLAG_GROUPS,
+  type FeatureFlagAdminMeta,
+  type FeatureFlagValueSource,
+} from '../../shared/types/feature-flags';
 
-interface FlagMeta {
-  key: string;
-  enabled: boolean;
-  source: 'db' | 'env' | 'default';
-  default: boolean;
-}
-
-// FLAG_GROUPS and FLAG_LABELS are intentionally maintained alongside FEATURE_FLAGS
-// in shared/types/feature-flags.ts. When adding a new flag:
-//   1. Add the key to FEATURE_FLAGS (source of truth)
-//   2. Add it to the appropriate FLAG_GROUPS entry (or it falls into the "Other" bucket)
-//   3. Add a human-readable label to FLAG_LABELS (or the raw key is displayed as fallback)
-const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
-  {
-    label: 'Outcome Intelligence Engine',
-    keys: [
-      'outcome-tracking',
-      'outcome-dashboard',
-      'outcome-playbooks',
-      'outcome-external-detection',
-      'outcome-ai-injection',
-      'outcome-client-reporting',
-      'outcome-predictive',
-    ],
-  },
-  {
-    label: 'Copy & Brand Engine',
-    keys: ['copy-engine', 'copy-engine-voice', 'copy-engine-pipeline'],
-  },
-  {
-    label: 'Self-Service Onboarding',
-    keys: ['self-service-onboarding', 'self-service-gsc-ga4'],
-  },
-  {
-    label: 'Team & Collaboration',
-    keys: ['team-collaboration'],
-  },
-  {
-    label: 'White-Label',
-    keys: ['white-label'],
-  },
-  {
-    label: 'Workspace Intelligence Bridges',
-    keys: [
-      'intelligence-shadow-mode',
-      'bridge-outcome-reweight',
-      'bridge-decay-suggested-brief',
-      'bridge-strategy-invalidate',
-      'bridge-insight-to-action',
-      'bridge-page-analysis-invalidate',
-      'bridge-action-auto-resolve',
-      'bridge-content-to-insight',
-      'bridge-schema-to-insight',
-      'bridge-anomaly-boost',
-      'bridge-settings-cascade',
-      'bridge-audit-page-health',
-      'bridge-action-annotation',
-      'bridge-annotation-to-insight',
-      'bridge-audit-site-health',
-      'bridge-audit-auto-resolve',
-      'bridge-briefing-candidate-refresh',
-      'bridge-client-signal',
-    ],
-  },
-  {
-    label: 'Deep Diagnostics',
-    keys: ['deep-diagnostics'],
-  },
-  {
-    label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders', 'client-brand-section', 'seo-editor-unified'],
-  },
-  {
-    label: 'Client Insights Briefing',
-    keys: ['client-briefing-v2', 'client-briefing-v2-ai-polish'],
-  },
-  {
-    label: 'Client IA Redesign',
-    keys: ['new-inbox-ia', 'client-wins-surface'],
-  },
-  {
-    label: 'Schema AI',
-    keys: ['schema-ai-element-classifier'],
-  },
-];
-
-const FLAG_LABELS: Record<string, string> = {
-  // Outcome Intelligence Engine
-  'outcome-tracking':           'Action tracking & measurement',
-  'outcome-dashboard':          'Outcomes admin dashboard',
-  'outcome-playbooks':          'Playbook pattern detection',
-  'outcome-external-detection': 'External change detection (weekly)',
-  'outcome-ai-injection':       'Inject outcomes into AI context',
-  'outcome-client-reporting':   'Client-facing outcome reporting',
-  'outcome-predictive':         'Predictive scoring (future)',
-  // Copy & Brand Engine
-  'copy-engine':                'Copy Engine — core',
-  'copy-engine-voice':          'Copy Engine — voice calibration',
-  'copy-engine-pipeline':       'Copy Engine — pipeline',
-  // Self-Service
-  'self-service-onboarding':    'Self-service Webflow onboarding',
-  'self-service-gsc-ga4':       'Self-service GSC / GA4 connection',
-  // Team
-  'team-collaboration':         'Team management',
-  // White-label
-  'white-label':                'White-label domains',
-  // Workspace Intelligence Bridges
-  'intelligence-shadow-mode':        'Shadow-mode comparison logging',
-  'bridge-outcome-reweight':         '#1: Outcome → reweight insight scores',
-  'bridge-decay-suggested-brief':    '#2: Content decay → suggested brief',
-  'bridge-strategy-invalidate':      '#3: Strategy update → cache invalidation',
-  'bridge-insight-to-action':        '#4: Insight resolved → tracked action',
-  'bridge-page-analysis-invalidate': '#5: Page analysis → cache invalidation',
-  'bridge-action-auto-resolve':      '#7: Action recorded → auto-resolve insights',
-  'bridge-content-to-insight':       '#8: Content published → staleness insight',
-  'bridge-schema-to-insight':        '#9: Schema validation → schema health insight',
-  'bridge-anomaly-boost':            '#10: Anomaly → boost insight severity',
-  'bridge-settings-cascade':         '#11: Settings change → cascade invalidation',
-  'bridge-audit-page-health':        '#12: Audit → page health insights',
-  'bridge-action-annotation':        '#13: Action recorded → analytics annotation',
-  'bridge-annotation-to-insight':    '#14: Annotation → insight correlation',
-  'bridge-audit-site-health':        '#15: Audit → site health insight',
-  'bridge-audit-auto-resolve':           'IG-4: Auto-resolve audit_finding insights on clean audit',
-  'bridge-briefing-candidate-refresh':   'CB-1: Audit complete → briefing candidate-pool freshness',
-  'bridge-client-signal':                '#16: Client feedback → signal insights',
-  // Platform Intelligence Enhancements
-  'smart-placeholders':   'Smart placeholders (admin chips + client ghost text)',
-  'client-brand-section': 'Client portal — Brand tab (business profile)',
-  'seo-editor-unified':   'SEO editor — merged static + CMS with collection filter',
-  // Deep Diagnostics
-  'deep-diagnostics':     'Deep diagnostics mode',
-  // Client Insights Briefing
-  'client-briefing-v2':           'Client insights briefing — v2 layout',
-  'client-briefing-v2-ai-polish': 'Client briefing — AI headline polish (premium only)',
-  // Client IA Redesign (PRs 1.2 + 1.3, May 2026)
-  'new-inbox-ia':        'New 3-section inbox layout (Decisions / Reviews / Conversations)',
-  'client-wins-surface': 'Wins surface in Insights page (hides PredictionShowcaseCard)',
-  // Schema AI
-  'schema-ai-element-classifier': 'Schema AI — page-element role classifier',
-};
-
-const SOURCE_LABEL: Record<FlagMeta['source'], string> = {
-  db:      'Admin override',
-  env:     'Env var',
+const SOURCE_LABEL: Record<FeatureFlagValueSource, string> = {
+  db: 'Admin override',
+  env: 'Env var',
   default: 'Default',
 };
 
-async function fetchAdminFlags(): Promise<FlagMeta[]> {
-  return get<FlagMeta[]>('/api/admin/feature-flags');
+async function fetchAdminFlags(): Promise<FeatureFlagAdminMeta[]> {
+  return get<FeatureFlagAdminMeta[]>('/api/admin/feature-flags');
 }
 
 export function FeatureFlagSettings() {
@@ -177,7 +41,7 @@ export function FeatureFlagSettings() {
     onError: () => toast('Failed to update flag'),
   });
 
-  const flagMap = new Map<string, FlagMeta>(flags?.map(f => [f.key, f]) ?? []);
+  const flagMap = new Map<string, FeatureFlagAdminMeta>(flags?.map(f => [f.key, f]) ?? []);
 
   return (
     // pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally
@@ -204,8 +68,8 @@ export function FeatureFlagSettings() {
         </div>
       ) : (
         <div className="divide-y divide-[var(--brand-border)]/60">
-          {FLAG_GROUPS.map(group => {
-            const groupFlags = group.keys.map(k => flagMap.get(k)).filter(Boolean) as FlagMeta[];
+          {FEATURE_FLAG_GROUPS.map(group => {
+            const groupFlags = group.keys.map(k => flagMap.get(k)).filter(Boolean) as FeatureFlagAdminMeta[];
             if (groupFlags.length === 0) return null;
             return (
               <div key={group.label} className="px-5 py-3 space-y-2.5">
@@ -225,9 +89,8 @@ export function FeatureFlagSettings() {
             );
           })}
 
-          {/* Any flags not in a defined group */}
           {(() => {
-            const defined = new Set(FLAG_GROUPS.flatMap(g => g.keys));
+            const defined = new Set(FEATURE_FLAG_GROUPS.flatMap(g => g.keys));
             const ungrouped = (flags ?? []).filter(f => !defined.has(f.key));
             if (ungrouped.length === 0) return null;
             return (
@@ -252,14 +115,13 @@ export function FeatureFlagSettings() {
 }
 
 interface FlagRowProps {
-  flag: FlagMeta;
+  flag: FeatureFlagAdminMeta;
   disabled: boolean;
   onToggle: (enabled: boolean) => void;
   onReset: () => void;
 }
 
 function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
-  const label = FLAG_LABELS[flag.key] ?? flag.key;
   const isOverridden = flag.source === 'db';
 
   return (
@@ -272,13 +134,17 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
         disabled={disabled}
       />
 
-      {/* Label */}
       <div className="flex-1 min-w-0">
-        <span className="t-caption text-[var(--brand-text)] truncate">{label}</span>
+        <span className="t-caption text-[var(--brand-text)] truncate">{flag.label}</span>
         <span className="ml-2 t-caption-sm font-mono text-[var(--brand-text-muted)]">{flag.key}</span>
+        <div
+          className="t-caption-sm text-[var(--brand-text-muted)] truncate"
+          title={`Owner: ${flag.lifecycle.owner} | Target: ${flag.lifecycle.rolloutTarget} | Remove when: ${flag.lifecycle.removalCondition} | Roadmap: ${flag.lifecycle.linkedRoadmapItemId}`}
+        >
+          {flag.lifecycle.owner} · {flag.lifecycle.rolloutTarget} · review {flag.lifecycle.staleAuditCadence} (last {flag.lifecycle.lastReviewedAt})
+        </div>
       </div>
 
-      {/* Source badge */}
       <span
         className={`t-caption-sm px-1.5 py-0.5 rounded font-medium shrink-0 ${
           flag.source === 'db'
@@ -291,7 +157,6 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
         {SOURCE_LABEL[flag.source]}
       </span>
 
-      {/* Reset button — only shown when DB override is set */}
       {isOverridden ? (
         <button
           onClick={onReset}

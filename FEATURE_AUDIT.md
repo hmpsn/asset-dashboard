@@ -5681,3 +5681,16 @@ Bug hardening included:
 **Mutual:** Creates a stable base for recurring platform-health cadences and future deprecation/flag lifecycle work without forcing immediate route removals.
 
 **Files:** `scripts/product-surface-map.ts`; `tests/unit/product-surface-map.test.ts`; `docs/rules/product-surface-rationalization.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 419. Feature Flag Lifecycle Management (Wave 5)
+**What it does:** Establishes a single-source-of-truth lifecycle contract for every feature flag. `shared/types/feature-flags.ts` now carries typed catalog metadata for each flag (owner, created date, rollout target, removal condition, linked roadmap item, stale-audit cadence, last reviewed date) alongside centralized labels/grouping used by the admin UI. Server metadata responses now include this lifecycle payload (`FeatureFlagAdminMeta`) so flag operators can see lifecycle context where they toggle rollout behavior. Added a dedicated lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) that validates metadata/date/roadmap-link integrity and emits a review-due queue.
+
+**Agency value:** Prevents hidden architecture debt from stale dark-launch toggles by making ownership and cleanup conditions explicit, test-backed, and runnable in recurring platform-health sweeps.
+
+**Client value:** Safer, clearer feature rollout behavior because flags are governed with visible ownership and cleanup conditions, reducing long-lived split-path regressions.
+
+**Mutual:** Aligns product rollout discipline with operational safety by joining runtime toggles, documentation, and roadmap traceability in one contract.
+
+**Files:** `shared/types/feature-flags.ts`; `server/feature-flags.ts`; `src/components/FeatureFlagSettings.tsx`; `scripts/feature-flag-lifecycle.ts`; `tests/unit/feature-flag-lifecycle.test.ts`; `tests/component/FeatureFlagSettings.test.tsx`; `docs/rules/feature-flag-lifecycle.md`; `docs/rules/development-patterns.md`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
