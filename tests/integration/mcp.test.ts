@@ -258,3 +258,47 @@ describe('get_seo_context', () => {
     expect(result).not.toBeNull();
   });
 });
+
+describe('get_client_signals', () => {
+  it('returns client signals for a known workspace', async () => {
+    const result = await mcpToolCall('get_client_signals', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown> | null;
+    // Result may be null/empty for a test workspace with no client activity
+    expect(result === null || typeof result === 'object').toBe(true);
+  });
+
+  it('returns an error for an unknown workspace', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name: 'get_client_signals', arguments: { workspaceId: 'nonexistent' } },
+        id: 5,
+      },
+      MCP_TEST_KEY,
+    );
+    const body = await res.json() as { result?: { isError?: boolean } };
+    expect(body.result?.isError).toBe(true);
+  });
+});
+
+describe('get_pending_work', () => {
+  it('returns pending work for a known workspace', async () => {
+    const result = await mcpToolCall('get_pending_work', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown>;
+    expect(typeof result.pendingApprovals).toBe('number');
+    expect(typeof result.pendingRequests).toBe('number');
+    expect(typeof result.pendingActions).toBe('number');
+    expect(Array.isArray(result.approvalBatches)).toBe(true);
+    expect(Array.isArray(result.requests)).toBe(true);
+    expect(Array.isArray(result.clientActions)).toBe(true);
+  });
+
+  it('returns cross-workspace pending work when no workspaceId provided', async () => {
+    const result = await mcpToolCall('get_pending_work', {}) as Record<string, unknown>;
+    expect(typeof result.totalPending).toBe('number');
+    expect(Array.isArray(result.workspaces)).toBe(true);
+  });
+});
