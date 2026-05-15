@@ -36,7 +36,6 @@ import { PulseStrip, type PulseStripData } from './PulseStrip';
 import { DataSpread, spreadItemFromStory, type SpreadItem } from './DataSpread';
 import { RecommendedForYou } from './RecommendedForYou';
 import { renderDrillInUrl } from './drillIn';
-import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { WinsSurface } from './WinsSurface';
 
 interface InsightsBriefingPageProps {
@@ -63,7 +62,6 @@ export function InsightsBriefingPage({
 }: InsightsBriefingPageProps) {
   const navigate = useNavigate();
   const isFree = effectiveTier === 'free';
-  const winsEnabled = useFeatureFlag('client-wins-surface');
 
   // ── Briefing draft (paid only) ──
   const { data: briefing, isLoading } = useClientBriefing(workspaceId, !isFree);
@@ -255,9 +253,7 @@ export function InsightsBriefingPage({
       ) : hasDigest ? (
         <MonthlyDigestContent digest={digest} />
       ) : null}
-      {winsEnabled && (
-        <WinsSurface workspaceId={workspaceId} effectiveTier={effectiveTier} />
-      )}
+      <WinsSurface workspaceId={workspaceId} effectiveTier={effectiveTier} />
       <DataSpread wins={spreadColumns.wins} risks={spreadColumns.risks} />
       <RecommendedForYou
         recommendations={recommendations}

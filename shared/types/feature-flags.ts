@@ -59,7 +59,6 @@ export const FEATURE_FLAGS = {
   // Platform Intelligence Enhancements
   'smart-placeholders': false,
   'client-brand-section': false,
-  'seo-editor-unified': false,
 
   // Client Insights Briefing (5-phase feature)
   'client-briefing-v2': false,
@@ -74,7 +73,6 @@ export const FEATURE_FLAGS = {
 
   // Client IA Redesign Phase 1 (PRs 1.2 + 1.3)
   'new-inbox-ia': false,
-  'client-wins-surface': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -608,20 +606,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-  'seo-editor-unified': {
-    label: 'SEO editor — merged static + CMS with collection filter',
-    group: 'Platform Intelligence Enhancements',
-    lifecycle: {
-      owner: 'seo-health',
-      createdAt: '2026-05-06',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once unified SEO editor fully replaces legacy paths in production.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'client-briefing-v2': {
     label: 'Client insights briefing — v2 layout',
     group: 'Client Insights Briefing',
@@ -662,20 +646,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: REVIEWED_AT,
     },
   },
-  'client-wins-surface': {
-    label: 'Wins surface in Insights page (hides PredictionShowcaseCard)',
-    group: 'Client IA Redesign',
-    lifecycle: {
-      owner: 'outcomes-roi',
-      createdAt: '2026-05-08',
-      rolloutTarget: 'tiered-client-rollout',
-      removalCondition: 'Remove once wins surface is universally enabled for eligible client tiers.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.inboxIa,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
-
   'schema-ai-element-classifier': {
     label: 'Schema AI — page-element role classifier',
     group: 'Schema AI',
@@ -749,7 +719,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders', 'client-brand-section', 'seo-editor-unified'],
+    keys: ['smart-placeholders', 'client-brand-section'],
   },
   {
     label: 'Client Insights Briefing',
@@ -757,7 +727,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Client IA Redesign',
-    keys: ['new-inbox-ia', 'client-wins-surface'],
+    keys: ['new-inbox-ia'],
   },
   {
     label: 'Schema AI',

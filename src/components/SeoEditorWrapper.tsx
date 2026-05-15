@@ -7,14 +7,12 @@ import { PendingApprovals } from './PendingApprovals';
 import type { FixContext } from '../App';
 import { useCmsEditor, useSeoEditor } from '../hooks/admin';
 import { pageEditStatesKey } from '../hooks/usePageEditStates';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { resolveSeoEditorWriteTargets } from './editor/seoWriteTargetResolver';
 import { Icon, SectionCard } from './ui';
 import { SEO_EDITOR_TARGET_TYPES } from '../../shared/types/seo-editor-write-target';
 import type { SeoEditorTargetType } from '../../shared/types/seo-editor-write-target';
 
 type SourceFilter = 'all' | SeoEditorTargetType;
-type EditorTab = 'pages' | 'cms';
 
 interface Props {
   siteId: string;
@@ -23,47 +21,7 @@ interface Props {
 }
 
 export function SeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
-  const unifiedEditorEnabled = useFeatureFlag('seo-editor-unified');
-
-  if (!unifiedEditorEnabled) {
-    return <LegacySeoEditorWrapper siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />;
-  }
-
   return <UnifiedSeoEditorWrapper siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />;
-}
-
-function LegacySeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
-  const [tab, setTab] = useState<EditorTab>('pages');
-
-  return (
-    <div>
-      <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
-        {([
-          { id: 'pages' as const, label: 'Pages', icon: Pencil },
-          { id: 'cms' as const, label: 'CMS Collections', icon: Database },
-        ]).map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-              tab === t.id
-                ? 'border-[var(--teal)] text-accent-brand'
-                : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-            }`}
-          >
-            <Icon as={t.icon} size="sm" />
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: tab === 'pages' ? undefined : 'none' }}>
-        <SeoEditor siteId={siteId} workspaceId={workspaceId} fixContext={fixContext} />
-      </div>
-      <div style={{ display: tab === 'cms' ? undefined : 'none' }}>
-        <CmsEditor siteId={siteId} workspaceId={workspaceId} />
-      </div>
-    </div>
-  );
 }
 
 function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {

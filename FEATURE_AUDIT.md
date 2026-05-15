@@ -5431,14 +5431,14 @@ Bug hardening included:
 
 ---
 
-### 398. Client Wins Surface (`client-wins-surface` flag)
-**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. Mutually exclusive with `PredictionShowcaseCard` ("We called it"): flag off → PredictionShowcaseCard remains on OverviewTab, WinsSurface hidden; flag on → WinsSurface shows, PredictionShowcaseCard hidden. Mutual-exclusivity invariant enforced by pr-check rule.
+### 398. Client Wins Surface
+**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. This surface is now the promoted default (the temporary `client-wins-surface` flag has been sunset).
 
 **Agency value:** Closes the loop on recommendations — shows which tracked actions led to measurable outcomes, giving account managers proof points for client retention conversations.
 
 **Client value:** Surfaces concrete wins ("We called it — your traffic grew 23%") in the client briefing page; Growth+ sees full win cards; Free tier sees a win-count teaser prompting upgrade.
 
-**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard enforced by pr-check rule `prediction-showcase-ungated`.
+**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard remains enforced by pr-check rule `prediction-showcase-ungated`.
 
 **Files:** `src/components/client/Briefing/WinsSurface.tsx`; `src/hooks/client/useClientOutcomeWins.ts`; `server/routes/public-portal.ts` (`GET /api/public/outcomes/:wsId/wins`); `shared/types/outcomes.ts` (score field); `tests/unit/wins-surface.test.tsx`; `tests/integration/outcome-wins.test.ts`.
 
@@ -5592,7 +5592,7 @@ Bug hardening included:
 ---
 
 ### 411. Unified SEO Editor Surface Quality Fixes
-**What it does:** Resolves staging follow-up issues in the `seo-editor-unified` flag path by rendering one shared SEO-scoped `PendingApprovals` panel in unified mode and disabling duplicate nested panels inside static/CMS child sections. It also enforces effective title fallback semantics for CMS items (blank SEO title now falls back to item name) in both resolver output and preview rendering, and removes extra UI truncation on CMS approval history/value summaries.
+**What it does:** Resolves staging follow-up issues in the unified SEO Editor path by rendering one shared SEO-scoped `PendingApprovals` panel in unified mode and disabling duplicate nested panels inside static/CMS child sections. It also enforces effective title fallback semantics for CMS items (blank SEO title now falls back to item name) in both resolver output and preview rendering, and removes extra UI truncation on CMS approval history/value summaries. The temporary `seo-editor-unified` rollout flag has been sunset, so unified is now the only runtime path.
 
 **Agency value:** Eliminates duplicate review surfaces and tightens cross-component title semantics without changing backend route contracts.
 
