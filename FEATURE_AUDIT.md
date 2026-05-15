@@ -541,6 +541,8 @@ A comprehensive value assessment of every feature in the platform — **361 feat
 
 **Admin button primitive sweep (2026-05-15):** Parallel Wave follow-up migrated high-traffic admin controls from raw `<button>` markup to shared action primitives (`Button`, `IconButton`, `ClickableRow`) across SEO Editor action surfaces (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls (Google connect/disconnect, storage refresh, prune actions, booking save), Workspace Home action links/status cards, and SchemaSuggester top controls. Verified by style-drift report improvement from `raw_button_unallowlisted_count: 891 → 855`, `non_primitive_action_count: 876 → 840`, and admin raw-button count `753 → 717`.
 
+**Admin settings + audit follow-up sweep (2026-05-15):** Continued migration of admin control surfaces to shared action primitives across `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and the SEO Audit share banner. Replaced raw CTA/button stacks and icon-only action buttons with `Button` / `IconButton` while preserving existing behavior and tokens. Verified by style-drift report improvement to `raw_button_unallowlisted_count: 808`, `non_primitive_action_count: 793`, and admin raw-button count `670`.
+
 **Status:** Phases 0, 2, 3, A, B, C, D, follow-up sweep, and final promotion complete. Phase 1 (primitive implementation — superseded by Phase A) and Phase 4 (light-theme parity validation) remain. 20 warn-level rules remain with active violations for future cleanup passes.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.

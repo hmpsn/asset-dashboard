@@ -3,7 +3,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink, Server, AlertTriangle, Clock3,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button, IconButton } from '../ui';
 import { useIntegrationHealth } from '../../hooks/admin/useIntegrationHealth';
 import type { IntegrationHealthItem } from '../../../shared/types/integration-health';
 
@@ -104,16 +104,29 @@ export function ConnectionsTab({
                   className="flex-1 px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                   autoFocus
                 />
-                <button onClick={handleDomainSave} className="px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors">Save</button>
-                <button onClick={() => setDomainEditing(false)} className="px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption-sm font-medium transition-colors">Cancel</button>
+                <Button onClick={handleDomainSave} size="sm" className="px-2.5">
+                  Save
+                </Button>
+                <Button
+                  onClick={() => setDomainEditing(false)}
+                  size="sm"
+                  variant="secondary"
+                  className="px-2.5 text-[var(--brand-text)]"
+                >
+                  Cancel
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2 flex-1">
                 <span className="t-caption text-[var(--brand-text-bright)] font-mono">{currentDomain || <span className="text-[var(--brand-text-muted)] italic">Not set</span>}</span>
-                <button
+                <Button
                   onClick={() => { setDomainDraft(currentDomain.replace(/^https?:\/\//, '')); setDomainEditing(true); }}
-                  className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors"
-                >Edit</button>
+                  variant="link"
+                  size="sm"
+                  className="no-underline text-teal-400 hover:text-teal-300"
+                >
+                  Edit
+                </Button>
               </div>
             )}
           </div>
@@ -133,14 +146,18 @@ export function ConnectionsTab({
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
               <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Connected</span>
-              <button onClick={disconnectGoogle} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Disconnect">
-                <Icon as={LogOut} size="md" className="text-[var(--brand-text-muted)]" />
-              </button>
+              <IconButton
+                onClick={disconnectGoogle}
+                icon={LogOut}
+                label="Disconnect Google"
+                title="Disconnect"
+                size="md"
+              />
             </div>
           ) : googleStatus?.configured ? (
-            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors">
-              <Icon as={LogIn} size="md" /> Connect
-            </button>
+            <Button onClick={connectGoogle} icon={LogIn} size="md" className="px-3">
+              Connect
+            </Button>
           ) : (
             <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Not configured</span>
           )}
