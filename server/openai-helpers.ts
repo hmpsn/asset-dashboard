@@ -10,6 +10,7 @@ import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
 import { stripCodeFences } from './helpers.js';
 import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { recordOperationTrace } from './platform-observability.js';
 
 const log = createLogger('openai');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -396,6 +397,14 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       // Track usage
       const durationMs = Date.now() - callStartMs;
       logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs });
+      recordOperationTrace({
+        source: 'ai',
+        operation: feature,
+        status: 'success',
+        durationMs,
+        workspaceId,
+        message: `${model} call completed`,
+      });
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
@@ -405,7 +414,17 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
         await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
         continue;
       }
-      if (attempt === maxRetries) throw err;
+      if (attempt === maxRetries) {
+        recordOperationTrace({
+          source: 'ai',
+          operation: feature,
+          status: 'error',
+          durationMs: Date.now() - callStartMs,
+          workspaceId,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
       // Generic retry for network errors
       log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
       await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);

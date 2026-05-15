@@ -142,8 +142,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "3-5h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Improve the ability to answer 'what happened?' with per-workspace operation traces, failed job/error dashboards, external API failure rates, AI cost and latency by feature, slow route tracking, and last-success timestamps for critical syncs."
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added platform observability telemetry capture for operation traces, slow-route tracking, AI outcomes, external provider outcomes (SEMRush/DataForSEO), and job lifecycle traces. Added typed workspace observability contracts and report builder in shared and server modules, workspace-scoped API endpoint /api/observability/:workspaceId, and a CLI report via npm run verify:observability. The report covers failed jobs, external API failure rates and latency, AI cost and latency by feature, slow-route leaderboards, and critical sync last-success timestamps. Added workflow docs and integration coverage for the endpoint.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-reliability-release-safety",

@@ -66,7 +66,6 @@ explicit justification.
 |-----------|-------------|---------------|
 | Purple in client components | regex-shell | Simple literal `purple-`; grep succeeds; zero hits in `src/components/client/` confirmed. |
 | Forbidden hues (violet/indigo) in components | regex-shell | Pattern `(violet-\|indigo-)`; grep succeeds; zero hits in `src/components/` confirmed via manual grep. |
-| Bare JSON.parse on server | regex-shell | Pattern `JSON\.parse\(`; pathFilter `server/`; 22 exclusions for legitimate non-DB parse sites; zero remaining hits confirmed via manual grep. |
 | Banned hedge words in briefing templates | regex-shell | Pattern `\b(potentially\|could\|may\|appears to\|suggests\|might\|seems)\b`; pathFilter `server/briefing-templates/`; new-with-feature (Phase 2.5a of client-insights-redesign) — the directory is created in the same PR, so it starts at zero by construction. Hatch line `// hedge-ok` for legitimate cited-source hedges. |
 | Hard-coded studio name | regex-shell | Pattern `hmpsn[ .]studio`; two excludes (`server/constants.ts`, `src/constants.ts`); three excludeLines for SVG alt text; `tests/` dir in EXCLUDED_DIRS so test fixtures don't count; zero hits in scanned dirs. |
 | formatBrandVoiceForPrompt reintroduction | regex-manual | Pattern `\bformatBrandVoiceForPrompt\b`; verified both directions: (a) `grep -rn --include='*.ts' --include='*.tsx' -E '\bformatBrandVoiceForPrompt\b' server/ src/` returns zero hits (the function was deleted in PR #168); (b) regex matches the synthetic trigger `const x = formatBrandVoiceForPrompt("test");`. Excludes cover `tests/` (legitimate "this was deleted" comments), `.codesight/` (auto-generated), and `scripts/pr-check.ts` (the rule itself references the name in its error message). Do-not-reintroduce rule; the only way this flips from ✓ to a match is if someone re-adds the helper, which is exactly what we want to block. |
@@ -91,7 +90,6 @@ explicit justification.
 | Raw ai_estimate string in server files | regex-shell | Literal `'ai_estimate'`; grep succeeds. |
 | replaceAllPageKeywords called outside keyword-strategy route | regex-shell | Literal function name; grep succeeds. |
 | getBacklinksOverview called outside workspace intelligence SEO context | regex-shell | Literal function name; grep succeeds. |
-| Silent bare catch in server files | regex-shell | Pattern `\} catch \{$`; end-anchor; grep succeeds. Expanded from workspace-intelligence.ts to all server/ files after #576 broad catch hardening. |
 | useGlobalAdminEvents import restriction | customCheck-fixture | P1.1 Round 2 fix — converted to customCheck with dual-quote regex and inline+above-line hatch. 6 fixture tests cover all paths. |
 | getOrCreate* function returns nullable | customCheck-fixture | P1.2 Round 2 fix — depth-tracked `findReturnRegionEnd()` walker replaced fragile `.search(/[{=]/)`. 11 fixture tests cover object-literal, Promise, Array, arrow, intersection, and non-null return shapes. |
 | Record<string, unknown> in shared/types | regex-shell | Pattern `Record<string,\s*unknown>`; grep succeeds. |
@@ -164,7 +162,7 @@ explicit justification.
 | prediction-showcase-ungated | customCheck-fixture | customCheck scans `src/**/*.tsx` for `<PredictionShowcaseCard` on non-comment lines and checks whether `!winsEnabled` appears on the same line or within 2 preceding lines. Pre-existing usage in `src/components/client/OverviewTab.tsx:331` suppressed with `{/* prediction-showcase-ungated-ok */}` on the immediately preceding line. Hatch `prediction-showcase-ungated-ok`. Fixture tests (Task 5) cover: bare usage trigger, guarded usage negative, hatch suppression. Rule reports ✓ on full-repo scan. |
 | inbox-action-queue-strip | backfill-complete | Pattern `ActionQueueStrip`; restricted to files named exactly `InboxTab.tsx`. Pre-existing JSDoc comment reference in `src/components/client/InboxTab.tsx:36` suppressed with `inbox-action-queue-strip-ok` appended to the comment line (pattern-based grep matches the comment; hatch is placed inline on the matched line). Hatch `inbox-action-queue-strip-ok`. Rule reports ✓ on full-repo scan after hatch comment added. |
 
-**Count: 99 verified-clean rules.**
+**Count: 97 verified-clean rules.**
 
 > Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
 > warn severity because a full-repo `--all` scan finds ~11 remaining

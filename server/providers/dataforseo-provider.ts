@@ -9,6 +9,7 @@ import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
+import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -221,7 +222,9 @@ interface DataForSeoResponse {
   }>;
 }
 
-async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoResponse> {
+async function apiCall(endpoint: string, body: unknown[], workspaceId?: string): Promise<DataForSeoResponse> {
+  const startedAt = Date.now();
+  const operation = `dataforseo:${endpoint}`;
   let json: DataForSeoResponse;
   try {
     json = await fetchProviderJson<DataForSeoResponse>({
@@ -238,6 +241,23 @@ async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoRes
     });
   } catch (err) {
     if (isExternalFetchError(err)) {
+      const durationMs = Date.now() - startedAt;
+      recordExternalApiTelemetry({
+        provider: 'dataforseo',
+        endpoint,
+        workspaceId,
+        durationMs,
+        status: 'error',
+        errorKind: err.kind,
+      });
+      recordOperationTrace({
+        source: 'integration',
+        operation,
+        status: 'error',
+        workspaceId,
+        durationMs,
+        message: `DataForSEO fetch ${err.kind}${err.status ? ` ${err.status}` : ''}`,
+      });
       if (err.kind === 'http' && err.status === 402) markCreditsExhausted();
       const snippet = err.responseBodySnippet || '';
       if (snippet.includes('balance')) markCreditsExhausted();
@@ -250,11 +270,45 @@ async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoRes
   const task = json.tasks?.[0];
   if (task && task.status_code !== 20000) {
     const msg = task.status_message || 'Unknown error';
+    const durationMs = Date.now() - startedAt;
+    recordExternalApiTelemetry({
+      provider: 'dataforseo',
+      endpoint,
+      workspaceId,
+      durationMs,
+      status: 'error',
+      errorKind: 'task_error',
+    });
+    recordOperationTrace({
+      source: 'integration',
+      operation,
+      status: 'error',
+      workspaceId,
+      durationMs,
+      message: `task ${task.status_code}: ${msg}`,
+    });
     if (msg.toLowerCase().includes('balance') || msg.toLowerCase().includes('insufficient')) {
       markCreditsExhausted();
     }
     throw new Error(`DataForSEO ${endpoint} task error ${task.status_code}: ${msg}`);
   }
+
+  const durationMs = Date.now() - startedAt;
+  recordExternalApiTelemetry({
+    provider: 'dataforseo',
+    endpoint,
+    workspaceId,
+    durationMs,
+    status: 'success',
+  });
+  recordOperationTrace({
+    source: 'integration',
+    operation,
+    status: 'success',
+    workspaceId,
+    durationMs,
+    message: `DataForSEO ${endpoint} success`,
+  });
 
   return json;
 }
@@ -361,12 +415,12 @@ export class DataForSeoProvider implements SeoDataProvider {
             keywords: batch,
             location_code: locationCode(database),
             language_code: 'en',
-          }]),
+          }], workspaceId),
           apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
             keywords: batch,
             location_code: locationCode(database),
             language_code: 'en',
-          }]).catch(() => null),   // graceful fallback if KD endpoint unavailable
+          }], workspaceId).catch(() => null),   // graceful fallback if KD endpoint unavailable
         ]);
 
         // Build KD lookup map
@@ -442,7 +496,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         limit,
         depth: 1,
         include_seed_keyword: false,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -486,7 +540,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -535,7 +589,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -616,7 +670,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -676,7 +730,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit: 1,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -727,7 +781,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         item_types: ['organic'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -830,7 +884,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       const json = await apiCall('backlinks/summary/live', [{
         target,
         include_subdomains: true,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -887,7 +941,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         limit,
         include_subdomains: true,
         order_by: ['rank,desc'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);

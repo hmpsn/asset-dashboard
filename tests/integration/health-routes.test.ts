@@ -133,6 +133,19 @@ describe('Integration health center endpoint', () => {
     clearCookies();
   });
 
+  it('GET /api/observability/:workspaceId returns 403 when JWT user lacks access to workspace', async () => {
+    expect(memberToken).toBeTruthy();
+    setAuthToken(memberToken);
+
+    const res = await authApi(`/api/observability/${forbiddenWorkspaceId}`);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe('You do not have access to this workspace');
+
+    setAuthToken('');
+    clearCookies();
+  });
+
   it('GET /api/integrations/health/:workspaceId returns integration summary and items', async () => {
     const res = await api(`/api/integrations/health/${workspaceId}`);
     expect(res.status).toBe(200);
@@ -156,6 +169,38 @@ describe('Integration health center endpoint', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Workspace not found');
+  });
+
+  it('GET /api/observability/:workspaceId returns workspace observability report shape', async () => {
+    const res = await api(`/api/observability/${workspaceId}?days=7`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workspaceId).toBe(workspaceId);
+    expect(body).toHaveProperty('generatedAt');
+    expect(body).toHaveProperty('window');
+    expect(body).toHaveProperty('failedJobs');
+    expect(body).toHaveProperty('operationTraces');
+    expect(body).toHaveProperty('externalApiFailureRates');
+    expect(body).toHaveProperty('aiByFeature');
+    expect(body).toHaveProperty('slowRoutes');
+    expect(body).toHaveProperty('criticalSyncs');
+    expect(Array.isArray(body.failedJobs)).toBe(true);
+    expect(Array.isArray(body.operationTraces)).toBe(true);
+    expect(Array.isArray(body.externalApiFailureRates)).toBe(true);
+  });
+
+  it('GET /api/observability/:workspaceId with unknown workspace returns 404', async () => {
+    const res = await api('/api/observability/ws_missing_observability_test');
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Workspace not found');
+  });
+
+  it('GET /api/observability/:workspaceId with out-of-range days returns 400', async () => {
+    const res = await api(`/api/observability/${workspaceId}?days=9999`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('days must be between');
   });
 
   afterAll(async () => {

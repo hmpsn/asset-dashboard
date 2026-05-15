@@ -7,7 +7,7 @@ export { audit, auditSchedules, reports, schema, keywords, rankTracking, backlin
 export {
   requests, publicRequests, approvals, activity, annotations, anomalies, churnSignals,
   jobs, chat, roadmap, recommendations, notifications, upload, settings,
-  salesReport, redirects, stripe, auth, keywordFeedback, trackedKeywords, businessPriorities, integrationHealth,
+  salesReport, redirects, stripe, auth, keywordFeedback, trackedKeywords, businessPriorities, integrationHealth, observability,
 } from './misc';
 export { meetingBriefApi } from './meetingBrief';
 export { briefingApi } from './briefing';

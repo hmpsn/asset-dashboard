@@ -8,6 +8,7 @@ import { isProgrammingError } from './errors.js';
 import { normalizeProviderDate } from './seo-data-provider.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from './constants.js';
 import { fetchProviderText, isExternalFetchError } from './external-fetch.js';
+import { recordExternalApiTelemetry, recordOperationTrace } from './platform-observability.js';
 
 const log = createLogger('semrush');
 
@@ -206,16 +207,69 @@ function isSemrushBalanceError(detail: string): boolean {
   return detail.includes('BALANCE IS ZERO') || detail.includes('API UNITS BALANCE IS ZERO');
 }
 
-async function fetchSemrushCsv(url: string, endpoint: string, query: string): Promise<string | null> {
+function redactSemrushErrorDetail(detail: string): string {
+  return detail.replace(/([?&](?:key|api_key)=)[^&\s]+/gi, '$1[redacted]');
+}
+
+function formatSemrushFetchError(kind: string, status?: number): string {
+  return `SEMRush fetch ${kind}${typeof status === 'number' ? ` ${status}` : ''}`;
+}
+
+async function fetchSemrushCsv(
+  url: string,
+  endpoint: string,
+  query: string,
+  workspaceId?: string,
+): Promise<string | null> {
+  const startedAt = Date.now();
   try {
-    return await fetchProviderText({
+    const body = await fetchProviderText({
       url,
       timeoutMs: 20_000,
       logContext: { module: 'semrush', endpoint, query },
     });
+    const durationMs = Date.now() - startedAt;
+    const isProviderError = body.startsWith('ERROR');
+
+    recordExternalApiTelemetry({
+      provider: 'semrush',
+      endpoint,
+      workspaceId,
+      durationMs,
+      status: isProviderError ? 'error' : 'success',
+      errorKind: isProviderError ? 'provider_error' : undefined,
+    });
+    recordOperationTrace({
+      source: 'integration',
+      operation: `semrush:${endpoint}`,
+      status: isProviderError ? 'error' : 'success',
+      workspaceId,
+      durationMs,
+      message: isProviderError ? `SEMRush ${endpoint} provider_error` : `SEMRush ${endpoint} success`,
+    });
+
+    return body;
   } catch (err) {
     if (isExternalFetchError(err)) {
-      const detail = (err.responseBodySnippet || err.message || '').slice(0, 200);
+      const durationMs = Date.now() - startedAt;
+      recordExternalApiTelemetry({
+        provider: 'semrush',
+        endpoint,
+        workspaceId,
+        durationMs,
+        status: 'error',
+        errorKind: err.kind,
+      });
+      recordOperationTrace({
+        source: 'integration',
+        operation: `semrush:${endpoint}`,
+        status: 'error',
+        workspaceId,
+        durationMs,
+        message: formatSemrushFetchError(err.kind, err.status),
+      });
+
+      const detail = redactSemrushErrorDetail((err.responseBodySnippet || err.message || '').slice(0, 200));
       if (isSemrushBalanceError(detail) || err.status === 402) {
         markCreditsExhausted();
       }
@@ -283,7 +337,7 @@ export async function getKeywordOverview(
         export_columns: 'Ph,Nq,Kd,Cp,Co,Nr,Td',
       });
 
-      const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'keyword_overview', kw);
+      const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'keyword_overview', kw, workspaceId);
       if (!csv) continue;
       if (csv.startsWith('ERROR')) {
         if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return results; }
@@ -363,7 +417,7 @@ export async function getDomainOrganicKeywords(
     export_columns: 'Ph,Po,Nq,Kd,Cp,Ur,Tr,Tc,Td,Fk',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_organic', cleanDomain);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_organic', cleanDomain, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
@@ -429,7 +483,7 @@ export async function getUrlOrganicKeywords(
     export_columns: 'Ph,Po,Nq,Kd,Cp,Ur,Tr,Tc,Td,Fk',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'url_organic', normalizedUrl);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'url_organic', normalizedUrl, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
@@ -566,7 +620,7 @@ export async function getRelatedKeywords(
     export_columns: 'Ph,Nq,Kd,Cp',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'related_keywords', keyword);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'related_keywords', keyword, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
@@ -625,7 +679,7 @@ export async function getQuestionKeywords(
     export_columns: 'Ph,Nq,Kd,Cp',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'phrase_questions', seedKeyword);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'phrase_questions', seedKeyword, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
@@ -685,7 +739,7 @@ export async function getDomainOverview(
     export_columns: 'Dn,Or,Ot,Oc,Ad,At,Ac',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_ranks', cleanDomain);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_ranks', cleanDomain, workspaceId);
   if (!csv) return null;
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return null; }
@@ -752,7 +806,7 @@ export async function getBacklinksOverview(
     export_columns: 'total,domains_num,urls_num,ips_num,follows_num,nofollows_num,texts_num,images_num,forms_num,frames_num',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`, 'backlinks_overview', cleanDomain);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`, 'backlinks_overview', cleanDomain, workspaceId);
   if (!csv) return null;
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return null; }
@@ -819,7 +873,7 @@ export async function getTopReferringDomains(
     export_columns: 'domain_ascore,domain,backlinks_num,first_seen,last_seen',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`, 'backlinks_refdomains', cleanDomain);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_BACKLINKS_API_BASE}?${params}`, 'backlinks_refdomains', cleanDomain, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
@@ -902,7 +956,7 @@ export async function getOrganicCompetitors(
     export_columns: 'Dn,Cr,Np,Or,Ot,Oc',
   });
 
-  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_organic_organic', cleanDomain);
+  const csv = await fetchSemrushCsv(`${SEMRUSH_API_BASE}?${params}`, 'domain_organic_organic', cleanDomain, workspaceId);
   if (!csv) return [];
   if (csv.startsWith('ERROR')) {
     if (csv.includes('BALANCE IS ZERO')) { markCreditsExhausted(); return []; }
