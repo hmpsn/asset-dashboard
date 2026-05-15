@@ -17,7 +17,7 @@ import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { fetchExternalText } from './external-fetch.js';
+import { fetchPublicWebText } from './external-fetch.js';
 
 const log = createLogger('internal-links');
 
@@ -36,7 +36,7 @@ function normalizeInternalLinkPath(path: string): string {
 async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; path: string; title: string }>> {
   try {
     const sitemapUrl = `${baseUrl}/sitemap.xml`;
-    const xml = await fetchExternalText({
+    const xml = await fetchPublicWebText({
       url: sitemapUrl,
       timeoutMs: 15_000,
       redirect: 'follow',
@@ -108,7 +108,7 @@ export interface InternalLinkResult {
 
 async function fetchPageContent(url: string): Promise<{ content: string; internalLinks: string[]; pageTitle?: string } | null> {
   try {
-    const html = await fetchExternalText({
+    const html = await fetchPublicWebText({
       url,
       timeoutMs: 10_000,
       redirect: 'follow',

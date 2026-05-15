@@ -1,5 +1,6 @@
 import { createLogger } from './logger.js';
 import { decodeEntities } from './helpers.js';
+import { fetchPublicWeb, fetchPublicWebText, isExternalFetchError } from './external-fetch.js';
 const log = createLogger('sales-audit');
 
 /**
@@ -152,16 +153,24 @@ function countExternalResources(html: string): { stylesheets: number; scripts: n
 
 async function fetchHtml(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, {
+    const res = await fetchPublicWeb({
+      url,
+      timeoutMs: 10_000,
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)' },
-      signal: AbortSignal.timeout(10000),
+      defaultHeaders: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+      userAgent: 'Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)',
+      logContext: { module: 'sales-audit', fetchPath: 'page-html' },
     });
-    if (!res.ok) return null;
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('text/html') && !contentType.includes('text/xml') && !contentType.includes('application/xml')) return null;
     return await res.text();
-  } catch (err) { log.debug({ url, err }, 'sales-audit/fetch: network failure — expected, returning null'); return null; }
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      log.debug({ url, kind: err.kind, status: err.status }, 'sales-audit/fetch: external fetch failed — expected, returning null');
+      return null;
+    }
+    throw err;
+  }
 }
 
 export function normalizeUrl(base: string, href: string): string | null {
@@ -212,12 +221,13 @@ async function parseSitemap(baseUrl: string): Promise<string[]> {
   const urls: string[] = [];
   try {
     const sitemapUrl = `${baseUrl}/sitemap.xml`;
-    const res = await fetch(sitemapUrl, {
+    const text = await fetchPublicWebText({
+      url: sitemapUrl,
+      timeoutMs: 5_000,
       redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
+      defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+      logContext: { module: 'sales-audit', fetchPath: 'sitemap-root' },
     });
-    if (!res.ok) return urls;
-    const text = await res.text();
     if (!text.trimStart().startsWith('<?xml') && !text.includes('<urlset') && !text.includes('<sitemapindex')) return urls;
 
     // Handle sitemap index
@@ -229,21 +239,36 @@ async function parseSitemap(baseUrl: string): Promise<string[]> {
       // Parse first sub-sitemap only
       if (subSitemaps.length > 0) {
         try {
-          const subRes = await fetch(subSitemaps[0], { redirect: 'follow', signal: AbortSignal.timeout(5000) });
-          if (subRes.ok) {
-            const subText = await subRes.text();
-            const subLocRegex = /<loc>([^<]+)<\/loc>/gi;
-            let sm;
-            while ((sm = subLocRegex.exec(subText)) !== null) urls.push(sm[1]);
+          const subText = await fetchPublicWebText({
+            url: subSitemaps[0],
+            timeoutMs: 5_000,
+            redirect: 'follow',
+            defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+            logContext: { module: 'sales-audit', fetchPath: 'sitemap-child' },
+          });
+          const subLocRegex = /<loc>([^<]+)<\/loc>/gi;
+          let sm;
+          while ((sm = subLocRegex.exec(subText)) !== null) urls.push(sm[1]);
+        } catch (err) {
+          if (isExternalFetchError(err)) {
+            log.debug({ subSitemap: subSitemaps[0], kind: err.kind, status: err.status }, 'sales-audit/sitemap: sub-sitemap fetch failed — skipping');
+          } else {
+            throw err;
           }
-        } catch (err) { log.debug({ subSitemap: subSitemaps[0], err }, 'sales-audit/sitemap: sub-sitemap fetch failed — skipping'); }
+        }
       }
     } else {
       const locRegex = /<loc>([^<]+)<\/loc>/gi;
       let m;
       while ((m = locRegex.exec(text)) !== null) urls.push(m[1]);
     }
-  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/sitemap: sitemap fetch failed — skipping'); }
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      log.debug({ baseUrl, kind: err.kind, status: err.status }, 'sales-audit/sitemap: sitemap fetch failed — skipping');
+    } else {
+      throw err;
+    }
+  }
   return urls;
 }
 
@@ -476,67 +501,101 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
 
   // Robots.txt
   try {
-    const robotsRes = await fetch(`${baseUrl}/robots.txt`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
-    if (!robotsRes.ok) {
-      issues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt', recommendation: 'Create a robots.txt file to guide search engine crawlers.' });
+    const robotsTxt = await fetchPublicWebText({
+      url: `${baseUrl}/robots.txt`,
+      timeoutMs: 5_000,
+      redirect: 'follow',
+      defaultHeaders: { Accept: 'text/plain,text/html;q=0.8,*/*;q=0.5' },
+      logContext: { module: 'sales-audit', fetchPath: 'robots' },
+    });
+    const looksLikeHtml = robotsTxt.trimStart().startsWith('<!') || robotsTxt.trimStart().startsWith('<html');
+    if (looksLikeHtml) {
+      issues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt', recommendation: 'Create a robots.txt file.' });
     } else {
-      const robotsTxt = await robotsRes.text();
-      const looksLikeHtml = robotsTxt.trimStart().startsWith('<!') || robotsTxt.trimStart().startsWith('<html');
-      if (looksLikeHtml) {
-        issues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt', recommendation: 'Create a robots.txt file.' });
-      } else {
-        const lines = robotsTxt.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-        let currentUA = '';
-        const blocks: { ua: string; disallow: string[] }[] = [];
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('user-agent:')) {
-            currentUA = line.split(':')[1]?.trim() || '';
-            blocks.push({ ua: currentUA, disallow: [] });
-          } else if (line.toLowerCase().startsWith('disallow:') && blocks.length > 0) {
-            blocks[blocks.length - 1].disallow.push(line.split(':').slice(1).join(':').trim());
-          }
-        }
-        const wildcardBlock = blocks.find(b => b.ua === '*');
-        if (wildcardBlock?.disallow.includes('/')) {
-          issues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Remove "Disallow: /" to allow search engines to index your site.', opportunityCost: 'Your site is completely invisible to search engines.' });
-        }
-        if (!robotsTxt.toLowerCase().includes('sitemap:')) {
-          issues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt missing sitemap reference', recommendation: 'Add Sitemap: directive to robots.txt.' });
+      const lines = robotsTxt.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+      let currentUA = '';
+      const blocks: { ua: string; disallow: string[] }[] = [];
+      for (const line of lines) {
+        if (line.toLowerCase().startsWith('user-agent:')) {
+          currentUA = line.split(':')[1]?.trim() || '';
+          blocks.push({ ua: currentUA, disallow: [] });
+        } else if (line.toLowerCase().startsWith('disallow:') && blocks.length > 0) {
+          blocks[blocks.length - 1].disallow.push(line.split(':').slice(1).join(':').trim());
         }
       }
+      const wildcardBlock = blocks.find(b => b.ua === '*');
+      if (wildcardBlock?.disallow.includes('/')) {
+        issues.push({ check: 'robots-txt', severity: 'error', message: 'robots.txt blocks all crawlers', recommendation: 'Remove "Disallow: /" to allow search engines to index your site.', opportunityCost: 'Your site is completely invisible to search engines.' });
+      }
+      if (!robotsTxt.toLowerCase().includes('sitemap:')) {
+        issues.push({ check: 'robots-txt', severity: 'info', message: 'robots.txt missing sitemap reference', recommendation: 'Add Sitemap: directive to robots.txt.' });
+      }
     }
-  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: robots.txt fetch failed — skipping'); }
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      if (err.kind === 'http') {
+        issues.push({ check: 'robots-txt', severity: 'warning', message: 'Missing robots.txt', recommendation: 'Create a robots.txt file to guide search engine crawlers.' });
+      } else {
+        log.debug({ baseUrl, kind: err.kind, status: err.status }, 'sales-audit/site-check: robots.txt fetch failed — skipping');
+      }
+    } else {
+      throw err;
+    }
+  }
 
   // Sitemap
   try {
-    const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
-    if (!sitemapRes.ok) {
-      issues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml for better indexing.', opportunityCost: 'Without a sitemap, search engines may miss pages on your site.' });
+    const sitemapText = await fetchPublicWebText({
+      url: `${baseUrl}/sitemap.xml`,
+      timeoutMs: 5_000,
+      redirect: 'follow',
+      defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+      logContext: { module: 'sales-audit', fetchPath: 'sitemap-site-check' },
+    });
+    const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.includes('<urlset') || sitemapText.includes('<sitemapindex');
+    if (!isXml) {
+      issues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml.' });
     } else {
-      const sitemapText = await sitemapRes.text();
-      const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.includes('<urlset') || sitemapText.includes('<sitemapindex');
-      if (!isXml) {
-        issues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml.' });
-      } else {
-        const sitemapUrls = (sitemapText.match(/<loc>([^<]+)<\/loc>/gi) || []).length;
-        if (sitemapUrls === 0) {
-          issues.push({ check: 'sitemap', severity: 'warning', message: 'XML sitemap is empty', recommendation: 'Ensure sitemap lists all indexable pages.' });
-        }
+      const sitemapUrls = (sitemapText.match(/<loc>([^<]+)<\/loc>/gi) || []).length;
+      if (sitemapUrls === 0) {
+        issues.push({ check: 'sitemap', severity: 'warning', message: 'XML sitemap is empty', recommendation: 'Ensure sitemap lists all indexable pages.' });
       }
     }
-  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: sitemap fetch failed — skipping'); }
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      if (err.kind === 'http') {
+        issues.push({ check: 'sitemap', severity: 'warning', message: 'Missing XML sitemap', recommendation: 'Create a sitemap.xml for better indexing.', opportunityCost: 'Without a sitemap, search engines may miss pages on your site.' });
+      } else {
+        log.debug({ baseUrl, kind: err.kind, status: err.status }, 'sales-audit/site-check: sitemap fetch failed — skipping');
+      }
+    } else {
+      throw err;
+    }
+  }
 
   // Response time
   try {
     const startTime = Date.now();
-    await fetch(baseUrl, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
+    await fetchPublicWeb({
+      url: baseUrl,
+      timeoutMs: 10_000,
+      redirect: 'follow',
+      defaultHeaders: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+      logContext: { module: 'sales-audit', fetchPath: 'response-time' },
+    });
     const responseTime = Date.now() - startTime;
     if (responseTime > 3000) {
       issues.push({ check: 'response-time', severity: 'error', message: `Slow server response (${(responseTime / 1000).toFixed(1)}s)`, recommendation: 'Optimize server response time to under 600ms.', value: `${responseTime}ms`, opportunityCost: '53% of mobile users abandon sites that take over 3 seconds to load.' });
     } else if (responseTime > 1000) {
       issues.push({ check: 'response-time', severity: 'warning', message: `Server response ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for under 600ms response time.', value: `${responseTime}ms` });
     }
-  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: response time network failure — skipping'); }
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      log.debug({ baseUrl, kind: err.kind, status: err.status }, 'sales-audit/site-check: response time network failure — skipping');
+    } else {
+      throw err;
+    }
+  }
 
   // Assign categories
   for (const issue of issues) {

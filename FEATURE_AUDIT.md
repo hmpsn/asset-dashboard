@@ -5552,3 +5552,16 @@ Bug hardening included:
 **Mutual:** Durable CMS saves/publishes now log activity, broadcast page-state updates, and refresh both static and CMS editor caches. Approval apply still blocks synthetic CMS discovery rows.
 
 **Files:** `shared/types/seo-editor-write-target.ts`; `src/components/SeoEditorWrapper.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `src/components/CmsEditor.tsx`; `server/routes/webflow-cms.ts`; `server/routes/approvals.ts`; `docs/rules/seo-editor-write-targets.md`; `tests/unit/seo-write-target-resolver.test.ts`.
+
+---
+
+### 409. External Fetch Safety + Reliability Rails
+**What it does:** Adds a shared server external-fetch layer for public-web and provider fetches with consistent defaults and error contracts. `server/external-fetch.ts` now centralizes timeout defaults, user-agent/header composition, redirect handling, response error classification, and URL safety policy modes. Public-web fetches enforce SSRF protections (unsafe host blocking, DNS resolution guard against private/reserved IPs, redirect-chain revalidation, IPv6-mapped loopback/private blocking including hex forms like `::ffff:7f00:1`). Provider-mode fetches keep internal/private compatibility where required.
+
+**Agency value:** High-risk integrations no longer hand-roll fetch logic. Failure modes are predictable (`unsafe_url`, `timeout`, `network`, `http`) and easier to debug. Safer defaults reduce production risk from accidental localhost/private-network fetches in crawl and rewrite workflows.
+
+**Client value:** More reliable page analysis/rewrite/sitemap/media workflows with fewer silent external-call failures and clearer error behavior.
+
+**Mutual:** Shared rails reduce regression risk during future endpoint migrations because fetch behavior, logging, and safety checks are centralized and tested once.
+
+**Files:** `server/external-fetch.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/sales-audit.ts`; `server/web-scraper.ts`; `server/routes/webflow-alt-text.ts`; `server/routes/rewrite-chat.ts`; `server/webflow-pages.ts`; `server/internal-links.ts`; `tests/unit/external-fetch-helper.test.ts`; `tests/integration/rewrite-chat-pages.test.ts`.

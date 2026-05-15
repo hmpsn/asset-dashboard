@@ -29,6 +29,7 @@ import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { checkUsageLimit, incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
+import { fetchExternalBytes, isExternalFetchError } from '../external-fetch.js';
 
 const log = createLogger('webflow-alt-text');
 
@@ -83,8 +84,14 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/generate-alt/:assetId: programming error'); /* proceed without context */ }
     }
 
-    const response = await fetch(imageUrl);
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const bytes = await fetchExternalBytes({
+      url: imageUrl,
+      timeoutMs: 15_000,
+      redirect: 'follow',
+      urlSafety: 'public-web',
+      logContext: { module: 'webflow-alt-text', fetchPath: 'single-alt-image' },
+    });
+    const buffer = Buffer.from(bytes);
     const ext = path.extname(imageUrl).split('?')[0] || '.jpg';
     const tmpPath = `/tmp/alt_gen_${Date.now()}${ext}`;
     fs.writeFileSync(tmpPath, buffer);
@@ -224,14 +231,27 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
       break;
     }
     try {
-      const response = await fetch(asset.imageUrl);
-      if (!response.ok) {
+      let buffer: Buffer;
+      try {
+        const bytes = await fetchExternalBytes({
+          url: asset.imageUrl,
+          timeoutMs: 15_000,
+          redirect: 'follow',
+          urlSafety: 'public-web',
+          logContext: { module: 'webflow-alt-text', fetchPath: 'bulk-alt-image' },
+        });
+        buffer = Buffer.from(bytes);
+      } catch (err) {
         done++;
         decrementUsage(bulkWs.id, 'alt_text_generations');
-        send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}`, done, total: assets.length });
+        if (isExternalFetchError(err)) {
+          const detail = err.kind === 'http' && err.status ? `Download failed: ${err.status}` : `Download failed: ${err.kind}`;
+          send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: detail, done, total: assets.length });
+        } else {
+          throw err;
+        }
         continue;
       }
-      const buffer = Buffer.from(await response.arrayBuffer());
       const ext = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
       const tmpPath = `/tmp/bulk_alt_${Date.now()}${ext}`;
       fs.writeFileSync(tmpPath, buffer);
@@ -379,8 +399,14 @@ router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAcces
   try {
     const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
 
-    const response = await fetch(imageUrl);
-    const originalBuffer = Buffer.from(await response.arrayBuffer());
+    const originalBytes = await fetchExternalBytes({
+      url: imageUrl,
+      timeoutMs: 20_000,
+      redirect: 'follow',
+      urlSafety: 'public-web',
+      logContext: { module: 'webflow-alt-text', fetchPath: 'compress-image' },
+    });
+    const originalBuffer = Buffer.from(originalBytes);
     const originalSize = originalBuffer.length;
 
     const ext = (fileName || imageUrl).split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';

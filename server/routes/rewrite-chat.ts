@@ -18,7 +18,7 @@ import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import type { SeoIssue, PageSeoResult } from '../seo-audit.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
-import { fetchExternalText, isExternalFetchError } from '../external-fetch.js';
+import { fetchPublicWebText, isExternalFetchError } from '../external-fetch.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -181,7 +181,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   try {
-    const html = await fetchExternalText({
+    const html = await fetchPublicWebText({
       url,
       redirect: 'follow',
       timeoutMs: 15_000,

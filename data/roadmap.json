@@ -143,8 +143,9 @@
           "source": "Product engineering base-layer review 2026-05-13",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Create shared helpers for external/public web fetches and provider API fetches. Standardize timeouts, redirect behavior, user-agent/headers, safe URL handling, error classification, expected network TypeError handling, and logging. Migrate high-risk sitemap/page/image/provider fetch call sites first."
+          "status": "done",
+          "notes": "Create shared helpers for external/public web fetches and provider API fetches. Standardize timeouts, redirect behavior, user-agent/headers, safe URL handling, error classification, expected network TypeError handling, and logging. Migrate high-risk sitemap/page/image/provider fetch call sites first.\nShipped 2026-05-15: expanded `server/external-fetch.ts` with `fetchPublicWeb*`, `fetchProvider*`, and `fetchExternalBytes` helpers; added URL safety modes, DNS/private-address SSRF guards, redirect-chain revalidation, and explicit unsafe/timeout/network/http classification. Migrated high-risk call sites in semrush, dataforseo provider, sales audit, web scraper, rewrite-chat load-page, webflow alt-text image downloads, webflow-pages sitemap reads, and internal-links fetch paths. Added unit coverage for redirect-to-private, DNS-to-private, and IPv6-mapped loopback (`::ffff:7f00:1`) blocking plus integration coverage updates for rewrite-chat load-page safety behavior.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-base-workspace-mutation-helper",

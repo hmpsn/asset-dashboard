@@ -6,7 +6,7 @@ import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { fetchExternalText } from './external-fetch.js';
+import { fetchPublicWebText } from './external-fetch.js';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
 
 const log = createLogger('webflow-pages');
@@ -522,7 +522,7 @@ export async function discoverCmsUrls(
   limit: number = 50,
 ): Promise<{ cmsUrls: CmsPageUrl[]; totalFound: number }> {
   try {
-    const sitemapText = await fetchExternalText({
+    const sitemapText = await fetchPublicWebText({
       url: `${sitemapBaseUrl}/sitemap.xml`,
       redirect: 'follow',
       timeoutMs: 8_000,
@@ -569,7 +569,7 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
   };
 
   try {
-    const text = await fetchExternalText({
+    const text = await fetchPublicWebText({
       url: `${baseUrl}/sitemap.xml`,
       redirect: 'follow',
       timeoutMs: 8_000,
@@ -582,7 +582,7 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
       const subUrls = extractLocs(text);
       for (const subUrl of subUrls) {
         try {
-          const subText = await fetchExternalText({
+          const subText = await fetchPublicWebText({
             url: subUrl,
             redirect: 'follow',
             timeoutMs: 8_000,
