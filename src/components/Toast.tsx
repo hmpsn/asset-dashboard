@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { CheckCircle, AlertTriangle, X, Info } from 'lucide-react';
-import { Icon } from './ui';
+import { Icon, IconButton } from './ui';
 
 interface ToastItem {
   id: string;
@@ -72,9 +72,14 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
     >
         {icons[item.type]}
         <span className="t-caption">{item.message}</span>
-        <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
-          <Icon as={X} size="sm" />
-        </button>
+        <IconButton
+          onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }}
+          icon={X}
+          label="Dismiss toast"
+          variant="ghost"
+          size="sm"
+          className="ml-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+        />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { SectionCard } from '../../ui/SectionCard.js';
+import { Button } from '../../ui/Button.js';
 import type { DiagnosticContext } from '../../../../shared/types/diagnostics.js';
 
 interface Props {
@@ -18,10 +19,15 @@ function AccordionSection({ title, children, defaultOpen = false }: AccordionSec
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-[var(--brand-border)] last:border-b-0">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 w-full py-3 px-1 text-left t-ui text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+      <Button
+        onClick={() => setOpen(!open)}
+        variant="ghost"
+        size="sm"
+        className="w-full justify-start gap-2 py-3 px-1 text-left t-ui text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
+      >
         {open ? <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)]" /> : <ChevronRight className="w-4 h-4 text-[var(--brand-text-muted)]" />}
         {title}
-      </button>
+      </Button>
       {open && <div className="pb-4 px-1">{children}</div>}
     </div>
   );

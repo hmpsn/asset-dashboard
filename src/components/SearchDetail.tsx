@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
-import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon } from './ui';
+import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon, Button } from './ui';
 import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
@@ -256,14 +256,24 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-[var(--brand-border)] shrink-0">
-                <button
-                  className={`text-xs font-semibold pb-1 ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`text-xs font-semibold pb-1 px-0 py-0 rounded-none bg-transparent hover:bg-transparent ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
                   onClick={() => setTableView('queries')}
-                >Queries</button>
-                <button
-                  className={`text-xs font-semibold pb-1 ${tableView === 'pages' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
+                >
+                  Queries
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`text-xs font-semibold pb-1 px-0 py-0 rounded-none bg-transparent hover:bg-transparent ${tableView === 'pages' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
                   onClick={() => setTableView('pages')}
-                >Pages</button>
+                >
+                  Pages
+                </Button>
               </div>
 
               <div className="overflow-y-auto flex-1 min-h-0">
@@ -275,13 +285,16 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     </th>
                     {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                       <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleSort(key)}
-                          className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text-bright)] transition-colors"
+                          className="gap-1 ml-auto px-0 py-0 rounded-none bg-transparent hover:bg-transparent hover:text-[var(--brand-text-bright)]"
                         >
                           {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                           {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                        </button>
+                        </Button>
                       </th>
                     ))}
                   </tr>

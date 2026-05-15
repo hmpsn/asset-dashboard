@@ -3,7 +3,7 @@ import {
   Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight, Layers,
 } from 'lucide-react';
 import { pageWeight as pageWeightApi } from '../api/seo';
-import { EmptyState, Icon, Button } from './ui';
+import { EmptyState, Icon, Button, ClickableRow } from './ui';
 
 interface PageAsset {
   id: string;
@@ -216,9 +216,9 @@ function PageWeight({ siteId, workspaceId }: Props) {
         {filteredPages.map(page => (
           // pr-check-disable-next-line -- brand asymmetric signature on page-weight result card; intentional non-SectionCard chrome
           <div key={page.page} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-            <button
+            <ClickableRow
               onClick={() => toggleExpand(page.page)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 text-left rounded-none"
             >
               {expanded.has(page.page) ? (
                 <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -240,7 +240,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
                   {formatSize(page.totalSize)}
                 </span>
               </div>
-            </button>
+            </ClickableRow>
 
             {expanded.has(page.page) && (
               <div className="ml-8 mb-2 space-y-0.5">

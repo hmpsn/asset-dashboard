@@ -163,10 +163,12 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
                   {sample.contextTag && <ContextTagBadge tag={sample.contextTag} />}
                   <p className="text-sm text-[var(--brand-text)] leading-relaxed">{sample.content}</p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => setConfirmDeleteId(sample.id)}
                   disabled={deletingId === sample.id}
+                  variant="ghost"
+                  size="sm"
                   aria-label="Delete sample"
                   className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
                 >
@@ -175,7 +177,7 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
                   ) : (
                     <Icon as={Trash2} size="md" />
                   )}
-                </button>
+                </Button>
               </div>
             ))}
           </div>

@@ -1,5 +1,6 @@
 import { Loader2, Check } from 'lucide-react';
 import type { AiFixResult } from '../../../shared/types/content';
+import { Button } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 
 interface FixDiffModalProps {
@@ -90,23 +91,25 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
       </Modal.Body>
       {result && !loading ? (
         <Modal.Footer>
-          <button
-            type="button"
+          <Button
             onClick={onDismiss}
+            variant="ghost"
+            size="sm"
             className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
           >
             Dismiss
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => onApply(result)}
             disabled={applying}
+            variant="ghost"
+            size="sm"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
           >
             {applying
               ? <><Loader2 className="w-3 h-3 animate-spin" /> Applying…</>
               : <><Check className="w-3 h-3" /> Apply</>}
-          </button>
+          </Button>
         </Modal.Footer>
       ) : null}
     </Modal>

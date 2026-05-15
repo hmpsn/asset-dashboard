@@ -1,5 +1,5 @@
 import { CheckCircle2, FilterX } from 'lucide-react';
-import { Badge, EmptyState, SectionCard } from './ui/index';
+import { Badge, Button, EmptyState, SectionCard } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters } from '../lib/roadmapFilters';
 import { matchesFilters } from '../lib/roadmapFilters';
@@ -75,13 +75,16 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                     <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] w-10 flex-shrink-0 text-right">
                       #{item.id}
                     </span>
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => onToggleStatus(item.id, sprint.id)}
-                      className="flex-shrink-0 hover:scale-110 transition-transform"
+                      className="flex-shrink-0 hover:scale-110 px-0 py-0 bg-transparent hover:bg-transparent"
                       title={`Status: ${item.status} — click to cycle`}
                     >
                       {STATUS_ICON[item.status]}
-                    </button>
+                    </Button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span

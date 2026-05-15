@@ -17,7 +17,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { ErrorState } from '../ui/ErrorState.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { Icon } from '../ui/index.js';
+import { Button, Icon } from '../ui/index.js';
 import { clientActions } from '../../api/clientActions.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import type { ClientAction, ClientActionStatus } from '../../../shared/types/client-actions.js';
@@ -114,13 +114,15 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium bg-amber-500/10 text-accent-warning border border-amber-500/20">
                 Awaiting implementation
               </span>
-              <button
+              <Button
                 onClick={() => markComplete.mutate()}
                 disabled={markComplete.isPending}
-                className="px-3 py-1 rounded-[var(--radius-sm)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                variant="secondary"
+                size="sm"
+                className="px-3 py-1 rounded-[var(--radius-sm)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white border-transparent disabled:opacity-50"
               >
                 {markComplete.isPending ? 'Marking...' : 'Mark complete'}
-              </button>
+              </Button>
             </div>
           )}
           {action.status === 'approved' && action.sourceType === 'content_decay' && (

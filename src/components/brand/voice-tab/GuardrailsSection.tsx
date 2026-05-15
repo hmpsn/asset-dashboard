@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { voice } from '../../../api/brand-engine';
 import type { VoiceGuardrails } from '../../../../shared/types/brand-engine';
-import { Button, Icon } from '../../ui';
+import { Button, IconButton } from '../../ui';
 import { useToast } from '../../Toast';
 import {
   appendUniqueListValue,
@@ -62,14 +62,15 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 rounded-[var(--radius-md)] t-caption"
             >
               {word}
-              <button
+              <IconButton
                 type="button"
+                icon={Trash2}
+                label={`Remove forbidden word: ${word}`}
+                size="sm"
+                variant="ghost"
                 onClick={() => setGr(prev => ({ ...prev, forbiddenWords: prev.forbiddenWords.filter(w => w !== word) }))}
-                aria-label={`Remove forbidden word: ${word}`}
-                className="hover:text-red-300 transition-colors"
-              >
-                <Icon as={Trash2} size="sm" />
-              </button>
+                className="hover:text-red-300 hover:bg-transparent"
+              />
             </span>
           ))}
         </div>
@@ -111,14 +112,15 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               <span className="text-sm text-teal-400 font-medium">{term.use}</span>
               <span className="t-caption text-[var(--brand-text-muted)] shrink-0">instead of</span>
               <span className="text-sm text-[var(--brand-text-muted)] line-through">{term.insteadOf}</span>
-              <button
+              <IconButton
                 type="button"
+                icon={Trash2}
+                label={`Remove terminology: use ${term.use} instead of ${term.insteadOf}`}
+                size="sm"
+                variant="ghost"
                 onClick={() => setGr(prev => ({ ...prev, requiredTerminology: prev.requiredTerminology.filter((_, idx) => idx !== i) }))}
-                aria-label={`Remove terminology: use ${term.use} instead of ${term.insteadOf}`}
-                className="ml-auto text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
-              >
-                <Icon as={Trash2} size="md" />
-              </button>
+                className="ml-auto text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-transparent"
+              />
             </div>
           ))}
         </div>
@@ -179,14 +181,15 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-3)] text-[var(--brand-text)] rounded-[var(--radius-md)] t-caption"
             >
               {boundary}
-              <button
+              <IconButton
                 type="button"
+                icon={Trash2}
+                label={`Remove tone boundary: ${boundary}`}
+                size="sm"
+                variant="ghost"
                 onClick={() => setGr(prev => ({ ...prev, toneBoundaries: prev.toneBoundaries.filter(b => b !== boundary) }))}
-                aria-label={`Remove tone boundary: ${boundary}`}
-                className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
-              >
-                <Icon as={Trash2} size="sm" />
-              </button>
+                className="text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-transparent"
+              />
             </span>
           ))}
         </div>
@@ -228,14 +231,15 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-[var(--radius-md)] t-caption"
             >
               {pattern}
-              <button
+              <IconButton
                 type="button"
+                icon={Trash2}
+                label={`Remove anti-pattern: ${pattern}`}
+                size="sm"
+                variant="ghost"
                 onClick={() => setGr(prev => ({ ...prev, antiPatterns: prev.antiPatterns.filter(p => p !== pattern) }))}
-                aria-label={`Remove anti-pattern: ${pattern}`}
-                className="hover:text-amber-300 transition-colors"
-              >
-                <Icon as={Trash2} size="sm" />
-              </button>
+                className="hover:text-amber-300 hover:bg-transparent"
+              />
             </span>
           ))}
         </div>

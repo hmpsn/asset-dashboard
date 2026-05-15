@@ -4,7 +4,7 @@ import {
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { MetricRing, EmptyState, Icon, Button, PageHeader } from './ui';
+import { MetricRing, EmptyState, Icon, Button, PageHeader, ClickableRow } from './ui';
 import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
@@ -238,19 +238,23 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{result.page}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
+          <Button
             onClick={() => runSingleTest(strategy === 'mobile' ? 'desktop' : 'mobile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+            variant="ghost"
+            size="sm"
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             {strategy === 'mobile' ? <Icon as={Monitor} size="sm" /> : <Icon as={Smartphone} size="sm" />}
             Test {strategy === 'mobile' ? 'Desktop' : 'Mobile'}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => { setHasRun(false); setSingleResult(null); setData(null); }}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1"
+            variant="ghost"
+            size="sm"
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             ← Back
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -332,18 +336,22 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
 
         {/* Mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-          <button
+          <Button
             onClick={() => setMode('single')}
-            className={`px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${mode === 'single' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`${mode === 'single' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Single Page
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setMode('bulk')}
-            className={`px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`${mode === 'bulk' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Bulk Test (Top 3)
-          </button>
+          </Button>
         </div>
 
           {mode === 'single' ? (
@@ -456,22 +464,26 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-          <button
+          <Button
             onClick={() => { if (strategy !== 'mobile') runBulkTest('mobile'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+            variant="ghost"
+            size="sm"
+            className={`${
               strategy === 'mobile' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
             <Icon as={Smartphone} size="sm" /> Mobile
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => { if (strategy !== 'desktop') runBulkTest('desktop'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+            variant="ghost"
+            size="sm"
+            className={`${
               strategy === 'desktop' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
             <Icon as={Monitor} size="sm" /> Desktop
-          </button>
+          </Button>
         </div>
         <div className="t-caption-sm text-[var(--brand-text-muted)]">
           {data.pages.length} pages tested · {new Date(data.testedAt).toLocaleTimeString()}
@@ -502,9 +514,9 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
           return (
             // pr-check-disable-next-line -- brand asymmetric signature on page-level result card; intentional non-SectionCard chrome
             <div key={page.url} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-              <button
+              <ClickableRow
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50"
               >
                 {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
                 <div className={`t-stat-sm tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
@@ -517,7 +529,7 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   <span>CLS {formatCLS(page.vitals.CLS)}</span>
                   <span>INP {formatMs(page.vitals.INP)}</span>
                 </div>
-              </button>
+              </ClickableRow>
 
               {isOpen && (
                 <div className="border-t border-[var(--brand-border)] bg-[var(--surface-1)]/50">
@@ -534,14 +546,16 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   {/* Opportunities */}
                   {page.opportunities.length > 0 && (
                     <div className="px-4 pb-3">
-                      <button
+                      <Button
                         onClick={() => toggleExpand(`opp-${page.url}`)}
-                        className="flex items-center gap-2 t-caption-sm font-medium text-[var(--brand-text)] mb-2"
+                        variant="ghost"
+                        size="sm"
+                        className="text-[var(--brand-text)] mb-2 !px-0"
                       >
                         <Icon as={Zap} size="sm" className="text-accent-warning" />
                         Opportunities ({page.opportunities.length})
                         {expanded.has(`opp-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
-                      </button>
+                      </Button>
                       {expanded.has(`opp-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.opportunities.map(opp => (
@@ -566,14 +580,16 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   {/* Diagnostics */}
                   {page.diagnostics.length > 0 && (
                     <div className="px-4 pb-4">
-                      <button
+                      <Button
                         onClick={() => toggleExpand(`diag-${page.url}`)}
-                        className="flex items-center gap-2 t-caption-sm font-medium text-[var(--brand-text)] mb-2"
+                        variant="ghost"
+                        size="sm"
+                        className="text-[var(--brand-text)] mb-2 !px-0"
                       >
                         <Icon as={Info} size="sm" className="text-accent-info" />
                         Diagnostics ({page.diagnostics.length})
                         {expanded.has(`diag-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
-                      </button>
+                      </Button>
                       {expanded.has(`diag-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.diagnostics.map(diag => (

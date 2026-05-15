@@ -8,7 +8,7 @@ import type { FixContext } from '../App';
 import { useCmsEditor, useSeoEditor } from '../hooks/admin';
 import { pageEditStatesKey } from '../hooks/usePageEditStates';
 import { resolveSeoEditorWriteTargets } from './editor/seoWriteTargetResolver';
-import { Icon, SectionCard } from './ui';
+import { Icon, SectionCard, Button } from './ui';
 import { SEO_EDITOR_TARGET_TYPES } from '../../shared/types/seo-editor-write-target';
 import type { SeoEditorTargetType } from '../../shared/types/seo-editor-write-target';
 
@@ -69,9 +69,11 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           {sourceOptions.map(option => (
-            <button
+            <Button
               key={option.id}
               onClick={() => setSourceFilter(option.id)}
+              variant="ghost"
+              size="sm"
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${
                 sourceFilter === option.id
                   ? 'bg-teal-500/10 border-teal-500/30 text-teal-300'
@@ -83,7 +85,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
               {option.id === SEO_EDITOR_TARGET_TYPES.manual && <Icon as={AlertCircle} size="sm" />}
               {option.label}
               <span className="text-[var(--brand-text-muted)]">{option.count}</span>
-            </button>
+            </Button>
           ))}
           {resolvedTargets.collectionOptions.length > 0 && sourceFilter !== SEO_EDITOR_TARGET_TYPES.staticPage && (
             <select

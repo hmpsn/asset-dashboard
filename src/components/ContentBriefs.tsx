@@ -4,7 +4,7 @@ import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
-import { Icon, cn, Button, Modal, PageHeader } from './ui';
+import { Icon, IconButton, ClickableRow, cn, Button, Modal, PageHeader } from './ui';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -426,7 +426,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 approved: 'text-accent-success bg-emerald-500/10 border-emerald-500/20',
               };
               return (
-                <button
+                <ClickableRow
                   key={post.id}
                   onClick={() => setActivePostId(post.id)}
                   className="w-full text-left rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
@@ -443,7 +443,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(post.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                </button>
+                </ClickableRow>
               );
             })}
           </div>
@@ -502,9 +502,14 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
               />
               {briefSearch && (
-                <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
-                  <Icon as={X} size="sm" />
-                </button>
+                <IconButton
+                  onClick={() => setBriefSearch('')}
+                  icon={X}
+                  label="Clear search"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+                />
               )}
             </div>
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">

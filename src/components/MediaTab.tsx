@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, FolderSearch, ShieldCheck, Clipboard } from 'lucide-react';
-import { Icon, cn } from './ui';
+import { Button, Icon, cn } from './ui';
 import { DropZone } from './DropZone';
 import { ProcessingQueue, type QueueItem } from './ProcessingQueue';
 import { AssetBrowser } from './AssetBrowser';
@@ -31,16 +31,18 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
         {subTabs.map(t => {
           const active = sub === t.id;
           return (
-            <button
+            <Button
               key={t.id}
               onClick={() => setSub(t.id)}
+              variant="ghost"
+              size="sm"
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-medium',
                 active ? 'bg-teal-500/10 text-accent-brand' : 'text-[var(--brand-text-muted)]',
               )}
             >
               <Icon as={t.icon} size="sm" /> {t.label}
-            </button>
+            </Button>
           );
         })}
       </div>

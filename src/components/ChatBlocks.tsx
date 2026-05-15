@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download, Copy, Check } from 'lucide-react';
-import { Icon, TrendBadge } from './ui';
+import { IconButton, TrendBadge } from './ui';
 import { CHART_SERIES_COLORS } from './ui/constants';
 
 // --- Metric Card ---
@@ -127,14 +127,24 @@ export function DataTableBlock({ data }: { data: DataTableBlockData }) {
       <div className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--surface-3)] border-b border-[var(--brand-border)]">
         {data.title && <span className="t-caption-sm font-medium text-[var(--brand-text)]">{data.title}</span>}
         <div className="flex items-center gap-1 ml-auto">
-            <button onClick={handleCopy} title="Copy as CSV"
-              className="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
-              {copied ? <Icon as={Check} size="sm" className="text-emerald-400/80" /> : <Icon as={Copy} size="sm" />}
-            </button>
-            <button onClick={handleDownload} title="Download CSV"
-              className="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
-              <Icon as={Download} size="sm" />
-            </button>
+            <IconButton
+              onClick={handleCopy}
+              title="Copy as CSV"
+              icon={copied ? Check : Copy}
+              label="Copy as CSV"
+              variant="ghost"
+              size="sm"
+              className={copied ? 'text-emerald-400/80' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}
+            />
+            <IconButton
+              onClick={handleDownload}
+              title="Download CSV"
+              icon={Download}
+              label="Download CSV"
+              variant="ghost"
+              size="sm"
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+            />
         </div>
       </div>
       <div className="overflow-x-auto">

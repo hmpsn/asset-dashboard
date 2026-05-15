@@ -200,14 +200,17 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
 
         {/* AI suggest button — this is an admin AI feature, purple is correct here */}
         {selectedCollection && fields.length > 0 && (
-          <button
+          <Button
             onClick={suggestMapping}
             disabled={suggesting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors disabled:opacity-50"
+            loading={suggesting}
+            icon={Sparkles}
+            size="sm"
+            variant="secondary"
+            className="rounded-[var(--radius-md)] t-caption-sm font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 disabled:opacity-50"
           >
-            {suggesting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
             {suggesting ? 'Suggesting...' : 'AI Suggest Mappings'}
-          </button>
+          </Button>
         )}
 
         {/* Field mapping */}

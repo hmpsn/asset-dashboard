@@ -131,37 +131,49 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           <div className="flex items-center gap-2">
             {data && (
               <>
-                <button
+                <Button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors"
+                  icon={copied ? Check : Copy}
+                  variant="secondary"
+                  size="sm"
+                  className={cn(
+                    'text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]',
+                    copied ? '[&_svg]:text-accent-success' : '',
+                  )}
                 >
-                  {copied ? <Icon as={Check} size="sm" className="text-accent-success" /> : <Icon as={Copy} size="sm" />}
                   {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDownload}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
+                  icon={Download}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15"
                 >
-                  <Icon as={Download} size="sm" />
                   llms.txt
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDownloadFull}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
+                  icon={Download}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15"
                 >
-                  <Icon as={Download} size="sm" />
                   llms-full.txt
-                </button>
+                </Button>
               </>
             )}
-            <button
+            <Button
               onClick={generate}
               disabled={loading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+              loading={loading}
+              icon={RefreshCw}
+              variant="secondary"
+              size="sm"
+              className="text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] disabled:opacity-50"
             >
-              <Icon as={RefreshCw} size="sm" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Generating…' : 'Regenerate'}
-            </button>
+            </Button>
           </div>
         }
       />
@@ -198,34 +210,40 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
             titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
             titleExtra={
               <div className="flex items-center gap-1 ml-2">
-                <button
+                <Button
                   onClick={() => setPreviewMode('index')}
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    't-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] transition-colors',
+                    't-caption-sm px-2 py-0.5 h-auto rounded-[var(--radius-pill)]',
                     previewMode === 'index' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
                   )}
                 >
                   llms.txt
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setPreviewMode('full')}
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    't-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] transition-colors',
+                    't-caption-sm px-2 py-0.5 h-auto rounded-[var(--radius-pill)]',
                     previewMode === 'full' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
                   )}
                 >
                   llms-full.txt
-                </button>
+                </Button>
               </div>
             }
             action={
-              <button
+              <Button
                 onClick={() => setShowPreview(!showPreview)}
-                className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                icon={showPreview ? EyeOff : Eye}
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0 py-0 h-auto"
               >
-                {showPreview ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
                 {showPreview ? 'Hide' : 'Show'}
-              </button>
+              </Button>
             }
             noPadding={showPreview}
           >

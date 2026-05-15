@@ -11,7 +11,7 @@ import {
   Upload,
   Wand2,
 } from 'lucide-react';
-import { CharacterCounter, Icon, SectionCard, SerpPreview, SocialPreview } from '../ui';
+import { Button, CharacterCounter, ClickableRow, Icon, IconButton, SectionCard, SerpPreview, SocialPreview } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
 import type { PageEditState } from '../../hooks/usePageEditStates';
@@ -111,9 +111,9 @@ export function CmsEditorCollections({
 
         return (
           <SectionCard key={coll.collectionId} noPadding className="overflow-hidden">
-            <button
+            <ClickableRow
               onClick={() => toggleCollection(coll.collectionId)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
+              className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30"
             >
               <div className="flex items-center gap-2 flex-wrap">
                 {workspaceId && filteredItemIds.length > 0 && (
@@ -167,7 +167,7 @@ export function CmsEditorCollections({
                   </span>
                 )}
               </div>
-            </button>
+            </ClickableRow>
 
             {isExpanded && (
               <div className="border-t border-[var(--brand-border)]">
@@ -190,9 +190,9 @@ export function CmsEditorCollections({
 
                   return (
                     <div key={item.id} className={`border-b border-[var(--brand-border)]/50 last:border-b-0 ${trackingBorder || (hasIssues ? 'border-l-2 border-l-amber-500/40' : '')}`}>
-                      <button
+                      <ClickableRow
                         onClick={() => toggleItem(item.id)}
-                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors"
+                        className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           {workspaceId && (
@@ -215,15 +215,17 @@ export function CmsEditorCollections({
                           {isDirty && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
                           {isSaved && !isDirty && <Icon as={Check} size="sm" className="text-emerald-400" />}
                           {error && <Icon as={AlertCircle} size="sm" className="text-red-400/80" />}
-                          <button
+                          <Button
                             onClick={e => { e.stopPropagation(); togglePreview(item.id); }}
-                            className="flex items-center gap-1 px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                             title="Toggle preview"
                           >
                             👁️
-                          </button>
+                          </Button>
                         </div>
-                      </button>
+                      </ClickableRow>
 
                       {isItemExpanded && (
                         <div className="px-4 pb-4 space-y-3 bg-[var(--surface-2)]/30">
@@ -232,14 +234,16 @@ export function CmsEditorCollections({
                               <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Name (Title)</label>
                               <div className="flex items-center gap-1">
                                 <CharacterCounter current={(edits[item.id]?.name || '').length} max={60} size="sm" />
-                                <button
+                                <IconButton
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
                                   disabled={!!aiLoading[`${item.id}-name`] || !!aiLoading[`${item.id}-both`]}
-                                  className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
+                                  icon={aiLoading[`${item.id}-name`] ? Loader2 : Wand2}
+                                  label="AI rewrite"
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`text-teal-400 hover:text-teal-300 ${aiLoading[`${item.id}-name`] ? '[&_svg]:animate-spin' : ''}`}
                                   title="AI rewrite"
-                                >
-                                  <Icon as={aiLoading[`${item.id}-name`] ? Loader2 : Wand2} size="sm" className={aiLoading[`${item.id}-name`] ? 'animate-spin' : ''} />
-                                </button>
+                                />
                               </div>
                             </div>
                             <input
@@ -252,7 +256,7 @@ export function CmsEditorCollections({
                               <div className="mt-1.5 space-y-1">
                                 <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                 {variations[item.id].options.map((v, variationIndex) => (
-                                  <button
+                                  <ClickableRow
                                     key={variationIndex}
                                     onClick={() => applySingleVariation(item.id, 'name', v)}
                                     className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
@@ -263,7 +267,7 @@ export function CmsEditorCollections({
                                   >
                                     <span className="text-[var(--brand-text-muted)] mr-1">{variationIndex + 1}.</span>{v}
                                     <CharacterCounter current={v.length} max={60} size="sm" className="ml-2" />
-                                  </button>
+                                  </ClickableRow>
                                 ))}
                               </div>
                             )}
@@ -289,14 +293,16 @@ export function CmsEditorCollections({
                                   <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">{field.displayName}</label>
                                   <div className="flex items-center gap-1">
                                     <CharacterCounter current={val.length} max={isTitle ? 60 : 160} size="sm" />
-                                    <button
+                                    <IconButton
                                       onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
                                       disabled={!!aiLoading[`${item.id}-${field.slug}`] || !!aiLoading[`${item.id}-both`]}
-                                      className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
+                                      icon={aiLoading[`${item.id}-${field.slug}`] ? Loader2 : Wand2}
+                                      label="AI rewrite"
+                                      size="sm"
+                                      variant="ghost"
+                                      className={`text-teal-400 hover:text-teal-300 ${aiLoading[`${item.id}-${field.slug}`] ? '[&_svg]:animate-spin' : ''}`}
                                       title="AI rewrite"
-                                    >
-                                      <Icon as={aiLoading[`${item.id}-${field.slug}`] ? Loader2 : Wand2} size="sm" className={aiLoading[`${item.id}-${field.slug}`] ? 'animate-spin' : ''} />
-                                    </button>
+                                    />
                                   </div>
                                 </div>
                                 {isTitle ? (
@@ -320,7 +326,7 @@ export function CmsEditorCollections({
                                     {variations[item.id].options.map((v, variationIndex) => {
                                       const maxLen = isTitle ? 60 : 160;
                                       return (
-                                        <button
+                                        <ClickableRow
                                           key={variationIndex}
                                           onClick={() => applySingleVariation(item.id, field.slug, v)}
                                           className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
@@ -331,7 +337,7 @@ export function CmsEditorCollections({
                                         >
                                           <span className="text-[var(--brand-text-muted)] mr-1">{variationIndex + 1}.</span>{v}
                                           <CharacterCounter current={v.length} max={maxLen} size="sm" className="ml-2" />
-                                        </button>
+                                        </ClickableRow>
                                       );
                                     })}
                                   </div>
@@ -342,15 +348,16 @@ export function CmsEditorCollections({
 
                           {titleField && descField && (
                             <div className="space-y-2">
-                              <button
+                              <Button
                                 onClick={() => aiRewriteBoth(coll.collectionId, item.id, titleField.slug, descField.slug)}
                                 disabled={!!aiLoading[`${item.id}-both`]}
-                                className="flex items-center gap-1 t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded transition-colors disabled:opacity-50"
+                                size="sm"
+                                icon={aiLoading[`${item.id}-both`] ? Loader2 : Sparkles}
+                                className={`t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded ${aiLoading[`${item.id}-both`] ? '[&_svg]:animate-spin' : ''}`}
                                 title="Generate paired title + description"
                               >
-                                <Icon as={aiLoading[`${item.id}-both`] ? Loader2 : Sparkles} size="sm" className={aiLoading[`${item.id}-both`] ? 'animate-spin' : ''} />
                                 AI Generate Both
-                              </button>
+                              </Button>
                               {variations[item.id]?.fieldSlug === 'both' && variations[item.id].options.length > 0 && variations[item.id].descOptions && (
                                 <div className="space-y-1.5 border border-teal-500/20 bg-teal-500/5 rounded-[var(--radius-lg)] p-3">
                                   <div className="t-caption-sm text-teal-400 font-medium">Pick a paired title + description:</div>
@@ -359,7 +366,7 @@ export function CmsEditorCollections({
                                     const isSelected = (edits[item.id]?.[titleField.slug] || '') === titleVariation
                                       && (edits[item.id]?.[descField.slug] || '') === descVariation;
                                     return (
-                                      <button
+                                      <ClickableRow
                                         key={variationIndex}
                                         onClick={() => applyPairedVariation(item.id, titleField.slug, descField.slug, titleVariation, descVariation)}
                                         className={`w-full text-left px-3 py-2 rounded-[var(--radius-lg)] text-xs border transition-colors ${
@@ -379,7 +386,7 @@ export function CmsEditorCollections({
                                           <span className="flex-1 text-[var(--brand-text)]">{descVariation}</span>
                                           <CharacterCounter current={descVariation.length} max={160} size="sm" />
                                         </div>
-                                      </button>
+                                      </ClickableRow>
                                     );
                                   })}
                                 </div>
@@ -392,14 +399,15 @@ export function CmsEditorCollections({
                               {error && <span className="t-caption-sm text-red-400/80">{error}</span>}
                               {isSaved && !isDirty && <span className="t-caption-sm text-emerald-400 flex items-center gap-1"><Icon as={Check} size="sm" /> Saved as draft</span>}
                             </div>
-                            <button
+                            <Button
                               onClick={() => saveItem(coll.collectionId, item.id)}
                               disabled={!isDirty || isSaving}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+                              size="sm"
+                              icon={isSaving ? Loader2 : Save}
+                              className={`rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium ${isSaving ? '[&_svg]:animate-spin' : ''}`}
                             >
-                              <Icon as={isSaving ? Loader2 : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />
                               Save
-                            </button>
+                            </Button>
                           </div>
 
                           {(() => {
@@ -431,13 +439,15 @@ export function CmsEditorCollections({
 
                                 {itemApprovals.length > 1 && (
                                   <>
-                                    <button
+                                    <Button
                                       onClick={() => toggleHistory(item.id)}
-                                      className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="px-0 py-0 h-auto min-h-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                                     >
                                       <Icon as={historyExpanded.has(item.id) ? ChevronDown : ChevronRight} size="sm" />
                                       {itemApprovals.length} changes in history
-                                    </button>
+                                    </Button>
                                     {historyExpanded.has(item.id) && (
                                       <div className="space-y-1.5 pl-3 border-l-2 border-[var(--brand-border)]">
                                         {itemApprovals.slice(1).map(approval => (
@@ -467,12 +477,14 @@ export function CmsEditorCollections({
                             <div className="border-t border-[var(--brand-border)] pt-4 mt-4 space-y-4">
                               <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-sm font-medium text-[var(--brand-text-bright)]">Preview</h4>
-                                <button
+                                <Button
                                   onClick={() => togglePreview(item.id)}
-                                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] text-xs"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="px-0 py-0 h-auto min-h-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] text-xs"
                                 >
                                   Hide
-                                </button>
+                                </Button>
                               </div>
 
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -1,7 +1,7 @@
 import {
-  Loader2, Sparkles, ChevronDown, ChevronUp, ExternalLink,
+  Sparkles, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react';
-import { AIContextIndicator, Icon } from '../ui';
+import { AIContextIndicator, Icon, Button } from '../ui';
 import type { BriefTemplateCrossrefMatch } from '../../../shared/types/content';
 
 export interface BriefGeneratorProps {
@@ -99,13 +99,15 @@ export function BriefGenerator({
       </div>
 
       {/* Advanced Options */}
-      <button
+      <Button
         onClick={onToggleAdvanced}
-        className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+        icon={showAdvanced ? ChevronUp : ChevronDown}
+        size="sm"
+        variant="ghost"
+        className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
       >
-        <Icon as={showAdvanced ? ChevronUp : ChevronDown} size="sm" />
         Advanced Options
-      </button>
+      </Button>
       {showAdvanced && (
         <div className="space-y-2 pl-1 border-l-2 border-[var(--brand-border)] ml-1">
           <div>
@@ -129,14 +131,17 @@ export function BriefGenerator({
 
       {error && <p className="text-xs text-red-400">{error}</p>}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           onClick={onGenerate}
           disabled={!keyword.trim() || generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
+          loading={generating}
+          icon={Sparkles}
+          size="md"
+          variant="secondary"
+          className="rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white border-0"
         >
-          <Icon as={generating ? Loader2 : Sparkles} size="md" className={generating ? 'animate-spin' : ''} />
           {generating ? 'Generating...' : 'Generate Brief'}
-        </button>
+        </Button>
         {generating && (
           <span className="t-caption-sm text-[var(--brand-text-muted)] animate-pulse">Enriching with SERP data, GA4 insights, and knowledge base...</span>
         )}

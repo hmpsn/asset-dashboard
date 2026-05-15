@@ -20,7 +20,7 @@ import {
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
 import { queryKeys } from '../../lib/queryKeys';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Toggle, cn } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, IconButton, Toggle, Button, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../../../shared/types/copy-pipeline';
 
@@ -162,18 +162,20 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
             aria-label="Edit pattern text"
           />
         ) : (
-          <button
+          <Button
             onClick={handleEditStart}
             disabled={isDeleting}
+            variant="ghost"
+            size="sm"
             className={cn(
-              'text-left w-full text-sm truncate transition-colors hover:text-teal-300 disabled:cursor-not-allowed',
+              'text-left justify-start w-full h-auto min-h-0 p-0 text-sm truncate transition-colors hover:text-teal-300 disabled:cursor-not-allowed',
               pattern.active ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] line-through'
             )}
             title="Click to edit"
             aria-label={`Edit: ${pattern.pattern}`}
           >
             {pattern.pattern}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -192,18 +194,18 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
       )}
 
       {/* Delete */}
-      <button
+      <IconButton
         onClick={() => deleteMutation.mutate(pattern.id)}
         disabled={isDeleting || isEditing}
-        aria-label={`Delete pattern: ${pattern.pattern}`}
-        className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        {isDeleting ? (
-          <Icon as={Loader2} size="md" className="animate-spin" />
-        ) : (
-          <Icon as={Trash2} size="md" />
+        label={`Delete pattern: ${pattern.pattern}`}
+        icon={isDeleting ? Loader2 : Trash2}
+        size="sm"
+        variant="ghost"
+        className={cn(
+          'shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30',
+          isDeleting && '[&_svg]:animate-spin',
         )}
-      </button>
+      />
     </div>
   );
 }
@@ -284,14 +286,16 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
                 </div>
               </div>
               {/* pr-check-disable-next-line -- preview/coming-soon button uses a deliberately muted /40 gradient that the Button primitive's primary variant does not support; preview is locked at disabled state */}
-              <button
+              <Button
                 disabled
                 title="Coming soon — Tier 2 feature"
                 aria-label={`Promote "${p.pattern}" to Voice Guardrail (coming soon)`}
+                variant="ghost"
+                size="sm"
                 className="shrink-0 px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] bg-gradient-to-r from-teal-600/40 to-emerald-600/40 text-teal-400/60 cursor-not-allowed border border-teal-500/20"
               >
                 Promote to Guardrail
-              </button>
+              </Button>
             </div>
           );
         })}

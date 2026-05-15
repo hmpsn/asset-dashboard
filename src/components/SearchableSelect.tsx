@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Icon } from './ui';
+import { Button, ClickableRow, Icon, IconButton } from './ui';
 import { Search, X, ChevronDown } from 'lucide-react';
 
 interface Option {
@@ -58,16 +58,18 @@ export default function SearchableSelect({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
+      <Button
         onClick={() => setOpen(!open)}
+        icon={ChevronDown}
+        iconPosition="right"
+        variant="secondary"
+        size="sm"
         className={`flex items-center gap-1.5 w-full bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-left text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] transition-colors focus:outline-none focus:border-teal-500 ${
           isSm ? 'px-2 py-1 t-caption-sm' : 'px-2.5 py-1.5 t-caption'
         }`}
       >
         <span className="flex-1 truncate">{selectedLabel}</span>
-        <Icon as={ChevronDown} size={isSm ? 'sm' : 'md'} className="shrink-0 text-[var(--brand-text-muted)]" />
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute z-[var(--z-modal)] mt-1 w-full min-w-[200px] bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] shadow-xl overflow-hidden">
@@ -81,32 +83,28 @@ export default function SearchableSelect({
               className="flex-1 bg-transparent t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none"
             />
             {search && (
-              <button onClick={() => setSearch('')} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
-                <Icon as={X} size="sm" />
-              </button>
+              <IconButton onClick={() => setSearch('')} icon={X} label="Clear search" variant="ghost" size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />
             )}
           </div>
           <div className="max-h-[200px] overflow-y-auto">
-            <button
-              type="button"
+            <ClickableRow
               onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
               className={`w-full text-left px-2.5 py-1.5 t-caption-sm hover:bg-[var(--surface-3)] transition-colors ${
                 !value ? 'text-teal-400 bg-teal-500/5' : 'text-[var(--brand-text-muted)]'
               }`}
             >
               {emptyLabel}
-            </button>
+            </ClickableRow>
             {filtered.map(o => (
-              <button
+              <ClickableRow
                 key={o.value}
-                type="button"
                 onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
                 className={`w-full text-left px-2.5 py-1.5 t-caption-sm hover:bg-[var(--surface-3)] transition-colors truncate ${
                   o.value === value ? 'text-teal-400 bg-teal-500/5' : 'text-[var(--brand-text)]'
                 }`}
               >
                 {o.label}
-              </button>
+              </ClickableRow>
             ))}
             {filtered.length === 0 && (
               <div className="px-2.5 py-3 t-caption-sm text-[var(--brand-text-muted)] text-center">No matches</div>

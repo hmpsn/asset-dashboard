@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
-import { SectionCard, StatCard, Icon } from '../ui';
+import { Button, ClickableRow, SectionCard, StatCard, Icon } from '../ui';
 import {
   Loader2, TrendingUp, Globe, Search, Link2,
   DollarSign, Target, ChevronDown, ChevronRight,
@@ -156,7 +156,9 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       <SectionCard>
         <div className="text-center py-6">
           <p className="t-ui text-red-400">{errorMsg}</p>
-          <button onClick={() => refetch()} className="mt-2 t-caption text-teal-400 hover:underline">Retry</button>
+          <Button onClick={() => refetch()} variant="ghost" size="sm" className="mt-2 t-caption text-teal-400 hover:underline">
+            Retry
+          </Button>
         </div>
       </SectionCard>
     );
@@ -183,9 +185,14 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
           <Icon as={Target} size="md" className="text-teal-400" />
           <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
         </div>
-        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button
+          onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }}
+          variant="ghost"
+          size="sm"
+          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        >
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Domain Overview Cards */}
@@ -207,7 +214,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         return (
           // pr-check-disable-next-line -- brand asymmetric signature on collapsible per-competitor card; non-SectionCard chrome (button-as-first-child)
           <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-            <button
+            <ClickableRow
               onClick={() => toggleExpand(comp.domain)}
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
@@ -221,7 +228,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
                   <span>{fmtNum(comp.backlinks?.referringDomains || 0)} ref. domains</span>
                 </div>
               )}
-            </button>
+            </ClickableRow>
 
             {isExpanded && myOv && compOv && (
               <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)] pt-3">
@@ -264,7 +271,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
       {effectiveGaps.length > 0 && (
         // pr-check-disable-next-line -- brand asymmetric signature on Keyword Gaps collapsible section; non-SectionCard chrome
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-          <button
+          <ClickableRow
             onClick={() => toggleExpand('gaps')}
             className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
           >
@@ -273,7 +280,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
             <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">Keyword Gaps</span>
             {usingFallbackGaps && <span className="t-micro text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
             <span className="t-caption-sm text-[var(--brand-text-muted)]">{effectiveGaps.length} opportunities</span>
-          </button>
+          </ClickableRow>
           {expanded.has('gaps') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)] pt-3">
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Keywords your competitors rank for that you don't — sorted by traffic potential.</p>
@@ -296,7 +303,9 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
         {errorMsg && effectiveGaps.length > 0 && (
           <p className="t-caption-sm text-amber-500/70">
             Live fetch failed — showing cached data.{' '}
-            <button onClick={() => refetch()} className="text-teal-400 hover:underline">Retry</button>
+            <Button onClick={() => refetch()} variant="ghost" size="sm" className="text-teal-400 hover:underline px-0 py-0 h-auto">
+              Retry
+            </Button>
           </p>
         )}
         <p className="t-caption-sm text-[var(--brand-text-dim)] text-right ml-auto">

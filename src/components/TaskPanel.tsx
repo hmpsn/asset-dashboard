@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertTriangle, X, ChevronDown, ChevronUp, Activity, StopCircle, Ban } from 'lucide-react';
-import { Icon } from './ui';
+import { Icon, Button, IconButton } from './ui';
 import { useBackgroundTasks, type BackgroundJob } from '../hooks/useBackgroundTasks';
 import { getBackgroundJobLabel, isBackgroundJobCancellable } from '../../shared/types/background-jobs';
 
@@ -28,14 +28,25 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
           <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{job.message}</div>
         </div>
         {canCancel && (
-          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all" title="Stop" aria-label={`Stop ${label}`}>
-            <Icon as={StopCircle} size="sm" />
-          </button>
+          <IconButton
+            icon={StopCircle}
+            label={`Stop ${label}`}
+            title="Stop"
+            size="sm"
+            variant="ghost"
+            onClick={onCancel}
+            className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all"
+          />
         )}
         {!isActive && (
-          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-all" aria-label={`Dismiss ${label}`}>
-            <Icon as={X} size="sm" />
-          </button>
+          <IconButton
+            icon={X}
+            label={`Dismiss ${label}`}
+            size="sm"
+            variant="ghost"
+            onClick={onDismiss}
+            className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-all"
+          />
         )}
       </div>
       {isActive && (pct != null || progressText) && (
@@ -78,9 +89,11 @@ export function TaskPanel({ workspaceId }: { workspaceId?: string }) {
         className="w-full flex items-center gap-2 px-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-t-[var(--radius-xl)] hover:border-[var(--brand-border-hover)] transition-colors"
         style={!expanded ? { borderRadius: 'var(--radius-xl)' } : undefined}
       >
-        <button
+        <Button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          variant="ghost"
+          size="sm"
+          className="flex items-center gap-2 flex-1 min-w-0 !px-0 !py-0 !justify-start text-left bg-transparent hover:bg-transparent"
           aria-expanded={expanded}
           aria-label={`${summary}. ${expanded ? 'Hide' : 'Show'} background tasks`}
         >
@@ -96,14 +109,16 @@ export function TaskPanel({ workspaceId }: { workspaceId?: string }) {
             ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
             : <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" />
           }
-        </button>
+        </Button>
         {doneCount > 0 && !expanded && (
-          <button
+          <Button
             onClick={(e) => { e.stopPropagation(); clearDone(visibleWorkspaceId); }}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-1"
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] !px-1"
           >
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
@@ -115,9 +130,14 @@ export function TaskPanel({ workspaceId }: { workspaceId?: string }) {
           ))}
           {doneCount > 0 && (
             <div className="px-3 py-2 text-center">
-              <button onClick={() => clearDone(visibleWorkspaceId)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              <Button
+                onClick={() => clearDone(visibleWorkspaceId)}
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+              >
                 Clear completed
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import {
   Clipboard, RefreshCw, ChevronDown, ChevronRight,
   Sparkles, Flag, Eye, Send, ArrowRight,
 } from 'lucide-react';
-import { SectionCard, Icon } from './ui';
+import { SectionCard, Icon, ClickableRow } from './ui';
 
 interface GuideSection {
   id: string;
@@ -165,9 +165,9 @@ export function ContentPipelineGuide() {
         const SectionIcon = section.icon;
         return (
           <SectionCard key={section.id} noPadding>
-            <button
+            <ClickableRow
               onClick={() => toggle(section.id)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-xl)]"
+              className="flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 rounded-[var(--radius-xl)]"
             >
               <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={SectionIcon} size="md" className="text-accent-brand" />
@@ -177,7 +177,7 @@ export function ContentPipelineGuide() {
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{section.subtitle}</span>
               </div>
               <Icon as={expanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-            </button>
+            </ClickableRow>
 
             {expanded && (
               <div className="px-4 pb-4 space-y-3">

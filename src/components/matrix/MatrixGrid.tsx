@@ -3,7 +3,7 @@ import {
   Filter, ArrowUpDown, Sparkles, FileText, Send, Download,
   FileDown, CheckSquare, Square, BarChart3, Flag,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader } from '../ui';
+import { SectionCard, Badge, PageHeader, Button, IconButton, ClickableRow } from '../ui';
 import type { ContentMatrix, MatrixCell } from './types';
 import { CellDetailPanel } from './CellDetailPanel';
 
@@ -185,29 +185,31 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         <div className="flex items-center gap-2">
           {/* Filter */}
           <div className="relative">
-            <button
+            <Button
               onClick={() => { setShowFilter(!showFilter); setShowSort(false); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
             >
               <Filter className="w-3 h-3" /> Filter
               {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
-            </button>
+            </Button>
             {showFilter && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
-                <button
+                <ClickableRow
                   onClick={() => { setFilterStatus('all'); setShowFilter(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${filterStatus === 'all' ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
+                  className={`px-3 py-1.5 text-xs ${filterStatus === 'all' ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                 >
                   All statuses
-                </button>
+                </ClickableRow>
                 {ALL_STATUSES.map(s => (
-                  <button
+                  <ClickableRow
                     key={s}
                     onClick={() => { setFilterStatus(s); setShowFilter(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${filterStatus === s ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
+                    className={`px-3 py-1.5 text-xs ${filterStatus === s ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                   >
                     {STATUS_CONFIG[s].icon} {STATUS_CONFIG[s].label}
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )}
@@ -215,22 +217,24 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
 
           {/* Sort */}
           <div className="relative">
-            <button
+            <Button
               onClick={() => { setShowSort(!showSort); setShowFilter(false); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
             >
               <ArrowUpDown className="w-3 h-3" /> Sort
-            </button>
+            </Button>
             {showSort && (
               <div className="absolute top-full left-0 mt-1 w-40 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                 {([['status', 'Status'], ['volume', 'Volume'], ['difficulty', 'Difficulty'], ['alphabetical', 'Alphabetical']] as const).map(([key, label]) => (
-                  <button
+                  <ClickableRow
                     key={key}
                     onClick={() => { setSortKey(key); setShowSort(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${sortKey === key ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
+                    className={`px-3 py-1.5 text-xs ${sortKey === key ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                   >
                     {label}
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )}
@@ -245,12 +249,14 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                 {selectedIds.size} selected
               </span>
               <div className="relative">
-                <button
+                <Button
                   onClick={() => setShowBulkMenu(!showBulkMenu)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 font-medium"
                 >
                   Actions
-                </button>
+                </Button>
                 {showBulkMenu && (
                   <div className="absolute top-full right-0 mt-1 w-52 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                     {[
@@ -260,14 +266,14 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                       { key: 'export_csv' as const, label: 'Export CSV', icon: Download },
                       { key: 'export_docx' as const, label: 'Export Word Doc', icon: FileDown },
                     ].map(action => (
-                      <button
+                      <ClickableRow
                         key={action.key}
                         onClick={() => { onBulkAction(action.key, [...selectedIds]); setShowBulkMenu(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--brand-text-bright)]"
                       >
                         <action.icon className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
                         {action.label}
-                      </button>
+                      </ClickableRow>
                     ))}
                   </div>
                 )}
@@ -324,12 +330,14 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   onClick={e => handleCellSelect(cell.id, e, i)}
                   onDoubleClick={() => handleCellOpen(cell)}
                 >
-                  <button
+                  <IconButton
                     onClick={e => { e.stopPropagation(); handleCellSelect(cell.id, { ...e, ctrlKey: true } as React.MouseEvent, i); }}
-                    className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
-                  >
-                    {isSelected ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
-                  </button>
+                    icon={isSelected ? CheckSquare : Square}
+                    label={isSelected ? 'Deselect cell' : 'Select cell'}
+                    size="sm"
+                    variant="ghost"
+                    className={isSelected ? 'text-teal-400 hover:text-teal-300' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}
+                  />
                   <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') || cfg.text.includes('brand') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : cfg.text.includes('emerald') ? 'emerald' : cfg.text.includes('red') ? 'red' : 'zinc'} />
                   <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{cell.customKeyword ?? cell.targetKeyword}</span>
                   {cell.keywordValidation && (

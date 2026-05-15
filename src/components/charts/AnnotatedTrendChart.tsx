@@ -7,7 +7,7 @@ import {
 import { Plus, X } from 'lucide-react';
 import type { Annotation } from '../../hooks/admin/useAnalyticsAnnotations';
 import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle, CHART_SERIES_COLORS } from '../ui/constants';
-import { Icon, Button } from '../ui';
+import { Button, IconButton } from '../ui';
 
 // ── Category colors (matches AnalyticsAnnotations badges) ──
 const ANNOTATION_COLORS: Record<string, string> = {
@@ -232,7 +232,15 @@ function CreatePopover({
     >
       <div className="flex items-center justify-between mb-2">
         <span className="t-caption-sm font-mono text-[var(--brand-text-muted)]">{state.date}</span>
-        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5" aria-label="Close"><Icon as={X} size="md" /></button>
+        <IconButton
+          onClick={onClose}
+          icon={X}
+          label="Close"
+          title="Close"
+          variant="ghost"
+          size="sm"
+          className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5"
+        />
       </div>
       <input
         type="text"

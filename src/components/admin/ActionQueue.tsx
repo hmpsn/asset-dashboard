@@ -4,7 +4,7 @@ import { useActionQueue } from '../../hooks/admin/useActionQueue.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { Icon } from '../ui/index.js';
+import { Icon, Button, ClickableRow } from '../ui/index.js';
 import { put } from '../../api/client.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import { AlertTriangle, Clock, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -72,8 +72,9 @@ export function ActionQueue({ workspaceId }: Props) {
           return (
             <div key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
               {/* Header row */}
-              <button
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
+              <ClickableRow
+                active={isExpanded}
+                className="flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] bg-transparent"
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
@@ -91,7 +92,7 @@ export function ActionQueue({ workspaceId }: Props) {
                 ) : (
                   <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)] shrink-0" />
                 )}
-              </button>
+              </ClickableRow>
 
               {/* Expanded resolution panel */}
               {isExpanded && (
@@ -112,22 +113,26 @@ export function ActionQueue({ workspaceId }: Props) {
 
                   {/* Resolution buttons — teal for actions */}
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'in_progress', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+                      variant="ghost"
+                      size="sm"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
                     >
                       <Clock className="w-3 h-3" />
                       In Progress
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'resolved', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 text-accent-brand hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
+                      variant="ghost"
+                      size="sm"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 text-accent-brand hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
                     >
                       <CheckCircle className="w-3 h-3" />
                       Mark Resolved
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

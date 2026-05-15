@@ -348,7 +348,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   </Button>
                 ))}
               </div>
-              <button
+              <Button
                 disabled={sendingReport}
                 onClick={async () => {
                   setSendingReport(true);
@@ -362,10 +362,12 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                     setSendingReport(false);
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
               >
                 <Icon as={Mail} size="xs" /> Send Report Now
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import {
   PauseCircle, AlertTriangle, FileText, Settings2,
 } from 'lucide-react';
 import { contentSubscriptions } from '../api/misc';
-import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button } from './ui';
+import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button, IconButton, ClickableRow } from './ui';
 import type { ContentSubscription, ContentSubPlan } from '../../shared/types/content';
 import { CONTENT_SUB_PLANS } from '../../shared/types/content';
 
@@ -107,15 +107,20 @@ export function ContentSubscriptions({ workspaceId }: Props) {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="t-ui text-[var(--brand-text-bright)]">Create Content Subscription</h3>
-              <button onClick={() => setShowCreate(false)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">
-                <Icon as={XCircle} size="md" />
-              </button>
+              <IconButton
+                onClick={() => setShowCreate(false)}
+                icon={XCircle}
+                label="Close create subscription"
+                variant="ghost"
+                size="sm"
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+              />
             </div>
 
             {/* Plan selection */}
             <div className="grid grid-cols-3 gap-3">
               {CONTENT_SUB_PLANS.map(plan => (
-                <button
+                <ClickableRow
                   key={plan.plan}
                   onClick={() => setNewPlan(plan.plan)}
                   style={{ borderRadius: 'var(--radius-signature)' }}
@@ -128,7 +133,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                   <div className="t-ui text-[var(--brand-text-bright)]">{plan.displayName}</div>
                   <div className="t-caption-sm text-[var(--brand-text)] mt-1">{plan.description}</div>
                   <div className="t-stat-sm text-accent-brand mt-2">${plan.priceUsd}<span className="t-caption-sm text-[var(--brand-text-muted)]">/mo</span></div>
-                </button>
+                </ClickableRow>
               ))}
             </div>
 
@@ -158,20 +163,22 @@ export function ContentSubscriptions({ workspaceId }: Props) {
             </div>
 
             <div className="flex justify-end gap-2">
-              <button
+              <Button
                 onClick={() => setShowCreate(false)}
+                variant="ghost"
                 className="px-4 py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleCreate}
                 disabled={creating}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                variant="ghost"
+                className="px-4 py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
               >
                 <Icon as={creating ? Loader2 : Plus} size="md" className={creating ? 'animate-spin' : ''} />
                 Create Subscription
-              </button>
+              </Button>
             </div>
           </div>
         </SectionCard>
@@ -201,27 +208,33 @@ export function ContentSubscriptions({ workspaceId }: Props) {
             </div>
             <div className="flex items-center gap-2">
               {activeSub.status === 'active' && (
-                <button
+                <Button
                   onClick={() => handleStatusChange(activeSub.id, 'paused')}
-                  className="t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] flex items-center gap-1"
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
                 >
                   <Icon as={PauseCircle} size="md" /> Pause
-                </button>
+                </Button>
               )}
               {activeSub.status === 'paused' && (
-                <button
+                <Button
                   onClick={() => handleStatusChange(activeSub.id, 'active')}
-                  className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-1"
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption-sm text-accent-brand hover:text-accent-brand"
                 >
                   <Icon as={CheckCircle2} size="md" /> Resume
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={() => handleDelete(activeSub.id)}
-                className="t-caption-sm text-accent-danger hover:text-accent-danger flex items-center gap-1"
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm text-accent-danger hover:text-accent-danger"
               >
                 <Icon as={Trash2} size="md" /> Delete
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -248,12 +261,14 @@ export function ContentSubscriptions({ workspaceId }: Props) {
 
           {/* Quick action: mark post as delivered */}
           {activeSub.postsDeliveredThisPeriod < activeSub.postsPerMonth && (
-            <button
+            <Button
               onClick={() => handleMarkDelivered(activeSub.id)}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="mt-3 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
             >
               <Icon as={FileText} size="md" /> Mark Post Delivered
-            </button>
+            </Button>
           )}
         </SectionCard>
       )}

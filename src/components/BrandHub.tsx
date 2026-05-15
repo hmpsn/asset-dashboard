@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
 import {
-  Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
+  Save, Sparkles, BookOpen, Users, MessageSquare,
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
-import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, ConfirmDialog } from './ui';
+import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -314,14 +314,18 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             >
               Save Brand Voice
             </Button>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              icon={generatingBrandVoice ? undefined : Sparkles}
+              loading={generatingBrandVoice}
               onClick={generateBrandVoiceHandler}
               disabled={generatingBrandVoice || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {generatingBrandVoice ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="sm" /> Generate from Website</>}
-            </button>
+              {generatingBrandVoice ? 'Crawling site...' : 'Generate from Website'}
+            </Button>
           </div>
           <ProgressIndicator
             status={generatingBrandVoice ? 'running' : 'idle'}
@@ -380,8 +384,12 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed"
           />
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              icon={generatingKB ? undefined : Sparkles}
+              loading={generatingKB}
               onClick={async () => {
                 if (generatingKB) return;
                 setStartingKbJob(true);
@@ -401,10 +409,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 }
               }}
               disabled={generatingKB || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {generatingKB ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
-            </button>
+              {generatingKB ? 'Crawling site...' : 'Generate from Website'}
+            </Button>
             {kbDraft !== null && kbDraft !== (ws?.knowledgeBase || '') && (
               <span className="t-caption-sm text-accent-warning">Unsaved changes — click outside the textarea to save</span>
             )}
@@ -421,18 +429,21 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         title="Audience Personas"
         titleIcon={<Icon as={Users} size="md" className="text-accent-info" />}
         action={
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
+            icon={showPersonas ? undefined : Plus}
             onClick={() => {
               if (!showPersonas) setLocalPersonas(ws?.personas || []);
               setShowPersonas(!showPersonas);
               setEditingPersonaId(null);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors"
+            className="gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium"
             style={{ backgroundColor: 'var(--surface-3)', color: 'var(--brand-text)' }}
           >
-            {showPersonas ? 'Close' : <><Icon as={Plus} size="sm" /> Manage</>}
-          </button>
+            {showPersonas ? 'Close' : 'Manage'}
+          </Button>
         }
         noPadding
       >
@@ -466,9 +477,12 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                     {p.buyingStage && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{p.buyingStage}</span>}
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
+                    <IconButton
                       type="button"
-                      aria-label={`Edit persona ${p.name}`}
+                      label={`Edit persona ${p.name}`}
+                      icon={Pencil}
+                      size="sm"
+                      variant="ghost"
                       onClick={() => {
                         if (editingPersonaId === p.id) { setEditingPersonaId(null); return; }
                         setEditingPersonaId(p.id);
@@ -481,17 +495,16 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                         });
                       }}
                       className="p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                    >
-                      <Icon as={Pencil} size="sm" />
-                    </button>
-                    <button
+                    />
+                    <IconButton
                       type="button"
-                      aria-label={`Delete persona ${p.name}`}
+                      label={`Delete persona ${p.name}`}
+                      icon={Trash2}
+                      size="sm"
+                      variant="ghost"
                       onClick={() => setConfirmDeletePersona(p)}
                       className="p-1 rounded text-[var(--brand-text-muted)] hover:text-accent-danger"
-                    >
-                      <Icon as={Trash2} size="sm" />
-                    </button>
+                    />
                   </div>
                 </div>
                 {editingPersonaId !== p.id && (
@@ -576,8 +589,11 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                         className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       />
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={() => {
                         setLocalPersonas(prev => prev.map(x => x.id === p.id ? {
                           ...x, name: personaDraft.name.trim(), description: personaDraft.description.trim(),
@@ -589,18 +605,21 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                         } : x));
                         setEditingPersonaId(null);
                       }}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors"
+                      className="gap-1 px-3 py-1.5 rounded bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium"
                     >
-                      <Icon as={Check} size="sm" /> Apply Changes
-                    </button>
+                      Apply Changes
+                    </Button>
                   </div>
                 )}
               </div>
             ))}
 
             {/* Add new persona */}
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              icon={Plus}
               onClick={() => {
                 const newP: AudiencePersona = {
                   id: `persona_${Date.now()}`, name: 'New Persona', description: '',
@@ -610,10 +629,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 setEditingPersonaId(newP.id);
                 setPersonaDraft({ name: newP.name, description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' });
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-md)] border border-dashed border-[var(--brand-border)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] transition-colors w-full justify-center"
+              className="w-full justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-md)] border border-dashed border-[var(--brand-border)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-hover)]"
             >
-              <Icon as={Plus} size="sm" /> Add Persona
-            </button>
+              Add Persona
+            </Button>
 
             {/* Save button */}
             <div className="pt-2 border-t border-[var(--brand-border)] flex items-center gap-3">
@@ -634,8 +653,12 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               >
                 Save Personas
               </Button>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
+                icon={generatingPersonas ? undefined : Sparkles}
+                loading={generatingPersonas}
                 onClick={async () => {
                   if (generatingPersonas) return;
                   setStartingPersonasJob(true);
@@ -655,10 +678,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                   }
                 }}
                 disabled={generatingPersonas || !webflowSiteId}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-blue-500/10 text-accent-info hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-blue-500/10 text-accent-info hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {generatingPersonas ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
-              </button>
+                {generatingPersonas ? 'Crawling site...' : 'Generate from Website'}
+              </Button>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{localPersonas.length} persona{localPersonas.length !== 1 ? 's' : ''}</span>
             </div>
           </div>

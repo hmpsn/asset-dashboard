@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useContentCalendar } from '../hooks/admin';
-import { EmptyState, Icon } from './ui';
+import { Button, EmptyState, Icon, IconButton } from './ui';
 import { adminPath } from '../routes';
 import { timeAgo } from '../lib/timeAgo';
 
@@ -179,9 +179,11 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         <div className="flex items-center gap-2">
           {/* Type filter pills */}
           {(['all', 'brief', 'post', 'request', 'matrix'] as const).map(t => (
-            <button
+            <Button
               key={t}
               onClick={() => setTypeFilter(t)}
+              variant="ghost"
+              size="sm"
               className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-medium transition-colors ${
                 typeFilter === t
                   ? 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
@@ -189,7 +191,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
               }`}
             >
               {t === 'all' ? 'All' : TYPE_CONFIG[t].label + 's'}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -213,29 +215,37 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       {/* Month navigation */}
       {/* pr-check-disable-next-line -- Calendar navigation toolbar uses brand signature radius as control chrome, not a content card. */}
       <div className="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-2.5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <button
+        <IconButton
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+          icon={ChevronLeft}
+          label="Previous month"
+          title="Previous month"
+          variant="ghost"
+          size="sm"
           className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
-        >
-          <Icon as={ChevronLeft} size="md" />
-        </button>
+        />
         <div className="flex items-center gap-3">
           <span className="t-ui text-[var(--brand-text-bright)]">{formatMonthYear(currentMonth)}</span>
           {!isCurrentMonth && (
-            <button
+            <Button
               onClick={() => setCurrentMonth(startOfMonth(new Date()))}
+              variant="ghost"
+              size="sm"
               className="t-caption-sm px-2 py-0.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
             >
               Today
-            </button>
+            </Button>
           )}
         </div>
-        <button
+        <IconButton
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+          icon={ChevronRight}
+          label="Next month"
+          title="Next month"
+          variant="ghost"
+          size="sm"
           className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
-        >
-          <Icon as={ChevronRight} size="md" />
-        </button>
+        />
       </div>
 
       {/* Calendar grid */}
@@ -258,12 +268,14 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
             const isSelected = selectedDay === key;
 
             return (
-              <button
+              <Button
                 key={i}
                 onClick={() => setSelectedDay(isSelected ? null : key)}
+                variant="ghost"
+                size="sm"
                 className={`min-h-[80px] p-1.5 border-b border-r border-[var(--brand-border)]/50 text-left transition-colors relative ${
                   isSelected ? 'bg-[var(--surface-3)]/80' : 'hover:bg-[var(--surface-3)]/30'
-                } ${!isThisMonth ? 'opacity-40' : ''}`}
+                } ${!isThisMonth ? 'opacity-40' : ''} block w-full h-full`}
               >
                 <div className={`t-caption-sm font-medium mb-1 ${
                   isToday ? 'text-accent-warning' : isThisMonth ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'
@@ -290,7 +302,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                     <div className="t-micro text-[var(--brand-text-muted)] px-1">+{dayItems.length - 3} more</div>
                   )}
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -351,13 +363,15 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           title="No content items yet"
           description="Create a content brief to get started"
           action={
-            <button
+            <Button
               onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
-              className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
+              variant="ghost"
+              size="sm"
+              className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
             >
               <Icon as={PenLine} size="sm" />
               Create a Brief
-            </button>
+            </Button>
           }
         />
       )}

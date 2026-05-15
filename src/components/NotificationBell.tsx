@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, X } from 'lucide-react';
 import { adminPath, type Page } from '../routes';
 import { useNotifications } from '../hooks/admin/useNotifications';
-import { EmptyState, Icon } from './ui';
+import { EmptyState, Icon, Button, IconButton, ClickableRow } from './ui';
 
 interface NotificationBellProps {
   onSelectWorkspace: (workspaceId: string) => void;
@@ -37,9 +37,11 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
   return (
     <>
       {/* Bell trigger button */}
-      <button
+      <Button
         onClick={() => setOpen(prev => !prev)}
         title="Notifications"
+        variant="ghost"
+        size="sm"
         className={`p-2 rounded-[var(--radius-lg)] transition-all relative ${
           open ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
         }`}
@@ -48,7 +50,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
         {hasItems && (
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-[var(--radius-pill)] bg-red-500 ring-2 ring-[var(--surface-1)]" />
         )}
-      </button>
+      </Button>
 
       {/* Backdrop */}
       {open && (
@@ -74,13 +76,14 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                   {items.length}
                 </span>
               )}
-              <button
+              <IconButton
                 onClick={() => setOpen(false)}
+                icon={X}
+                label="Close notifications"
+                variant="ghost"
+                size="sm"
                 className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-                aria-label="Close notifications"
-              >
-                <Icon as={X} size="sm" />
-              </button>
+              />
             </div>
           </div>
 
@@ -91,7 +94,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                 {items.map(item => {
                   const ItemIcon = item.icon;
                   return (
-                    <button
+                    <ClickableRow
                       key={item.id}
                       onClick={() => {
                         if (item.workspaceId) {
@@ -100,7 +103,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                         }
                         setOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
+                      className="flex items-center gap-2.5 px-4 py-3 hover:bg-[var(--surface-3)] text-left bg-transparent"
                     >
                       <Icon as={ItemIcon} size="sm" className={`flex-shrink-0 ${item.color}`} />
                       <div className="flex-1 min-w-0">
@@ -108,7 +111,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                         <div className="t-micro text-[var(--brand-text-muted)] truncate">{item.sub}</div>
                       </div>
                       <Icon as={AlertTriangle} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
-                    </button>
+                    </ClickableRow>
                   );
                 })}
               </div>

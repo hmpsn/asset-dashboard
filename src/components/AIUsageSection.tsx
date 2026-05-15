@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getOptional } from '../api/client';
 import { Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { SectionCard, Icon, cn } from './ui';
+import { SectionCard, Icon, cn, Button } from './ui';
 import { chartAxisColor } from './ui/constants';
 
 interface DailyUsage {
@@ -94,9 +94,11 @@ export function AIUsageSection() {
       action={
         <div className="flex gap-1">
           {[7, 14, 30].map(d => (
-            <button
+            <Button
               key={d}
               onClick={() => setDays(d)}
+              variant="ghost"
+              size="sm"
               className={cn(
                 'px-2 py-0.5 rounded t-caption-sm font-medium transition-colors',
                 days === d
@@ -105,7 +107,7 @@ export function AIUsageSection() {
               )}
             >
               {d}d
-            </button>
+            </Button>
           ))}
         </div>
       }

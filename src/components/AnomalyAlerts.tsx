@@ -5,7 +5,7 @@ import { post } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryKeys';
 import { timeAgo } from '../lib/timeAgo';
-import { Icon, Tooltip, TrendBadge } from './ui';
+import { Button, Icon, IconButton, Tooltip, TrendBadge } from './ui';
 
 interface AnomalyAlertsProps {
   workspaceId: string;
@@ -122,21 +122,33 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button
+          onClick={() => setCollapsed(!collapsed)}
+          variant="ghost"
+          size="sm"
+          className="px-0 py-0 h-auto text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+        >
           <Icon as={Activity} size="md" className="text-[var(--brand-text)]" />
           Anomaly Alerts
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-red-500/20 text-red-400/80">{critical.length}</span>}
           {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-amber-500/20 text-amber-400/80">{warnings.length}</span>}
           {positive.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-emerald-500/20 text-emerald-400/80">{positive.length}</span>}
           {collapsed ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronUp} size="sm" />}
-        </button>
+        </Button>
         {isAdmin && (
           <Tooltip content="Re-scan now">
-            <button onClick={handleScan} disabled={isLoading}
-              aria-label="Re-scan now"
-              className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50">
-              <Icon as={RefreshCw} size="sm" className={isLoading ? 'animate-spin' : ''} />
-            </button>
+            <IconButton
+              onClick={handleScan}
+              disabled={isLoading}
+              icon={RefreshCw}
+              label="Re-scan now"
+              title="Re-scan now"
+              variant="ghost"
+              size="sm"
+              className={isLoading
+                ? 'p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50 [&_svg]:animate-spin'
+                : 'p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50'}
+            />
           </Tooltip>
         )}
       </div>
@@ -173,10 +185,15 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {isAdmin && (
-                        <button onClick={e => { e.stopPropagation(); handleDismiss(anomaly.id); }} aria-label="Dismiss"
-                          className="p-1 text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors">
-                          <Icon as={X} size="sm" />
-                        </button>
+                        <IconButton
+                          onClick={e => { e.stopPropagation(); handleDismiss(anomaly.id); }}
+                          icon={X}
+                          label="Dismiss"
+                          title="Dismiss"
+                          variant="ghost"
+                          size="sm"
+                          className="p-1 text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors"
+                        />
                       )}
                     </div>
                   </div>
@@ -202,10 +219,14 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                         />
                       </div>
                       {isAdmin && !anomaly.acknowledgedAt && (
-                        <button onClick={() => handleAcknowledge(anomaly.id)}
-                          className="mt-2 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-text-dim)] transition-colors">
+                        <Button
+                          onClick={() => handleAcknowledge(anomaly.id)}
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-text-dim)] transition-colors"
+                        >
                           Mark as reviewed
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}

@@ -5,7 +5,7 @@ import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { SchemaFieldTarget } from '../../../shared/types/site-inventory';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { adminPath } from '../../routes';
-import { Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 import type { SchemaMappingCollection, SchemaPageOption } from './schemaSuggesterTypes';
 
 export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -54,13 +54,14 @@ export function SchemaBusinessProfileCallout({
           </Link>
         )}
       </div>
-      <button
+      <IconButton
+        icon={X}
+        label="Dismiss"
+        size="sm"
+        variant="ghost"
         onClick={onDismiss}
         className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
-        aria-label="Dismiss"
-      >
-        <X size={14} />
-      </button>
+      />
     </div>
   );
 }
@@ -81,12 +82,14 @@ export function SchemaGeneratorHero({
         <p className="t-body font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
         <p className="t-caption text-[var(--brand-text-muted)] max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
       </div>
-      <button
+      <Button
         onClick={onRunScan}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors mt-2"
+        size="md"
+        icon={Sparkles}
+        className="t-body font-medium bg-teal-600 hover:bg-teal-500 text-white mt-2"
       >
-        <Icon as={Sparkles} size="md" /> Generate All Pages
-      </button>
+        Generate All Pages
+      </Button>
     </div>
   );
 }
@@ -133,14 +136,16 @@ export function SchemaInitialPageTypePicker({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="t-caption text-[var(--brand-text-muted)]">{availablePages.length} pages — set page types for better AI prompts</span>
-          <button
+          <Button
             onClick={() => setShowTypeGuide(value => !value)}
-            className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+            variant="ghost"
+            size="sm"
+            className="!px-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
             title="Page Type Guide"
           >
             <Icon as={HelpCircle} size="sm" />
             Guide
-          </button>
+          </Button>
         </div>
         <input
           type="text"
@@ -170,14 +175,16 @@ export function SchemaInitialPageTypePicker({
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <button
+            <Button
               onClick={() => onGenerateSinglePage(page.id)}
               disabled={generatingSingle === page.id}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+              size="sm"
+              loading={generatingSingle === page.id}
+              icon={Sparkles}
+              className="t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 disabled:opacity-50"
             >
-              {generatingSingle === page.id ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
               Generate
-            </button>
+            </Button>
           </div>
         ))}
       </div>
