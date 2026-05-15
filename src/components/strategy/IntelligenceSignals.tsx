@@ -2,7 +2,7 @@ import { useIntelligenceSignals } from '../../hooks/admin/useIntelligenceSignals
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Badge, Icon } from '../ui';
-import { TrendingUp, AlertTriangle, Target } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Target } from 'lucide-react'; // trend-icon-ok — icon usage here is signal-category decoration, not a directional metric trend readout.
 import type { StrategySignal } from '../../../shared/types/insights.js';
 
 interface Props {

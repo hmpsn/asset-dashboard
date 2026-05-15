@@ -209,11 +209,11 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
   };
 
   const statusBadge = (status: number | 'error') => {
-    if (status === 'error') return <span className="px-1.5 py-0.5 rounded t-caption font-mono bg-red-500/15 text-red-400">ERR</span>;
-    if (status >= 200 && status < 300) return <span className="px-1.5 py-0.5 rounded t-caption font-mono bg-emerald-500/15 text-emerald-400">{status}</span>;
-    if (status >= 300 && status < 400) return <span className="px-1.5 py-0.5 rounded t-caption font-mono bg-amber-500/15 text-amber-400">{status}</span>;
-    if (status >= 400) return <span className="px-1.5 py-0.5 rounded t-caption font-mono bg-red-500/15 text-red-400">{status}</span>;
-    return <span className="px-1.5 py-0.5 rounded t-caption font-mono bg-[var(--surface-2)] text-[var(--brand-text)]">{status}</span>;
+    if (status === 'error') return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-red-500/15 text-red-400">ERR</span>;
+    if (status >= 200 && status < 300) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-emerald-500/15 text-emerald-400">{status}</span>;
+    if (status >= 300 && status < 400) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-amber-500/15 text-amber-400">{status}</span>;
+    if (status >= 400) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-red-500/15 text-red-400">{status}</span>;
+    return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-[var(--surface-2)] text-[var(--brand-text)]">{status}</span>;
   };
 
   const filteredPages = data?.pageStatuses.filter(p => {
@@ -239,12 +239,12 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
           <button
             onClick={runScan}
             disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium mx-auto transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium mx-auto transition-colors"
           >
             <Icon as={RefreshCw} size="md" /> Scan Redirects
           </button>
           {error && (
-            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 t-caption text-red-400">
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 t-caption text-red-400">
               {error}
             </div>
           )}
@@ -273,7 +273,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         title="Redirect Manager"
         subtitle={`Scanned ${new Date(snapshotDate || data.scannedAt).toLocaleString()} · ${summary.totalPages} pages checked`}
         actions={
-          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] t-caption font-medium transition-colors">
+          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] t-caption font-medium transition-colors">
             <Icon as={RefreshCw} size="sm" /> Rescan
           </button>
         }
@@ -313,13 +313,13 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                     <span className="t-caption text-[var(--brand-text-bright)] truncate font-mono">{new URL(chain.originalUrl).pathname}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                    <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">
                       {chain.totalHops} hop{chain.totalHops !== 1 ? 's' : ''}
                     </span>
                     {chain.isLoop && (
-                      <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">loop</span>
+                      <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">loop</span>
                     )}
-                    <span className={cn('t-caption-sm px-1.5 py-0.5 rounded', chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-[var(--surface-2)] text-[var(--brand-text)]')}>
+                    <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)]', chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-[var(--surface-2)] text-[var(--brand-text)]')}>
                       {chain.type}
                     </span>
                   </div>
@@ -366,16 +366,16 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
                 {workspaceId && (
-                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
+                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
                     <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
                     {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
                   </button>
                 )}
-                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] t-caption-sm font-medium transition-colors">
+                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] t-caption-sm font-medium transition-colors">
                   {copiedRules ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                   {copiedRules ? 'Copied!' : 'Copy All'}
                 </button>
-                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors">
+                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors">
                   <Icon as={Download} size="sm" /> Export CSV
                 </button>
               </div>
@@ -406,12 +406,12 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                         type="text"
                         value={editDraft}
                         onChange={e => setEditDraft(e.target.value)}
-                        className="flex-1 px-2 py-1 bg-[var(--surface-2)] border border-teal-500/50 rounded t-caption text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-teal-400"
+                        className="flex-1 px-2 py-1 bg-[var(--surface-2)] border border-teal-500/50 rounded-[var(--radius-sm)] t-caption text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-teal-400"
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
                       />
-                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded t-caption-sm font-medium text-white transition-colors">Save</button>
-                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded t-caption-sm text-[var(--brand-text)] transition-colors">Cancel</button>
+                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-sm)] t-caption-sm font-medium text-white transition-colors">Save</button>
+                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] transition-colors">Cancel</button>
                     </div>
                   ) : (
                     <span className={cn('t-caption font-mono', rule.accepted ? 'text-emerald-400' : 'text-teal-400')}>{rule.to}</span>
@@ -423,13 +423,13 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{rule.reason}</div>
                 {!rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/80 hover:bg-emerald-500 rounded t-caption-sm font-medium text-white transition-colors">
+                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/80 hover:bg-emerald-500 rounded-[var(--radius-sm)] t-caption-sm font-medium text-white transition-colors">
                       <Icon as={Check} size="sm" /> Accept
                     </button>
-                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm font-medium text-[var(--brand-text-bright)] transition-colors">
+                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] transition-colors">
                       <Icon as={Edit3} size="sm" /> Edit Target
                     </button>
-                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm font-medium text-red-400 transition-colors">
+                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm font-medium text-red-400 transition-colors">
                       <Icon as={X} size="sm" /> Dismiss
                     </button>
                   </div>
@@ -459,7 +459,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className="px-2.5 py-1 rounded t-caption-sm font-medium transition-colors"
+              className="px-2.5 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium transition-colors"
               style={filter === f.id ? {
                 backgroundColor: 'rgba(45,212,191,0.1)',
                 color: '#2dd4bf',
@@ -478,7 +478,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Filter pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />
         </div>
       </div>

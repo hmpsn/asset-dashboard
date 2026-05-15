@@ -29,7 +29,7 @@ export function StatCard({
   const isHero = size === 'hero';
 
   const baseStyle = {
-    borderRadius: '6px 12px 6px 12px',
+    borderRadius: 'var(--radius-signature)',
     ...(staggerIndex !== undefined && {
       animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both',
       animationDelay: `${staggerIndex * 60}ms`,
@@ -77,7 +77,7 @@ export function CompactStatBar({ items, className }: { items: CompactStatProps[]
   return (
     <div
       className={`bg-[var(--surface-2)] border border-[var(--brand-border)] px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
-      style={{ borderRadius: '6px 12px 6px 12px' }}
+      style={{ borderRadius: 'var(--radius-signature)' }}
     >
       {items.map(m => (
         <div key={m.label} className="flex items-center gap-2">

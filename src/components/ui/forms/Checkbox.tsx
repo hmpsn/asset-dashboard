@@ -49,12 +49,12 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             'transition-colors duration-150',
             checked
               ? 'bg-[var(--brand-mint)] border-[var(--brand-mint)]'
-              : 'bg-zinc-800 border-zinc-700',
+              : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)]',
           )}
         >
           {checked && (
             <svg
-              className="w-2.5 h-2.5 text-zinc-900"
+              className="w-2.5 h-2.5 text-[var(--surface-1)]"
               viewBox="0 0 10 10"
               fill="none"
               stroke="currentColor"
@@ -68,7 +68,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         </span>
 
         {/* Label text */}
-        <span className="text-sm text-zinc-300">{label}</span>
+        <span className="text-sm text-[var(--brand-text)]">{label}</span>
       </label>
     );
   }

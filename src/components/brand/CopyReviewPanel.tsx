@@ -337,7 +337,7 @@ function ProgressBar({ approved, total, percentage }: ProgressBarProps) {
         <span className="t-caption font-medium text-[var(--brand-text)]">{Math.round(percentage)}%</span>
       </div>
       <div
-        className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden"
+        className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(percentage)}
         aria-valuemin={0}

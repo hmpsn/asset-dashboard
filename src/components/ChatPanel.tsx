@@ -164,9 +164,9 @@ export function ChatPanel({
                     <span className="t-caption-sm text-[var(--brand-text-muted)] animate-pulse">{phrase}</span>
                   ) : (
                     <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   )}
                 </div>
@@ -197,7 +197,7 @@ export function ChatPanel({
             <button
               key={i}
               onClick={() => onChipClick?.(chip)}
-              className="t-caption-sm px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+              className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
             >
               {chip}
             </button>

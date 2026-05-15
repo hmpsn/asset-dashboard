@@ -4,7 +4,7 @@ import {
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { MetricRing, EmptyState, Icon, Button } from './ui';
+import { MetricRing, EmptyState, Icon, Button, PageHeader } from './ui';
 import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
@@ -221,6 +221,14 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
     });
   };
 
+  const pageHeader = (
+    <PageHeader
+      title="Page Speed"
+      subtitle="Core Web Vitals and performance diagnostics."
+      icon={<Icon as={Gauge} size="lg" className="text-accent-brand" />}
+    />
+  );
+
   // Single result view (re-uses same VitalCard / opportunity / diagnostic rendering)
   const renderSingleResult = (result: PageSpeedResult) => (
     <div className="space-y-5">
@@ -314,11 +322,13 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
 
   if (!hasRun) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-5">
-        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
-          <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
-        </div>
-        <p className="text-[var(--brand-text)] t-caption-sm">Core Web Vitals &amp; Performance</p>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-12 gap-5">
+          <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
+            <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
+          </div>
+          <p className="text-[var(--brand-text)] t-caption-sm">Core Web Vitals &amp; Performance</p>
 
         {/* Mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
@@ -336,8 +346,8 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
           </button>
         </div>
 
-        {mode === 'single' ? (
-          <div className="w-full max-w-md space-y-3">
+          {mode === 'single' ? (
+            <div className="w-full max-w-md space-y-3">
             <SearchableSelect
               options={pages.map(p => ({ value: p.id, label: `${p.title} ${p.slug ? `(/${p.slug})` : '(Home)'}` }))}
               value={selectedPage}
@@ -364,9 +374,9 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                 Test Desktop
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2 text-center">
+            </div>
+          ) : (
+            <div className="space-y-2 text-center">
             <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md">
               Tests the top 3 most important pages automatically (homepage + key pages).
             </p>
@@ -386,42 +396,54 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                 Test Desktop
               </Button>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
-        <p className="t-caption-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
+          <p className="t-caption-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
+        </div>
       </div>
     );
   }
 
   // Single page result
   if (singleResult) {
-    return renderSingleResult(singleResult);
+    return (
+      <div className="space-y-6">
+        {pageHeader}
+        {renderSingleResult(singleResult)}
+      </div>
+    );
   }
 
   if (error || !data || data.pages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        {error ? (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
-            <p className="text-accent-danger t-ui mb-1">PageSpeed Analysis Failed</p>
-            <p className="t-caption-sm text-accent-danger">{error}</p>
-          </div>
-        ) : (
-          <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
-        )}
-        <Button variant="primary" onClick={() => { setHasRun(false); setError(null); }}>
-          Try Again
-        </Button>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          {error ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
+              <p className="text-accent-danger t-ui mb-1">PageSpeed Analysis Failed</p>
+              <p className="t-caption-sm text-accent-danger">{error}</p>
+            </div>
+          ) : (
+            <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
+          )}
+          <Button variant="primary" onClick={() => { setHasRun(false); setError(null); }}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -430,6 +452,7 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
 
   return (
     <div className="space-y-8">
+      {pageHeader}
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">

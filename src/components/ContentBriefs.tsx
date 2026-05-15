@@ -4,7 +4,7 @@ import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
-import { Icon, cn, Button, Modal } from './ui';
+import { Icon, cn, Button, Modal, PageHeader } from './ui';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -486,14 +486,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         onOpenPost={setActivePostId}
       />
 
-      {/* Content Briefs header — search/sort controls */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon as={Clipboard} size="lg" className="text-accent-brand" />
-            <h2 className="t-caption text-[var(--brand-text-bright)]">Content Briefs</h2>
-            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{briefs.length} total</span>
-          </div>
+      <PageHeader
+        title="Content Briefs"
+        subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
+        icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
+        actions={
           <div className="flex items-center gap-2">
             <div className="relative">
               <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -519,8 +516,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
               </select>
             </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Generator */}
       <BriefGenerator

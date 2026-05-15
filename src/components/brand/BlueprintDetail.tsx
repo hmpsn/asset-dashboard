@@ -86,7 +86,7 @@ function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; ent
   };
 
   return (
-    <span className={cn('shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption rounded font-medium', colorClass[config.color] ?? colorClass.zinc)}>
+    <span className={cn('shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption rounded-[var(--radius-sm)] font-medium', colorClass[config.color] ?? colorClass.zinc)}>
       <Icon as={BadgeIcon} size="sm" />
       {config.label}
       {status.totalSections > 0 && (
@@ -138,20 +138,20 @@ function EntryCard({
         </span>
 
         {/* Page type badge */}
-        <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--surface-3)] text-[var(--brand-text)] rounded font-medium">
+        <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--surface-3)] text-[var(--brand-text)] rounded-[var(--radius-sm)] font-medium">
           {PAGE_TYPE_LABELS[entry.pageType] ?? entry.pageType}
         </span>
 
         {/* CMS badge */}
         {entry.isCollection && (
-          <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--brand-border-hover)] text-[var(--brand-text)] rounded font-medium">
+          <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--brand-border-hover)] text-[var(--brand-text)] rounded-[var(--radius-sm)] font-medium">
             CMS
           </span>
         )}
 
         {/* Primary keyword badge */}
         {entry.primaryKeyword && (
-          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded font-medium">
+          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded-[var(--radius-sm)] font-medium">
             <Icon as={Tag} size="sm" />
             {entry.primaryKeyword}
           </span>
@@ -167,7 +167,7 @@ function EntryCard({
           onClick={onScopeToggle}
           disabled={isScopeToggling}
           className={cn(
-            'shrink-0 px-2 py-0.5 t-caption rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            'shrink-0 px-2 py-0.5 t-caption rounded-[var(--radius-sm)] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
             isIncluded
               ? 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'
               : 'bg-amber-900/40 text-amber-400 hover:bg-amber-900/60'
@@ -207,7 +207,7 @@ function EntryCard({
               key={section.id}
               className="flex items-start gap-3 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] px-3 py-2.5"
             >
-              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption font-medium">
+              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-[var(--radius-pill)] bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption font-medium">
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0 space-y-1">
@@ -217,7 +217,7 @@ function EntryCard({
                   </span>
                   {/* narrative role — purple (admin-only) */}
                   {section.narrativeRole && (
-                    <span className="px-1.5 py-0.5 t-caption bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
+                    <span className="px-1.5 py-0.5 t-caption bg-purple-900/30 text-purple-400 rounded-[var(--radius-sm)] font-medium capitalize">
                       {section.narrativeRole.replace(/-/g, ' ')}
                     </span>
                   )}
@@ -508,7 +508,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
         <div className="flex items-start gap-3">
           <button
             onClick={onBack}
-            className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded"
+            className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded-[var(--radius-sm)]"
             aria-label="Back to blueprints"
           >
             <Icon as={ArrowLeft} size="md" />

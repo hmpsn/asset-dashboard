@@ -28,7 +28,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
       >
         <div className="animate-pulse space-y-3">
           {[1, 2].map(i => (
-            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-lg" />
+            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]" />
           ))}
         </div>
       </SectionCard>
@@ -62,7 +62,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
           return (
             <div
               key={signal.insightId}
-              className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
+              className="flex items-start gap-3 p-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
               <Icon as={SignalIcon} size="md" className="mt-0.5 text-teal-400 shrink-0" />
               <div className="min-w-0 flex-1">

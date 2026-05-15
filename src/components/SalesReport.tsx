@@ -169,7 +169,7 @@ export function SalesReport() {
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-[var(--radius-pill)] animate-spin" />
                   Scanning...
                 </div>
               ) : 'Run Report'}
@@ -178,7 +178,7 @@ export function SalesReport() {
 
           {loading && progress && (
             <div className="mt-3 flex items-center justify-center gap-2 text-sm text-[var(--brand-text-muted)]">
-              <div className="w-3 h-3 border border-[var(--brand-border-hover)] border-t-teal-400 rounded-full animate-spin" />
+              <div className="w-3 h-3 border border-[var(--brand-border-hover)] border-t-teal-400 rounded-[var(--radius-pill)] animate-spin" />
               {progress}
             </div>
           )}
@@ -386,12 +386,12 @@ export function SalesReport() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {page.issues.filter(i => i.severity === 'error').length > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">
+                    <span className="text-xs px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-red-500/15 text-red-400">
                       {page.issues.filter(i => i.severity === 'error').length}
                     </span>
                   )}
                   {page.issues.filter(i => i.severity === 'warning').length > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400">
+                    <span className="text-xs px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-yellow-500/15 text-yellow-400">
                       {page.issues.filter(i => i.severity === 'warning').length}
                     </span>
                   )}

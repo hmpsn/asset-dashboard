@@ -26,7 +26,7 @@ export function CharacterCounter({
   }
   
   const sizeClasses = {
-    sm: 'text-[10px]',
+    sm: 't-micro',
     md: 'text-xs',
     lg: 'text-sm'
   };
@@ -39,10 +39,10 @@ export function CharacterCounter({
       className
     )}>
       <span>{current}</span>
-      <span className="text-zinc-500">/</span>
+      <span className="text-[var(--brand-text-dim)]">/</span>
       <span>{max}</span>
       {showPercentage && (
-        <span className="text-zinc-500">({Math.round(percentage)}%)</span>
+        <span className="text-[var(--brand-text-dim)]">({Math.round(percentage)}%)</span>
       )}
     </div>
   );

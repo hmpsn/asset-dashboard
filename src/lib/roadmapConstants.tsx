@@ -33,7 +33,7 @@ interface ChipProps {
 export function FeatureChip({ children, nowrap }: ChipProps) {
   return (
     <span
-      className={`px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20${nowrap ? ' whitespace-nowrap' : ''}`}
+      className={`px-1.5 py-0.5 rounded t-caption-sm font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20${nowrap ? ' whitespace-nowrap' : ''}`}
     >
       {children}
     </span>
@@ -43,7 +43,7 @@ export function FeatureChip({ children, nowrap }: ChipProps) {
 export function TagChip({ children, nowrap }: ChipProps) {
   return (
     <span
-      className={`px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]${nowrap ? ' whitespace-nowrap' : ''}`}
+      className={`px-1.5 py-0.5 rounded t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]${nowrap ? ' whitespace-nowrap' : ''}`}
     >
       {children}
     </span>

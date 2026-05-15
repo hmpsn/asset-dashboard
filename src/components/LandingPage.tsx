@@ -33,7 +33,7 @@ function NavBar() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-semibold tracking-wide uppercase mb-4">
+    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-semibold tracking-wide uppercase mb-4">
       {children}
     </div>
   );
@@ -45,10 +45,10 @@ function Hero() {
   return (
     <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">
       {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-full bg-gradient-to-b from-teal-500/8 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-[var(--radius-pill)] bg-gradient-to-b from-teal-500/8 to-transparent blur-3xl pointer-events-none" />
 
       <div className="relative max-w-4xl mx-auto px-6 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--surface-3)]/80 border border-[var(--brand-border)] text-[var(--brand-text)] text-xs font-medium mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)]/80 border border-[var(--brand-border)] text-[var(--brand-text)] text-xs font-medium mb-8">
           <Zap className="w-3.5 h-3.5 text-teal-400" />
           AI-powered SEO for Webflow sites
         </div>
@@ -75,10 +75,10 @@ function Hero() {
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-1)] via-transparent to-transparent z-[var(--z-sticky)] pointer-events-none" />
           <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 overflow-hidden shadow-2xl shadow-black/40">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/80">
-              <div className="w-3 h-3 rounded-full bg-[var(--brand-border)]" />
-              <div className="w-3 h-3 rounded-full bg-[var(--brand-border)]" />
-              <div className="w-3 h-3 rounded-full bg-[var(--brand-border)]" />
-              <div className="flex-1 mx-4 h-5 rounded bg-[var(--surface-3)]" />
+              <div className="w-3 h-3 rounded-[var(--radius-pill)] bg-[var(--brand-border)]" />
+              <div className="w-3 h-3 rounded-[var(--radius-pill)] bg-[var(--brand-border)]" />
+              <div className="w-3 h-3 rounded-[var(--radius-pill)] bg-[var(--brand-border)]" />
+              <div className="flex-1 mx-4 h-5 rounded-[var(--radius-sm)] bg-[var(--surface-3)]" />
             </div>
             <div className="p-6 sm:p-10 space-y-4">
               <div className="grid grid-cols-3 gap-4">
@@ -210,7 +210,7 @@ function Solution() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pillars.map((p, i) => (
             <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-[var(--surface-2)]/50 p-6 relative overflow-hidden`} style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-[var(--radius-pill)] bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
                 <div className={`w-10 h-10 rounded-[var(--radius-xl)] ${p.iconBg} flex items-center justify-center mb-4`}>
                   <p.icon className={`w-5 h-5 ${p.iconColor}`} />
@@ -256,7 +256,7 @@ function HowItWorks() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {steps.map((s, i) => (
             <div key={i} className="text-center">
-              <div className="w-12 h-12 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
                 <span className="text-sm font-bold text-teal-400">{s.num}</span>
               </div>
               <h3 className="text-base font-bold text-[var(--brand-text-bright)] mb-2">{s.title}</h3>
@@ -357,7 +357,7 @@ function Pricing() {
           {plans.map(plan => (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-6 transition-all ${plan.highlighted ? 'bg-teal-500/[0.03] border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] /* arbitrary-text-ok */ font-semibold uppercase tracking-wider bg-teal-500/20 border border-teal-500/30 text-teal-300">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] text-[10px] /* arbitrary-text-ok */ font-semibold uppercase tracking-wider bg-teal-500/20 border border-teal-500/30 text-teal-300">
                   Most Popular
                 </div>
               )}

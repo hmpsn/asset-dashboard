@@ -18,7 +18,7 @@ import {
   CheckCircle2, LineChart, Trophy, Layers,
   Clock, CreditCard, Building2, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -691,6 +691,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     (tabId === 'health' && !!audit) ||
     tabId === 'inbox' ||
     (tabId === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
+  const activeTabLabel = NAV.find(item => item.id === tab)?.label ?? 'Dashboard';
 
   return (
     <ErrorBoundary label="Client Dashboard">
@@ -731,6 +732,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <main className="max-w-6xl mx-auto px-6 py-6">
         <ScannerReveal>
         <div className="space-y-8">
+        <PageHeader
+          title={activeTabLabel}
+          subtitle={ws.name}
+          icon={<Sparkles className="w-5 h-5 text-accent-brand" />}
+        />
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (

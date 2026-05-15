@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, Minus, Download, Copy, Check } from 'lucide-react';
-import { Icon } from './ui';
+import { Download, Copy, Check } from 'lucide-react';
+import { Icon, TrendBadge } from './ui';
 import { CHART_SERIES_COLORS } from './ui/constants';
 
 // --- Metric Card ---
@@ -32,10 +32,13 @@ export function MetricBlock({ data }: { data: MetricBlockData | MetricBlockData[
           <div className="flex items-baseline gap-1.5 mt-0.5">
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{fmtValue(m.value, m.format)}{m.unit || ''}</span>
             {m.change != null && (
-              <span className={`flex items-center gap-0.5 t-caption-sm font-medium ${m.change > 0 ? 'text-emerald-400/80' : m.change < 0 ? 'text-red-400/80' : 'text-[var(--brand-text-muted)]'}`}>
-                {m.change > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : m.change < 0 ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
-                {m.change > 0 ? '+' : ''}{typeof m.change === 'number' ? m.change.toFixed(1) : m.change}%
-              </span>
+              <TrendBadge
+                value={m.change}
+                suffix="%"
+                showSign
+                hideOnZero={false}
+                className="t-caption-sm"
+              />
             )}
           </div>
           {m.changeLabel && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{m.changeLabel}</div>}
@@ -67,8 +70,8 @@ export function ChartBlock({ data }: { data: ChartBlockData }) {
           return (
             <div key={i} className="flex items-center gap-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-24 truncate flex-shrink-0" title={item.label}>{item.label}</span>
-              <div className="flex-1 h-4 bg-[var(--surface-2)] rounded-sm overflow-hidden relative">
-                <div className="h-full rounded-sm transition-all" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color, opacity: 0.7 }} />
+              <div className="flex-1 h-4 bg-[var(--surface-2)] rounded-[var(--radius-sm)] overflow-hidden relative">
+                <div className="h-full rounded-[var(--radius-sm)] transition-all" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color, opacity: 0.7 }} />
               </div>
               <span className="t-caption-sm text-[var(--brand-text-bright)] font-medium w-12 text-right flex-shrink-0">
                 {data.valueFormat === 'percent' ? `${item.value.toFixed(1)}%` : fmtValue(item.value)}
@@ -125,11 +128,11 @@ export function DataTableBlock({ data }: { data: DataTableBlockData }) {
         {data.title && <span className="t-caption-sm font-medium text-[var(--brand-text)]">{data.title}</span>}
         <div className="flex items-center gap-1 ml-auto">
             <button onClick={handleCopy} title="Copy as CSV"
-              className="p-1 rounded hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              className="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
               {copied ? <Icon as={Check} size="sm" className="text-emerald-400/80" /> : <Icon as={Copy} size="sm" />}
             </button>
             <button onClick={handleDownload} title="Download CSV"
-              className="p-1 rounded hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              className="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
               <Icon as={Download} size="sm" />
             </button>
         </div>

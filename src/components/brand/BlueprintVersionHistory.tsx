@@ -51,11 +51,11 @@ export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
             const timeStr = formatVersionDate(v.createdAt);
 
             return (
-              <li key={v.id} className="rounded-md border border-[var(--brand-border)] bg-[var(--surface-2)]">
+              <li key={v.id} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
                 <button
                   type="button"
                   onClick={() => toggleVersion(v.id)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 transition-colors rounded-md"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 transition-colors rounded-[var(--radius-md)]"
                 >
                   <Icon as={Clock} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
                   <span className="t-mono text-xs text-teal-400 shrink-0">

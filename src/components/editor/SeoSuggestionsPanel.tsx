@@ -83,7 +83,7 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
             {descSuggestions.length > 0 && ` · ${descSuggestions.length} description${descSuggestions.length !== 1 ? 's' : ''}`}
           </span>
           {readyToApply > 0 && (
-            <span className="px-2 py-0.5 t-caption-sm font-medium bg-teal-500/20 text-teal-300 rounded-full">
+            <span className="px-2 py-0.5 t-caption-sm font-medium bg-teal-500/20 text-teal-300 rounded-[var(--radius-pill)]">
               {readyToApply} selected
             </span>
           )}
@@ -144,7 +144,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
             {s.pageTitle}
           </span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">/{s.pageSlug}</span>
-          <span className={`t-caption-sm px-1.5 py-0.5 rounded ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
+          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
             {fieldLabel}
           </span>
         </div>
@@ -177,7 +177,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
                   : 'bg-[var(--surface-2)]/50 border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
-              <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center t-caption-sm font-bold ${
+              <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-[var(--radius-pill)] flex items-center justify-center t-caption-sm font-bold ${
                 isSelected ? 'bg-teal-500 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
               }`}>
                 {isSelected ? <Icon as={Check} size="sm" /> : i + 1}

@@ -113,7 +113,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
         </span>
       </div>
       <div
-        className="h-2 bg-[var(--surface-3)] rounded-full overflow-hidden"
+        className="h-2 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(percentage)}
         aria-valuemin={0}
@@ -121,7 +121,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
         aria-label={`Batch generation progress: ${generated} of ${total} done`}
       >
         <div
-          className={`h-full transition-all duration-500 rounded-full ${
+          className={`h-full transition-all duration-500 rounded-[var(--radius-pill)] ${
             job.status === 'failed'
               ? 'bg-red-500'
               : job.status === 'complete'

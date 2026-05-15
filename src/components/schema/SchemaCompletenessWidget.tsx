@@ -91,7 +91,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
       </p>
 
       {/* Progress bar */}
-      <div className="h-2 w-full rounded-full bg-[var(--surface-3)] overflow-hidden mb-4">
+      <div className="h-2 w-full rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden mb-4">
         <div
           className="h-full bg-emerald-500 transition-all duration-300"
           style={{ width: `${completenessPct}%` }}
@@ -113,7 +113,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
               if (!workspaceId) return;
               navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
             }}
-            className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded text-left hover:bg-[var(--surface-3)] transition-colors group"
+            className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded-[var(--radius-sm)] text-left hover:bg-[var(--surface-3)] transition-colors group"
           >
             <span className="flex items-center gap-2 min-w-0">
               <span aria-hidden="true" className={g.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>

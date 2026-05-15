@@ -29,7 +29,7 @@ function StepIndicator({ current }: { current: Step }) {
         <div key={step} className="flex items-center gap-2">
           {i > 0 && <div className={`w-8 h-px ${step <= current ? 'bg-teal-500/50' : 'bg-[var(--brand-border-hover)]'}`} />}
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center t-caption font-bold ${
+            <div className={`w-6 h-6 rounded-[var(--radius-pill)] flex items-center justify-center t-caption font-bold ${
               step < current ? 'bg-teal-500 text-white' :
               step === current ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40' :
               'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
@@ -98,7 +98,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
   return (
     <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] min-h-[42px] focus-within:border-teal-500/40 transition-colors">
       {values.map(val => (
-        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
+        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
           <button onClick={() => onChange(values.filter(v => v !== val))} className="hover:text-red-400 transition-colors">
             <X className="w-2.5 h-2.5" />

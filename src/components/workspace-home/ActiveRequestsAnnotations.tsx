@@ -65,7 +65,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
           <div className="divide-y divide-[var(--brand-border)]">
             {annotations.map(ann => (
               <div key={ann.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
+                <div className="w-2 h-2 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
                 <div className="flex-1 min-w-0">
                   <div className="t-caption text-[var(--brand-text-bright)] truncate">{ann.label}</div>
                 </div>

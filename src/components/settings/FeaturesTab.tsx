@@ -73,7 +73,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Workspace Tier</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Controls which features the client can access</p>
           </div>
-          <span className={`t-caption-sm font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+          <span className={`t-caption-sm font-semibold uppercase tracking-wider px-2.5 py-1 rounded-[var(--radius-pill)] border ${
             (ws?.tier || 'free') === 'premium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
               : (ws?.tier || 'free') === 'growth' ? 'text-teal-400 bg-teal-500/10 border-teal-500/20'
               : 'text-[var(--brand-text)] bg-[var(--surface-3)] border-[var(--brand-border)]'
@@ -140,10 +140,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ clientPortalEnabled: val });
               toast(val ? 'Client portal enabled' : 'Client portal disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.clientPortalEnabled !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.clientPortalEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -163,10 +163,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ billingMode: next });
               toast(next === 'external' ? 'External billing enabled — payment bypassed' : 'External billing disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.billingMode === 'external' ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.billingMode === 'external' ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -185,10 +185,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ seoClientView: val });
               toast(val ? 'SEO view enabled for client' : 'SEO view hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.seoClientView ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.seoClientView ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -207,10 +207,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ analyticsClientView: val });
               toast(val ? 'Analytics view enabled for client' : 'Analytics view hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.analyticsClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -229,10 +229,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ siteIntelligenceClientView: val });
               toast(val ? 'Site Intelligence summary enabled for client' : 'Site Intelligence summary hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.siteIntelligenceClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.siteIntelligenceClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -256,7 +256,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   await patchWorkspace({ onboardingCompleted: false });
                   toast('Onboarding reset — client will see the questionnaire again');
                 }}
-                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
                   Reset
                 </button>
               )}
@@ -265,10 +265,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 await patchWorkspace({ onboardingEnabled: val });
                 toast(val ? 'Onboarding questionnaire enabled' : 'Onboarding questionnaire disabled');
               }}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                   ws?.onboardingEnabled ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
                 }`}>
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                   ws?.onboardingEnabled ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
               </button>
@@ -302,10 +302,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               await patchWorkspace({ autoReports: val });
               toast(val ? 'Auto-reports enabled' : 'Auto-reports disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.autoReports ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.autoReports ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
@@ -379,7 +379,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   }
                 }}
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500" />
-              {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded" />}
+              {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded-[var(--radius-sm)]" />}
             </div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
               Also used as publisher logo in your schema. Required for Article rich snippets in Google search results.

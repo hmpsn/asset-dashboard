@@ -57,7 +57,7 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
             <button
               key={chip.key ?? 'all'}
               onClick={() => setActiveFilter(chip.key)}
-              className={`px-3 py-1 rounded-md t-caption-sm font-medium transition-colors ${
+              className={`px-3 py-1 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                 activeFilter === chip.key ? 'bg-teal-600 text-white' : 'bg-[var(--surface-3)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'
               }`}
             >

@@ -27,7 +27,7 @@ interface SchemaHealthDashboardProps {
 function ValidationBadge({ status }: { status: 'valid' | 'warnings' | 'errors' }) {
   if (status === 'valid') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
         <Icon as={ShieldCheck} size="sm" />
         Valid
       </span>
@@ -35,14 +35,14 @@ function ValidationBadge({ status }: { status: 'valid' | 'warnings' | 'errors' }
   }
   if (status === 'warnings') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
         <Icon as={AlertTriangle} size="sm" />
         Warnings
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption font-medium bg-red-500/10 text-red-400 border border-red-500/20">
       <Icon as={XCircle} size="sm" />
       Errors
     </span>
@@ -80,7 +80,7 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {record.richResults.slice(0, 3).map(type => (
-            <span key={type} className="t-caption px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
+            <span key={type} className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400 border border-teal-500/20">
               {type}
             </span>
           ))}
@@ -131,7 +131,7 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
               <p className="t-caption font-medium text-teal-400 mb-1">Rich Results Eligible</p>
               <div className="flex flex-wrap gap-1">
                 {record.richResults.map(type => (
-                  <span key={type} className="t-caption px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                  <span key={type} className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     {type}
                   </span>
                 ))}

@@ -4,7 +4,7 @@ import {
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState, SectionCard, Icon, Button } from './ui';
+import { EmptyState, SectionCard, Icon, Button, PageHeader } from './ui';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
 
@@ -134,7 +134,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
           const latest = data[data.length - 1]?.positions[kw];
           return (
             <div key={kw} className="flex items-center gap-1.5 t-caption">
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TREND_COLORS[ki % TREND_COLORS.length] }} />
+              <span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: TREND_COLORS[ki % TREND_COLORS.length] }} />
               <span className="text-[var(--brand-text)]">{kw}</span>
               {latest !== undefined && <span className="text-[var(--brand-text-dim)]">#{latest.toFixed(1)}</span>}
             </div>
@@ -292,42 +292,41 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon as={Target} size="lg" className="text-teal-400" />
-          <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Rank Tracker</h2>
-          <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{keywords.length} keywords</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {latestRanks.some(r => r.pinned) && (
-            <button
-              onClick={() => showTrends ? setShowTrends(false) : loadTrends()}
-              disabled={trendsLoading}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] t-caption font-medium border transition-colors',
-                showTrends
-                  ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
-                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
-              )}
+      <PageHeader
+        title="Rank Tracker"
+        subtitle={`${keywords.length} keyword${keywords.length === 1 ? '' : 's'} tracked`}
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {latestRanks.some(r => r.pinned) && (
+              <button
+                onClick={() => showTrends ? setShowTrends(false) : loadTrends()}
+                disabled={trendsLoading}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] t-caption font-medium border transition-colors',
+                  showTrends
+                    ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                    : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
+                )}
+              >
+                {trendsLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={LineChart} size="sm" />}
+                Trends
+              </button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={snapshotting ? undefined : RefreshCw}
+              loading={snapshotting}
+              disabled={!hasGsc || snapshotting || keywords.length === 0}
+              title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
+              onClick={takeSnapshot}
             >
-              {trendsLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={LineChart} size="sm" />}
-              Trends
-            </button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={snapshotting ? undefined : RefreshCw}
-            loading={snapshotting}
-            disabled={!hasGsc || snapshotting || keywords.length === 0}
-            title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
-            onClick={takeSnapshot}
-          >
-            {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
-          </Button>
-        </div>
-      </div>
+              {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
+            </Button>
+          </div>
+        }
+      />
 
       {!hasGsc && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-sm)] px-4 py-3 text-xs text-amber-300">

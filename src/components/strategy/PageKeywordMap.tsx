@@ -115,7 +115,7 @@ export function PageKeywordMapPanel({
               <button
                 key={s}
                 onClick={() => { if (sortBy === s) onSetSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { onSetSortBy(s); onSetSortDir(() => 'desc'); } }}
-                className={`px-2 py-1 rounded t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
+                className={`px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
                   sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
@@ -146,20 +146,20 @@ export function PageKeywordMapPanel({
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                 {page.searchIntent && (
-                  <span className={`t-caption-sm px-1.5 py-0.5 rounded-full border font-medium ${intentColor(page.searchIntent)}`}>
+                  <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(page.searchIntent)}`}>
                     {page.searchIntent}
                   </span>
                 )}
-                <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
+                <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] max-w-[180px] truncate">
                   {page.primaryKeyword}
                 </span>
                 {page.validated === false && (
-                  <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
+                  <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded-[var(--radius-sm)] border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
                     Unvalidated
                   </span>
                 )}
                 {page.volume !== undefined && page.volume > 0 && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1">
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded-[var(--radius-sm)] font-mono inline-flex items-center gap-1">
                     {page.volume.toLocaleString()}/mo
                     {page.metricsSource === 'partial_match' && (
                       <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
@@ -167,7 +167,7 @@ export function PageKeywordMapPanel({
                   </span>
                 )}
                 {page.difficulty !== undefined && page.difficulty > 0 && (
-                  <span className={`t-caption-sm ${difficultyColor(page.difficulty)} bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1`}>
+                  <span className={`t-caption-sm ${difficultyColor(page.difficulty)} bg-[var(--surface-3)] px-1.5 py-0.5 rounded-[var(--radius-sm)] font-mono inline-flex items-center gap-1`}>
                     KD {page.difficulty}%
                     {page.metricsSource === 'partial_match' && (
                       <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>
@@ -175,11 +175,11 @@ export function PageKeywordMapPanel({
                   </span>
                 )}
                 {page.currentPosition ? (
-                  <span className={`t-caption-sm ${positionColor(page.currentPosition)} font-mono font-medium bg-[var(--surface-3)] px-1.5 py-0.5 rounded`}>
+                  <span className={`t-caption-sm ${positionColor(page.currentPosition)} font-mono font-medium bg-[var(--surface-3)] px-1.5 py-0.5 rounded-[var(--radius-sm)]`}>
                     #{page.currentPosition.toFixed(0)}
                   </span>
                 ) : (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono">—</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded-[var(--radius-sm)] font-mono">—</span>
                 )}
                 {page.impressions !== undefined && page.impressions > 0 && (
                   <span className="t-mono text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} imp</span>
@@ -208,7 +208,7 @@ export function PageKeywordMapPanel({
                       <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Secondary Keywords</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {page.secondaryKeywords.map((kw, i) => (
-                          <span key={i} className="px-1.5 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded t-caption-sm text-[var(--brand-text)]">
+                          <span key={i} className="px-1.5 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)]">
                             {kw}
                           </span>
                         ))}
@@ -257,7 +257,7 @@ export function PageKeywordMapPanel({
                         <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider">Secondary keyword data</span>
                         <div className="flex flex-wrap gap-1 mt-0.5">
                           {page.secondaryMetrics.filter(sm => sm.volume > 0 || sm.difficulty > 0).map((sm, si) => (
-                            <span key={si} className="t-caption-sm px-1.5 py-0.5 bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded text-[var(--brand-text-muted)]">
+                            <span key={si} className="t-caption-sm px-1.5 py-0.5 bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)]">
                               {sm.keyword} {sm.volume > 0 && <span className="text-[var(--brand-text)]">{sm.volume}/mo</span>} {sm.difficulty > 0 && <span className={difficultyColor(sm.difficulty)}>KD {sm.difficulty}%</span>}
                             </span>
                           ))}
@@ -299,13 +299,13 @@ export function PageKeywordMapPanel({
                       <button
                         onClick={onSaveEdit}
                         disabled={saving}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption-sm font-medium"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption-sm font-medium"
                       >
                         {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Check} size="sm" />} Save
                       </button>
                       <button
                         onClick={() => onSetEditingPage(null)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] t-caption-sm font-medium"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] t-caption-sm font-medium"
                       >
                         <Icon as={X} size="sm" /> Cancel
                       </button>

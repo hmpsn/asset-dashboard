@@ -31,11 +31,11 @@ export function SerpPreview({
 
   return (
     <div className={cn(
-      'bg-white border border-zinc-200 rounded-lg p-4 shadow-sm',
+      'bg-white border border-[var(--zinc-200)] rounded-lg p-4 shadow-sm',
       className
     )}>
       {/* URL */}
-      <div className="text-[14px] text-zinc-500 mb-1 truncate">
+      <div className="text-sm text-[var(--zinc-500)] mb-1 truncate">
         {url}
       </div>
       
@@ -49,7 +49,7 @@ export function SerpPreview({
       
       {/* Description */}
       <div className={cn(
-        'text-zinc-600 leading-relaxed',
+        'text-[var(--zinc-600)] leading-relaxed',
         descSizeClasses[size]
       )}>
         {description || 'No description available.'}
@@ -57,7 +57,7 @@ export function SerpPreview({
       
       {/* Site attribution */}
       {siteName && (
-        <div className="text-[12px] text-zinc-500 mt-2">
+        <div className="text-xs text-[var(--zinc-500)] mt-2">
           {siteName}
         </div>
       )}

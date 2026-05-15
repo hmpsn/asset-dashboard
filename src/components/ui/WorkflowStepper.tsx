@@ -15,9 +15,9 @@ export interface WorkflowStepperProps {
 
 export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps) {
   const circleSize = compact ? 'w-6 h-6' : 'w-8 h-8';
-  const labelSize = compact ? 'text-[10px]' : 'text-xs';
+  const labelSize = compact ? 'text-xs' : 'text-xs';
   const gap = compact ? 'gap-1' : 'gap-2';
-  const numberSize = compact ? 'text-[10px]' : 'text-xs';
+  const numberSize = compact ? 'text-xs' : 'text-xs';
   const iconSize = compact ? 'w-3 h-3' : 'w-4 h-4';
 
   return (
@@ -37,10 +37,10 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
           } else if (step.current) {
             circleClasses = `bg-teal-500/10 border-2 border-teal-500 text-teal-400`;
             labelClasses = `text-teal-400 font-semibold`;
-            ringClasses = 'ring-2 ring-teal-500/30 ring-offset-1 ring-offset-zinc-900';
+            ringClasses = 'ring-2 ring-teal-500/30 ring-offset-1 ring-offset-[var(--surface-1)]';
           } else {
-            circleClasses = `bg-zinc-800/50 border-2 border-zinc-700 text-zinc-500`;
-            labelClasses = `text-zinc-500`;
+            circleClasses = `bg-[var(--surface-3)]/50 border-2 border-[var(--brand-border-strong)] text-[var(--brand-text-dim)]`;
+            labelClasses = `text-[var(--brand-text-dim)]`;
           }
 
           if (isClickable) {
@@ -78,7 +78,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
                 <button
                   type="button"
                   onClick={step.onClick}
-                  className={`group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-md`}
+                  className={`group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-1)] rounded-[var(--radius-md)]`}
                   aria-label={`Step ${step.number}: ${step.label}${step.completed ? ' (completed)' : step.current ? ' (current)' : ''}`}
                   aria-current={step.current ? 'step' : undefined}
                 >
@@ -94,7 +94,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
 
               {!isLast && (
                 <div className={`flex-1 flex items-start ${compact ? 'pt-2' : 'pt-3'} mx-1 min-w-[8px]`}>
-                  <div className={`w-full h-px ${compact ? 'mt-0' : 'mt-1'} bg-zinc-700`} aria-hidden="true" />
+                  <div className={`w-full h-px ${compact ? 'mt-0' : 'mt-1'} bg-[var(--brand-border-strong)]`} aria-hidden="true" />
                 </div>
               )}
             </li>

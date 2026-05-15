@@ -26,22 +26,22 @@ export function MetricToggleCard({
 
   const content = (
     <>
-      <div className="text-[9px] font-medium uppercase tracking-wider" style={{ color }}>
+      <div className="t-micro font-medium uppercase tracking-wider" style={{ color }}>
         {label}
       </div>
-      <div className="text-lg font-bold text-zinc-200 leading-tight mt-0.5">
+      <div className="text-lg font-bold text-[var(--brand-text-bright)] leading-tight mt-0.5">
         {value}
       </div>
-      <div className={`text-[9px] mt-0.5 ${isNeutral ? 'text-zinc-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+      <div className={`t-micro normal-case tracking-normal mt-0.5 ${isNeutral ? 'text-[var(--brand-text-dim)]' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
         {delta}
       </div>
     </>
   );
 
-  const baseClasses = `text-left rounded-lg p-2.5 transition-all border-2 ${
+  const baseClasses = `text-left rounded-[var(--radius-lg)] p-2.5 transition-all border-2 ${
     active
       ? 'border-current bg-current/8'
-      : 'border-zinc-800 opacity-50 hover:opacity-70'
+      : 'border-[var(--brand-border)] opacity-50 hover:opacity-70'
   }`;
 
   if (displayOnly) {
