@@ -5603,3 +5603,16 @@ Bug hardening included:
 **Mutual:** Adds extraction guardrails so future edits keep route handlers thin and domain-owned mutation logic centralized.
 
 **Files:** `server/domains/inbox/client-actions-mutations.ts`; `server/routes/client-actions.ts`; `server/workspace-mutation-helper.ts`; `server/routes/workspace-mutation-helper.ts`; `server/routes/content-matrices.ts`; `server/routes/content-templates.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/contract/inbox-route-service-extraction.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.
+
+---
+
+### 413. Integration Health Center
+**What it does:** Adds a single workspace-scoped operational health view across critical integrations. Backend route `GET /api/integrations/health/:workspaceId` aggregates typed status for Webflow, Google auth, GSC property, GA4 property, SEMRush, DataForSEO, Stripe, OpenAI, Anthropic, and SMTP email, including configured/missing/degraded state, last-success timestamps where available, last-error context, quota/rate-limit status placeholders, Google token expiry visibility, and affected feature mapping. Frontend renders this in Workspace Settings → Connections as an Integration Health Center card with summary pills and per-integration detail rows.
+
+**Agency value:** Gives operators one place to diagnose integration drift and missing setup before it causes downstream tool failures.
+
+**Client value:** Fewer silent failures and faster issue resolution because integration breakage is visible before client-facing workflows degrade.
+
+**Mutual:** Strengthens runtime confidence by turning scattered status checks into one consistent, typed, test-covered surface.
+
+**Files:** `shared/types/integration-health.ts`; `server/routes/health.ts`; `server/google-auth.ts`; `src/api/misc.ts`; `src/api/index.ts`; `src/lib/queryKeys.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/components/settings/ConnectionsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `tests/integration/health-routes.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `data/roadmap.json`.

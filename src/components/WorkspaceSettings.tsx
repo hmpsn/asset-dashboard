@@ -218,6 +218,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {tab === 'connections' && (
         <ConnectionsTab
+          workspaceId={workspaceId}
           webflowSiteId={webflowSiteId}
           webflowSiteName={webflowSiteName}
           googleStatus={googleStatus}

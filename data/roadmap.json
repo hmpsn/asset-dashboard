@@ -102,94 +102,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave3-silent-failure-rails",
-      "name": "Platform Health Wave 3 — Silent-Failure Reduction Rails",
-      "hours": "18-30",
-      "rationale": "Reduce correct-looking but miswired code by centralizing serializers, events, AI operation contracts, external fetch behavior, and workspace mutation lifecycle rails.",
-      "items": [
-        {
-          "id": "platform-base-client-safe-serializers",
-          "title": "Client-Safe Serializer Layer",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "notes": "Create explicit serializers for high-value admin/client/public views such as toPublicWorkspaceView(), toClientInboxItem(), toClientSchemaView(), and toAdminSchemaView(). Goal: stop route handlers from hand-picking fields inline and reduce regressions where the backend stores a field but public/client endpoints forget to expose it.\nShipped 2026-05-14 in PR #734: added explicit client-safe/public/admin serializers across workspace/public, inbox, and schema read paths with contract coverage so route handlers no longer hand-pick field lists inline.",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": "platform-base-domain-event-definitions",
-          "title": "Domain Event Definitions",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Layer a richer event registry over WS_EVENTS that documents event name, owning domain, producer routes/services, payload shape, query keys to invalidate, admin/client listeners, and related activity type. This should prevent drift where a broadcast exists but no listener handles it, or a listener expects a payload field that one emitter does not send.\nShipped 2026-05-14: added `scripts/platform-domain-event-definitions.ts` as the canonical WS event registry (owning context, producer/listener surfaces, invalidation hints, activity mappings), added advisory report CLI (`scripts/report-domain-event-definitions.ts`, markdown + --json), and unit coverage for full WS_EVENTS key coverage, stable report shape, and orphan producer/listener mapping detection.",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": "platform-base-ai-operation-registry",
-          "title": "AI Operation Registry",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "4-6h",
-          "priority": "P0",
-          "status": "done",
-          "notes": "Build a registry for AI operations that declares feature/domain, provider/model, prose vs structured JSON, response schema/parser, research-mode expectations, cost-tracking key, timeout/retry policy, and whether the operation may run synchronously or must use the background job platform. This extends callAI() from a dispatcher into an auditable contract surface.\nShipped 2026-05-14: added server/ai-operation-registry.ts as the canonical contract map, extended callAI() to accept operation ids with registry-derived defaults (provider/model/feature/retry/timeout/responseFormat/researchMode), and wired representative high-value flows (content brief regenerate, schema plan, client search chat, content decay, keyword strategy synthesis, workspace context generation jobs). Added unit + contract coverage for registry integrity, dispatcher default/override behavior, and representative operation wiring.",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": "platform-base-external-fetch-helper",
-          "title": "Server External Fetch Helper",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Create shared helpers for external/public web fetches and provider API fetches. Standardize timeouts, redirect behavior, user-agent/headers, safe URL handling, error classification, expected network TypeError handling, and logging. Migrate high-risk sitemap/page/image/provider fetch call sites first.\nShipped 2026-05-15: expanded `server/external-fetch.ts` with `fetchPublicWeb*`, `fetchProvider*`, and `fetchExternalBytes` helpers; added URL safety modes, DNS/private-address SSRF guards, redirect-chain revalidation, and explicit unsafe/timeout/network/http classification. Migrated high-risk call sites in semrush, dataforseo provider, sales audit, web scraper, rewrite-chat load-page, webflow alt-text image downloads, webflow-pages sitemap reads, and internal-links fetch paths. Added unit coverage for redirect-to-private, DNS-to-private, and IPv6-mapped loopback (`::ffff:7f00:1`) blocking plus integration coverage updates for rewrite-chat load-page safety behavior.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-base-workspace-mutation-helper",
-          "title": "Workspace Mutation Helper",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive.\nShipped 2026-05-15: promoted `runWorkspaceMutation` beyond the content-plan pilot by migrating `server/routes/client-actions.ts` admin/client mutation paths (create, admin update, public respond) to the shared lifecycle helper with route-specific error mapping and explicit read-before-write guards. Added helper-adoption contract coverage (`tests/contract/workspace-mutation-helper-adoption.test.ts`) and refreshed integration helper coverage naming (`tests/integration/workspace-mutation-helper-pilot.test.ts`) to keep the pattern auditable in high-churn workspace-scoped writes.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "seo-editor-job-safety-page-state-wiring",
-          "title": "SEO Editor Job Safety + Page Edit State Wiring",
-          "source": "Backend Health + Content Quality Hardening PR 6",
-          "est": "2-4h",
-          "priority": "P1",
-          "status": "done",
-          "shippedAt": "2026-05-13",
-          "notes": "Shipped 2026-05-13: retired the synchronous AI `/api/webflow/seo-bulk-fix/:siteId` write route in favor of the existing `bulk-seo-fix` background job, added page-state broadcasts and activity context for background bulk fixes plus SEO suggestion select/dismiss mutations, removed the stale frontend bulk-fix wrapper, and switched SEO Editor reads to the all-pages source while preserving CMS manual-apply/write guards."
-        },
-        {
-          "id": "seo-editor-unified-static-cms-write-targets",
-          "title": "Unified SEO Editor Static + CMS Write Targets",
-          "source": "Staging smoke follow-up 2026-05-13",
-          "est": "4-7h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "PR #711 landed the shared SEO Editor write-target contract/resolver and CMS approval apply support, but staging smoke found product-quality issues in the unified surface: duplicated Sent to Client panels, unscoped approval history, CMS summaries that may already be truncated at source, and missing effective-title fallback semantics when a CMS item name is the practical SEO title. Follow-up hotfix gated the unified shell behind `seo-editor-unified` (default off) so the legacy Pages / CMS Collections split remains active while these issues are resolved.\nShipped 2026-05-15: resolved unified-surface quality issues by rendering a single SEO-scoped `PendingApprovals` panel in unified mode (while disabling nested duplicates in static/CMS child sections), preserving scoped approval visibility. Added CMS effective-title fallback semantics so blank SEO-title fields fall back to item name in both write-target resolution and preview rendering. Removed extra UI truncation in CMS approval history/value summaries to avoid compounding already-truncated source values. Added/updated contract and unit coverage (`seo-editor-unified-flag-gate`, `seo-write-target-resolver`) for the new unified panel and fallback behavior.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-org-extraction-pilot",
-          "title": "Route-to-Service Extraction Pilot",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Choose one bounded context, preferably Schema or Inbox, and move business logic out of route files into server/domains/<domain>/ while preserving all existing URLs, response shapes, broadcasts, activity logs, and tests. Treat this as a proof of the organization pattern before expanding it.\nShipped 2026-05-15: completed an Inbox route-to-service extraction pilot by introducing `server/domains/inbox/client-actions-mutations.ts` and delegating admin create/update + public respond mutation orchestration from `server/routes/client-actions.ts` into the domain module while preserving route URLs, response shapes, activity logging, broadcasts, and side effects (email + playbook enqueue). Also promoted `runWorkspaceMutation` helper ownership to `server/workspace-mutation-helper.ts` (with route shim compatibility) and refreshed the mutation-helper adoption contract to enforce helper usage on the extracted inbox domain module. Added extraction contract coverage (`tests/contract/inbox-route-service-extraction.test.ts`) plus targeted route/integration verification for behavior parity.",
-          "shippedAt": "2026-05-15"
-        }
-      ]
-    },
-    {
       "id": "sprint-platform-health-wave4-runtime-operability",
       "name": "Platform Health Wave 4 — Runtime & Operational Confidence",
       "hours": "18-30",
@@ -201,8 +113,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "4-7h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Create a single operational view for Webflow, GSC, GA4, SEMRush/DataForSEO, Stripe, OpenAI, Anthropic, email, and other critical integrations. Track configured/missing state, last success, last error, quota/rate-limit status, token expiry where applicable, and affected platform features."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped 2026-05-15: added a typed workspace-scoped Integration Health Center contract (`shared/types/integration-health.ts`), backend aggregator endpoint (`GET /api/integrations/health/:workspaceId`) in `server/routes/health.ts`, and frontend Connections-tab surface with React Query wiring (`useIntegrationHealth`, `queryKeys.admin.integrationHealth`). Health cards now report configured/missing/degraded state for Webflow, Google auth, GSC, GA4, SEMRush, DataForSEO, Stripe, OpenAI, Anthropic, and SMTP, including quota-status placeholders, token expiry visibility for Google auth, and affected feature mapping. Added integration endpoint coverage (`tests/integration/health-routes.test.ts`) and hook coverage (`tests/component/useIntegrationHealth.test.tsx`)."
         },
         {
           "id": "platform-reliability-ai-evals",
@@ -1246,6 +1159,95 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave3-silent-failure-rails",
+      "name": "✅ SHIPPED — Platform Health Wave 3 — Silent-Failure Reduction Rails",
+      "hours": "18-30",
+      "rationale": "Reduce correct-looking but miswired code by centralizing serializers, events, AI operation contracts, external fetch behavior, and workspace mutation lifecycle rails.",
+      "items": [
+        {
+          "id": "platform-base-client-safe-serializers",
+          "title": "Client-Safe Serializer Layer",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Create explicit serializers for high-value admin/client/public views such as toPublicWorkspaceView(), toClientInboxItem(), toClientSchemaView(), and toAdminSchemaView(). Goal: stop route handlers from hand-picking fields inline and reduce regressions where the backend stores a field but public/client endpoints forget to expose it.\nShipped 2026-05-14 in PR #734: added explicit client-safe/public/admin serializers across workspace/public, inbox, and schema read paths with contract coverage so route handlers no longer hand-pick field lists inline.",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": "platform-base-domain-event-definitions",
+          "title": "Domain Event Definitions",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Layer a richer event registry over WS_EVENTS that documents event name, owning domain, producer routes/services, payload shape, query keys to invalidate, admin/client listeners, and related activity type. This should prevent drift where a broadcast exists but no listener handles it, or a listener expects a payload field that one emitter does not send.\nShipped 2026-05-14: added `scripts/platform-domain-event-definitions.ts` as the canonical WS event registry (owning context, producer/listener surfaces, invalidation hints, activity mappings), added advisory report CLI (`scripts/report-domain-event-definitions.ts`, markdown + --json), and unit coverage for full WS_EVENTS key coverage, stable report shape, and orphan producer/listener mapping detection.",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": "platform-base-ai-operation-registry",
+          "title": "AI Operation Registry",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Build a registry for AI operations that declares feature/domain, provider/model, prose vs structured JSON, response schema/parser, research-mode expectations, cost-tracking key, timeout/retry policy, and whether the operation may run synchronously or must use the background job platform. This extends callAI() from a dispatcher into an auditable contract surface.\nShipped 2026-05-14: added server/ai-operation-registry.ts as the canonical contract map, extended callAI() to accept operation ids with registry-derived defaults (provider/model/feature/retry/timeout/responseFormat/researchMode), and wired representative high-value flows (content brief regenerate, schema plan, client search chat, content decay, keyword strategy synthesis, workspace context generation jobs). Added unit + contract coverage for registry integrity, dispatcher default/override behavior, and representative operation wiring.",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": "platform-base-external-fetch-helper",
+          "title": "Server External Fetch Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Create shared helpers for external/public web fetches and provider API fetches. Standardize timeouts, redirect behavior, user-agent/headers, safe URL handling, error classification, expected network TypeError handling, and logging. Migrate high-risk sitemap/page/image/provider fetch call sites first.\nShipped 2026-05-15: expanded `server/external-fetch.ts` with `fetchPublicWeb*`, `fetchProvider*`, and `fetchExternalBytes` helpers; added URL safety modes, DNS/private-address SSRF guards, redirect-chain revalidation, and explicit unsafe/timeout/network/http classification. Migrated high-risk call sites in semrush, dataforseo provider, sales audit, web scraper, rewrite-chat load-page, webflow alt-text image downloads, webflow-pages sitemap reads, and internal-links fetch paths. Added unit coverage for redirect-to-private, DNS-to-private, and IPv6-mapped loopback (`::ffff:7f00:1`) blocking plus integration coverage updates for rewrite-chat load-page safety behavior.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-base-workspace-mutation-helper",
+          "title": "Workspace Mutation Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Introduce a lightweight runWorkspaceMutation-style helper for repeated mutation lifecycle pieces: workspace scoping, optional read-before-write context, transaction boundary, activity logging, broadcast event, error shape, and serialized response. Avoid over-abstracting Express; target high-churn workspace-scoped writes where missing activity/broadcast bugs are expensive.\nShipped 2026-05-15: promoted `runWorkspaceMutation` beyond the content-plan pilot by migrating `server/routes/client-actions.ts` admin/client mutation paths (create, admin update, public respond) to the shared lifecycle helper with route-specific error mapping and explicit read-before-write guards. Added helper-adoption contract coverage (`tests/contract/workspace-mutation-helper-adoption.test.ts`) and refreshed integration helper coverage naming (`tests/integration/workspace-mutation-helper-pilot.test.ts`) to keep the pattern auditable in high-churn workspace-scoped writes.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "seo-editor-job-safety-page-state-wiring",
+          "title": "SEO Editor Job Safety + Page Edit State Wiring",
+          "source": "Backend Health + Content Quality Hardening PR 6",
+          "est": "2-4h",
+          "priority": "P1",
+          "status": "done",
+          "shippedAt": "2026-05-13",
+          "notes": "Shipped 2026-05-13: retired the synchronous AI `/api/webflow/seo-bulk-fix/:siteId` write route in favor of the existing `bulk-seo-fix` background job, added page-state broadcasts and activity context for background bulk fixes plus SEO suggestion select/dismiss mutations, removed the stale frontend bulk-fix wrapper, and switched SEO Editor reads to the all-pages source while preserving CMS manual-apply/write guards."
+        },
+        {
+          "id": "seo-editor-unified-static-cms-write-targets",
+          "title": "Unified SEO Editor Static + CMS Write Targets",
+          "source": "Staging smoke follow-up 2026-05-13",
+          "est": "4-7h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "PR #711 landed the shared SEO Editor write-target contract/resolver and CMS approval apply support, but staging smoke found product-quality issues in the unified surface: duplicated Sent to Client panels, unscoped approval history, CMS summaries that may already be truncated at source, and missing effective-title fallback semantics when a CMS item name is the practical SEO title. Follow-up hotfix gated the unified shell behind `seo-editor-unified` (default off) so the legacy Pages / CMS Collections split remains active while these issues are resolved.\nShipped 2026-05-15: resolved unified-surface quality issues by rendering a single SEO-scoped `PendingApprovals` panel in unified mode (while disabling nested duplicates in static/CMS child sections), preserving scoped approval visibility. Added CMS effective-title fallback semantics so blank SEO-title fields fall back to item name in both write-target resolution and preview rendering. Removed extra UI truncation in CMS approval history/value summaries to avoid compounding already-truncated source values. Added/updated contract and unit coverage (`seo-editor-unified-flag-gate`, `seo-write-target-resolver`) for the new unified panel and fallback behavior.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-org-extraction-pilot",
+          "title": "Route-to-Service Extraction Pilot",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Choose one bounded context, preferably Schema or Inbox, and move business logic out of route files into server/domains/<domain>/ while preserving all existing URLs, response shapes, broadcasts, activity logs, and tests. Treat this as a proof of the organization pattern before expanding it.\nShipped 2026-05-15: completed an Inbox route-to-service extraction pilot by introducing `server/domains/inbox/client-actions-mutations.ts` and delegating admin create/update + public respond mutation orchestration from `server/routes/client-actions.ts` into the domain module while preserving route URLs, response shapes, activity logging, broadcasts, and side effects (email + playbook enqueue). Also promoted `runWorkspaceMutation` helper ownership to `server/workspace-mutation-helper.ts` (with route shim compatibility) and refreshed the mutation-helper adoption contract to enforce helper usage on the extracted inbox domain module. Added extraction contract coverage (`tests/contract/inbox-route-service-extraction.test.ts`) plus targeted route/integration verification for behavior parity.",
+          "shippedAt": "2026-05-15"
+        }
+      ],
+      "shippedAt": "2026-05-15"
     },
     {
       "id": "sprint-platform-health-wave2b-critical-test-coverage",
