@@ -1,8 +1,19 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **360 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **361 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 361. Wave 5 Recurring Platform Health Cadence
+**What it does:** Establishes a measurable recurring platform-health checkpoint contract every 4-6 product sprints. Adds a source-of-truth cadence registry (`data/platform-health-cadence.json`) with required dimensions (oversized modules, ownership gaps, docs updates, contract tests, duplication fixes, pr-check warnings), checkpoint evidence links, and Wave 5 baseline metrics. Adds verifier command `npm run verify:platform-health-cadence` (`scripts/platform-health-cadence.ts`) that validates cadence policy integrity, roadmap references, checkpoint metric contracts, and computes due/overdue checkpoint windows. Wires this audit into `verify-platform` and documents operational flow in `docs/workflows/platform-health-cadence.md`.
+
+**Agency value:** Prevents platform maintenance from becoming reactive by turning architecture hygiene into a scheduled, auditable operational rhythm.
+
+**Client value:** More stable product quality over time because regressions from architecture drift are addressed before they compound into visible UX issues.
+
+**Mutual:** Creates a durable governance loop that ties roadmap planning, code evidence, and quality signals together with clear accountability.
 
 ---
 
