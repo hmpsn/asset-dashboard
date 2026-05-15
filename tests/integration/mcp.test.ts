@@ -176,3 +176,47 @@ describe('get_workspace_intelligence', () => {
     expect(body.result?.isError).toBe(true);
   });
 });
+
+describe('get_insights', () => {
+  it('returns an array for a known workspace', async () => {
+    const result = await mcpToolCall('get_insights', {
+      workspaceId: ws.workspaceId,
+    }) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('accepts a type filter', async () => {
+    const result = await mcpToolCall('get_insights', {
+      workspaceId: ws.workspaceId,
+      type: 'content_decay',
+    }) as Array<Record<string, unknown>>;
+    expect(Array.isArray(result)).toBe(true);
+    if (result.length > 0) {
+      expect(result.every(i => i.insightType === 'content_decay')).toBe(true); // every-ok — length guard above
+    }
+  });
+
+  it('returns an error for an unknown workspace', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name: 'get_insights', arguments: { workspaceId: 'nonexistent' } },
+        id: 4,
+      },
+      MCP_TEST_KEY,
+    );
+    const body = await res.json() as { result?: { isError?: boolean } };
+    expect(body.result?.isError).toBe(true);
+  });
+});
+
+describe('get_anomalies', () => {
+  it('returns an array of anomaly_digest insights', async () => {
+    const result = await mcpToolCall('get_anomalies', {
+      workspaceId: ws.workspaceId,
+    }) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+    // May be empty if no anomalies seeded — that is valid
+  });
+});
