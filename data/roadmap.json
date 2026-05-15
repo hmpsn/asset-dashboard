@@ -134,8 +134,9 @@
           "source": "Operator follow-up 2026-05-15",
           "est": "1-2h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Perform a flag-by-flag promotion/sunset pass after Wave 5 rollout validation. For each active flag: decide promote/remove/keep-gated, execute required code cleanup (default path, dead branch removal, docs/tests), and confirm no stale rollout metadata remains."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 promotion/sunset pass for low-risk active flags validated on staging. Promoted and removed `client-wins-surface` and `seo-editor-unified` from `shared/types/feature-flags.ts` and lifecycle catalog metadata; removed runtime gates/fallback branches so promoted paths are now canonical (`InsightsBriefingPage` always renders `WinsSurface`; `SeoEditorWrapper` always renders unified editor). Updated contract/component tests and feature audit wording to remove stale flag references."
         },
         {
           "id": "platform-reliability-deprecation-discipline",

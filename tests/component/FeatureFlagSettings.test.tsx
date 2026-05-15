@@ -53,23 +53,6 @@ vi.mock('@tanstack/react-query', async () => {
               },
             },
             {
-              key: 'seo-editor-unified',
-              enabled: true,
-              source: 'default',
-              default: true,
-              label: 'SEO editor — merged static + CMS with collection filter',
-              group: 'Platform Intelligence Enhancements',
-              lifecycle: {
-                owner: 'seo-health',
-                createdAt: '2026-05-06',
-                rolloutTarget: 'tiered-client-rollout',
-                removalCondition: 'Remove when unified SEO editor replaces legacy paths.',
-                linkedRoadmapItemId: 'platform-intelligence-enhancements-phase-1',
-                staleAuditCadence: 'monthly',
-                lastReviewedAt: '2026-05-15',
-              },
-            },
-            {
               key: 'outcome-tracking',
               enabled: true,
               source: 'default',
@@ -138,22 +121,16 @@ describe('FeatureFlagSettings', () => {
     expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
   });
 
-  it('renders seo-editor-unified flag with human-readable label', () => {
-    render(<FeatureFlagSettings />);
-    expect(screen.getByText(/SEO editor/i)).toBeInTheDocument();
-  });
-
-  it('displays all three new flags under the same group', () => {
+  it('displays all platform-enhancement flags under the same group', () => {
     render(<FeatureFlagSettings />);
 
     // Find the group header
     const groupHeader = screen.getByText('Platform Intelligence Enhancements');
     expect(groupHeader).toBeInTheDocument();
 
-    // Verify all three labels are present after the group header
+    // Verify both labels are present after the group header
     expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
     expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
-    expect(screen.getByText(/SEO editor/i)).toBeInTheDocument();
   });
 
   it('does not render flags in the Other bucket if all are properly grouped', () => {
@@ -167,7 +144,6 @@ describe('FeatureFlagSettings', () => {
       const otherSection = otherSections[0];
       expect(otherSection.parentElement).not.toHaveTextContent('smart-placeholders');
       expect(otherSection.parentElement).not.toHaveTextContent('client-brand-section');
-      expect(otherSection.parentElement).not.toHaveTextContent('seo-editor-unified');
     }
   });
 });
