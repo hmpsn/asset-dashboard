@@ -1,6 +1,6 @@
 import { TrendingUp } from 'lucide-react'; // trend-icon-ok — title/empty-state icon is decorative context, not a metric trend badge.
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, EmptyState, Icon, TrendBadge } from '../ui';
+import { SectionCard, EmptyState, Icon, TrendBadge, Button } from '../ui';
 import { adminPath } from '../../routes';
 
 interface RankEntry {
@@ -23,7 +23,16 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
     <SectionCard
       title="Top Rankings"
       titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
-      action={ranks.length > 0 ? <button onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button> : undefined}
+      action={ranks.length > 0 ? (
+        <Button
+          variant="link"
+          size="sm"
+          onClick={() => navigate(adminPath(workspaceId, 'seo-ranks'))}
+          className="no-underline text-teal-400 hover:text-teal-300"
+        >
+          View All →
+        </Button>
+      ) : undefined}
       className={className}
       noPadding
     >

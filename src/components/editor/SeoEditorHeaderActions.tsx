@@ -1,7 +1,7 @@
 import {
-  Loader2, Upload, Check, Wand2, RefreshCw,
+  Upload, Check, Wand2, RefreshCw,
 } from 'lucide-react';
-import { LoadingState, Icon } from '../ui';
+import { LoadingState, Icon, Button, IconButton } from '../ui';
 import { ApprovalPanel } from './ApprovalPanel';
 
 interface SeoEditorHeaderActionsProps {
@@ -58,27 +58,34 @@ export function SeoEditorHeaderActions({
           </span>
         )}
         <div className="flex-1" />
-        <button
+        <IconButton
           onClick={onRefreshPages}
-          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-accent-brand hover:bg-[var(--surface-3)] transition-colors"
+          icon={RefreshCw}
+          label="Refresh pages from Webflow"
+          size="sm"
+          className="hover:text-accent-brand"
           title="Refresh pages from Webflow"
-        >
-          <Icon as={RefreshCw} size="md" />
-        </button>
-        <button
+        />
+        <Button
           onClick={onFixTitles}
           disabled={bulkFixing || missingTitles === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
+          icon={Wand2}
+          size="sm"
+          variant="secondary"
+          className="bg-teal-600 hover:bg-teal-500 border-0 text-white rounded-[var(--radius-lg)] font-medium"
         >
-          <Icon as={Wand2} size="sm" /> AI Fix Titles ({missingTitles})
-        </button>
-        <button
+          AI Fix Titles ({missingTitles})
+        </Button>
+        <Button
           onClick={onFixDescriptions}
           disabled={bulkFixing || missingDescs === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
+          icon={Wand2}
+          size="sm"
+          variant="secondary"
+          className="bg-teal-600 hover:bg-teal-500 border-0 text-white rounded-[var(--radius-lg)] font-medium"
         >
-          <Icon as={Wand2} size="sm" /> AI Fix Descriptions ({missingDescs})
-        </button>
+          AI Fix Descriptions ({missingDescs})
+        </Button>
         {workspaceId && (
           <ApprovalPanel
             approvalSelected={approvalSelected}
@@ -87,18 +94,21 @@ export function SeoEditorHeaderActions({
             onSendApproval={onSendApproval}
           />
         )}
-        <button
+        <Button
           onClick={onPublish}
           disabled={publishing}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+          loading={publishing}
+          icon={published ? Check : Upload}
+          size="sm"
+          variant="secondary"
+          className={`rounded-[var(--radius-lg)] font-medium ${
             published
-              ? 'bg-[var(--emerald)] text-white'
+              ? 'bg-[var(--emerald)] text-white border-0 hover:bg-[var(--emerald)]/90'
               : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-active)]'
           }`}
         >
-          <Icon as={publishing ? Loader2 : published ? Check : Upload} size="sm" className={publishing ? 'animate-spin' : ''} />
           {published ? 'Published!' : publishing ? 'Publishing...' : 'Publish Site'}
-        </button>
+        </Button>
       </div>
 
       {bulkFixing && (
