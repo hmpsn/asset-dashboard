@@ -109,3 +109,43 @@ describe('MCP auth', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('list_workspaces', () => {
+  it('returns an array of workspace summaries', async () => {
+    const result = await mcpToolCall('list_workspaces') as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+    const first = result[0] as Record<string, unknown>;
+    expect(typeof first.id).toBe('string');
+    expect(typeof first.name).toBe('string');
+    expect(typeof first.tier).toBe('string');
+  });
+});
+
+describe('get_workspace_overview', () => {
+  it('returns overview for a known workspace', async () => {
+    const result = await mcpToolCall('get_workspace_overview', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown>;
+    expect(result.id).toBe(ws.workspaceId);
+    expect(typeof result.name).toBe('string');
+    expect(typeof result.tier).toBe('string');
+    expect(typeof result.pendingApprovals).toBe('number');
+    expect(typeof result.pendingRequests).toBe('number');
+  });
+
+  it('returns an error for an unknown workspace', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name: 'get_workspace_overview', arguments: { workspaceId: 'nonexistent-ws' } },
+        id: 2,
+      },
+      MCP_TEST_KEY,
+    );
+    const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
+    expect(body.result?.isError).toBe(true);
+    expect(body.result?.content[0].text).toContain('Workspace not found');
+  });
+});
