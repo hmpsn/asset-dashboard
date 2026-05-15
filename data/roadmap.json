@@ -123,8 +123,9 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "2-3h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Add a lifecycle convention for feature flags: owner, created date, rollout target, removal condition, linked roadmap item, and stale-flag audit cadence. Goal: preserve safe rollout while preventing stale flags from becoming hidden architecture debt."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 feature-flag lifecycle management baseline. Expanded `shared/types/feature-flags.ts` into a single source-of-truth catalog with typed lifecycle metadata (owner, createdAt, rolloutTarget, removalCondition, linkedRoadmapItemId, staleAuditCadence, lastReviewedAt), centralized admin grouping/labels, and shared API contract type `FeatureFlagAdminMeta`. Updated server/admin surfaces so `/api/admin/feature-flags` now returns lifecycle context for each flag and FeatureFlagSettings renders that metadata inline. Added lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) plus test coverage (`tests/unit/feature-flag-lifecycle.test.ts`) and refreshed docs (`docs/rules/feature-flag-lifecycle.md`, development/release-safety references)."
         },
         {
           "id": "platform-reliability-deprecation-discipline",

@@ -68,6 +68,7 @@ Before production merge, confirm:
 
 If flags are involved:
 - Enumerate touched flags in `shared/types/feature-flags.ts`.
+- Verify lifecycle metadata + audit queue health: `npm run verify:feature-flags`.
 - Define staged enablement criteria for staging and production.
 - Confirm kill-switch path (disable without redeploy where possible).
 - Document removal condition to prevent stale flags.

@@ -264,6 +264,22 @@ export const FEATURE_FLAGS = {
   // ... existing flags ...
   'my-new-feature': false,  // Description of what it controls
 } as const;
+
+export const FEATURE_FLAG_CATALOG = {
+  'my-new-feature': {
+    label: 'My new feature',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'platform-foundation',
+      createdAt: '2026-05-15',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after this path is default and no fallback branch remains.',
+      linkedRoadmapItemId: 'my-roadmap-item-id',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-05-15',
+    },
+  },
+} as const;
 ```
 
 ### 2. Gate in frontend
@@ -294,6 +310,14 @@ if (!isFeatureEnabled('my-new-feature')) {
 Set in Render dashboard env vars:
 - Server: `FEATURE_MY_NEW_FEATURE=true`
 - Frontend: `VITE_FEATURE_MY_NEW_FEATURE=true`
+
+### 5. Run lifecycle audit
+
+```bash
+npm run verify:feature-flags
+```
+
+See `docs/rules/feature-flag-lifecycle.md` for the full lifecycle contract and audit expectations.
 
 ---
 
