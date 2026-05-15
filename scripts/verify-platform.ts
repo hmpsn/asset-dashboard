@@ -6,7 +6,7 @@
  *   1) npm run typecheck
  *   2) npx vite build
  *   3) targeted decomposition/migration regression suites
- *   4) platform lifecycle audits (feature flags + deprecations)
+ *   4) platform lifecycle audits (feature flags + performance budgets + deprecations)
  *   5) npx vitest run (full suite)
  *   6) npx tsx scripts/pr-check.ts
  *
@@ -73,6 +73,7 @@ const steps: Step[] = [
     ],
   },
   { label: 'Feature-flag lifecycle audit', cmd: 'npm', args: ['run', 'verify:feature-flags'] },
+  { label: 'Performance budget audit', cmd: 'npm', args: ['run', 'verify:performance-budgets'] },
   { label: 'Deprecation lifecycle audit', cmd: 'npm', args: ['run', 'verify:deprecations'] },
 ];
 

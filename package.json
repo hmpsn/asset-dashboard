@@ -31,6 +31,7 @@
     "verify:observability": "tsx scripts/report-platform-observability.ts",
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
+    "verify:performance-budgets": "tsx scripts/performance-budgets.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",

@@ -154,8 +154,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "3-5h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Define budgets beyond bundle size: max AI calls per workflow, max external fetches per workflow, expected job duration, route response targets, query count limits, cache expectations, and escalation rules when a feature exceeds budget."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 platform performance budget governance baseline. Added typed performance budget registry + verification command (`npm run verify:performance-budgets`) in `scripts/performance-budgets.ts` covering per-workflow AI call caps, external fetch caps, route response targets, query count budgets, expected background-job durations, cache expectations, and escalation triggers/actions. Seeded high-risk workflows across jobs and public/admin read paths with required code/test evidence references and policy validation checks (duplicate ids, numeric budget integrity, evidence path existence, background-job duration requirements). Added rule doc `docs/rules/performance-budgets.md` and unit coverage in `tests/unit/performance-budgets.test.ts`."
         },
         {
           "id": "platform-reliability-local-dev-onboarding",
