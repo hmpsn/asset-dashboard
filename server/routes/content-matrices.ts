@@ -21,7 +21,7 @@ import {
   mutationError,
   runWorkspaceMutation,
   WorkspaceMutationError,
-} from './workspace-mutation-helper.js';
+} from '../workspace-mutation-helper.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 
