@@ -27,6 +27,7 @@
     "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
     "verify:domain-events": "tsx scripts/report-domain-event-definitions.ts",
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
+    "verify:observability": "tsx scripts/report-platform-observability.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",

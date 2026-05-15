@@ -21,10 +21,14 @@ import db from '../db/index.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import type { IntegrationHealthItem, IntegrationHealthState, WorkspaceIntegrationHealth } from '../../shared/types/integration-health.js';
+import { buildWorkspaceObservabilityReport } from '../platform-observability-report.js';
 
 
 const log = createLogger('health');
 const router = Router();
+const DEFAULT_OBSERVABILITY_DAYS = 14;
+const MAX_OBSERVABILITY_DAYS = 90;
+const MIN_OBSERVABILITY_DAYS = 1;
 
 /** Set to true during graceful shutdown so /api/health returns 503. */
 let shuttingDown = false;
@@ -340,6 +344,28 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
   };
 
   res.json(payload);
+});
+
+router.get('/api/observability/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId } = req.params;
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+  const hasDaysParam = typeof req.query.days === 'string';
+  const daysRaw = hasDaysParam ? Number(req.query.days) : DEFAULT_OBSERVABILITY_DAYS;
+  if (!Number.isFinite(daysRaw)) {
+    return res.status(400).json({
+      error: `days must be a number between ${MIN_OBSERVABILITY_DAYS} and ${MAX_OBSERVABILITY_DAYS}`,
+    });
+  }
+  const days = Math.floor(daysRaw);
+  if (days < MIN_OBSERVABILITY_DAYS || days > MAX_OBSERVABILITY_DAYS) {
+    return res.status(400).json({
+      error: `days must be between ${MIN_OBSERVABILITY_DAYS} and ${MAX_OBSERVABILITY_DAYS}`,
+    });
+  }
+  const report = buildWorkspaceObservabilityReport(workspaceId, { days });
+  res.json(report);
 });
 
 // ── Storage monitoring & pruning ──

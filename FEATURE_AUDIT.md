@@ -5629,3 +5629,16 @@ Bug hardening included:
 **Mutual:** Documents a consistent backup/restore drill and restore-based rollback workflow, improving operational confidence without changing product-facing behavior.
 
 **Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `docs/workflows/data-integrity-recovery.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `package.json`; `data/roadmap.json`.
+
+---
+
+### 415. Workspace Observability Layer
+**What it does:** Adds an operational observability layer for workspace-scoped incident diagnosis. New file-backed telemetry (`server/platform-observability.ts`) captures operation traces across AI calls, integration/provider calls, background job lifecycle transitions, and slow HTTP routes. A typed observability report contract (`shared/types/platform-observability.ts`) and report builder (`server/platform-observability-report.ts`) aggregate this telemetry with job state and AI usage into a single report surface. New workspace endpoint `GET /api/observability/:workspaceId` returns failed-job/error dashboard data, external API failure rates + latency, AI cost/latency by feature, slow-route leaderboards, critical sync last-success timestamps, and recent operation traces. CLI report added via `npm run verify:observability` for operator workflows.
+
+**Agency value:** Provides a practical "what happened?" answer path per workspace without digging through scattered logs or ad hoc SQL queries. Failed jobs, provider instability, and AI cost/latency hotspots are visible in one place.
+
+**Client value:** Faster issue triage and recovery for customer-facing incidents, reducing time-to-resolution when syncs or generation flows degrade.
+
+**Mutual:** Establishes reusable observability primitives for future platform-health work, with typed contracts, a protected API surface, and integration test coverage.
+
+**Files:** `server/platform-observability.ts`; `server/platform-observability-report.ts`; `shared/types/platform-observability.ts`; `server/middleware/request-logger.ts`; `server/openai-helpers.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/jobs.ts`; `server/routes/health.ts`; `src/api/misc.ts`; `src/api/index.ts`; `scripts/platform-observability.ts`; `scripts/report-platform-observability.ts`; `docs/workflows/platform-observability.md`; `tests/integration/health-routes.test.ts`; `package.json`; `data/roadmap.json`.

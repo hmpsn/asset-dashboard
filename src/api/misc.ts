@@ -3,6 +3,7 @@ import { get, post, patch, del, getSafe, getOptional, getText, postForm } from '
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 import type { FeaturesData } from '../../shared/types/features';
 import type { WorkspaceIntegrationHealth } from '../../shared/types/integration-health';
+import type { WorkspaceObservabilityReport } from '../../shared/types/platform-observability';
 import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
 
 // ── Requests (client requests / support tickets) ────────────────
@@ -217,6 +218,11 @@ export const workspaceOverview = {
 export const integrationHealth = {
   get: (wsId: string) =>
     get<WorkspaceIntegrationHealth>(`/api/integrations/health/${wsId}`),
+};
+
+export const observability = {
+  get: (wsId: string, days = 14) =>
+    get<WorkspaceObservabilityReport>(`/api/observability/${wsId}?days=${days}`),
 };
 
 // ── Upload ──────────────────────────────────────────────────────
