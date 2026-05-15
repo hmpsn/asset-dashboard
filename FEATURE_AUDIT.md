@@ -5694,3 +5694,16 @@ Bug hardening included:
 **Mutual:** Aligns product rollout discipline with operational safety by joining runtime toggles, documentation, and roadmap traceability in one contract.
 
 **Files:** `shared/types/feature-flags.ts`; `server/feature-flags.ts`; `src/components/FeatureFlagSettings.tsx`; `scripts/feature-flag-lifecycle.ts`; `tests/unit/feature-flag-lifecycle.test.ts`; `tests/component/FeatureFlagSettings.test.tsx`; `docs/rules/feature-flag-lifecycle.md`; `docs/rules/development-patterns.md`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 420. Deprecation Lifecycle Discipline (Wave 5)
+**What it does:** Adds a typed, repeatable deprecation governance registry and verifier for retired or duplicate capability surfaces. New command `npm run verify:deprecations` (`scripts/deprecation-lifecycle.ts`) tracks lifecycle state (`deprecated`, `hidden`, `read-only`, `migrated`, `removed`), requires replacement guidance, and enforces state-specific contracts (redirect, safe-failure, read-only enforcement, visibility gate, migration) with linked code evidence and linked automated-test evidence. The verifier also requires human-review gating for deprecated/migrated/removed entries and fails when lifecycle states are missing from the registry or policy gaps are detected.
+
+**Agency value:** Prevents cleanup drift by making deprecation decisions explicit, auditable, and owned instead of implicit tribal memory.
+
+**Client value:** Preserves bookmark and route stability while reducing surprises from partial migrations or resurrected legacy endpoints.
+
+**Mutual:** Strengthens platform reliability by keeping retirement behavior contract-tested and visible in recurring platform-health sweeps.
+
+**Files:** `scripts/deprecation-lifecycle.ts`; `tests/unit/deprecation-lifecycle.test.ts`; `docs/rules/deprecation-lifecycle.md`; `scripts/verify-platform.ts`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

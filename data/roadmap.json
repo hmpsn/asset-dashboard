@@ -128,13 +128,23 @@
           "notes": "Shipped Wave 5 feature-flag lifecycle management baseline. Expanded `shared/types/feature-flags.ts` into a single source-of-truth catalog with typed lifecycle metadata (owner, createdAt, rolloutTarget, removalCondition, linkedRoadmapItemId, staleAuditCadence, lastReviewedAt), centralized admin grouping/labels, and shared API contract type `FeatureFlagAdminMeta`. Updated server/admin surfaces so `/api/admin/feature-flags` now returns lifecycle context for each flag and FeatureFlagSettings renders that metadata inline. Added lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) plus test coverage (`tests/unit/feature-flag-lifecycle.test.ts`) and refreshed docs (`docs/rules/feature-flag-lifecycle.md`, development/release-safety references)."
         },
         {
+          "id": "platform-confidence-feature-flag-sunset-pass",
+          "title": "Feature Flag Promotion & Sunset Pass",
+          "source": "Operator follow-up 2026-05-15",
+          "est": "1-2h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Perform a flag-by-flag promotion/sunset pass after Wave 5 rollout validation. For each active flag: decide promote/remove/keep-gated, execute required code cleanup (default path, dead branch removal, docs/tests), and confirm no stale rollout metadata remains."
+        },
+        {
           "id": "platform-reliability-deprecation-discipline",
           "title": "Deprecation Lifecycle Discipline",
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "2-4h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Codify the lifecycle for duplicate or retired capabilities: deprecated, hidden, read-only, migrated, removed, and contract-tested redirects or safe failures for old URLs/bookmarks. This prevents platform bloat from returning after cleanup work ships."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 deprecation lifecycle governance baseline. Added typed registry + audit command `npm run verify:deprecations` (`scripts/deprecation-lifecycle.ts`) covering lifecycle states (`deprecated`, `hidden`, `read-only`, `migrated`, `removed`) with state-specific policy checks and required code/test evidence links. Added test coverage (`tests/unit/deprecation-lifecycle.test.ts`) and rule doc `docs/rules/deprecation-lifecycle.md` to codify operating flow and human-verification requirements for deprecated/migrated/removed surfaces."
         },
         {
           "id": "platform-reliability-performance-budgets",
