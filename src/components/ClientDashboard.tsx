@@ -697,7 +697,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
-    <div className={`min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
+    <div className={`min-h-screen overflow-x-hidden bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
       <ClientHeader
