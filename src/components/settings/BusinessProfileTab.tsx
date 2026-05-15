@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Phone, Mail, MapPin, Link2, Clock, Save } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Link2, Clock, Save, X } from 'lucide-react';
 import { put } from '../../api/client';
-import { SectionCard, Icon, Button } from '../ui';
+import { SectionCard, Icon, Button, IconButton } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 import { adminPath } from '../../routes';
 
@@ -79,13 +79,15 @@ function SchemaImpactRow({
         </Link>
       )}
       {handleScroll && (
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={handleScroll}
-          className="t-caption text-[var(--brand-text-bright)] hover:underline shrink-0"
+          className="t-caption text-[var(--brand-text-bright)] no-underline hover:underline shrink-0"
         >
           Jump to →
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -371,25 +373,31 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
                 onChange={e => setSocialInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSocial(); } }}
               />
-              <button
+              <Button
+                type="button"
                 onClick={addSocial}
-                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors whitespace-nowrap"
+                variant="secondary"
+                size="sm"
+                className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30 whitespace-nowrap"
               >
                 Add
-              </button>
+              </Button>
             </div>
             {(form.socialProfiles || []).length > 0 && (
               <div className="space-y-1">
                 {(form.socialProfiles || []).map(url => (
                   <div key={url} className="flex items-center justify-between bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-1.5">
                     <span className="t-caption-sm text-[var(--brand-text)] truncate">{url}</span>
-                    <button
+                    <IconButton
+                      type="button"
                       onClick={() => removeSocial(url)}
+                      icon={X}
+                      label={`Remove social profile ${url}`}
+                      size="sm"
+                      variant="ghost"
                       className="ml-2 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors shrink-0"
                       title="Remove"
-                    >
-                      ×
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
