@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ValidationFinding } from '../../../shared/types/schema-validation';
 import { SectionCard } from '../ui/SectionCard';
+import { Button } from '../ui';
 import { adminPath } from '../../routes';
 import { fieldToTarget } from './fieldTargets';
 
@@ -106,14 +107,16 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
       {/* Missing-field rows */}
       <div className="space-y-1">
         {groups.map(g => (
-          <button
+          <Button
             key={g.field}
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => {
               if (!workspaceId) return;
               navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
             }}
-            className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded-[var(--radius-sm)] text-left hover:bg-[var(--surface-3)] transition-colors group"
+            className="items-center justify-between gap-3 w-full px-3 py-2 rounded-[var(--radius-sm)] text-left hover:bg-[var(--surface-3)] group"
           >
             <span className="flex items-center gap-2 min-w-0">
               <span aria-hidden="true" className={g.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>
@@ -127,7 +130,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
             <span className="t-caption text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] shrink-0">
               Fix →
             </span>
-          </button>
+          </Button>
         ))}
       </div>
     </SectionCard>

@@ -5,7 +5,7 @@ import {
   CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
   Send,
 } from 'lucide-react';
-import { PageHeader, StatCard, Icon, SectionCard, cn } from './ui';
+import { PageHeader, StatCard, Icon, SectionCard, Button, ClickableRow, cn } from './ui';
 import { redirects } from '../api/misc';
 import { clientActions } from '../api/clientActions';
 import { themeColor } from './ui/constants';
@@ -236,13 +236,15 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             Scan your site for redirect chains, 404 pages, and routing issues.
             Detects multi-hop redirects, loops, and pages that need attention.
           </p>
-          <button
+          <Button
             onClick={runScan}
             disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium mx-auto transition-colors"
+            icon={RefreshCw}
+            variant="primary"
+            className="mx-auto rounded-[var(--radius-lg)]"
           >
-            <Icon as={RefreshCw} size="md" /> Scan Redirects
-          </button>
+            Scan Redirects
+          </Button>
           {error && (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 t-caption text-red-400">
               {error}
@@ -273,9 +275,9 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         title="Redirect Manager"
         subtitle={`Scanned ${new Date(snapshotDate || data.scannedAt).toLocaleString()} · ${summary.totalPages} pages checked`}
         actions={
-          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] t-caption font-medium transition-colors">
-            <Icon as={RefreshCw} size="sm" /> Rescan
-          </button>
+          <Button onClick={runScan} disabled={loading} icon={RefreshCw} variant="secondary" size="sm" className="rounded-[var(--radius-lg)]">
+            Rescan
+          </Button>
         }
       />
 
@@ -302,9 +304,9 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             const isExpanded = expandedChains.has(idx);
             return (
               <div key={idx} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-                <button
+                <ClickableRow
                   onClick={() => toggleChain(idx)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-2)]/20 transition-colors text-left"
+                  className="flex items-center justify-between px-4 py-2.5 text-left hover:bg-[var(--surface-2)]/20"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {isExpanded
@@ -323,7 +325,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                       {chain.type}
                     </span>
                   </div>
-                </button>
+                </ClickableRow>
                 {isExpanded && (
                   <div className="px-4 pb-3 pl-10">
                     <div className="space-y-1">
@@ -366,18 +368,16 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
                 {workspaceId && (
-                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
-                    <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
+                  <Button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} icon={sentToClient ? Check : Send} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300">
                     {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
-                  </button>
+                  </Button>
                 )}
-                <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] t-caption-sm font-medium transition-colors">
-                  {copiedRules ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                <Button onClick={copyRulesToClipboard} icon={copiedRules ? Check : Copy} variant="secondary" size="sm" className="rounded-[var(--radius-lg)] text-[var(--brand-text)]">
                   {copiedRules ? 'Copied!' : 'Copy All'}
-                </button>
-                <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors">
-                  <Icon as={Download} size="sm" /> Export CSV
-                </button>
+                </Button>
+                <Button onClick={exportCSV} icon={Download} variant="primary" size="sm" className="rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white">
+                  Export CSV
+                </Button>
               </div>
             )}
           </div>
@@ -410,8 +410,8 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
                       />
-                      <button onClick={() => updateRuleTo(rule.from, editDraft)} className="px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-sm)] t-caption-sm font-medium text-white transition-colors">Save</button>
-                      <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] transition-colors">Cancel</button>
+                      <Button onClick={() => updateRuleTo(rule.from, editDraft)} variant="primary" size="sm" className="rounded-[var(--radius-sm)] bg-teal-600 hover:bg-teal-500 text-white">Save</Button>
+                      <Button onClick={() => { setEditingRule(null); setEditDraft(''); }} variant="secondary" size="sm" className="rounded-[var(--radius-sm)] text-[var(--brand-text)]">Cancel</Button>
                     </div>
                   ) : (
                     <span className={cn('t-caption font-mono', rule.accepted ? 'text-emerald-400' : 'text-teal-400')}>{rule.to}</span>
@@ -423,22 +423,16 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{rule.reason}</div>
                 {!rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/80 hover:bg-emerald-500 rounded-[var(--radius-sm)] t-caption-sm font-medium text-white transition-colors">
-                      <Icon as={Check} size="sm" /> Accept
-                    </button>
-                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] transition-colors">
-                      <Icon as={Edit3} size="sm" /> Edit Target
-                    </button>
-                    <button onClick={() => rejectRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm font-medium text-red-400 transition-colors">
-                      <Icon as={X} size="sm" /> Dismiss
-                    </button>
+                    <Button onClick={() => acceptRule(rule.from)} icon={Check} variant="ghost" size="sm" className="rounded-[var(--radius-sm)] bg-emerald-600/80 hover:bg-emerald-500 text-white">Accept</Button>
+                    <Button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} icon={Edit3} variant="secondary" size="sm" className="rounded-[var(--radius-sm)] text-[var(--brand-text-bright)]">Edit Target</Button>
+                    <Button onClick={() => rejectRule(rule.from)} icon={X} variant="secondary" size="sm" className="rounded-[var(--radius-sm)] text-red-400">Dismiss</Button>
                   </div>
                 )}
                 {rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+                    <Button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} variant="link" size="sm" className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] no-underline">
                       Change target
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -456,10 +450,12 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             { id: '404s', label: '404s' },
             { id: 'errors', label: 'Errors' },
           ] as Array<{ id: ViewFilter; label: string }>).map(f => (
-            <button
+            <Button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className="px-2.5 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium transition-colors"
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-sm)] font-medium"
               style={filter === f.id ? {
                 backgroundColor: 'rgba(45,212,191,0.1)',
                 color: '#2dd4bf',
@@ -468,7 +464,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
               }}
             >
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex-1 relative">

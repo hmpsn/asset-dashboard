@@ -1,5 +1,5 @@
 import { X, FolderOpen } from 'lucide-react';
-import { Button, Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 
 interface OrganizePlan {
   foldersToCreate: string[];
@@ -31,9 +31,14 @@ export function OrganizePreview({
         <h3 className="text-sm font-semibold text-teal-200 flex items-center gap-2">
           <Icon as={FolderOpen} size="md" /> Organization Plan
         </h3>
-        <button onClick={onCancel} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
-          <Icon as={X} size="md" />
-        </button>
+        <IconButton
+          onClick={onCancel}
+          icon={X}
+          label="Close organization plan"
+          size="sm"
+          variant="ghost"
+          className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+        />
       </div>
 
       {/* Summary */}
@@ -91,12 +96,14 @@ export function OrganizePreview({
         >
           {organizeExecuting ? 'Organizing...' : 'Apply Organization'}
         </Button>
-        <button
+        <Button
           onClick={onCancel}
-          className="px-4 py-2 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs transition-colors"
+          variant="ghost"
+          size="sm"
+          className="px-4 py-2 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs"
         >
           Cancel
-        </button>
+        </Button>
         {(organizePreview.summary.unused > 0 || organizePreview.summary.ogImages > 0) && (
           <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">
             {organizePreview.summary.ogImages > 0 && <>{organizePreview.summary.ogImages} OG images &rarr; _Social / OG Images</>}

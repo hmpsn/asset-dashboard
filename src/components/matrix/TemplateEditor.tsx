@@ -3,7 +3,7 @@ import {
   ArrowLeft, Plus, X, GripVertical, ChevronDown, ChevronUp,
   Eye, Save, FileText, Variable, Link2, Search, Type,
 } from 'lucide-react';
-import { SectionCard, Badge, Button } from '../ui';
+import { SectionCard, Badge, Button, IconButton, ClickableRow } from '../ui';
 import type { ContentTemplate, TemplateVariable, TemplateSection } from './types';
 import { MOCK_TEMPLATE } from './mockData';
 
@@ -62,9 +62,14 @@ function VariablePill({ variable, index, onRemove }: { variable: TemplateVariabl
       <span className={`text-xs font-mono font-semibold ${color.text}`}>{`{${variable.name}}`}</span>
       <span className="t-caption text-[var(--brand-text)]">Label: {variable.label}</span>
       {variable.description && <span className="t-caption text-[var(--brand-text-muted)]">&mdash; {variable.description}</span>}
-      <button onClick={onRemove} className="ml-auto p-0.5 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
-        <X className="w-3 h-3" />
-      </button>
+      <IconButton
+        onClick={onRemove}
+        icon={X}
+        label={`Remove variable ${variable.name}`}
+        variant="ghost"
+        size="sm"
+        className="ml-auto p-0.5 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+      />
     </div>
   );
 }
@@ -98,9 +103,10 @@ function SectionItem({
       onDrop={onDrop}
       className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden transition-colors hover:border-[var(--brand-border-hover)]"
     >
-      <button
+      <ClickableRow
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
+        active={isExpanded}
+        className="flex items-center gap-2 px-3 py-2.5 text-left bg-transparent"
       >
         <GripVertical className="w-3.5 h-3.5 text-[var(--brand-text-muted)] cursor-grab flex-shrink-0" />
         <span className="text-xs font-semibold text-[var(--brand-text-bright)] flex-1 truncate capitalize">
@@ -108,7 +114,7 @@ function SectionItem({
         </span>
         <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0">{section.wordCountTarget} words</span>
         {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />}
-      </button>
+      </ClickableRow>
 
       {isExpanded && (
         <div className="px-3 pb-3 space-y-2 border-t border-[var(--brand-border)]">
@@ -158,9 +164,9 @@ function SectionItem({
             </div>
           </div>
           <div className="flex justify-end pt-1">
-            <button onClick={onRemove} className="t-caption-sm text-red-400 hover:text-red-300 transition-colors">
+            <Button onClick={onRemove} variant="ghost" size="sm" className="t-caption-sm text-red-400 hover:text-red-300 transition-colors">
               Remove section
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -302,9 +308,9 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
     <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={onCancel} className="flex items-center gap-1 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button onClick={onCancel} variant="ghost" size="sm" className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Templates
-        </button>
+        </Button>
       </div>
 
       {/* Name / Description / Page Type */}
@@ -393,12 +399,14 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 </div>
               </div>
             ) : (
-              <button
+              <Button
                 onClick={() => setShowAddVar(true)}
-                className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Variable
-              </button>
+              </Button>
             )}
 
             <div className="pt-3 space-y-2 border-t border-[var(--brand-border)]">
@@ -512,12 +520,14 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               onDrop={handleDrop}
             />
           ))}
-          <button
+          <Button
             onClick={handleAddSection}
-            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-teal-400 hover:border-teal-500/30 transition-colors"
+            variant="ghost"
+            size="sm"
+            className="w-full py-2.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-teal-400 hover:border-teal-500/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Add Section
-          </button>
+          </Button>
         </div>
       </SectionCard>
 

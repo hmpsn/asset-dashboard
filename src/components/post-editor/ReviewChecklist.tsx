@@ -7,7 +7,7 @@ import {
   Check, ChevronDown, ChevronUp, Eye, ClipboardCheck, Square, CheckSquare,
   Sparkles, Loader2, ExternalLink,
 } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button, ClickableRow } from '../ui';
 import {
   type AIReviewMap,
   type AIReviewResponse,
@@ -111,9 +111,9 @@ export function ReviewChecklist({
     <div className="space-y-3">
       {postStatus === 'draft' && (
         <SectionCard noPadding className="overflow-hidden">
-          <button
+          <ClickableRow
             onClick={onToggleShowChecklist}
-            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[var(--surface-3)]/50 transition-colors"
+            className="px-4 py-2.5 flex items-center justify-between hover:bg-[var(--surface-3)]/50"
           >
             <div className="flex items-center gap-2">
               <Icon as={ClipboardCheck} size="md" className={allChecked ? 'text-emerald-400/80' : 'text-[var(--brand-text-muted)]'} />
@@ -123,18 +123,19 @@ export function ReviewChecklist({
               </span>
             </div>
             {showChecklist ? <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />}
-          </button>
+          </ClickableRow>
           {showChecklist && (
             <div className="px-4 pb-3 space-y-1.5 border-t border-[var(--brand-border)]/50 pt-2.5">
               {onRunAIReview && (
-                <button
+                <Button
                   onClick={handleAIReview}
                   disabled={aiRunning}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mb-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                  size="sm"
+                  className="w-full mb-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                 >
                   <Icon as={aiRunning ? Loader2 : Sparkles} size="sm" className={aiRunning ? 'animate-spin' : ''} />
                   {aiRunning ? 'Running AI Review...' : 'AI Pre-Check'}
-                </button>
+                </Button>
               )}
               {evidenceToShow && (
                 <div className="mb-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/5 px-3 py-2">
@@ -173,9 +174,11 @@ export function ReviewChecklist({
               )}
               {CHECKLIST_ITEMS.map(item => (
                 <div key={item.key}>
-                  <button
+                  <Button
                     onClick={() => onToggleItem(item.key)}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-[var(--radius-lg)] text-left hover:bg-[var(--surface-3)]/50 transition-colors group"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start gap-2.5 px-2 py-1.5 rounded-[var(--radius-lg)] text-left hover:bg-[var(--surface-3)]/50 group"
                   >
                     {checklist[item.key]
                       ? <Icon as={CheckSquare} size="md" className="text-emerald-400/80 flex-shrink-0" />
@@ -188,7 +191,7 @@ export function ReviewChecklist({
                         {aiResults[item.key].humanReviewRequired ? 'Human review' : aiResults[item.key].pass ? 'AI: Pass' : 'AI: Review'}
                       </span>
                     )}
-                  </button>
+                  </Button>
                   {aiResults?.[item.key] && (
                     <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded t-caption-sm ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
@@ -203,15 +206,16 @@ export function ReviewChecklist({
                   )}
                   {aiResults?.[item.key] && !aiResults[item.key].pass && !aiResults[item.key].humanReviewRequired && onRequestFix && (
                     <div className="ml-8 mr-2 mb-1">
-                      <button
+                      <Button
                         onClick={() => handleFixThis(item.key, aiResults![item.key].reason)}
                         disabled={fixingKey !== null}
-                        className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                        size="sm"
+                        className="px-2 py-1 rounded t-caption-sm bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                       >
                         {fixingKey === item.key
                           ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Fixing…</>
                           : 'Fix this'}
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -223,27 +227,28 @@ export function ReviewChecklist({
 
       <div className="flex items-center gap-2">
         {postStatus === 'draft' && (
-          <button
+          <Button
             onClick={() => onChangeStatus('review')}
             disabled={!allChecked}
             title={allChecked ? 'Send to review' : `Complete all ${CHECKLIST_ITEMS.length} checklist items before sending to review`}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${
+            size="sm"
+            className={`rounded-[var(--radius-lg)] t-caption-sm font-medium border ${
               allChecked
                 ? 'bg-cyan-600/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30'
                 : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)]/50 text-[var(--brand-text-muted)] cursor-not-allowed'
             }`}
           >
             <Icon as={Eye} size="sm" /> Send to Review
-          </button>
+          </Button>
         )}
         {postStatus === 'review' && (
           <>
-            <button onClick={() => onChangeStatus('approved')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 transition-colors">
+            <Button onClick={() => onChangeStatus('approved')} size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30">
               <Icon as={Check} size="sm" /> Approve
-            </button>
-            <button onClick={() => onChangeStatus('draft')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+            </Button>
+            <Button onClick={() => onChangeStatus('draft')} size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
               Back to Draft
-            </button>
+            </Button>
           </>
         )}
       </div>

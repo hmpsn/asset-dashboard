@@ -410,15 +410,17 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
 
       {/* ── 9. Events & Conversions (collapsible, collapsed by default) ── */}
       <SectionCard>
-        <button
+        <Button
           onClick={() => setEventsExpanded(!eventsExpanded)}
-          className="w-full flex items-center justify-between text-sm font-semibold text-[var(--brand-text-bright)]"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-between text-sm font-semibold text-[var(--brand-text-bright)] px-0 py-0 h-auto"
         >
           <span>Events &amp; Conversions</span>
           <span className="text-xs text-[var(--brand-text-muted)]">
             {conversions.length} tracked event{conversions.length !== 1 ? 's' : ''} {eventsExpanded ? '▴' : '▾'}
           </span>
-        </button>
+        </Button>
         {eventsExpanded && (
           <div className="mt-4 space-y-4">
             {/* Key Events grid */}

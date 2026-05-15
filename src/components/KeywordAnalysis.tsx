@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, PageHeader } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, ClickableRow, PageHeader } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 import { resolvePagePath } from '../lib/pathUtils';
@@ -234,7 +234,9 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           <div className="flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
             <span className="text-xs text-[var(--brand-text)]">{bulkProgress.done}/{bulkProgress.total} pages...</span>
-            <button onClick={() => { cancelBulkRef.current = true; }} className="t-caption-sm text-accent-danger hover:text-accent-danger">Cancel</button>
+            <Button onClick={() => { cancelBulkRef.current = true; }} variant="link" size="sm" className="t-caption-sm text-accent-danger hover:text-accent-danger">
+              Cancel
+            </Button>
           </div>
         ) : (
           <Button
@@ -272,9 +274,10 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           return (
             // pr-check-disable-next-line -- brand asymmetric signature on page-level keyword analysis card; intentional non-SectionCard chrome
             <div key={page.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-              <button
+              <ClickableRow
                 onClick={() => toggleExpand(page.id, page)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
+                active={isExpanded}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 text-left bg-transparent"
               >
                 {isAnalyzing ? (
                   <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin shrink-0" />
@@ -302,7 +305,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                     </span>
                   </div>
                 )}
-              </button>
+              </ClickableRow>
 
               {isExpanded && (
                 <div className="px-4 pb-4 bg-[var(--surface-2)]/30">

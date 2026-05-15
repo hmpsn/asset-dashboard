@@ -8,7 +8,7 @@ import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
-import { EmptyState, Icon } from './ui';
+import { Button, EmptyState, Icon, IconButton } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -512,22 +512,27 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           </span>
         )}
         {cmsImageCount > 0 && (
-          <button
+          <Button
             onClick={() => setFilter('cms-images')}
-            className={`flex items-center gap-1 transition-colors ${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
+            icon={Database}
+            variant="ghost"
+            size="sm"
+            className={`${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
           >
-            <Icon as={Database} size="md" />
             {cmsImageCount} CMS{cmsMissingAltCount > 0 ? `, ${cmsMissingAltCount} missing alt` : ''}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           onClick={handleOrganizePreview}
           disabled={organizeLoading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-[var(--radius-md)] text-xs font-medium transition-colors"
+          loading={organizeLoading}
+          icon={FolderOpen}
+          size="sm"
+          variant="secondary"
+          className="ml-auto px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-[var(--radius-md)] text-xs font-medium"
         >
-          <Icon as={organizeLoading ? Loader2 : FolderOpen} size="md" className={organizeLoading ? 'animate-spin' : ''} />
           Organize into Folders
-        </button>
+        </Button>
       </div>
 
       {/* Alt text error banner */}
@@ -535,7 +540,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-[var(--radius-md)] text-sm text-red-300">
           <Icon as={AlertTriangle} size="md" className="text-red-400/80 shrink-0" />
           <span className="flex-1">{altError}</span>
-          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><Icon as={X} size="md" /></button>
+          <IconButton onClick={() => setAltError(null)} icon={X} label="Dismiss error" variant="ghost" size="sm" className="text-red-400/80 hover:text-red-300" />
         </div>
       )}
 
@@ -626,9 +631,14 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-2 px-4 py-2.5 bg-teal-950/50 border border-teal-800/50 rounded-[var(--radius-md)] text-sm text-teal-300">
           <Icon as={FolderOpen} size="md" className="text-teal-400 shrink-0" />
           <span>Organized: {organizeResult.moved} moved{organizeResult.failed > 0 ? `, ${organizeResult.failed} failed` : ''} of {organizeResult.total} assets</span>
-          <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-teal-400 hover:text-teal-300">
-            <Icon as={X} size="md" />
-          </button>
+          <IconButton
+            onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }}
+            icon={X}
+            label="Dismiss organize result"
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-teal-400 hover:text-teal-300"
+          />
         </div>
       )}
 

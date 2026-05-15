@@ -56,9 +56,15 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
           )}
         </div>
-        <button onClick={() => setShowSchedule(!showSchedule)} className="t-caption-sm text-teal-400 hover:text-teal-300">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowSchedule(!showSchedule)}
+          className="t-caption-sm text-teal-400 hover:text-teal-300 px-0 py-0 bg-transparent hover:bg-transparent"
+        >
           {showSchedule ? 'Hide' : 'Configure'}
-        </button>
+        </Button>
       </div>
       {showSchedule && (
         <div className="mt-3 pt-3 border-t border-[var(--brand-border)] space-y-3">

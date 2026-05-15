@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx to keep the orchestrator lean.
  */
 import { FileText, Download, X } from 'lucide-react';
-import { Icon, Modal, Button } from '../ui';
+import { Modal, Button, IconButton } from '../ui';
 import type { SeoAuditResult } from './types';
 
 // ── Pure helpers ────────────────────────────────────────────────────
@@ -211,30 +211,37 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
         </div>
         <div className="flex items-center gap-2">
           {reportView === 'csv' && (
-            <button
+            <Button
               onClick={() => { navigator.clipboard.writeText(getCSV(data)); }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+              variant="ghost"
+              size="sm"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors text-white"
             >
               Copy to Clipboard
-            </button>
+            </Button>
           )}
           {reportView === 'html' && (
-            <button
+            <Button
               onClick={() => {
                 const iframe = document.getElementById('report-iframe') as HTMLIFrameElement;
                 if (iframe?.contentWindow) iframe.contentWindow.print();
               }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+              variant="ghost"
+              size="sm"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors text-white"
             >
               Print / Save as PDF
-            </button>
+            </Button>
           )}
-          <button
+          <IconButton
             onClick={onClose}
+            icon={X}
+            label="Close report viewer"
+            title="Close"
+            variant="ghost"
+            size="sm"
             className="p-1.5 hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
-          >
-            <Icon as={X} size="md" className="text-[var(--brand-text)]" />
-          </button>
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto">

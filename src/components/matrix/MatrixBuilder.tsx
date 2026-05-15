@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, Check, FileText, Layers, Tag,
   Eye, Sparkles, X,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader, EmptyState, Button } from '../ui';
+import { SectionCard, Badge, PageHeader, EmptyState, Button, IconButton } from '../ui';
 import type { ContentTemplate, ContentMatrix, MatrixDimension, MatrixCell } from './types';
 
 interface MatrixBuilderProps {
@@ -48,13 +48,16 @@ function StepIndicator({ current }: { current: Step }) {
 
 function TemplateCard({ template, isSelected, onSelect }: { template: ContentTemplate; isSelected: boolean; onSelect: () => void }) {
   return (
-    <button
+    <Button
       onClick={onSelect}
+      type="button"
+      variant="ghost"
+      size="sm"
       className={`w-full text-left p-4 rounded-[var(--radius-xl)] border transition-all ${
         isSelected
           ? 'bg-teal-500/10 border-teal-500/30 ring-2 ring-teal-400'
           : 'bg-[var(--surface-1)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
-      }`}
+      } block`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{template.name}</span>
@@ -67,7 +70,7 @@ function TemplateCard({ template, isSelected, onSelect }: { template: ContentTem
         <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {template.variables.length} variable{template.variables.length !== 1 ? 's' : ''}</span>
         <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> {template.sections.length} section{template.sections.length !== 1 ? 's' : ''}</span>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -100,9 +103,15 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
       {values.map(val => (
         <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
-          <button onClick={() => onChange(values.filter(v => v !== val))} className="hover:text-red-400 transition-colors">
-            <X className="w-2.5 h-2.5" />
-          </button>
+          <IconButton
+            onClick={() => onChange(values.filter(v => v !== val))}
+            icon={X}
+            label={`Remove ${val}`}
+            title={`Remove ${val}`}
+            variant="ghost"
+            size="sm"
+            className="w-3.5 h-3.5 p-0 rounded-none hover:bg-transparent text-current hover:text-red-400 transition-colors"
+          />
         </span>
       ))}
       <input
@@ -236,9 +245,15 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
           subtitle="Build a matrix of planned pages from a template"
           icon={<Layers className="w-5 h-5 text-teal-400" />}
         />
-        <button onClick={onCancel} className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button
+          onClick={onCancel}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors px-0 py-0 h-auto"
+        >
           Cancel
-        </button>
+        </Button>
       </div>
 
       {/* Step indicator */}
@@ -369,12 +384,16 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">
-        <button
+        <Button
           onClick={() => step > 1 ? setStep((step - 1) as Step) : onCancel()}
-          className="flex items-center gap-1 px-4 py-2 rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          type="button"
+          variant="ghost"
+          size="md"
+          icon={ArrowLeft}
+          className="px-4 py-2 rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> {step > 1 ? 'Back' : 'Cancel'}
-        </button>
+          {step > 1 ? 'Back' : 'Cancel'}
+        </Button>
 
         {step < 4 ? (
           <Button

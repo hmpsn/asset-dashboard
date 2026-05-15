@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { scoreColorClass, Icon } from '../ui';
+import { scoreColorClass, Icon, IconButton, ClickableRow } from '../ui';
 import {
   intentColor,
   kdColor,
@@ -90,9 +90,9 @@ export function PageIntelligencePageRow({
 
   return (
     <div className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-      <button
+      <ClickableRow
         onClick={() => onToggleExpanded(page.id)}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
+        className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isAnalyzing ? (
@@ -122,16 +122,18 @@ export function PageIntelligencePageRow({
           {strategy?.primaryKeyword && (
             <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
               <span className="truncate">{strategy.primaryKeyword}</span>
-              <button
+              <IconButton
+                icon={trackedKeywords.has(strategy.primaryKeyword) ? Check : Plus}
+                label={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                size="sm"
+                variant="ghost"
                 onClick={event => {
                   event.stopPropagation();
                   onTrackKeyword(strategy.primaryKeyword);
                 }}
-                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                className={`flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
-              >
-                {trackedKeywords.has(strategy.primaryKeyword) ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-              </button>
+                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
+              />
             </span>
           )}
           {strategy?.validated === false && (
@@ -163,7 +165,7 @@ export function PageIntelligencePageRow({
             </span>
           )}
         </div>
-      </button>
+      </ClickableRow>
 
       {isExpanded && (
         <PageIntelligencePageDetails

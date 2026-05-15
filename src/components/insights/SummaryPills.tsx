@@ -1,5 +1,5 @@
 import type { SummaryCount } from '../../../shared/types/insights.js';
-import { Skeleton } from '../ui';
+import { Skeleton, Button } from '../ui';
 
 const PILL_COLORS: Record<string, { dot: string; activeBg: string }> = {
   red: { dot: 'bg-red-400', activeBg: 'bg-red-500/15 border-red-500/30' },
@@ -33,9 +33,11 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
         const colors = PILL_COLORS[pill.color] ?? PILL_COLORS.blue;
         const isActive = activeFilter === pill.filterKey;
         return (
-          <button
+          <Button
             key={pill.filterKey}
             onClick={() => onFilter(isActive ? null : pill.filterKey)}
+            variant="ghost"
+            size="sm"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs transition-all border ${
               isActive ? colors.activeBg : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
             }`}
@@ -43,7 +45,7 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
             <span className={`w-2 h-2 rounded-[var(--radius-pill)] ${colors.dot}`} />
             <span className="text-[var(--brand-text-bright)] font-semibold tabular-nums">{pill.count}</span>
             <span className="text-[var(--brand-text-muted)]">{pill.label}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

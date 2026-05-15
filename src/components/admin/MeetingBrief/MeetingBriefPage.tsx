@@ -3,6 +3,7 @@ import { useAdminMeetingBrief } from '../../../hooks/admin/useAdminMeetingBrief'
 import { SectionCard } from '../../ui/SectionCard';
 import { Skeleton } from '../../ui/Skeleton';
 import { EmptyState } from '../../ui/EmptyState';
+import { Button } from '../../ui';
 import { ErrorBoundary } from '../../ErrorBoundary';
 import { BriefHeader } from './BriefHeader';
 import { AtAGlanceStrip } from './AtAGlanceStrip';
@@ -52,12 +53,14 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           title="Couldn't load brief"
           description="Something went wrong loading the meeting brief. Try again."
           action={
-            <button
+            <Button
               onClick={() => refetch()}
+              variant="secondary"
+              size="md"
               className="mt-4 px-4 py-2 t-ui rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border)] transition-colors"
             >
               Retry
-            </button>
+            </Button>
           }
         />
       </SectionCard>
@@ -72,13 +75,15 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           title="No meeting brief yet"
           description="Generate a brief before your next client call. Takes about 10 seconds."
           action={
-            <button
+            <Button
               onClick={() => generate()}
               disabled={isGenerating}
+              variant="ghost"
+              size="md"
               className="mt-4 px-4 py-2 t-ui rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating\u2026' : 'Generate First Brief'}
-            </button>
+            </Button>
           }
         />
         {generateError && (

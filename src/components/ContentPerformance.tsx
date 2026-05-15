@@ -4,7 +4,7 @@ import {
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { PageHeader, SectionCard, EmptyState, Badge, Icon } from './ui';
+import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon } from './ui';
 import { CHART_SERIES_COLORS } from './ui/constants';
 import { contentPerformance } from '../api/seo';
 
@@ -230,9 +230,11 @@ export function ContentPerformance({ workspaceId }: Props) {
           <div className="flex items-center gap-2">
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Sort by:</span>
             {(['clicks', 'impressions', 'sessions', 'days'] as const).map(key => (
-              <button
+              <Button
                 key={key}
                 onClick={() => setSortKey(key)}
+                variant="secondary"
+                size="sm"
                 className={`px-2.5 py-1 rounded t-caption-sm transition-colors ${
                   sortKey === key
                     ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
@@ -240,7 +242,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                 }`}
               >
                 {key === 'days' ? 'Age' : key.charAt(0).toUpperCase() + key.slice(1)}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -253,7 +255,7 @@ export function ContentPerformance({ workspaceId }: Props) {
               return (
                 <SectionCard key={item.requestId} noPadding className="overflow-hidden">
                   {/* Row header */}
-                  <button
+                  <ClickableRow
                     onClick={() => toggleExpand(item.requestId)}
                     className="w-full flex items-center gap-4 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                   >
@@ -325,7 +327,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                         />
                       )}
                     </div>
-                  </button>
+                  </ClickableRow>
 
                   {/* Expanded detail */}
                   {isExpanded && (

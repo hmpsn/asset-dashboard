@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Icon } from '../ui';
+import { ClickableRow, Icon } from '../ui';
 import { RefreshCw, Plus, Minus, ArrowRight, ChevronDown } from 'lucide-react';
 import { keywords } from '../../api/seo';
 import type { StrategyDiff as StrategyDiffType } from '../../api/seo';
@@ -33,9 +33,9 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
   return (
     // pr-check-disable-next-line -- brand asymmetric signature on StrategyDiff "What Changed" callout; amber-bordered non-SectionCard chrome
     <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
-      <button
+      <ClickableRow
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+        className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
       >
         <div className="flex items-center gap-2">
           <Icon as={RefreshCw} size="md" className="text-amber-400" />
@@ -45,7 +45,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           </span>
         </div>
         <Icon as={ChevronDown} size="md" className={`text-[var(--brand-text-muted)] transition-transform ${expanded ? '' : '-rotate-90'}`} />
-      </button>
+      </ClickableRow>
 
       {expanded && (
         <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50 space-y-3 mt-3">

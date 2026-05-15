@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Flag, Plus, Trash2, Loader2 } from 'lucide-react';
 import { annotations as annotationsApi } from '../api/misc';
-import { EmptyState, Icon, Button } from './ui';
+import { EmptyState, Icon, Button, ClickableRow, IconButton } from './ui';
 import { cn } from '../lib/utils';
 import { CHART_SERIES_COLORS } from './ui/constants';
 
@@ -75,12 +75,15 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Color</label>
             <div className="flex gap-2 pt-1.5">
               {COLORS.map(c => (
-                <button key={c} onClick={() => setNewAnn(p => ({ ...p, color: c }))}
+                <ClickableRow key={c} onClick={() => setNewAnn(p => ({ ...p, color: c }))}
                   className={cn(
                     'w-6 h-6 rounded-[var(--radius-pill)] border-2 transition-all',
                     newAnn.color === c ? 'border-white scale-110' : 'border-[var(--brand-border-hover)] hover:border-[var(--brand-text-muted)]',
                   )}
-                  style={{ backgroundColor: c }} />
+                  style={{ backgroundColor: c }}
+                >
+                  <span className="sr-only">Select color</span>
+                </ClickableRow>
               ))}
             </div>
           </div>
@@ -117,10 +120,14 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
                 <span className="text-xs text-[var(--brand-text-bright)] font-medium">{ann.label}</span>
                 {ann.description && <span className="t-caption text-[var(--brand-text-muted)] ml-2">{ann.description}</span>}
               </div>
-              <button onClick={() => deleteAnnotation(ann.id)}
-                className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
-                <Icon as={Trash2} size="md" />
-              </button>
+              <IconButton
+                onClick={() => deleteAnnotation(ann.id)}
+                icon={Trash2}
+                label="Delete annotation"
+                variant="ghost"
+                size="sm"
+                className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0"
+              />
             </div>
           ))}
         </div>

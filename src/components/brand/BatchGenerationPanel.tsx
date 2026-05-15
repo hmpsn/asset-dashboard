@@ -12,7 +12,7 @@ import {
   useBatchJob,
   useCopyStatus,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, cn } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
 import type { BatchMode, BatchJob } from '../../../shared/types/copy-pipeline';
@@ -46,10 +46,11 @@ function EntryRow({ entry, workspaceId, selected, onToggle }: EntryRowProps) {
   const CheckIcon = selected ? CheckSquare : Square;
 
   return (
-    <button
+    <ClickableRow
       onClick={onToggle}
+      active={selected}
       className={cn(
-        'w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border transition-colors text-left',
+        'flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border transition-colors text-left',
         selected
           ? 'bg-teal-900/20 border-teal-700/40 hover:bg-teal-900/30'
           : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:bg-[var(--surface-3)]'
@@ -67,7 +68,7 @@ function EntryRow({ entry, workspaceId, selected, onToggle }: EntryRowProps) {
         <Badge label={pageTypeLabel} color="zinc" />
         <Badge label={statusConfig.label} color={statusConfig.color} />
       </div>
-    </button>
+    </ClickableRow>
   );
 }
 
@@ -237,13 +238,15 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
           </span>
         }
         action={
-          <button
+          <Button
             onClick={toggleAll}
+            variant="link"
+            size="sm"
             className="t-caption text-teal-400 hover:text-teal-300 transition-colors"
             aria-label={allSelected ? 'Deselect all entries' : 'Select all entries'}
           >
             {allSelected ? 'Deselect all' : 'Select all'}
-          </button>
+          </Button>
         }
       >
         <div className="space-y-1.5" role="group" aria-label="Blueprint entries">
@@ -272,8 +275,10 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
             role="radiogroup"
             aria-label="Batch generation mode"
           >
-            <button
+            <Button
               onClick={() => setMode('review_inbox')}
+              variant="ghost"
+              size="sm"
               role="radio"
               aria-checked={mode === 'review_inbox'}
               className={cn(
@@ -285,9 +290,11 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
             >
               <Icon as={InboxIcon} size="md" />
               Review Inbox
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setMode('iterative')}
+              variant="ghost"
+              size="sm"
               role="radio"
               aria-checked={mode === 'iterative'}
               className={cn(
@@ -299,7 +306,7 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
             >
               <Icon as={Layers} size="md" />
               Iterative Batch
-            </button>
+            </Button>
           </div>
 
           {/* Mode description */}

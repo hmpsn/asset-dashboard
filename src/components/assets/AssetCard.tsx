@@ -3,9 +3,9 @@
  * Extracted from AssetBrowser.tsx asset grid row.
  */
 import {
-  FileText, ExternalLink, Check, X, Loader2, Minimize2, Sparkles, Wand2, Database,
+  FileText, ExternalLink, Check, X, Minimize2, Sparkles, Wand2, Database,
 } from 'lucide-react';
-import { Icon, cn } from '../ui';
+import { Icon, Button, IconButton, cn } from '../ui';
 import type { CmsImageUsage } from '../../../shared/types/cms-images';
 
 interface Asset {
@@ -106,12 +106,24 @@ export function AssetCard({
               className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-3)] border border-teal-600 rounded text-xs focus:outline-none"
               autoFocus
             />
-            <button onClick={() => onSaveRename(asset.id)} className="text-emerald-400/80 hover:text-emerald-300 shrink-0">
-              <Icon as={Check} size="md" />
-            </button>
-            <button onClick={onCancelRename} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] shrink-0">
-              <Icon as={X} size="md" />
-            </button>
+            <IconButton
+              type="button"
+              icon={Check}
+              label="Save rename"
+              size="sm"
+              variant="ghost"
+              onClick={() => onSaveRename(asset.id)}
+              className="text-emerald-400/80 hover:text-emerald-300 hover:bg-transparent shrink-0"
+            />
+            <IconButton
+              type="button"
+              icon={X}
+              label="Cancel rename"
+              size="sm"
+              variant="ghost"
+              onClick={onCancelRename}
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent shrink-0"
+            />
           </div>
         ) : (
           <>
@@ -136,14 +148,20 @@ export function AssetCard({
                 {cmsLabel}
               </span>
             )}
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => onSmartRename(asset)}
               disabled={renameLoading}
-              className="shrink-0 p-0.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
+              loading={renameLoading}
+              icon={renameLoading ? undefined : Wand2}
+              className="shrink-0 p-0.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-transparent"
               title="Smart rename"
+              aria-label="Smart rename"
             >
-              <Icon as={renameLoading ? Loader2 : Wand2} size="sm" className={renameLoading ? 'animate-spin' : ''} />
-            </button>
+              <span className="sr-only">Smart rename</span>
+            </Button>
           </>
         )}
       </div>
@@ -160,24 +178,39 @@ export function AssetCard({
               className="flex-1 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded text-xs focus:outline-none"
               autoFocus
             />
-            <button onClick={() => onSaveAlt(asset.id)} className="text-emerald-400/80 hover:text-emerald-300">
-              <Icon as={Check} size="md" />
-            </button>
-            <button onClick={onCancelEditAlt} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
-              <Icon as={X} size="md" />
-            </button>
+            <IconButton
+              type="button"
+              icon={Check}
+              label="Save alt text"
+              size="sm"
+              variant="ghost"
+              onClick={() => onSaveAlt(asset.id)}
+              className="text-emerald-400/80 hover:text-emerald-300 hover:bg-transparent"
+            />
+            <IconButton
+              type="button"
+              icon={X}
+              label="Cancel alt text edit"
+              size="sm"
+              variant="ghost"
+              onClick={onCancelEditAlt}
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
+            />
           </div>
         ) : (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => onEditAlt(asset.id, asset.altText || '')}
             className={cn(
-              'truncate text-left text-xs w-full',
+              'truncate text-left text-xs w-full justify-start px-0 py-0 rounded-none bg-transparent hover:bg-transparent',
               asset.altText ? 'text-[var(--brand-text)]' : 'text-amber-500/70 italic',
             )}
             title={asset.altText || 'Click to add alt text'}
           >
             {asset.altText || 'No alt text'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -188,26 +221,38 @@ export function AssetCard({
 
       {/* Actions */}
       <div className="flex items-center gap-1 justify-end">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => onGenerateAlt(asset)}
           disabled={generatingAlt}
-          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
+          loading={generatingAlt}
+          icon={generatingAlt ? undefined : Sparkles}
+          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)]"
           title="Generate alt text with AI"
+          aria-label="Generate alt text with AI"
         >
-          <Icon as={generatingAlt ? Loader2 : Sparkles} size="md" className={generatingAlt ? 'animate-spin' : ''} />
-        </button>
+          <span className="sr-only">Generate alt text with AI</span>
+        </Button>
         {asset.size > 0 && (
-          <button
-            onClick={() => !compressDisabled && onCompress(asset)}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onCompress(asset)}
             disabled={compressing || compressDisabled}
+            loading={compressing}
+            icon={compressing ? undefined : Minimize2}
             className={cn(
-              'p-1.5 rounded transition-colors',
+              'p-1.5 rounded',
               compressDisabled ? 'text-[var(--brand-text-dim)] cursor-not-allowed' : 'text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)]',
             )}
             title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
+            aria-label={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
           >
-            <Icon as={compressing ? Loader2 : Minimize2} size="md" className={compressing ? 'animate-spin' : ''} />
-          </button>
+            <span className="sr-only">Compress image</span>
+          </Button>
         )}
         <a
           href={asset.hostedUrl || asset.url}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { patch, post, del, getSafe, postForm } from '../api/client';
-import { Icon, cn } from './ui';
+import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
@@ -316,20 +316,20 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           <div className="flex items-center gap-1">
             <span className="t-caption-sm uppercase tracking-wider mr-1 text-[var(--brand-text-muted)]">Set status:</span>
             {STATUS_OPTIONS.map(s => (
-              <button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating}
-                className={cn('px-2 py-1 rounded t-caption font-medium border transition-colors hover:opacity-90 disabled:opacity-50', s.color)}>
+              <Button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating} variant="ghost" size="sm"
+                className={cn('rounded border transition-colors hover:opacity-90 disabled:opacity-50', s.color)}>
                 {s.label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="h-4 w-px bg-[var(--brand-border)]" />
-          <button onClick={bulkDelete} disabled={bulkUpdating}
-            className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium text-accent-danger hover:bg-red-500/10 transition-colors disabled:opacity-50">
-            <Icon as={Trash2} size="sm" /> Delete
-          </button>
-          <button onClick={() => setSelected(new Set())} className="ml-auto t-caption hover:underline text-[var(--brand-text-muted)]">
+          <Button onClick={bulkDelete} disabled={bulkUpdating} icon={Trash2} variant="ghost" size="sm"
+            className="rounded text-accent-danger hover:bg-red-500/10 disabled:opacity-50">
+            Delete
+          </Button>
+          <Button onClick={() => setSelected(new Set())} variant="link" size="sm" className="ml-auto t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-muted)]">
             Clear selection
-          </button>
+          </Button>
         </div>
       )}
 
@@ -338,12 +338,12 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-2">
           {/* Select all header */}
           <div className="flex items-center gap-2 px-2 py-1">
-            <button onClick={selectAll} className="flex items-center gap-1.5 t-caption font-medium transition-colors text-[var(--brand-text-muted)]">
+            <Button onClick={selectAll} variant="ghost" size="sm" className="text-[var(--brand-text-muted)]">
               <div className={cn('w-4 h-4 rounded border flex items-center justify-center transition-colors', selected.size === filtered.length && filtered.length > 0 ? 'bg-teal-400 border-teal-400' : 'border-[var(--brand-border-hover)]')}>
                 {selected.size === filtered.length && filtered.length > 0 && <CheckCheck className="w-3 h-3 text-black" />}
               </div>
               {selected.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
-            </button>
+            </Button>
           </div>
 
           {filtered.map(req => {
@@ -360,15 +360,15 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                 {/* Row header */}
                 <div className="flex items-center">
                   {/* Checkbox */}
-                  <button onClick={() => toggleSelect(req.id)}
-                    className="px-3 py-3.5 flex-shrink-0 self-stretch flex items-center border-r border-[var(--brand-border)]">
+                  <Button onClick={() => toggleSelect(req.id)} variant="ghost" size="sm"
+                    className="px-3 py-3.5 flex-shrink-0 self-stretch flex items-center border-r border-[var(--brand-border)] rounded-none">
                     <div className={cn('w-4 h-4 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-teal-400 border-teal-400' : 'border-[var(--brand-border-hover)]')}>
                       {isSelected && <CheckCheck className="w-3 h-3 text-black" />}
                     </div>
-                  </button>
+                  </Button>
                   {/* Main row */}
-                  <button onClick={() => { setExpandedId(isExpanded ? null : req.id); setNoteInput(''); }}
-                    className="flex-1 px-4 py-3.5 text-left hover:opacity-90 transition-opacity min-w-0">
+                  <ClickableRow onClick={() => { setExpandedId(isExpanded ? null : req.id); setNoteInput(''); }} active={isExpanded}
+                    className="flex-1 px-4 py-3.5 text-left hover:opacity-90 transition-opacity min-w-0 bg-transparent">
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -399,22 +399,22 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       </div>
                       {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0 text-[var(--brand-text-muted)]" /> : <ChevronDown className="w-4 h-4 shrink-0 text-[var(--brand-text-muted)]" />}
                     </div>
-                  </button>
+                  </ClickableRow>
                   {/* Quick action buttons */}
                   <div className="flex items-center gap-1 px-3 flex-shrink-0">
                     {next && !isDone && (
-                      <button onClick={() => quickStatus(req.id, next)}
-                        className={cn('flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors', next === 'completed' ? 'bg-emerald-400/10 text-accent-success' : 'bg-teal-400/10 text-accent-brand')}
+                      <Button onClick={() => quickStatus(req.id, next)} variant="ghost" size="sm"
+                        className={cn('rounded t-caption font-medium transition-colors', next === 'completed' ? 'bg-emerald-400/10 text-accent-success' : 'bg-teal-400/10 text-accent-brand')}
                         title={next === 'in_progress' ? 'Start working' : next === 'completed' ? 'Mark complete' : next}>
                         {next === 'in_progress' ? <><Play className="w-3 h-3" /> Start</> : <><CheckCircle2 className="w-3 h-3" /> Done</>}
-                      </button>
+                      </Button>
                     )}
                     {isDone && (
-                      <button onClick={() => quickStatus(req.id, 'in_progress')}
-                        className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors bg-teal-400/10 text-accent-brand"
+                      <Button onClick={() => quickStatus(req.id, 'in_progress')} variant="ghost" size="sm"
+                        className="rounded t-caption font-medium transition-colors bg-teal-400/10 text-accent-brand"
                         title="Reopen task">
                         <ArrowRight className="w-3 h-3" /> Reopen
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -445,10 +445,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                       </div>
-                      <button onClick={() => deleteReq(req.id)}
-                        className="ml-auto p-1.5 rounded hover:bg-red-500/10 transition-colors" title="Delete request">
-                        <Icon as={Trash2} size="md" className="text-accent-danger" />
-                      </button>
+                      <IconButton onClick={() => deleteReq(req.id)} icon={Trash2} label="Delete request" variant="danger" size="sm"
+                        className="ml-auto" />
                     </div>
 
                     {/* Description */}
@@ -511,7 +509,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           {noteFiles.map((f, i) => (
                             <span key={i} className="flex items-center gap-1 t-caption rounded px-2 py-1 border border-[var(--brand-border)] text-[var(--brand-text)] bg-[var(--surface-1)]">
                               <Paperclip className="w-2.5 h-2.5" />{f.name}
-                              <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="hover:opacity-70"><X className="w-2.5 h-2.5" /></button>
+                              <IconButton onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} icon={X} label={`Remove ${f.name}`} variant="ghost" size="sm" className="w-4 h-4 hover:opacity-70" />
                             </span>
                           ))}
                         </div>
@@ -524,13 +522,10 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           disabled={sendingNote} />
                         <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                           onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-[var(--radius-lg)] transition-colors border border-[var(--brand-border)] bg-[var(--surface-1)]" title="Attach file">
-                          <Icon as={Paperclip} size="md" className="text-[var(--brand-text-muted)]" />
-                        </button>
-                        <button onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)}
-                          className="px-3 py-2 rounded-[var(--radius-lg)] transition-colors disabled:opacity-50 bg-teal-400 text-black">
-                          <Icon as={Send} size="md" />
-                        </button>
+                        <IconButton onClick={() => noteFileRef.current?.click()} icon={Paperclip} label="Attach file" variant="solid" size="md"
+                          className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] text-[var(--brand-text-muted)]" />
+                        <IconButton onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)} icon={Send} label="Send note" variant="accent" size="md"
+                          className="rounded-[var(--radius-lg)] disabled:opacity-50 text-black bg-teal-400" />
                       </div>
                     </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { voice } from '../../../api/brand-engine';
 import type { VoiceDNA } from '../../../../shared/types/brand-engine';
-import { Button, Icon } from '../../ui';
+import { Button, IconButton } from '../../ui';
 import { useToast } from '../../Toast';
 import { appendUniqueListValue, defaultDNA } from './voiceTabModel';
 
@@ -65,14 +65,15 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)]"
             >
               {trait}
-              <button
+              <IconButton
                 type="button"
                 onClick={() => removeTrait(trait)}
-                aria-label={`Remove trait: ${trait}`}
+                icon={Trash2}
+                label={`Remove trait: ${trait}`}
+                variant="ghost"
+                size="sm"
                 className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
-              >
-                <Icon as={Trash2} size="sm" />
-              </button>
+              />
             </span>
           ))}
         </div>

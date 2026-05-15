@@ -74,13 +74,18 @@ export function BulkPublishPanel({
             : `Publish All (${unpublishedCount})`}
         </Button>
       )}
-      <button
+      <Button
+        type="button"
         onClick={() => onSendToClient(note.trim() || undefined)}
         disabled={sendingToClient || sentToClient}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        variant="secondary"
+        size="sm"
+        loading={sendingToClient}
+        icon={sendingToClient ? undefined : Send}
+        className="gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Icon as={Send} size="sm" /> {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
-      </button>
+        {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
+      </Button>
       {!sentToClient && (
         <textarea
           value={note}

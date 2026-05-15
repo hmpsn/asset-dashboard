@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
-import { PageHeader, EmptyState, Icon, cn } from './ui';
+import { Button, PageHeader, EmptyState, Icon, cn } from './ui';
 import { features as featuresApi } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
@@ -133,24 +133,28 @@ export default function FeatureLibrary() {
           />
         </div>
         <div className="flex rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
-          <button
+          <Button
             onClick={() => setView('painPoint')}
+            variant="secondary"
+            size="sm"
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
               view === 'painPoint' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Pain Point
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setView('category')}
+            variant="secondary"
+            size="sm"
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
               view === 'category' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Platform Area
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import type { ValidationFinding } from '../../../shared/types/schema-validation'
 import type { SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
 import type { Recommendation } from '../../../shared/types/recommendations';
 import type { RichResultEligibility } from './schemaSuggesterTypes';
-import { Icon, cn } from '../ui';
+import { Icon, cn, Button } from '../ui';
 
 export type SchemaPageCardRecommendation = Pick<Recommendation, 'id' | 'type' | 'title' | 'insight' | 'priority' | 'trafficAtRisk' | 'estimatedGain'>;
 
@@ -103,16 +103,18 @@ export function ValidationFindingsSection({ findings, validationErrors }: Valida
 
           return (
             <div key={field}>
-              <button
+              <Button
                 type="button"
                 onClick={() => setExpandedField(expanded ? null : field)}
                 aria-expanded={expanded}
-                className={`flex items-center gap-2 w-full text-left ${colorClass} t-caption-sm hover:opacity-80`}
+                variant="ghost"
+                size="sm"
+                className={`w-full h-auto px-0 py-0 justify-start gap-2 text-left ${colorClass} t-caption-sm hover:opacity-80 hover:bg-transparent`}
               >
                 <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
                 <span className="truncate">{field} ({fieldFindings.length})</span>
                 <span aria-hidden="true" className="text-[var(--brand-text-muted)] shrink-0">{expanded ? '▾' : '▸'}</span>
-              </button>
+              </Button>
               {expanded && (
                 <div className="ml-4 mt-1 space-y-0.5">
                   {fieldFindings.map((finding, index) => (

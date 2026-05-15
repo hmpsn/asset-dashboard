@@ -1,6 +1,6 @@
 import { BarChart3, Check, DollarSign, Pencil, Shield, X } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { Button, Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 import { SeoCopyPanel } from '../strategy/SeoCopyPanel';
 import { kdColor, kdLabel, positionColor } from './pageIntelligenceDisplay';
 import type { KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
@@ -91,9 +91,14 @@ export function PageIntelligenceStrategySection({
             />
           </div>
         </div>
-        <button onClick={() => onStartEdit(page)} className="p-1 text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors" title="Edit keywords">
-          <Pencil className="w-3 h-3" />
-        </button>
+        <IconButton
+          icon={Pencil}
+          label="Edit keywords"
+          size="sm"
+          onClick={() => onStartEdit(page)}
+          title="Edit keywords"
+          className="text-[var(--brand-text-muted)] hover:text-accent-brand"
+        />
       </div>
       <div>
         <span className="t-label text-[var(--brand-text-muted)]">Secondary Keywords</span>

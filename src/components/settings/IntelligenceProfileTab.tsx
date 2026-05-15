@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrainCircuit, Save, Loader2, Sparkles } from 'lucide-react';
+import { BrainCircuit, Save, Sparkles } from 'lucide-react';
 import { put, post } from '../../api/client';
 import { SectionCard, Icon, Button } from '../ui';
 
@@ -92,14 +92,18 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
               </p>
             </div>
           </div>
-          <button
+          <Button
+            type="button"
             onClick={handleAutofill}
             disabled={autofilling || saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="secondary"
+            size="sm"
+            loading={autofilling}
+            icon={autofilling ? undefined : Sparkles}
+            className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/40 transition-all"
           >
-            {autofilling ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Sparkles} size="xs" />}
             {autofilling ? 'Analysing…' : 'Auto-fill from site data'}
-          </button>
+          </Button>
         </div>
 
         <div className="px-5 py-5 space-y-5">

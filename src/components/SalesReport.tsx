@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
-import { MetricRing, MetricRingSvg } from './ui';
+import { MetricRing, MetricRingSvg, Button, IconButton } from './ui';
 import { salesReport as salesReportApi } from '../api/misc';
 
 interface SalesIssue {
@@ -162,10 +162,12 @@ export function SalesReport() {
                 disabled={loading}
               />
             </div>
-            <button
+            <Button
               onClick={runReport}
               disabled={loading || !url.trim()}
-              className="px-6 py-3 rounded-[var(--radius-lg)] text-sm font-semibold transition-all disabled:opacity-50 bg-teal-400 text-[var(--surface-1)]"
+              size="md"
+              variant="secondary"
+              className="px-6 py-3 rounded-[var(--radius-lg)] text-sm font-semibold disabled:opacity-50 bg-teal-400 text-[var(--surface-1)] border-0"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -173,7 +175,7 @@ export function SalesReport() {
                   Scanning...
                 </div>
               ) : 'Run Report'}
-            </button>
+            </Button>
           </div>
 
           {loading && progress && (
@@ -212,13 +214,14 @@ export function SalesReport() {
                     <div className="text-xs text-[var(--brand-text-muted)]">
                       {new Date(h.generatedAt).toLocaleDateString()}
                     </div>
-                    <button
+                    <IconButton
                       onClick={(e) => { e.stopPropagation(); openHtmlReport(h.id); }}
-                      className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] transition-colors"
+                      icon={FileText}
+                      label="View printable report"
+                      size="sm"
+                      className="w-7 h-7 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]"
                       title="View printable report"
-                    >
-                      <FileText className="w-4 h-4 text-[var(--brand-text-muted)]" />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}
@@ -236,32 +239,38 @@ export function SalesReport() {
     <div className="space-y-8 p-6">
       {/* Back + Actions bar */}
       <div className="flex items-center justify-between">
-        <button
+        <Button
           onClick={() => { setView('input'); setReport(null); }}
-          className="text-sm px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] transition-colors text-[var(--brand-text-muted)]"
+          size="sm"
+          variant="ghost"
+          className="text-sm px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
         >
           ← Back
-        </button>
+        </Button>
         <div className="flex items-center gap-2">
           {r.id && (
-            <button
+            <Button
               onClick={() => openHtmlReport(r.id!)}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-[var(--radius-lg)] transition-colors bg-teal-400 text-[var(--surface-1)]"
+              icon={ExternalLink}
+              size="sm"
+              variant="secondary"
+              className="text-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-400 text-[var(--surface-1)] border-0"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
               Client Report
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => {
               const domain = r.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               window.location.hash = `#new-workspace?url=${encodeURIComponent(r.url)}&name=${encodeURIComponent(domain)}`;
             }}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-[var(--radius-lg)] transition-colors bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
+            icon={Zap}
+            size="sm"
+            variant="secondary"
+            className="text-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
           >
-            <Zap className="w-3.5 h-3.5" />
             Onboard as Client
-          </button>
+          </Button>
         </div>
       </div>
 

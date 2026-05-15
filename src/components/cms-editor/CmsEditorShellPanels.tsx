@@ -3,7 +3,7 @@ import {
   Loader2, Check, Search, Sparkles, Send,
 } from 'lucide-react';
 import { PendingApprovals } from '../PendingApprovals';
-import { ErrorState, Icon } from '../ui';
+import { Button, ErrorState, Icon } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import type { PageEditSummary } from '../../hooks/usePageEditStates';
 import type { CmsCollection } from './cmsEditorModel';
@@ -89,10 +89,10 @@ export function CmsEditorShellPanels({
           {approvalSelectedCount > 0 && bulkMode === 'idle' && (
             <div className="flex items-center gap-1.5">
               <span className="t-caption-sm text-[var(--brand-text-muted)] mr-1">AI Rewrite:</span>
-              <button onClick={() => onBulkAiRewrite('name')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Names</button>
-              <button onClick={() => onBulkAiRewrite('title')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Titles</button>
-              <button onClick={() => onBulkAiRewrite('description')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Descriptions</button>
-              <button onClick={() => onBulkAiRewrite('all')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 transition-colors">All SEO</button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('name')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Names</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('title')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Titles</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('description')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Descriptions</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('all')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30">All SEO</Button>
             </div>
           )}
           {bulkMode === 'rewriting' && (
@@ -111,16 +111,18 @@ export function CmsEditorShellPanels({
                   className="w-56 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/50 focus:outline-none"
                 />
               )}
-              <button
+              <Button
                 onClick={() => sendForApproval(approvalNote)}
                 disabled={sendingApproval || approvalSelectedCount === 0}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+                loading={sendingApproval}
+                icon={approvalSent ? Check : Send}
+                size="sm"
+                className={`px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
                   approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
                 }`}
               >
-                <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
                 {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send to client (${approvalSelectedCount})`}
-              </button>
+              </Button>
             </div>
           )}
         </div>

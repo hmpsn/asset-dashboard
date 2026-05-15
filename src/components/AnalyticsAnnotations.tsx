@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Flag, Plus, Trash2, Pencil, Loader2, Check, X } from 'lucide-react';
-import { EmptyState, Icon, Button } from './ui';
+import { EmptyState, Icon, Button, IconButton } from './ui';
 import { cn } from '../lib/utils';
 import {
   useAnalyticsAnnotations,
@@ -122,21 +122,32 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
 
       {/* Category filter pills */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setFilter('all')}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setFilter('all')}
           className={cn(
-            't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border transition-colors',
+            't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border',
             filter === 'all' ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
-          )}>
+          )}
+        >
           All
-        </button>
+        </Button>
         {CATEGORIES.map(c => (
-          <button key={c.id} onClick={() => setFilter(c.id)}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            key={c.id}
+            onClick={() => setFilter(c.id)}
             className={cn(
-              't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border transition-colors',
+              't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border',
               filter === c.id ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
-            )}>
+            )}
+          >
             {c.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -155,26 +166,49 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                   </select>
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
                     className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
-                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-accent-brand hover:text-accent-brand flex-shrink-0 p-1" aria-label="Save edit">
-                    <Icon as={Check} size="md" />
-                  </button>
-                  <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex-shrink-0 p-1" aria-label="Cancel edit">
-                    <Icon as={X} size="md" />
-                  </button>
+                  <IconButton
+                    type="button"
+                    icon={Check}
+                    label="Save edit"
+                    size="sm"
+                    variant="ghost"
+                    onClick={saveEdit}
+                    disabled={updateMutation.isPending}
+                    className="text-accent-brand hover:text-accent-brand flex-shrink-0 p-1 hover:bg-transparent"
+                  />
+                  <IconButton
+                    type="button"
+                    icon={X}
+                    label="Cancel edit"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditId(null)}
+                    className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex-shrink-0 p-1 hover:bg-transparent"
+                  />
                 </>
               ) : (
                 <>
                   <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
                   <CategoryBadge category={ann.category} />
                   <span className="text-xs text-[var(--brand-text-bright)] font-medium flex-1 min-w-0 truncate">{ann.label}</span>
-                  <button onClick={() => startEdit(ann)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all flex-shrink-0 p-1" aria-label="Edit annotation">
-                    <Icon as={Pencil} size="md" />
-                  </button>
-                  <button onClick={() => remove(ann.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
-                    <Icon as={Trash2} size="md" />
-                  </button>
+                  <IconButton
+                    type="button"
+                    icon={Pencil}
+                    label="Edit annotation"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startEdit(ann)}
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all flex-shrink-0 p-1 hover:bg-transparent"
+                  />
+                  <IconButton
+                    type="button"
+                    icon={Trash2}
+                    label="Delete annotation"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => remove(ann.id)}
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all flex-shrink-0 p-1 hover:bg-transparent"
+                  />
                 </>
               )}
             </div>
