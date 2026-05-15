@@ -7,13 +7,20 @@ import path from 'path';
 import { DATA_BASE, getUploadRoot } from '../data-dir.js';
 import { getQueueStats } from '../email-queue.js';
 import { isEmailConfigured } from '../email.js';
-import { getGoogleCredentials } from '../google-auth.js';
+import { getGoogleCredentials, getTokenStatus, GLOBAL_KEY } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
-import { listWorkspaces, getTokenForSite } from '../workspaces.js';
+import { getStripeConfigSafe } from '../stripe-config.js';
+import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
+import { getSemrushUsage } from '../semrush.js';
+import { getDataForSeoUsage } from '../providers/dataforseo-provider.js';
+import { listProviders } from '../seo-data-provider.js';
+import { getTokenUsage } from '../openai-helpers.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import db from '../db/index.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import type { IntegrationHealthItem, IntegrationHealthState, WorkspaceIntegrationHealth } from '../../shared/types/integration-health.js';
 
 
 const log = createLogger('health');
@@ -24,6 +31,30 @@ let shuttingDown = false;
 export function setShuttingDown(): void { shuttingDown = true; }
 
 const DATA_ROOT = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
+
+function latestTimestamp(entries: Array<{ timestamp?: string }>): string | null {
+  if (entries.length === 0) return null;
+  return entries
+    .map(entry => entry.timestamp ?? null)
+    .filter((value): value is string => !!value)
+    .sort()
+    .at(-1) ?? null;
+}
+
+function summaryFromIntegrations(integrations: IntegrationHealthItem[]) {
+  const configured = integrations.filter(item => item.state !== 'missing').length;
+  const missing = integrations.filter(item => item.state === 'missing').length;
+  const degraded = integrations.filter(item => item.state === 'degraded').length;
+  const healthy = integrations.filter(item => item.state === 'configured').length;
+  return { configured, missing, degraded, healthy };
+}
+
+function createIntegration(item: Omit<IntegrationHealthItem, 'state'> & { state?: IntegrationHealthState }): IntegrationHealthItem {
+  return {
+    ...item,
+    state: item.state ?? (item.configured ? 'configured' : 'missing'),
+  };
+}
 
 // Diagnostic endpoint - test Webflow API connection
 router.get('/api/health/diag', async (_req, res) => {
@@ -108,6 +139,207 @@ router.get('/api/health', (_req, res) => {
     notificationEmail: process.env.NOTIFICATION_EMAIL || null,
     emailQueue: getQueueStats(),
   });
+});
+
+router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('workspaceId'), (_req, res) => {
+  const { workspaceId } = _req.params;
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+  const googleConfigured = !!getGoogleCredentials();
+  const googleToken = getTokenStatus(GLOBAL_KEY);
+  const googleOperational = googleToken.connected && googleToken.usable;
+  const hasGscProperty = !!workspace.gscPropertyUrl;
+  const hasGa4Property = !!workspace.ga4PropertyId;
+  const hasWebflowSite = !!workspace.webflowSiteId;
+  const hasWebflowToken = hasWebflowSite ? !!getTokenForSite(workspace.webflowSiteId!) : false;
+
+  const providerStatus = listProviders();
+  const semrushProvider = providerStatus.find(provider => provider.name === 'semrush');
+  const dataforseoProvider = providerStatus.find(provider => provider.name === 'dataforseo');
+
+  const semrushUsage = getSemrushUsage(workspaceId);
+  const dataforseoUsage = getDataForSeoUsage(workspaceId);
+  const aiUsage = getTokenUsage(workspaceId);
+  const openAiUsageEntries = aiUsage.entries.filter(entry => !entry.model.includes('claude'));
+  const anthropicUsageEntries = aiUsage.entries.filter(entry => entry.model.includes('claude'));
+  const stripeConfig = getStripeConfigSafe();
+
+  const integrations: IntegrationHealthItem[] = [
+    createIntegration({
+      key: 'webflow',
+      label: 'Webflow',
+      configured: hasWebflowSite && hasWebflowToken,
+      connected: hasWebflowSite,
+      state: hasWebflowSite && !hasWebflowToken ? 'degraded' : undefined,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: hasWebflowSite && !hasWebflowToken ? 'Site linked but API token is missing' : (hasWebflowSite ? null : 'No Webflow site linked'),
+      quotaStatus: 'unknown',
+      quotaDetail: 'Webflow API quota status is not currently exposed.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['SEO Editor', 'Schema Generator', 'CMS Editor', 'Asset Manager'],
+      notes: hasWebflowSite ? null : 'Link a Webflow site in workspace settings.',
+    }),
+    createIntegration({
+      key: 'google',
+      label: 'Google Auth',
+      configured: googleConfigured,
+      connected: googleOperational,
+      state: googleConfigured && !googleOperational ? 'degraded' : undefined,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: !googleConfigured
+        ? 'Google OAuth credentials are not configured'
+        : (!googleToken.connected ? 'Google account not connected' : (googleToken.usable ? null : 'Google token expired and cannot be refreshed')),
+      quotaStatus: 'unknown',
+      quotaDetail: 'Google API quota status is not currently exposed.',
+      tokenExpiresAt: googleToken.expiresAt,
+      affectedFeatures: ['Search Console analytics', 'GA4 analytics', 'Rank tracking'],
+      notes: !googleToken.connected
+        ? 'Connect Google from the Connections tab.'
+        : (googleToken.usable ? 'Successful-call telemetry is not yet tracked for this integration.' : 'Reconnect Google to refresh credentials.'),
+    }),
+    createIntegration({
+      key: 'gsc',
+      label: 'Google Search Console Property',
+      configured: googleOperational && hasGscProperty,
+      connected: googleOperational && hasGscProperty,
+      state: googleOperational && !hasGscProperty ? 'degraded' : undefined,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: googleOperational
+        ? (hasGscProperty ? null : 'Connected Google account but no GSC property selected')
+        : (!googleToken.connected ? 'Google account not connected' : 'Google token is not currently usable'),
+      quotaStatus: 'unknown',
+      quotaDetail: 'GSC query quota is not currently exposed.',
+      tokenExpiresAt: googleToken.expiresAt,
+      affectedFeatures: ['Search overview', 'Keyword rankings', 'Traffic insights'],
+      notes: hasGscProperty
+        ? 'Successful-call telemetry is not yet tracked for this integration.'
+        : 'Select a Search Console property in the Connections tab.',
+    }),
+    createIntegration({
+      key: 'ga4',
+      label: 'GA4 Property',
+      configured: googleOperational && hasGa4Property,
+      connected: googleOperational && hasGa4Property,
+      state: googleOperational && !hasGa4Property ? 'degraded' : undefined,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: googleOperational
+        ? (hasGa4Property ? null : 'Connected Google account but no GA4 property selected')
+        : (!googleToken.connected ? 'Google account not connected' : 'Google token is not currently usable'),
+      quotaStatus: 'unknown',
+      quotaDetail: 'GA4 quota status is not currently exposed.',
+      tokenExpiresAt: googleToken.expiresAt,
+      affectedFeatures: ['Traffic analytics', 'Engagement metrics', 'Monthly reporting'],
+      notes: hasGa4Property
+        ? 'Successful-call telemetry is not yet tracked for this integration.'
+        : 'Select a GA4 property in the Connections tab.',
+    }),
+    createIntegration({
+      key: 'semrush',
+      label: 'SEMRush',
+      configured: !!semrushProvider?.configured,
+      connected: !!semrushProvider?.configured,
+      lastSuccessAt: latestTimestamp(semrushUsage.entries),
+      lastErrorAt: null,
+      lastError: semrushProvider?.configured ? null : 'SEMRush API key is not configured',
+      quotaStatus: semrushProvider?.configured ? 'unknown' : 'unknown',
+      quotaDetail: semrushProvider?.configured
+        ? `Credits used: ${semrushUsage.totalCredits} across ${semrushUsage.totalCalls} calls.`
+        : 'SEMRush usage unavailable until configured.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Competitor intelligence', 'Keyword opportunities', 'Content strategy'],
+      notes: semrushProvider?.configured ? null : 'Configure SEMRush credentials to enable direct provider fallback.',
+    }),
+    createIntegration({
+      key: 'dataforseo',
+      label: 'DataForSEO',
+      configured: !!dataforseoProvider?.configured,
+      connected: !!dataforseoProvider?.configured,
+      lastSuccessAt: latestTimestamp(dataforseoUsage.entries),
+      lastErrorAt: null,
+      lastError: dataforseoProvider?.configured ? null : 'DataForSEO credentials are not configured',
+      quotaStatus: 'unknown',
+      quotaDetail: dataforseoProvider?.configured
+        ? `Credits used: ${dataforseoUsage.totalCredits} across ${dataforseoUsage.totalCalls} calls.`
+        : 'DataForSEO usage unavailable until configured.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Keyword strategy', 'SERP research', 'Backlink and domain analysis'],
+      notes: dataforseoProvider?.configured ? null : 'Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.',
+    }),
+    createIntegration({
+      key: 'stripe',
+      label: 'Stripe',
+      configured: stripeConfig.configured,
+      connected: stripeConfig.configured,
+      lastSuccessAt: stripeConfig.updatedAt,
+      lastErrorAt: null,
+      lastError: stripeConfig.configured ? null : 'Stripe secret key is not configured',
+      quotaStatus: 'unknown',
+      quotaDetail: 'Stripe request quota status is not currently exposed.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Checkout', 'Plan upgrades', 'Billing portal'],
+      notes: stripeConfig.configured ? null : 'Configure Stripe keys in admin settings.',
+    }),
+    createIntegration({
+      key: 'openai',
+      label: 'OpenAI',
+      configured: !!process.env.OPENAI_API_KEY,
+      connected: !!process.env.OPENAI_API_KEY,
+      lastSuccessAt: latestTimestamp(openAiUsageEntries),
+      lastErrorAt: null,
+      lastError: process.env.OPENAI_API_KEY ? null : 'OPENAI_API_KEY is not configured',
+      quotaStatus: 'unknown',
+      quotaDetail: process.env.OPENAI_API_KEY
+        ? `${openAiUsageEntries.length} calls logged for this workspace.`
+        : 'Usage unavailable until configured.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['SEO rewrites', 'Schema generation', 'AI recommendations'],
+      notes: null,
+    }),
+    createIntegration({
+      key: 'anthropic',
+      label: 'Anthropic (Claude)',
+      configured: !!process.env.ANTHROPIC_API_KEY,
+      connected: !!process.env.ANTHROPIC_API_KEY,
+      lastSuccessAt: latestTimestamp(anthropicUsageEntries),
+      lastErrorAt: null,
+      lastError: process.env.ANTHROPIC_API_KEY ? null : 'ANTHROPIC_API_KEY is not configured',
+      quotaStatus: 'unknown',
+      quotaDetail: process.env.ANTHROPIC_API_KEY
+        ? `${anthropicUsageEntries.length} calls logged for this workspace.`
+        : 'Usage unavailable until configured.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Creative writing', 'Brand voice generation', 'Content drafting'],
+      notes: null,
+    }),
+    createIntegration({
+      key: 'email',
+      label: 'Email (SMTP)',
+      configured: isEmailConfigured(),
+      connected: isEmailConfigured(),
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastError: isEmailConfigured() ? null : 'SMTP credentials are not configured',
+      quotaStatus: 'unknown',
+      quotaDetail: 'SMTP provider quota status is not currently exposed.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Client notifications', 'Approval reminders', 'Scheduled reports'],
+      notes: isEmailConfigured() ? null : 'Set SMTP_HOST/SMTP_USER/SMTP_PASS and notification email.',
+    }),
+  ];
+
+  const payload: WorkspaceIntegrationHealth = {
+    workspaceId,
+    generatedAt: new Date().toISOString(),
+    summary: summaryFromIntegrations(integrations),
+    integrations,
+  };
+
+  res.json(payload);
 });
 
 // ── Storage monitoring & pruning ──

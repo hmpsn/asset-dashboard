@@ -25,13 +25,14 @@ const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'health-routes-test-
 process.env.DATA_DIR = TEST_DATA_DIR;
 
 const ctx = createTestContext(13217);
-const { api, postJson } = ctx;
+const { api, postJson, setAuthToken, authApi, authPostJson, authDel, clearCookies } = ctx;
 
 beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
 afterAll(async () => {
+  setAuthToken('');
   await ctx.stopServer();
   // Clean up isolated temp data dir
   try { fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -55,6 +56,115 @@ describe('Health endpoint', () => {
     expect(body).toHaveProperty('hasEmailConfig');
     expect(body).toHaveProperty('hasStripe');
     expect(body).toHaveProperty('emailQueue');
+  });
+});
+
+describe('Integration health center endpoint', () => {
+  let workspaceId = '';
+  let restrictedWorkspaceId = '';
+  let forbiddenWorkspaceId = '';
+  let ownerToken = '';
+  let memberToken = '';
+  let memberUserId = '';
+
+  it('creates a workspace for integration health checks', async () => {
+    const res = await postJson('/api/workspaces', { name: 'Integration Health Test Workspace' });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('id');
+    workspaceId = body.id;
+  });
+
+  it('creates two workspaces for access-boundary checks', async () => {
+    const [allowedRes, forbiddenRes] = await Promise.all([
+      postJson('/api/workspaces', { name: 'Integration Health Allowed Workspace' }),
+      postJson('/api/workspaces', { name: 'Integration Health Forbidden Workspace' }),
+    ]);
+    expect(allowedRes.status).toBe(200);
+    expect(forbiddenRes.status).toBe(200);
+    const allowedBody = await allowedRes.json();
+    const forbiddenBody = await forbiddenRes.json();
+    restrictedWorkspaceId = allowedBody.id;
+    forbiddenWorkspaceId = forbiddenBody.id;
+  });
+
+  it('returns 403 when JWT user lacks access to requested workspace', async () => {
+    const ownerEmail = `integration_health_owner_${Date.now()}@test.local`;
+    const memberEmail = `integration_health_member_${Date.now()}@test.local`;
+    const memberPassword = 'testpassword123';
+
+    const setupRes = await postJson('/api/auth/setup', {
+      email: ownerEmail,
+      password: 'ownerpassword123',
+      name: 'Integration Health Owner',
+    });
+    expect(setupRes.status).toBe(200);
+    const setupBody = await setupRes.json();
+    ownerToken = setupBody.token;
+    setAuthToken(ownerToken);
+
+    const createMemberRes = await authPostJson('/api/users', {
+      email: memberEmail,
+      password: memberPassword,
+      name: 'Integration Health Member',
+      role: 'member',
+      workspaceIds: [restrictedWorkspaceId],
+    });
+    expect(createMemberRes.status).toBe(200);
+    const createMemberBody = await createMemberRes.json();
+    memberUserId = createMemberBody.id;
+
+    setAuthToken('');
+    const loginRes = await postJson('/api/auth/user-login', {
+      email: memberEmail,
+      password: memberPassword,
+    });
+    expect(loginRes.status).toBe(200);
+    const loginBody = await loginRes.json();
+    memberToken = loginBody.token;
+    setAuthToken(memberToken);
+
+    const res = await authApi(`/api/integrations/health/${forbiddenWorkspaceId}`);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe('You do not have access to this workspace');
+
+    setAuthToken('');
+    clearCookies();
+  });
+
+  it('GET /api/integrations/health/:workspaceId returns integration summary and items', async () => {
+    const res = await api(`/api/integrations/health/${workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workspaceId).toBe(workspaceId);
+    expect(body).toHaveProperty('generatedAt');
+    expect(body).toHaveProperty('summary');
+    expect(body).toHaveProperty('integrations');
+    expect(Array.isArray(body.integrations)).toBe(true);
+    expect(body.integrations.length).toBeGreaterThan(0);
+
+    const keys = new Set((body.integrations as Array<{ key: string }>).map(item => item.key));
+    expect(keys.has('webflow')).toBe(true);
+    expect(keys.has('google')).toBe(true);
+    expect(keys.has('openai')).toBe(true);
+    expect(keys.has('email')).toBe(true);
+  });
+
+  it('GET /api/integrations/health/:workspaceId with unknown workspace returns 404', async () => {
+    const res = await api('/api/integrations/health/ws_missing_health_test');
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Workspace not found');
+  });
+
+  afterAll(async () => {
+    if (memberUserId && ownerToken) {
+      setAuthToken(ownerToken);
+      await authDel(`/api/users/${memberUserId}`);
+    }
+    setAuthToken('');
+    clearCookies();
   });
 });
 

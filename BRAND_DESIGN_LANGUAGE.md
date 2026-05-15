@@ -702,3 +702,9 @@ When shipping UI changes that affect color or design patterns:
 | 2026-05-11 | **InboxTab Phase 3.5 — Action Playbooks Resolution** (client-inbox-phase35-action-playbooks-resolution): Closes the approval dead-end. Client approves an action → admin team notified via `action_approved` email event. `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`. Other action types (aeo_change, internal_link, keyword_strategy, redirect_proposal) surface in admin UI with "Awaiting implementation" badge (`bg-amber-500/10 text-amber-400 border-amber-500/20`) and teal "Mark complete" CTA button (`bg-teal-600 hover:bg-teal-500`). Badge styling follows Law 2 (amber for warning/pending state), button follows Law 1 (teal for action CTAs). `ClientActionsTab.tsx` renders approved actions with inline approval acknowledgment and action metadata. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
+
+### Workspace Settings — Integration Health Center (May 2026)
+- `ConnectionsTab` now includes an **Integration Health Center** card.
+- **Blue** remains the data/observability hue for the module icon and quota-detail chips (`bg-blue-500/10 text-blue-400`).
+- Integration state badges follow semantic status mapping: **emerald** (`configured/healthy`), **amber** (`degraded`), **red** (`missing/error`).
+- No purple usage; the surface is admin operational telemetry, not admin AI interaction.

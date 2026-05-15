@@ -2,6 +2,7 @@
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 import type { FeaturesData } from '../../shared/types/features';
+import type { WorkspaceIntegrationHealth } from '../../shared/types/integration-health';
 import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
 
 // ── Requests (client requests / support tickets) ────────────────
@@ -210,6 +211,12 @@ export const notifications = {
 // ── Workspace overview (notification aggregation) ───────────────
 export const workspaceOverview = {
   list: () => getSafe<unknown[]>('/api/workspace-overview', []),
+};
+
+// ── Integration Health ──────────────────────────────────────────
+export const integrationHealth = {
+  get: (wsId: string) =>
+    get<WorkspaceIntegrationHealth>(`/api/integrations/health/${wsId}`),
 };
 
 // ── Upload ──────────────────────────────────────────────────────
