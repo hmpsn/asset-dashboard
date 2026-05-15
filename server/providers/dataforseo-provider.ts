@@ -22,7 +22,7 @@ import type {
   ReferringDomain,
 } from '../seo-data-provider.js';
 import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
-import { fetchExternalJson, isExternalFetchError } from '../external-fetch.js';
+import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -224,7 +224,7 @@ interface DataForSeoResponse {
 async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoResponse> {
   let json: DataForSeoResponse;
   try {
-    json = await fetchExternalJson<DataForSeoResponse>({
+    json = await fetchProviderJson<DataForSeoResponse>({
       url: `https://api.dataforseo.com/v3/${endpoint}`,
       method: 'POST',
       headers: {

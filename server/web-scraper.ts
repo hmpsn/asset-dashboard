@@ -7,6 +7,7 @@ import { STUDIO_BOT_UA } from './constants.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { decodeEntities } from './helpers.js';
+import { fetchPublicWebText } from './external-fetch.js';
 
 
 const log = createLogger('web-scraper');
@@ -42,21 +43,16 @@ const SCRAPE_TIMEOUT = 8000;
  */
 export async function scrapeUrl(url: string): Promise<ScrapedPage | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT);
-
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': STUDIO_BOT_UA,
+    const html = await fetchPublicWebText({
+      url,
+      timeoutMs: SCRAPE_TIMEOUT,
+      redirect: 'follow',
+      defaultHeaders: {
         'Accept': 'text/html,application/xhtml+xml',
       },
-      signal: controller.signal,
-      redirect: 'follow',
+      userAgent: STUDIO_BOT_UA,
+      logContext: { module: 'web-scraper', fetchPath: 'scrape-url' },
     });
-    clearTimeout(timeout);
-
-    if (!res.ok) return null;
-    const html = await res.text();
     return parseHtml(url, html);
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'web-scraper/scrapeUrl: programming error');
@@ -131,23 +127,17 @@ export async function scrapeSerpData(query: string): Promise<SerpData | null> {
   try {
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.google.com/search?q=${encodedQuery}&hl=en&gl=us&num=10`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT);
-
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    const html = await fetchPublicWebText({
+      url,
+      timeoutMs: SCRAPE_TIMEOUT,
+      redirect: 'follow',
+      defaultHeaders: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      signal: controller.signal,
-      redirect: 'follow',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      logContext: { module: 'web-scraper', fetchPath: 'google-serp' },
     });
-    clearTimeout(timeout);
-
-    if (!res.ok) return null;
-    const html = await res.text();
 
     // Check if we got a CAPTCHA/block
     if (html.includes('unusual traffic') || html.includes('CAPTCHA') || html.length < 5000) {
@@ -273,4 +263,3 @@ export function buildSerpContext(serp: SerpData): string {
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
 }
-

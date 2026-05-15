@@ -40,12 +40,12 @@ describe('GET /api/rewrite-chat/:workspaceId/pages', () => {
     await expect(res.json()).resolves.toEqual({ error: 'Failed to fetch page' });
   });
 
-  it('returns 502 from load-page for upstream HTTP failures', async () => {
+  it('returns 500 from load-page when URL targets an unsafe local host', async () => {
     const res = await ctx.authPostJson(`/api/rewrite-chat/${workspaceId}/load-page`, {
       url: 'http://127.0.0.1:13316/does-not-exist',
     });
-    expect(res.status).toBe(502);
-    await expect(res.json()).resolves.toEqual({ error: 'Failed to fetch page: 404' });
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: 'Failed to fetch page' });
   });
 
   // Shape validation for non-empty responses (when workspace has a Webflow site + snapshot)
