@@ -4669,6 +4669,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Design-system enforcement rules (Phase 1, PR #277)
     'Non-standard transition duration',
     'Page component missing PageHeader',
+    'Style exception registry entry missing required metadata',
     // SVG shell-quoting fix (Phase 3 follow-up)
     'SVG with hardcoded dark fill/stroke',
     // Phase 3 migration bug pattern — recurring 5× in PR #277
@@ -4694,6 +4695,8 @@ describe('Meta: customCheck rule name registry', () => {
     // must use <Button variant="primary">. Locked in after migrating the two
     // TemplateEditor sites that were the last hand-rolled gradient CTAs.
     'Hand-rolled gradient CTA button',
+    'Raw <button> outside primitive/infra allowlist',
+    'Raw CTA class literal outside Button/IconButton',
     // Schema Yoast parity PR1 (2026-04-29) — Trajectory 3 → 1 migration guard.
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
@@ -6028,6 +6031,279 @@ describe('Rule: Hand-rolled gradient CTA button', () => {
     );
     const hits = runRule(RULE, [probe]);
     expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Style exception registry entry missing required metadata', () => {
+  const RULE = 'Style exception registry entry missing required metadata';
+  const STYLE_EXCEPTIONS_FILE = path.resolve(process.cwd(), 'data/style-exceptions.json');
+
+  function withStyleExceptionsFixture(content: string, fn: () => void): void {
+    const original = existsSync(STYLE_EXCEPTIONS_FILE)
+      ? readFileSync(STYLE_EXCEPTIONS_FILE, 'utf-8')
+      : null;
+    try {
+      writeFileSync(STYLE_EXCEPTIONS_FILE, content, 'utf-8');
+      fn();
+    } finally {
+      if (original === null) {
+        rmSync(STYLE_EXCEPTIONS_FILE, { force: true });
+      } else {
+        writeFileSync(STYLE_EXCEPTIONS_FILE, original, 'utf-8');
+      }
+    }
+  }
+
+  it('flags entries missing required metadata fields', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{ id: 'raw-button-admin-shell' }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags expired exceptions', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'legacy-expired',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/legacy/Expired.tsx',
+            reason: 'Legacy migration still pending',
+            owner: 'platform',
+            createdAt: '2026-05-01',
+            expiresOn: '2026-05-10',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags duplicate exception ids', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [
+            {
+              id: 'dup-id',
+              rule: 'raw-button-outside-primitives',
+              file: 'src/components/admin/a.tsx',
+              reason: 'Legacy migration still pending',
+              owner: 'platform',
+              createdAt: '2026-05-01',
+              expiresOn: '2026-06-30',
+            },
+            {
+              id: 'dup-id',
+              rule: 'raw-button-outside-primitives',
+              file: 'src/components/admin/b.tsx',
+              reason: 'Legacy migration still pending',
+              owner: 'platform',
+              createdAt: '2026-05-01',
+              expiresOn: '2026-06-30',
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags non-ISO (non-zero-padded) date values', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'bad-date-format',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/legacy/DateFormat.tsx',
+            reason: 'Legacy migration still pending',
+            owner: 'platform',
+            createdAt: '2026-5-01',
+            expiresOn: '2026-06-30',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+        expect(hits[0].text).toContain('invalid createdAt/expiresOn date format');
+      }
+    );
+  });
+
+  it('pins errors to the failing exception entry line', () => {
+    const fixtureContent = JSON.stringify(
+      {
+        version: 1,
+        updatedAt: '2026-05-15',
+        exceptions: [
+          {
+            id: 'first-valid',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/a.tsx',
+            reason: 'valid baseline entry',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          },
+          {
+            id: 'second-invalid',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/b.tsx',
+            reason: '',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          },
+        ],
+      },
+      null,
+      2
+    );
+
+    const secondIdLine = fixtureContent.split('\n').findIndex(line => line.includes('"id": "second-invalid"')) + 1;
+
+    withStyleExceptionsFixture(fixtureContent, () => {
+      const hits = runRule(RULE, []);
+      expect(hits.length).toBeGreaterThanOrEqual(1);
+      expect(hits[0].line).toBe(secondIdLine);
+    });
+  });
+
+  it('does not flag a valid registry entry', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'admin-seo-editor-transitional',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/seo/SeoEditorActionRow.tsx',
+            reason: 'Migrating this route in next wave',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        expect(runRule(RULE, [])).toHaveLength(0);
+      }
+    );
+  });
+});
+
+describe('Rule: Raw <button> outside primitive/infra allowlist', () => {
+  const RULE = 'Raw <button> outside primitive/infra allowlist';
+
+  it('flags a raw <button> in src/components outside ui/', () => {
+    const probe = write(
+      uniqPath('raw-button-rule', 'src/components/admin/seo/Trigger.tsx'),
+      '<button className="px-3 py-1.5">Refresh</button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // button-ok hatch', () => {
+    const probe = write(
+      uniqPath('raw-button-hatch-inline', 'src/components/admin/seo/InlineHatch.tsx'),
+      '<button className="px-3 py-1.5">Refresh</button> // button-ok\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('respects // button-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('raw-button-hatch-above', 'src/components/admin/seo/AboveHatch.tsx'),
+      lines(
+        '// button-ok',
+        '<button className="px-3 py-1.5">Refresh</button>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag primitive usage (<Button />)', () => {
+    const probe = write(
+      uniqPath('raw-button-negative', 'src/components/admin/seo/Primitive.tsx'),
+      '<Button variant="secondary">Refresh</Button>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Raw CTA class literal outside Button/IconButton', () => {
+  const RULE = 'Raw CTA class literal outside Button/IconButton';
+
+  it('flags a raw <button> with inline teal CTA classes', () => {
+    const probe = write(
+      uniqPath('cta-literal-trigger', 'src/components/admin/seo/CtaTrigger.tsx'),
+      '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // cta-literal-ok hatch', () => {
+    const probe = write(
+      uniqPath('cta-literal-inline', 'src/components/admin/seo/CtaInlineHatch.tsx'),
+      '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button> // cta-literal-ok\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('respects // cta-literal-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('cta-literal-above', 'src/components/admin/seo/CtaAboveHatch.tsx'),
+      lines(
+        '// cta-literal-ok',
+        '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag non-button teal classes', () => {
+    const probe = write(
+      uniqPath('cta-literal-negative', 'src/components/admin/seo/CtaNegative.tsx'),
+      '<div className="bg-teal-600 hover:bg-teal-500">Legend</div>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
   });
 });
 

@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-05-15T17:20:38.076Z",
+  "metrics": {
+    "raw_button_unallowlisted_count": 887,
+    "raw_typography_bypass_count": 28,
+    "raw_radius_literal_count": 2,
+    "disallowed_hue_count": 3,
+    "non_primitive_action_count": 872,
+    "exception_count": 0
+  }
+}

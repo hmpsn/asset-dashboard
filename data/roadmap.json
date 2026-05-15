@@ -217,8 +217,9 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Add advisory checks or docs for route/component files that exceed agreed thresholds, new route modules without a bounded-context owner, new public mutations without WebSocket invalidation, and newly created catch-all API wrappers. Start as warnings or manual review guidance before promoting anything to pr-check errors."
+          "status": "done",
+          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-confidence-demo-workspaces",
