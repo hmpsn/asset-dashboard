@@ -5,7 +5,7 @@ import {
   Minimize2, RefreshCw, ChevronDown, Download, X, Copy, CopyCheck, MessageSquareWarning,
 } from 'lucide-react';
 import { get, post, del } from '../api/client';
-import { Icon, cn } from './ui';
+import { Button, ClickableRow, Icon, IconButton, cn } from './ui';
 
 interface AuditIssue {
   assetId: string;
@@ -236,12 +236,13 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         </div>
         <p className="text-[var(--brand-text)] t-body">Scan your Webflow site for asset issues</p>
         <p className="t-caption text-[var(--brand-text-muted)]">Checks for missing alt text, oversized files, unused assets, and more</p>
-        <button
+        <Button
           onClick={runAudit}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
+          size="lg"
+          className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium"
         >
           Run Asset Audit
-        </button>
+        </Button>
       </div>
     );
   }
@@ -265,55 +266,61 @@ function AssetAudit({ siteId, workspaceId }: Props) {
     <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
-        <button
+        <ClickableRow
           onClick={() => setActiveFilter(null)}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === null ? 'border-[var(--brand-border-hover)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: 'var(--radius-signature)' }}
+          className={cn(
+            'bg-[var(--surface-2)] p-5 border transition-colors rounded-[var(--radius-signature)]',
+            activeFilter === null ? 'border-[var(--brand-border-hover)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
+          )}
         >
           <div className={cn('text-3xl font-bold', scoreColor)}>{score}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Health Score</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{audit.totalAssets} total · {audit.issueCount} with issues</div>
-        </button>
+        </ClickableRow>
 
-        <button
+        <ClickableRow
           onClick={() => setActiveFilter(activeFilter === 'missing-alt' ? null : 'missing-alt')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: 'var(--radius-signature)' }}
+          className={cn(
+            'bg-[var(--surface-2)] p-5 border transition-colors rounded-[var(--radius-signature)]',
+            activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
+          )}
         >
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Missing Alt Text</div>
           {((audit.lowQualityAlt || 0) + (audit.duplicateAlt || 0)) > 0 && (
             <div className="t-caption-sm text-yellow-500 mt-0.5">+{(audit.lowQualityAlt || 0) + (audit.duplicateAlt || 0)} low quality</div>
           )}
-        </button>
+        </ClickableRow>
 
-        <button
+        <ClickableRow
           onClick={() => setActiveFilter(activeFilter === 'oversized' ? null : 'oversized')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: 'var(--radius-signature)' }}
+          className={cn(
+            'bg-[var(--surface-2)] p-5 border transition-colors rounded-[var(--radius-signature)]',
+            activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
+          )}
         >
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Oversized</div>
           {unoptimizedPngCount > 0 && (
             <div className="t-caption-sm text-orange-300 mt-0.5">+{unoptimizedPngCount} unoptimized PNG</div>
           )}
-        </button>
+        </ClickableRow>
 
-        <button
+        <ClickableRow
           onClick={() => setActiveFilter(activeFilter === 'unused' ? null : 'unused')}
           className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors',
             activeFilter === 'unused'
               ? 'border-zinc-500/50' // raw-zinc-ok
-              : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
+              : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
+            'rounded-[var(--radius-signature)]',
           )}
-          style={{ borderRadius: 'var(--radius-signature)' }}
         >
           <div className="text-3xl font-bold text-[var(--brand-text)]">{audit.unused}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Unused</div>
           {(audit.duplicates || 0) > 0 && (
             <div className="t-caption-sm text-cyan-400 mt-0.5">{audit.duplicates} possible duplicates</div>
           )}
-        </button>
+        </ClickableRow>
       </div>
 
       {/* Secondary filter pills */}
@@ -324,13 +331,20 @@ function AssetAudit({ siteId, workspaceId }: Props) {
           ['unoptimized-png', `Unoptimized PNG (${unoptimizedPngCount})`, 'text-orange-300 border-orange-400/30'],
           ['legacy-format', `Legacy Format`, 'text-red-400 border-red-500/30'],
         ].map(([key, label, colors]) => (
-          <button
+          <Button
             key={key}
             onClick={() => setActiveFilter(activeFilter === key ? null : key)}
-            className={cn('t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border transition-colors', activeFilter === key ? `${colors} bg-[var(--surface-2)]` : 'text-[var(--brand-text-muted)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'rounded-[var(--radius-pill)] border',
+              activeFilter === key
+                ? `${colors} bg-[var(--surface-2)]`
+                : 'text-[var(--brand-text-muted)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
+            )}
           >
             {label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -402,83 +416,98 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         {/* Quick actions */}
         <div className="flex items-center gap-2">
           {activeFilter === 'missing-alt' && audit.missingAlt > 0 && (
-            <button
+            <Button
               onClick={handleBulkGenerateAlt}
               disabled={!!bulkAltProgress}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+              size="sm"
+              icon={Sparkles}
+              className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium"
             >
-              <Icon as={Sparkles} size="md" />
               {bulkAltProgress
                 ? `${bulkAltProgress.done}/${bulkAltProgress.total}`
                 : `Generate All (${filteredIssues.filter(i => i.issues.includes('missing-alt')).length})`}
-            </button>
+            </Button>
           )}
           {(activeFilter === 'oversized' || activeFilter === 'unoptimized-png') && (
-            <button
+            <Button
               onClick={handleBulkCompress}
               disabled={!!bulkCompressProgress}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+              size="sm"
+              icon={Minimize2}
+              className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-lg)] t-caption font-medium"
             >
-              <Icon as={Minimize2} size="md" />
               {bulkCompressProgress
                 ? `${bulkCompressProgress.done}/${bulkCompressProgress.total}`
                 : `Compress All (${filteredIssues.filter(i => i.issues.includes('oversized') || i.issues.includes('unoptimized-png')).length})`}
-            </button>
+            </Button>
           )}
           {activeFilter === 'unused' && audit.unused > 0 && (
-            <button
+            <Button
               onClick={handleDeleteUnused}
               disabled={deletingUnused}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+              size="sm"
+              icon={Trash2}
+              className="bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium"
             >
-              <Icon as={Trash2} size="md" />
               {deletingUnused ? 'Deleting...' : `Delete All Unused (${audit.unused})`}
-            </button>
+            </Button>
           )}
           {!activeFilter && (
             <>
               {audit.missingAlt > 0 && (
-                <button
+                <Button
                   onClick={handleBulkGenerateAlt}
                   disabled={!!bulkAltProgress}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+                  size="sm"
+                  icon={Sparkles}
+                  className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium"
                 >
-                  <Icon as={Sparkles} size="md" /> Generate All Alt Text ({audit.missingAlt})
-                </button>
+                  Generate All Alt Text ({audit.missingAlt})
+                </Button>
               )}
               {(audit.oversized > 0 || unoptimizedPngCount > 0) && (
-                <button
+                <Button
                   onClick={handleBulkCompress}
                   disabled={!!bulkCompressProgress}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+                  size="sm"
+                  icon={Minimize2}
+                  className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-lg)] t-caption font-medium"
                 >
-                  <Icon as={Minimize2} size="md" /> Compress All ({audit.oversized + unoptimizedPngCount})
-                </button>
+                  Compress All ({audit.oversized + unoptimizedPngCount})
+                </Button>
               )}
               {audit.unused > 0 && (
-                <button
+                <Button
                   onClick={handleDeleteUnused}
                   disabled={deletingUnused}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+                  size="sm"
+                  icon={Trash2}
+                  className="bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium"
                 >
-                  <Icon as={Trash2} size="md" /> Remove Unused ({audit.unused})
-                </button>
+                  Remove Unused ({audit.unused})
+                </Button>
               )}
             </>
           )}
-          <button
+          <Button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            className="rounded-[var(--radius-lg)] t-caption font-medium"
             title="Export audit as CSV"
           >
-            <Icon as={Download} size="md" /> Export
-          </button>
-          <button
+            Export
+          </Button>
+          <Button
             onClick={runAudit}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors ml-auto"
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            className="rounded-[var(--radius-lg)] t-caption font-medium ml-auto"
           >
-            <Icon as={RefreshCw} size="md" /> Re-scan
-          </button>
+            Re-scan
+          </Button>
         </div>
       </div>
 
@@ -486,9 +515,9 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       <div className="t-caption text-[var(--brand-text-muted)] px-1">
         Showing {filteredIssues.length} of {audit.issues.length} issues
         {activeFilter && (
-          <button onClick={() => setActiveFilter(null)} className="ml-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] underline">
+          <Button variant="link" size="sm" onClick={() => setActiveFilter(null)} className="ml-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">
             Clear filter
-          </button>
+          </Button>
         )}
       </div>
 
@@ -503,8 +532,10 @@ function AssetAudit({ siteId, workspaceId }: Props) {
           filteredIssues.map(issue => (
             <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] hover:bg-[var(--surface-3)]/50 border border-[var(--brand-border)] transition-colors group" style={{ borderRadius: 'var(--radius-signature)' }}>
               {/* Thumbnail — click for lightbox */}
-              <button
-                className="w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--surface-3)] overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-zinc-600 transition-all"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-10 h-10 p-0 rounded-[var(--radius-sm)] bg-[var(--surface-3)] overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-zinc-600"
                 onClick={() => issue.url && setLightboxIssue(issue)}
               >
                 {issue.url ? (
@@ -512,7 +543,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 ) : (
                   <Icon as={Image} size="md" className="text-[var(--brand-text-muted)]" />
                 )}
-              </button>
+              </Button>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
@@ -546,46 +577,49 @@ function AssetAudit({ siteId, workspaceId }: Props) {
               {/* Actions */}
               <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                 {issue.issues.includes('missing-alt') && issue.url && (
-                  <button
+                  <IconButton
                     onClick={() => handleGenerateAlt(issue)}
                     disabled={generatingAlt.has(issue.assetId)}
-                    className="p-1.5 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
-                    title="Generate alt text"
-                  >
-                    {generatingAlt.has(issue.assetId) ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Icon as={Sparkles} size="md" />
+                    icon={generatingAlt.has(issue.assetId) ? Loader2 : Sparkles}
+                    label="Generate alt text"
+                    size="sm"
+                    variant="ghost"
+                    className={cn(
+                      'rounded-[var(--radius-sm)] hover:text-teal-400',
+                      generatingAlt.has(issue.assetId) && '[&_svg]:animate-spin',
                     )}
-                  </button>
+                    title="Generate alt text"
+                  />
                 )}
                 {(issue.issues.includes('oversized') || issue.issues.includes('unoptimized-png')) && issue.url && (
-                  <button
+                  <IconButton
                     onClick={() => handleCompress(issue)}
                     disabled={compressing.has(issue.assetId)}
-                    className="p-1.5 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)] transition-colors"
-                    title="Compress image"
-                  >
-                    {compressing.has(issue.assetId) ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Icon as={Minimize2} size="md" />
+                    icon={compressing.has(issue.assetId) ? Loader2 : Minimize2}
+                    label="Compress image"
+                    size="sm"
+                    variant="ghost"
+                    className={cn(
+                      'rounded-[var(--radius-sm)] hover:text-blue-400',
+                      compressing.has(issue.assetId) && '[&_svg]:animate-spin',
                     )}
-                  </button>
+                    title="Compress image"
+                  />
                 )}
                 {issue.issues.includes('unused') && (
-                  <button
+                  <IconButton
                     onClick={() => handleDeleteAsset(issue)}
                     disabled={deletingIds.has(issue.assetId)}
-                    className="p-1.5 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-3)] transition-colors"
-                    title="Delete unused asset"
-                  >
-                    {deletingIds.has(issue.assetId) ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Icon as={Trash2} size="md" />
+                    icon={deletingIds.has(issue.assetId) ? Loader2 : Trash2}
+                    label="Delete unused asset"
+                    size="sm"
+                    variant="ghost"
+                    className={cn(
+                      'rounded-[var(--radius-sm)] hover:text-red-400',
+                      deletingIds.has(issue.assetId) && '[&_svg]:animate-spin',
                     )}
-                  </button>
+                    title="Delete unused asset"
+                  />
                 )}
               </div>
             </div>
@@ -597,12 +631,14 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm" // fixed-inset-ok — image lightbox
             onClick={() => setLightboxIssue(null)}>
           <div className="relative max-w-4xl max-h-[90vh] w-full mx-4" onClick={e => e.stopPropagation()}>
-            <button
+            <IconButton
               onClick={() => setLightboxIssue(null)}
-              className="absolute -top-10 right-0 p-1.5 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
-            >
-              <Icon as={X} size="lg" />
-            </button>
+              icon={X}
+              label="Close lightbox"
+              size="sm"
+              variant="ghost"
+              className="absolute -top-10 right-0"
+            />
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
               <div className="flex items-center justify-center bg-[var(--surface-1)] p-6 min-h-[300px] max-h-[60vh]">
                 <img
@@ -638,40 +674,49 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 )}
                 <div className="flex items-center gap-2 pt-1">
                   {lightboxIssue.issues.includes('missing-alt') && lightboxIssue.url && (
-                    <button
+                    <Button
                       onClick={() => handleGenerateAlt(lightboxIssue)}
                       disabled={generatingAlt.has(lightboxIssue.assetId)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-sm)] t-caption font-medium transition-colors"
+                      size="sm"
+                      icon={Sparkles}
+                      loading={generatingAlt.has(lightboxIssue.assetId)}
+                      className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-sm)] t-caption font-medium"
                     >
-                      {generatingAlt.has(lightboxIssue.assetId) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon as={Sparkles} size="sm" />}
                       Generate Alt Text
-                    </button>
+                    </Button>
                   )}
                   {(lightboxIssue.issues.includes('oversized') || lightboxIssue.issues.includes('unoptimized-png')) && lightboxIssue.url && (
-                    <button
+                    <Button
                       onClick={() => handleCompress(lightboxIssue)}
                       disabled={compressing.has(lightboxIssue.assetId)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-[var(--radius-sm)] t-caption font-medium transition-colors"
+                      size="sm"
+                      icon={Minimize2}
+                      loading={compressing.has(lightboxIssue.assetId)}
+                      className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-sm)] t-caption font-medium"
                     >
-                      {compressing.has(lightboxIssue.assetId) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon as={Minimize2} size="sm" />}
                       Compress
-                    </button>
+                    </Button>
                   )}
                   {lightboxIssue.issues.includes('unused') && (
-                    <button
+                    <Button
                       onClick={() => { handleDeleteAsset(lightboxIssue); setLightboxIssue(null); }}
                       disabled={deletingIds.has(lightboxIssue.assetId)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-sm)] t-caption font-medium transition-colors"
+                      size="sm"
+                      icon={Trash2}
+                      className="bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-sm)] t-caption font-medium"
                     >
-                      <Icon as={Trash2} size="sm" /> Delete
-                    </button>
+                      Delete
+                    </Button>
                   )}
-                  <button
+                  <Button
                     onClick={() => { navigator.clipboard.writeText(lightboxIssue.url || ''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] rounded-[var(--radius-sm)] t-caption font-medium transition-colors ml-auto"
+                    variant="secondary"
+                    size="sm"
+                    icon={Copy}
+                    className="rounded-[var(--radius-sm)] t-caption font-medium ml-auto"
                   >
-                    <Icon as={Copy} size="sm" /> Copy URL
-                  </button>
+                    Copy URL
+                  </Button>
                 </div>
               </div>
             </div>

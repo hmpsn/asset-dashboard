@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal } from 'lucide-react';
-import { cn, Icon, ConfirmDialog } from './ui';
+import { cn, Icon, ConfirmDialog, Button, IconButton, ClickableRow } from './ui';
 import { webflow } from '../api';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 
@@ -92,8 +92,10 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
 
   return (
     <div className="relative">
-      <button
+      <Button
         onClick={() => setOpen(!open)}
+        variant="ghost"
+        size="sm"
         className={cn(
           'flex items-center gap-2 w-full px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-all border border-[var(--brand-border)]',
           open ? 'bg-teal-500/10 ring-1 ring-teal-500/20' : 'hover:bg-[var(--surface-3)]/60'
@@ -110,7 +112,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
           )}
         </div>
         <Icon as={ChevronDown} size="md" className={cn('shrink-0 transition-transform', open ? 'rotate-180 text-accent-brand' : 'text-[var(--brand-text-muted)]')} />
-      </button>
+      </Button>
 
       {open && (
         // pr-check-disable-next-line -- dropdown
@@ -141,36 +143,45 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                     </div>
                     <div className="flex items-center gap-0.5 relative">
                       {ws.webflowSiteId ? (
-                        <button
+                        <IconButton
                           onClick={(e) => { e.stopPropagation(); onUnlinkSite(ws.id); }}
-                          className="p-1 hover:bg-[var(--brand-border-hover)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          icon={Link2Off}
+                          label="Unlink site"
+                          size="sm"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100"
                           title="Unlink site"
-                        >
-                          <Icon as={Link2Off} size="sm" className="text-[var(--brand-text-muted)]" />
-                        </button>
+                        />
                       ) : (
-                        <button
+                        <IconButton
                           onClick={(e) => { e.stopPropagation(); setLinkingId(linkingId === ws.id ? null : ws.id); }}
-                          className="p-1 hover:bg-[var(--brand-border-hover)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          icon={Globe}
+                          label="Link Webflow site"
+                          size="sm"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100"
                           title="Link Webflow site"
-                        >
-                          <Icon as={Globe} size="sm" className="text-[var(--brand-text-muted)]" />
-                        </button>
+                        />
                       )}
-                      <button
+                      <IconButton
                         onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === ws.id ? null : ws.id); }}
-                        className="p-1 hover:bg-[var(--brand-border-hover)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Icon as={MoreHorizontal} size="sm" className="text-[var(--brand-text-muted)]" />
-                      </button>
+                        icon={MoreHorizontal}
+                        label="Open workspace actions"
+                        size="sm"
+                        variant="ghost"
+                        className="opacity-0 group-hover:opacity-100"
+                      />
                       {menuOpen === ws.id && (
                         <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-[var(--z-modal)] py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
-                          <button
+                          <Button
                             onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
-                            className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-accent-danger hover:bg-red-500/10 transition-colors"
+                            icon={Trash2}
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start rounded-none text-accent-danger hover:bg-red-500/10"
                           >
-                            <Icon as={Trash2} size="sm" /> Delete workspace
-                          </button>
+                            Delete workspace
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -198,20 +209,24 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                             placeholder="Paste API token..."
                             className="w-full px-2 py-1 pr-7 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption focus:outline-none focus:border-[var(--brand-border-hover)] placeholder-[var(--brand-border-hover)]"
                           />
-                          <button
+                          <IconButton
                             onClick={(e) => { e.stopPropagation(); setShowToken(!showToken); }}
+                            icon={showToken ? EyeOff : Eye}
+                            label={showToken ? 'Hide token' : 'Show token'}
+                            variant="ghost"
+                            size="sm"
                             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                          >
-                            {showToken ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
-                          </button>
+                          />
                         </div>
-                        <button
+                        <Button
                           onClick={(e) => { e.stopPropagation(); fetchSitesForToken(linkToken); }}
                           disabled={!linkToken.trim() || loadingSites}
-                          className="px-2 py-1 t-caption font-medium bg-teal-600 text-white rounded hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          variant="primary"
+                          size="sm"
+                          className="bg-teal-600 text-white rounded hover:bg-teal-500"
                         >
                           {loadingSites ? '...' : 'Go'}
-                        </button>
+                        </Button>
                       </div>
                       {tokenError && <p className="t-caption text-accent-danger mb-1">{tokenError}</p>}
                       {loadingSites && (
@@ -224,18 +239,18 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <div className="space-y-0.5 max-h-32 overflow-auto">
                           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Select a site:</p>
                           {sites.map(site => (
-                            <button
+                            <ClickableRow
                               key={site.id}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onLinkSite(ws.id, site.id, site.displayName, linkToken.trim());
                                 setLinkingId(null);
                               }}
-                              className="flex items-center gap-2 w-full px-2 py-1.5 text-left t-caption hover:bg-[var(--surface-3)] rounded transition-colors"
+                              className="flex items-center gap-2 px-2 py-1.5 t-caption rounded"
                             >
                               <Icon as={Globe} size="sm" className="text-accent-brand shrink-0" />
                               <span className="truncate">{site.displayName}</span>
-                            </button>
+                            </ClickableRow>
                           ))}
                         </div>
                       )}
@@ -258,21 +273,25 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   autoFocus
                   className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-text-muted)]"
                 />
-                <button
+                <Button
                   onClick={handleCreate}
-                  className="px-3 py-1.5 bg-teal-600 text-white t-body font-medium rounded-[var(--radius-lg)] hover:bg-teal-500 transition-colors"
+                  variant="primary"
+                  size="sm"
+                  className="bg-teal-600 text-white t-body font-medium rounded-[var(--radius-lg)] hover:bg-teal-500"
                 >
                   Add
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button
                 onClick={() => setCreating(true)}
-                className="flex items-center gap-2 w-full px-3 py-2 t-body text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)] transition-colors"
+                icon={Plus}
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start px-3 py-2 t-body text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)]"
               >
-                <Icon as={Plus} size="md" />
                 New workspace
-              </button>
+              </Button>
             )}
           </div>
         </div>
