@@ -77,5 +77,9 @@ export async function handleMcpRequest(req: Request, res: Response): Promise<voi
   });
   const server = createMcpServer();
   await server.connect(transport);
-  await transport.handleRequest(req, res, req.body as unknown);
+  try {
+    await transport.handleRequest(req, res, req.body as unknown);
+  } finally {
+    await server.close();
+  }
 }

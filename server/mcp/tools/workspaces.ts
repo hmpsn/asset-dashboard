@@ -61,7 +61,10 @@ async function handleListWorkspaces() {
 }
 
 async function handleGetWorkspaceOverview(args: Record<string, unknown>) {
-  const workspaceId = args.workspaceId as string;
+  const workspaceId = args.workspaceId;
+  if (typeof workspaceId !== 'string') {
+    return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
+  }
   const ws = getWorkspace(workspaceId);
   if (!ws) {
     return {
@@ -97,10 +100,10 @@ export async function handleWorkspaceTool(
       case 'get_workspace_overview':
         return handleGetWorkspaceOverview(args);
       default:
-        return { isError: true, content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
+        return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { isError: true, content: [{ type: 'text', text: `Tool error: ${message}` }] };
+    return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
   }
 }
