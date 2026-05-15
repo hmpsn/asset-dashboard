@@ -206,8 +206,8 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "5-8h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Create an evaluation harness for high-value AI features: schema generation, content briefs/posts, rewrites, diagnostics, admin/client chat, and brand/voice outputs. Include golden examples, prompt regression fixtures, expected output-shape tests, provenance/hallucination checks where relevant, and cost/quality comparison hooks by model."
+          "status": "done",
+          "notes": "Shipped Wave 4 AI reliability closeout: added shared reliability contracts (`shared/types/ai-reliability.ts`), canonical trace/scenario registry (`scripts/ai-reliability-registry.ts`), reliability report (`scripts/report-ai-reliability.ts`, markdown + `--json` + `--soft-gate`), pipeline wiring advisory report (`scripts/report-ai-pipeline-wiring.ts`), trace-map docs (`docs/testing/ai-reliability-pipeline-trace-map.md`), and new contract/unit/integration coverage (`tests/contract/ai-pipeline-trace-map.test.ts`, `tests/unit/ai-reliability-harness.test.ts`, `tests/integration/ai-critical-domain-reliability.test.ts`). Coverage now traces schema, content brief/review, SEO assist, client decision support, diagnostics, admin chat, client search chat, and brand/voice provenance-sensitive paths."
         },
         {
           "id": "platform-reliability-data-integrity-recovery",
