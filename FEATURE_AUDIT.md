@@ -5729,3 +5729,16 @@ Bug hardening included:
 **Mutual:** Strengthens platform reliability by keeping retirement behavior contract-tested and visible in recurring platform-health sweeps.
 
 **Files:** `scripts/deprecation-lifecycle.ts`; `tests/unit/deprecation-lifecycle.test.ts`; `docs/rules/deprecation-lifecycle.md`; `scripts/verify-platform.ts`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 421. Styleguide Lock-In Infrastructure (Phase 0/1 Foundation)
+**What it does:** Establishes a hard styleguide lock contract and machine-verifiable drift gates so UI consistency stops depending on ad hoc cleanup waves. Added a canonical migration contract doc (`docs/rules/styleguide-lockdown-contract.md`) that defines authority order, non-negotiable invariants, scorecard metrics, and ratchet policy. Added a style exception registry contract (`data/style-exceptions.json`) with required owner/expiry metadata and a new pr-check error rule that validates schema, duplicates, and expired entries. Added two new drift-detection rules in `scripts/pr-check.ts`: raw `<button>` usage outside primitive/infra allowlist and raw CTA class literals outside Button/IconButton. Added a style drift report CLI (`scripts/report-style-drift.ts`) with baseline regression guardrails (`data/style-drift-baseline.json`) and package scripts (`verify:style-drift`, `report:style-drift`) to produce CI-friendly JSON artifacts and fail on metric regressions (including net-new exceptions).
+
+**Agency value:** Converts style consistency from best-effort review into enforceable platform policy with measurable regression protection.
+
+**Client value:** Improves visual consistency and trust by reducing recurring UI drift in high-touch admin/client workflows.
+
+**Mutual:** Creates the enforcement foundation for phased admin-first/client-second migration without requiring a single mega-PR.
+
+**Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `data/style-exceptions.json`; `data/style-drift-baseline.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

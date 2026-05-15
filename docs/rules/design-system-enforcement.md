@@ -8,6 +8,9 @@
 These rules are mechanized in `scripts/pr-check.ts` and enforced on every PR diff.
 All rules are scoped to files changed in the diff (not the full repo) during the Phase 1–3 migration window.
 
+For the active lock-in contract (authority order, invariants, scorecard schema,
+and ratchet gates), see [styleguide-lockdown-contract.md](./styleguide-lockdown-contract.md).
+
 ---
 
 ## Active Rules (pr-check)
