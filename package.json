@@ -31,7 +31,9 @@
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify:release-safety": "tsx scripts/platform-release-safety.ts",
+    "report:release-safety": "tsx scripts/report-release-safety.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

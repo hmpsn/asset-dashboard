@@ -5642,3 +5642,16 @@ Bug hardening included:
 **Mutual:** Establishes reusable observability primitives for future platform-health work, with typed contracts, a protected API surface, and integration test coverage.
 
 **Files:** `server/platform-observability.ts`; `server/platform-observability-report.ts`; `shared/types/platform-observability.ts`; `server/middleware/request-logger.ts`; `server/openai-helpers.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/jobs.ts`; `server/routes/health.ts`; `src/api/misc.ts`; `src/api/index.ts`; `scripts/platform-observability.ts`; `scripts/report-platform-observability.ts`; `docs/workflows/platform-observability.md`; `tests/integration/health-routes.test.ts`; `package.json`; `data/roadmap.json`.
+
+---
+
+### 416. Release Safety Checklist & Smoke Flow
+**What it does:** Adds a practical release-safety operating layer that combines roadmap-derived deploy notes with a repeatable release checklist. New script `npm run verify:release-safety` (`scripts/platform-release-safety.ts`) generates a release report for a configurable window or sprint, including shipped-item notes from `data/roadmap.json` plus five checklist sections: feature-class release gates, staging smoke suite, rollback readiness, feature-flag rollout, and post-release monitoring window. Companion workflow doc `docs/workflows/release-safety.md` codifies the end-to-end flow with concrete commands (`verify-platform --quick`, domain smoke matrix, health/observability checks, and rollback/flag procedures).
+
+**Agency value:** Standardizes release execution and reduces tribal knowledge. Operators can move from PR-ready to production with one report-driven checklist instead of scattered docs and memory.
+
+**Client value:** Fewer production regressions and faster incident handling because smoke checks, rollback expectations, and short-window monitoring are explicit before and after release.
+
+**Mutual:** Improves operational confidence without changing product UI by making release quality controls repeatable, auditable, and tied to shipped roadmap work.
+
+**Files:** `scripts/platform-release-safety.ts`; `scripts/report-release-safety.ts`; `tests/unit/platform-release-safety.test.ts`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
