@@ -173,8 +173,9 @@
           "source": "Staging smoke follow-up 2026-05-13",
           "est": "4-7h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "PR #711 landed the shared SEO Editor write-target contract/resolver and CMS approval apply support, but staging smoke found product-quality issues in the unified surface: duplicated Sent to Client panels, unscoped approval history, CMS summaries that may already be truncated at source, and missing effective-title fallback semantics when a CMS item name is the practical SEO title. Follow-up hotfix gated the unified shell behind `seo-editor-unified` (default off) so the legacy Pages / CMS Collections split remains active while these issues are resolved."
+          "status": "done",
+          "notes": "PR #711 landed the shared SEO Editor write-target contract/resolver and CMS approval apply support, but staging smoke found product-quality issues in the unified surface: duplicated Sent to Client panels, unscoped approval history, CMS summaries that may already be truncated at source, and missing effective-title fallback semantics when a CMS item name is the practical SEO title. Follow-up hotfix gated the unified shell behind `seo-editor-unified` (default off) so the legacy Pages / CMS Collections split remains active while these issues are resolved.\nShipped 2026-05-15: resolved unified-surface quality issues by rendering a single SEO-scoped `PendingApprovals` panel in unified mode (while disabling nested duplicates in static/CMS child sections), preserving scoped approval visibility. Added CMS effective-title fallback semantics so blank SEO-title fields fall back to item name in both write-target resolution and preview rendering. Removed extra UI truncation in CMS approval history/value summaries to avoid compounding already-truncated source values. Added/updated contract and unit coverage (`seo-editor-unified-flag-gate`, `seo-write-target-resolver`) for the new unified panel and fallback behavior.",
+          "shippedAt": "2026-05-15"
         },
         {
           "id": "platform-org-extraction-pilot",

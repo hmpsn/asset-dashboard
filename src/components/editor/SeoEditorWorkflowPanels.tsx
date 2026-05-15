@@ -12,6 +12,7 @@ interface SeoSuggestionsData {
 
 interface SeoEditorWorkflowPanelsProps {
   workspaceId?: string;
+  showPendingApprovals?: boolean;
   approvalRefreshKey: number;
   onApprovalsRetracted: () => void;
   hasUnsaved: boolean;
@@ -23,6 +24,7 @@ interface SeoEditorWorkflowPanelsProps {
 
 export function SeoEditorWorkflowPanels({
   workspaceId,
+  showPendingApprovals = true,
   approvalRefreshKey,
   onApprovalsRetracted,
   hasUnsaved,
@@ -33,7 +35,7 @@ export function SeoEditorWorkflowPanels({
 }: SeoEditorWorkflowPanelsProps) {
   return (
     <>
-      {workspaceId && (
+      {workspaceId && showPendingApprovals && (
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}

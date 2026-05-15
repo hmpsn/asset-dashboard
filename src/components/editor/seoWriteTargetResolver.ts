@@ -80,6 +80,8 @@ export function resolveSeoEditorWriteTargets({
     for (const item of collection.items) {
       const itemSlug = stringValue(item.fieldData.slug);
       const itemName = stringValue(item.fieldData.name);
+      const rawSeoTitle = titleField ? stringValue(item.fieldData[titleField.slug]) : '';
+      const seoTitle = rawSeoTitle.trim() || itemName;
       const canonicalPath = resolveCmsItemPath(collection.collectionSlug, itemSlug);
       cmsTargets.push({
         id: item.id,
@@ -93,7 +95,7 @@ export function resolveSeoEditorWriteTargets({
         rawSlug: itemSlug || null,
         sourceLabel: collection.collectionName,
         seo: {
-          title: titleField ? stringValue(item.fieldData[titleField.slug]) : itemName,
+          title: seoTitle,
           description: descField ? stringValue(item.fieldData[descField.slug]) : '',
         },
         titleFieldSlug: titleField?.slug,

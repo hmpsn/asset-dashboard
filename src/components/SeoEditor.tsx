@@ -30,9 +30,18 @@ interface Props {
   workspaceId?: string;
   fixContext?: FixContext | null;
   externalSearch?: string;
+  showPendingApprovals?: boolean;
+  onApprovalBatchMutated?: () => void;
 }
 
-export function SeoEditor({ siteId, workspaceId, fixContext, externalSearch }: Props) {
+export function SeoEditor({
+  siteId,
+  workspaceId,
+  fixContext,
+  externalSearch,
+  showPendingApprovals = true,
+  onApprovalBatchMutated,
+}: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
   const { cancelJob, startJob, trackJob } = useBackgroundTasks();
@@ -177,6 +186,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext, externalSearch }: P
     filteredPageIds: filteredPages.map(page => page.id),
     refreshStates,
     toast,
+    onApprovalBatchMutated,
   });
 
   const {
@@ -274,6 +284,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext, externalSearch }: P
 
       <SeoEditorWorkflowPanels
         workspaceId={workspaceId}
+        showPendingApprovals={showPendingApprovals}
         approvalRefreshKey={approvalRefreshKey}
         onApprovalsRetracted={refreshStates}
         hasUnsaved={hasUnsaved}

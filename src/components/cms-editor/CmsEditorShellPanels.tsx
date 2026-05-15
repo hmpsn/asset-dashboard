@@ -33,6 +33,7 @@ interface CmsEditorShellPanelsProps {
   workspaceId?: string;
   approvalRefreshKey: number;
   onApprovalRetracted: () => void;
+  showPendingApprovals?: boolean;
   summary: PageEditSummary;
   search: string;
   onSearchChange: (value: string) => void;
@@ -57,6 +58,7 @@ export function CmsEditorShellPanels({
   workspaceId,
   approvalRefreshKey,
   onApprovalRetracted,
+  showPendingApprovals = true,
   summary,
   search,
   onSearchChange,
@@ -146,9 +148,10 @@ export function CmsEditorShellPanels({
         />
       )}
 
-      {workspaceId && (
+      {workspaceId && showPendingApprovals && (
         <PendingApprovals
           workspaceId={workspaceId}
+          nameFilter="SEO"
           refreshKey={approvalRefreshKey}
           onRetracted={onApprovalRetracted}
         />

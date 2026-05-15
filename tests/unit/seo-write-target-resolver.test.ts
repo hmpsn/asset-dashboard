@@ -84,6 +84,26 @@ describe('resolveSeoEditorWriteTargets', () => {
     });
   });
 
+  it('falls back to CMS item name when SEO title field is present but blank', () => {
+    const result = resolveSeoEditorWriteTargets({
+      pages: [],
+      collections: [{
+        ...collections[0],
+        items: [{
+          id: 'item-blank-seo-title',
+          fieldData: {
+            name: 'Fallback Name Title',
+            slug: 'fallback-name-title',
+            'seo-title': '',
+            'meta-description': 'Meta present',
+          },
+        }],
+      }],
+    });
+    const target = result.cmsTargets.find(item => item.id === 'item-blank-seo-title');
+    expect(target?.seo.title).toBe('Fallback Name Title');
+  });
+
   it('does not create a manual target when a trailing-slash sitemap row matches a real CMS item', () => {
     const result = resolveSeoEditorWriteTargets({
       pages: [

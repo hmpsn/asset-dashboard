@@ -5578,3 +5578,15 @@ Bug hardening included:
 **Mutual:** A contract test now guards helper adoption across the highest-churn routes so future refactors don't silently drift away from the lifecycle rails.
 
 **Files:** `server/routes/client-actions.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/integration/workspace-mutation-helper-pilot.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.
+---
+
+### 411. Unified SEO Editor Surface Quality Fixes
+**What it does:** Resolves staging follow-up issues in the `seo-editor-unified` flag path by rendering one shared SEO-scoped `PendingApprovals` panel in unified mode and disabling duplicate nested panels inside static/CMS child sections. It also enforces effective title fallback semantics for CMS items (blank SEO title now falls back to item name) in both resolver output and preview rendering, and removes extra UI truncation on CMS approval history/value summaries.
+
+**Agency value:** Eliminates duplicate review surfaces and tightens cross-component title semantics without changing backend route contracts.
+
+**Client value:** Cleaner unified SEO review workflow and more accurate CMS title previews when dedicated SEO title fields are empty.
+
+**Mutual:** Adds regression guardrails in contract/unit coverage for unified approval panel wiring and resolver fallback behavior.
+
+**Files:** `src/components/SeoEditorWrapper.tsx`; `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorWorkflowPanels.tsx`; `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorShellPanels.tsx`; `src/components/cms-editor/CmsEditorCollections.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `tests/contract/seo-editor-unified-flag-gate.test.ts`; `tests/unit/seo-write-target-resolver.test.ts`; `data/roadmap.json`.

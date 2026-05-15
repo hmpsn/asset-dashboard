@@ -15,6 +15,7 @@ interface UseSeoEditorApprovalWorkflowArgs {
   filteredPageIds: string[];
   refreshStates: () => void;
   toast: (message: string) => void;
+  onApprovalBatchMutated?: () => void;
 }
 
 export function toggleStringSet(previous: Set<string>, id: string): Set<string> {
@@ -38,6 +39,7 @@ export function useSeoEditorApprovalWorkflow({
   filteredPageIds,
   refreshStates,
   toast,
+  onApprovalBatchMutated,
 }: UseSeoEditorApprovalWorkflowArgs) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
@@ -71,6 +73,8 @@ export function useSeoEditorApprovalWorkflow({
       });
       setSentPage(prev => new Set(prev).add(pageId));
       refreshStates();
+      setApprovalRefreshKey(k => k + 1);
+      onApprovalBatchMutated?.();
       setTimeout(() => {
         setSentPage(prev => {
           const next = new Set(prev);
@@ -89,7 +93,7 @@ export function useSeoEditorApprovalWorkflow({
         return next;
       });
     }
-  }, [workspaceId, pages, edits, siteId, refreshStates, toast]);
+  }, [workspaceId, pages, edits, siteId, refreshStates, toast, onApprovalBatchMutated]);
 
   const sendForApproval = useCallback(async () => {
     if (!workspaceId || approvalSelected.size === 0) return;
@@ -110,6 +114,7 @@ export function useSeoEditorApprovalWorkflow({
       refreshStates();
       setApprovalSelected(new Set());
       setApprovalRefreshKey(k => k + 1);
+      onApprovalBatchMutated?.();
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
@@ -118,7 +123,7 @@ export function useSeoEditorApprovalWorkflow({
     } finally {
       setSendingApproval(false);
     }
-  }, [workspaceId, approvalSelected, pages, edits, siteId, refreshStates, toast]);
+  }, [workspaceId, approvalSelected, pages, edits, siteId, refreshStates, toast, onApprovalBatchMutated]);
 
   return {
     approvalSelected,
