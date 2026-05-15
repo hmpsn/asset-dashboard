@@ -149,3 +149,30 @@ describe('get_workspace_overview', () => {
     expect(body.result?.content[0].text).toContain('Workspace not found');
   });
 });
+
+describe('get_workspace_intelligence', () => {
+  it('returns an intelligence bundle for a known workspace', async () => {
+    const result = await mcpToolCall('get_workspace_intelligence', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown>;
+    expect(result.workspaceId).toBe(ws.workspaceId);
+    expect(typeof result.assembledAt).toBe('string');
+  });
+
+  it('returns an error for an unknown workspace', async () => {
+    const res = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: {
+          name: 'get_workspace_intelligence',
+          arguments: { workspaceId: 'nonexistent-ws' },
+        },
+        id: 3,
+      },
+      MCP_TEST_KEY,
+    );
+    const body = await res.json() as { result?: { isError?: boolean } };
+    expect(body.result?.isError).toBe(true);
+  });
+});
