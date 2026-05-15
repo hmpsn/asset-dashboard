@@ -1467,6 +1467,7 @@ export const CHECKS: Check[] = [
       'server/seo-data-provider.ts',             // interface definition
       'server/providers/semrush-provider.ts',    // provider implementation
       'server/providers/dataforseo-provider.ts', // provider implementation
+      'server/providers/fake-seo-provider.ts',   // local fake provider implementation
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
       'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
     ],

@@ -7,6 +7,7 @@
 import { logTokenUsage } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 
 const log = createLogger('anthropic');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -50,9 +51,6 @@ interface AnthropicChatResult {
  * exponential backoff, timeout, and token tracking.
  */
 export async function callAnthropic(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-
   const {
     model = 'claude-sonnet-4-6',
     system,
@@ -65,6 +63,18 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
     timeoutMs = 90_000,
     signal,
   } = opts;
+
+  if (isLocalFakeProviderModeEnabled()) {
+    const text = `[local-fake-providers] Synthetic Anthropic response for "${feature}".`;
+    const promptTokens = Math.max(1, Math.round(messages.length * 8));
+    const completionTokens = Math.max(1, Math.round(text.length / 7));
+    const totalTokens = promptTokens + completionTokens;
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId });
+    return { text, promptTokens, completionTokens, totalTokens };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const bodyObj: Record<string, unknown> = {
     model,
@@ -175,9 +185,6 @@ export async function callAnthropicWithTools(opts: {
   maxRetries?: number;
   timeoutMs?: number;
 }): Promise<AnthropicToolUseResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-
   const {
     model = 'claude-haiku-4-5-20251001',
     system,
@@ -190,6 +197,17 @@ export async function callAnthropicWithTools(opts: {
     maxRetries = 3,
     timeoutMs = 60_000,
   } = opts;
+
+  if (isLocalFakeProviderModeEnabled()) {
+    const toolInput = { mode: 'local-fake-providers', feature, synthetic: true } as Record<string, unknown>;
+    const promptTokens = 8;
+    const completionTokens = 12;
+    logTokenUsage({ promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, model, feature, workspaceId });
+    return { toolInput, promptTokens, completionTokens };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const bodyObj: Record<string, unknown> = {
     model,

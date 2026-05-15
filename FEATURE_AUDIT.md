@@ -1,8 +1,19 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **359 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **360 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 360. Wave 5 Local Dev & Agent Onboarding Confidence
+**What it does:** Adds a first-hour onboarding baseline for local development and autonomous agent work. Introduces deterministic fake-provider mode (`LOCAL_FAKE_PROVIDERS=true`) via `server/local-provider-mode.ts` and `server/providers/fake-seo-provider.ts`, with OpenAI/Anthropic helper fallbacks that emit synthetic responses for local workflows without external API keys. Adds one-command demo data seeding (`npm run seed:demo`, `scripts/seed-demo-workspaces.ts`) for three fixture workspaces (Free/Growth/Premium) and a one-command core smoke suite (`npm run smoke:core`) for fast local confidence. Documents environment tiers, setup flow, and fixture routes in `docs/workflows/local-dev-onboarding.md`.
+
+**Agency value:** New teammates and operators can verify critical platform paths quickly without credential setup blocking initial productivity.
+
+**Client value:** Faster internal onboarding reduces operational lag and lowers the chance of delayed responses caused by local environment drift.
+
+**Mutual:** Increases reliability by turning local setup from ad hoc steps into reproducible commands with typed provider contracts and tests.
 
 ---
 
