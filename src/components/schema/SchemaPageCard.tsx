@@ -9,7 +9,7 @@ import {
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
   Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
-import { StatusBadge, Icon, cn } from '../ui';
+import { StatusBadge, Icon, Button, IconButton, ClickableRow, cn } from '../ui';
 import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
@@ -102,16 +102,16 @@ export function SchemaPageCard({
       style={{ borderRadius: '10px 24px 10px 24px' }} // asymmetric-radius-ok
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        <button
+        <ClickableRow
           onClick={() => onToggleExpand(page.pageId)}
-          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity bg-transparent"
         >
           {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
           <div className="flex-1 min-w-0">
             <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
             <div className="t-caption text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
           </div>
-        </button>
+        </ClickableRow>
         <div className="flex items-center gap-2 flex-shrink-0">
           <StatusBadge status={editState?.status} />
           {page.existingSchemas.length > 0 && (
@@ -177,14 +177,19 @@ export function SchemaPageCard({
             <option value="recipe">Recipe</option>
             <option value="generic">General Page</option>
           </select>
-          <button
+          <IconButton
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
             disabled={isRegenLoading}
-            className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
+            icon={isRegenLoading ? Loader2 : RefreshCw}
+            label="Regenerate schema for this page"
+            size="sm"
+            variant="solid"
+            className={cn(
+              'rounded-[var(--radius-md)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]',
+              isRegenLoading && 'animate-pulse',
+            )}
             title="Regenerate schema for this page"
-          >
-            {isRegenLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />}
-          </button>
+          />
         </div>
       </div>
 
@@ -202,54 +207,64 @@ export function SchemaPageCard({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
-                  <button
+                  <Button
                     onClick={() => onToggleDiff(page.pageId)}
+                    icon={GitCompareArrows}
+                    variant="ghost"
+                    size="sm"
                     className={cn(
-                      'flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                      'rounded-[var(--radius-md)] font-medium',
                       showDiff
                         ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
                         : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                     )}
                   >
-                    <Icon as={GitCompareArrows} size="sm" />
                     {showDiff ? 'Hide Diff' : 'Show Diff'}
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <button
+                <Button
                   onClick={() => onToggleSchemaEdit(page.pageId, schema.template)}
+                  icon={Pencil}
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    'flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                    'rounded-[var(--radius-md)] font-medium',
                     editingSchema
                       ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
                       : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                   )}
                 >
-                  <Icon as={Pencil} size="sm" />
                   {editingSchema ? 'Done Editing' : 'Edit'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onCopyTemplate(schema, page.pageId)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                  icon={copiedId === `${page.pageId}-${schema.type}` ? CheckCircle : Copy}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   {copiedId === `${page.pageId}-${schema.type}` ? (
-                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> Copied</>
+                    'Copied'
                   ) : (
-                    <><Icon as={Copy} size="sm" /> Copy script</>
+                    'Copy script'
                   )}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onCopyJsonLd(schema, page.pageId)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 border border-blue-500/20 transition-colors"
+                  icon={copiedId === `${page.pageId}-${schema.type}-json` ? CheckCircle : Copy}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 border border-blue-500/20"
                   title="Copy JSON only for Webflow Page Settings -> Schema markup"
                 >
                   {copiedId === `${page.pageId}-${schema.type}-json` ? (
-                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> JSON copied</>
+                    'JSON copied'
                   ) : (
-                    <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
+                    'Copy JSON-LD'
                   )}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -312,34 +327,43 @@ export function SchemaPageCard({
                 ) : confirmPublish ? (
                   <div className="flex items-center gap-2">
                     <span className="t-caption text-amber-400/80">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
-                    <button
+                    <Button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
+                      loading={publishing}
+                      icon={publishing ? undefined : Upload}
+                      variant="primary"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] bg-emerald-600 hover:bg-emerald-500 text-white"
                     >
-                      {publishing ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Upload} size="md" />}
                       Yes, publish
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => onConfirmPublish(null)}
-                      className="px-2 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
+                  <Button
                     // pr-check-disable-next-line -- publish action with loading state
                     onClick={() => onConfirmPublish(page.pageId)}
                     disabled={publishing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
+                    loading={publishing}
+                    icon={publishing ? undefined : Upload}
+                    variant="primary"
+                    size="sm"
+                    className="rounded-[var(--radius-md)] bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                   >
                     {publishing ? (
-                      <><Icon as={Loader2} size="md" className="animate-spin" /> Publishing...</>
+                      'Publishing...'
                     ) : (
-                      <><Icon as={Upload} size="md" /> Publish to Webflow</>
+                      'Publish to Webflow'
                     )}
-                  </button>
+                  </Button>
                 )
               )}
               {isHomepage && (
@@ -348,29 +372,36 @@ export function SchemaPageCard({
                     <Icon as={CheckCircle} size="md" /> Template Saved
                   </span>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => onSaveAsTemplate(page.pageId)}
                     disabled={savingTemplate}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    loading={savingTemplate}
+                    icon={savingTemplate ? undefined : Save}
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-[var(--radius-md)] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
                     title="Save Organization + WebSite nodes as the site-wide template for subpages"
                   >
                     {savingTemplate ? (
-                      <><Icon as={Loader2} size="md" className="animate-spin" /> Saving...</>
+                      'Saving...'
                     ) : (
-                      <><Icon as={Save} size="md" /> Save as Site Template</>
+                      'Save as Site Template'
                     )}
-                  </button>
+                  </Button>
                 )
               )}
               {published && !retracted && (
-                <button
+                <Button
                   onClick={() => onRetract(page.pageId)}
                   disabled={retracting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
+                  loading={retracting}
+                  icon={retracting ? undefined : Trash2}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
                 >
-                  {retracting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Trash2} size="md" />}
                   Retract
-                </button>
+                </Button>
               )}
               {retracted && (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border border-[var(--brand-border)]/20">
@@ -396,16 +427,19 @@ export function SchemaPageCard({
                             ? ` · API payload ${manualDelivery.characterCount}/${manualDelivery.apiLimit} chars`
                             : ''}
                         </span>
-                        <button
+                        <Button
                           onClick={() => onCopyJsonLd(schema, page.pageId)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-amber-500/12 hover:bg-amber-500/18 text-amber-200 border border-amber-500/25 transition-colors"
+                          icon={copiedId === `${page.pageId}-${schema.type}-json` ? CheckCircle : Copy}
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-[var(--radius-md)] bg-amber-500/12 hover:bg-amber-500/18 text-amber-200 border border-amber-500/25"
                         >
                           {copiedId === `${page.pageId}-${schema.type}-json` ? (
-                            <><Icon as={CheckCircle} size="sm" /> JSON copied</>
+                            'JSON copied'
                           ) : (
-                            <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
+                            'Copy JSON-LD'
                           )}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -418,17 +452,21 @@ export function SchemaPageCard({
                   </span>
                 ) : (
                   <>
-                    <button
+                    <Button
                       onClick={() => onSendToClient(page, pageNote.trim() || undefined)}
                       disabled={sendingPage}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                      loading={sendingPage}
+                      icon={sendingPage ? undefined : Send}
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
                     >
                       {sendingPage ? (
-                        <><Icon as={Loader2} size="md" className="animate-spin" /> Sending...</>
+                        'Sending...'
                       ) : (
-                        <><Icon as={Send} size="md" /> Send to Client</>
+                        'Send to Client'
                       )}
-                    </button>
+                    </Button>
                     <textarea
                       value={pageNote}
                       onChange={e => setPageNote(e.target.value)}
@@ -442,19 +480,21 @@ export function SchemaPageCard({
                 )
               )}
               {/* Version History toggle */}
-              <button
+              <Button
                 onClick={() => setShowHistory(h => !h)}
+                icon={History}
+                variant="ghost"
+                size="sm"
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                  'rounded-[var(--radius-md)] font-medium',
                   showHistory
                     ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
                     : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                 )}
                 title="View publish version history"
               >
-                <Icon as={History} size="md" />
                 History
-              </button>
+              </Button>
             </div>
 
             {/* Stale schema warning */}

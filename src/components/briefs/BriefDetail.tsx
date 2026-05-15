@@ -4,7 +4,7 @@ import {
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
-import { Icon } from '../ui';
+import { Icon, Button, ClickableRow } from '../ui';
 import type { ContentBrief } from '../../../shared/types/content';
 
 interface BriefDetailProps {
@@ -45,35 +45,35 @@ export function BriefDetail({
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
         {!hideActions?.includes('generatePost') && (
-        <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+        <Button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
           <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
           {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
-        </button>
+        </Button>
         )}
-        <button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
+        <Button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
           {editingBrief === brief.id ? <><Icon as={Check} size="sm" /> Done Editing</> : <><Icon as={Pencil} size="sm" /> Edit Brief</>}
-        </button>
-        <button onClick={() => onCopyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+        </Button>
+        <Button onClick={() => onCopyAsMarkdown(brief)} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Icon as={Copy} size="sm" /> Copy for AI Tool
-        </button>
-        <button onClick={() => onExportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+        </Button>
+        <Button onClick={() => onExportClientHTML(brief)} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Icon as={Download} size="sm" /> Export PDF
-        </button>
+        </Button>
         {!hideActions?.includes('sendToClient') && (
-        <button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
+        <Button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
           <Icon as={sendingToClient === brief.id ? Loader2 : Send} size="sm" className={sendingToClient === brief.id ? 'animate-spin' : ''} />
           {sendingToClient === brief.id ? 'Sending...' : 'Send to Client'}
-        </button>
+        </Button>
         )}
-        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Copy} size="sm" /> Copy JSON
-        </button>
-        <button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
+        </Button>
+        <Button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
           showRegenerate ? 'bg-teal-600/20 border border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'
         }`}>
           <Icon as={RefreshCw} size="sm" className={regeneratingBrief === brief.id ? 'animate-spin' : ''} />
           {regeneratingBrief === brief.id ? 'Regenerating...' : 'Regenerate'}
-        </button>
+        </Button>
       </div>
 
       {/* Regenerate with feedback */}
@@ -88,13 +88,15 @@ export function BriefDetail({
             rows={2}
           />
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => { if (regenFeedback.trim()) { onRegenerate(brief.id, regenFeedback.trim()); setShowRegenerate(false); setRegenFeedback(''); } }}
               disabled={!regenFeedback.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
             >
               <Icon as={Send} size="sm" /> Regenerate Brief
-            </button>
+            </Button>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Creates a new brief — original is preserved</span>
           </div>
         </div>
@@ -125,17 +127,17 @@ export function BriefDetail({
             <div className="mt-1.5 space-y-1">
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.titleVariants.map((variant, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedTitle: variant,
                     titleVariants: [brief.suggestedTitle, ...brief.titleVariants!.filter((_, j) => j !== i)],
                   })}
-                  className="w-full text-left text-xs text-[var(--brand-text)] hover:text-teal-400 bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
+                  className="text-xs text-[var(--brand-text)] hover:text-teal-400 bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-teal-400">{variant}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2 group-hover:text-teal-500">click to use</span>
-                </button>
+                </ClickableRow>
               ))}
             </div>
           )}
@@ -151,17 +153,17 @@ export function BriefDetail({
             <div className="mt-1.5 space-y-1">
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.metaDescVariants.map((variant, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedMetaDesc: variant,
                     metaDescVariants: [brief.suggestedMetaDesc, ...brief.metaDescVariants!.filter((_, j) => j !== i)],
                   })}
-                  className="w-full text-left text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
+                  className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-[var(--brand-text-bright)]">{variant}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2 group-hover:text-teal-500">click to use</span>
-                </button>
+                </ClickableRow>
               ))}
             </div>
           )}
@@ -327,17 +329,19 @@ export function BriefDetail({
       {/* Content Outline */}
       {brief.outline.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2">
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Content Outline</div>
             {onRegenerateOutline && (
-              <button
+              <Button
                 onClick={() => setShowOutlineRegen(!showOutlineRegen)}
                 disabled={regeneratingOutline === brief.id}
-                className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm rounded-[var(--radius-sm)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
               >
                 <Icon as={regeneratingOutline === brief.id ? Loader2 : RefreshCw} size="sm" className={regeneratingOutline === brief.id ? 'animate-spin' : ''} />
                 {regeneratingOutline === brief.id ? 'Regenerating...' : 'Regenerate Outline'}
-              </button>
+              </Button>
             )}
           </div>
           {showOutlineRegen && onRegenerateOutline && (
@@ -350,19 +354,23 @@ export function BriefDetail({
                 rows={2}
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={() => { onRegenerateOutline(brief.id, outlineRegenFeedback.trim() || undefined); setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
                   disabled={regeneratingOutline === brief.id}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
                 >
                   Regenerate
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -490,12 +498,14 @@ export function BriefDetail({
       {/* Delete */}
       {!hideActions?.includes('delete') && (
       <div className="pt-3 border-t border-[var(--brand-border)] flex items-center justify-between">
-        <button
+        <Button
           onClick={() => onConfirmDelete(brief)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+          variant="ghost"
+          size="sm"
+          className="rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
         >
           <Icon as={Trash2} size="md" /> Delete Brief
-        </button>
+        </Button>
         <span className="t-caption-sm text-[var(--brand-text-muted)]/50">Created {new Date(brief.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
       </div>
       )}
