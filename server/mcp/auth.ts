@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { createLogger } from '../logger.js';
 
@@ -16,7 +17,12 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
     return;
   }
   const token = auth.slice(7);
-  if (token !== apiKey) {
+  const expected = Buffer.from(apiKey);
+  const provided = Buffer.from(token.padEnd(apiKey.length));
+  const valid = expected.length === provided.length &&
+    crypto.timingSafeEqual(expected, provided) &&
+    token.length === apiKey.length;
+  if (!valid) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

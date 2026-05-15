@@ -37,7 +37,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   log.debug({ tool: name }, 'MCP tool call');
 
-  const safeArgs = (args ?? {}) as Record<string, unknown>;
+  const safeArgs = args ?? {};
 
   if (workspaceTools.some(t => t.name === name)) {
     return handleWorkspaceTool(name, safeArgs);

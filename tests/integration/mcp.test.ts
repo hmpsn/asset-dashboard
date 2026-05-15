@@ -1,6 +1,6 @@
 /**
  * Integration tests for the MCP server.
- * Port: 13357
+ * Port: 13229
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
