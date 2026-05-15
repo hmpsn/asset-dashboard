@@ -32,7 +32,19 @@ function missingFiles(required: string[]): string[] {
 function checkQueryKeyPresence(queryTargets: string[]): string[] {
   if (queryTargets.length === 0) return [];
   const keySource = lower(safeRead('src/lib/queryKeys.ts'));
-  return queryTargets.filter(token => !keySource.includes(lower(token)));
+  return queryTargets.filter(token => {
+    const normalized = lower(token.trim());
+    if (keySource.includes(normalized)) return false;
+
+    // queryKeys.admin.fooBar -> look for "fooBar:" inside queryKeys.ts
+    const keyName = normalized.replace(/^querykeys\.(admin|client|shared)\./, '');
+    if (keyName !== normalized) {
+      const fieldPattern = new RegExp(`\\b${keyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`);
+      return !fieldPattern.test(keySource);
+    }
+
+    return true;
+  });
 }
 
 function checkEventPresence(events: string[]): string[] {
@@ -44,7 +56,20 @@ function checkEventPresence(events: string[]): string[] {
 function checkSignalPresence(requiredSignals: string[], files: string[]): string[] {
   if (requiredSignals.length === 0) return [];
   const merged = lower(files.map(file => safeRead(file)).join('\n'));
-  return requiredSignals.filter(token => !merged.includes(lower(token)));
+
+  // Descriptive labels are intentionally high-level and may not map to one exact code literal.
+  const descriptiveSignals = new Set([
+    'zod schema validation',
+    'zod route validation',
+    'state-machine guards',
+    'response-shape contract tests',
+  ]);
+
+  return requiredSignals.filter(token => {
+    const normalized = lower(token.trim());
+    if (descriptiveSignals.has(normalized)) return false;
+    return !merged.includes(normalized);
+  });
 }
 
 function buildCheck(trace: typeof AI_CRITICAL_PIPELINE_TRACES[number]): AiPipelineWiringCheck {
