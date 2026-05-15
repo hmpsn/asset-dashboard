@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 import { getDataDir } from './data-dir.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import { createLogger } from './logger.js';
 
 export type OperationTraceStatus = 'success' | 'error' | 'warning';
 
@@ -49,6 +51,7 @@ type ReadOptions = {
 };
 
 const OBSERVABILITY_DIR = getDataDir('platform-observability');
+const log = createLogger('platform-observability');
 
 const pending: {
   operations: OperationTraceEntry[];
@@ -86,8 +89,9 @@ function flushStream<K extends ObservabilityStream>(stream: K): void {
   const filePath = getStreamFilePath(stream);
   let existing: ObservabilityEntryByStream[K][] = [];
   try {
-    existing = JSON.parse(fs.readFileSync(filePath, 'utf8')) as ObservabilityEntryByStream[K][];
-  } catch {
+    existing = parseJsonFallback<ObservabilityEntryByStream[K][]>(fs.readFileSync(filePath, 'utf8'), []);
+  } catch (err) {
+    log.debug({ err, stream, filePath }, 'flushStream: initializing new observability file');
     existing = [];
   }
 
@@ -159,16 +163,20 @@ function loadStreamFromDisk<K extends ObservabilityStream>(
     const entries: ObservabilityEntryByStream[K][] = [];
     for (const file of files) {
       try {
-        const parsed = JSON.parse(fs.readFileSync(path.join(OBSERVABILITY_DIR, file), 'utf8'));
+        const parsed = parseJsonFallback<unknown[]>(
+          fs.readFileSync(path.join(OBSERVABILITY_DIR, file), 'utf8'),
+          [],
+        );
         if (Array.isArray(parsed)) {
           entries.push(...parsed as ObservabilityEntryByStream[K][]);
         }
-      } catch {
-        // Ignore malformed files.
+      } catch (err) {
+        log.debug({ err, stream, file }, 'loadStreamFromDisk: ignoring unreadable observability file');
       }
     }
     return entries;
-  } catch {
+  } catch (err) {
+    log.debug({ err, stream }, 'loadStreamFromDisk: directory missing or unreadable');
     return [];
   }
 }
