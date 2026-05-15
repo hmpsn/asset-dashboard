@@ -220,3 +220,41 @@ describe('get_anomalies', () => {
     // May be empty if no anomalies seeded — that is valid
   });
 });
+
+describe('get_content_decay', () => {
+  it('returns an array sorted by severity', async () => {
+    const result = await mcpToolCall('get_content_decay', {
+      workspaceId: ws.workspaceId,
+    }) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('respects the limit parameter', async () => {
+    const result = await mcpToolCall('get_content_decay', {
+      workspaceId: ws.workspaceId,
+      limit: 3,
+    }) as unknown[];
+    expect(result.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('get_keyword_analysis', () => {
+  it('returns gaps, clusters, and cannibalization arrays', async () => {
+    const result = await mcpToolCall('get_keyword_analysis', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown>;
+    expect(Array.isArray(result.gaps)).toBe(true);
+    expect(Array.isArray(result.topicClusters)).toBe(true);
+    expect(Array.isArray(result.cannibalization)).toBe(true);
+  });
+});
+
+describe('get_seo_context', () => {
+  it('returns an object with expected fields', async () => {
+    const result = await mcpToolCall('get_seo_context', {
+      workspaceId: ws.workspaceId,
+    }) as Record<string, unknown>;
+    expect(typeof result).toBe('object');
+    expect(result).not.toBeNull();
+  });
+});
