@@ -243,21 +243,22 @@ git commit -m "feat(mcp): install SDK and add bearer token auth middleware"
 ### Gotchas
 - The `/mcp` route must NOT be behind the APP_PASSWORD gate. Since it doesn't start with `/api`, the gate skips it automatically — no special handling needed.
 - `express.json()` is applied globally in app.ts (line ~189) before any routes, so the MCP request body will be parsed correctly.
-- Create a new `Server` + `StreamableHTTPServerTransport` per request (stateless mode). Do not share transport instances across requests.
+- **Singleton pattern (verified from SDK docs):** Create ONE `Server` + ONE `StreamableHTTPServerTransport` at module level. Call `server.connect(transport)` once. Each request calls `transport.handleRequest(req, res, req.body)` on the shared transport. Do NOT create new instances per request.
+- **Import paths (verified):** Use `@modelcontextprotocol/sdk/server`, `@modelcontextprotocol/sdk/server/streamableHttp`, `@modelcontextprotocol/sdk/types` — no `.js` extension on npm package sub-paths (project uses `moduleResolution: "bundler"`).
 
 ---
 
-- [ ] **Step 2.1 — Create the MCP server factory**
+- [ ] **Step 2.1 — Create the MCP server module**
 
 Create `server/mcp/server.ts`:
 
 ```typescript
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { Server } from '@modelcontextprotocol/sdk/server';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/sdk/types';
 import type { Request, Response } from 'express';
 import { createLogger } from '../logger.js';
 import { workspaceTools, handleWorkspaceTool } from './tools/workspaces.js';
@@ -276,54 +277,56 @@ const ALL_TOOLS = [
   ...clientTools,
 ];
 
-function buildMcpServer(): Server {
-  const server = new Server(
-    { name: 'hmpsn-studio', version: '1.0.0' },
-    { capabilities: { tools: {} } },
-  );
+// Singleton: one server + one transport for the application lifetime.
+// Each request calls transport.handleRequest() on the shared transport.
+const mcpServer = new Server(
+  { name: 'hmpsn-studio', version: '1.0.0' },
+  { capabilities: { tools: {} } },
+);
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ALL_TOOLS,
-  }));
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: ALL_TOOLS,
+}));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    log.debug({ tool: name }, 'MCP tool call');
+mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  log.debug({ tool: name }, 'MCP tool call');
 
-    const safeArgs = (args ?? {}) as Record<string, unknown>;
+  const safeArgs = (args ?? {}) as Record<string, unknown>;
 
-    if (workspaceTools.some(t => t.name === name)) {
-      return handleWorkspaceTool(name, safeArgs);
-    }
-    if (intelligenceTools.some(t => t.name === name)) {
-      return handleIntelligenceTool(name, safeArgs);
-    }
-    if (insightTools.some(t => t.name === name)) {
-      return handleInsightTool(name, safeArgs);
-    }
-    if (contentTools.some(t => t.name === name)) {
-      return handleContentTool(name, safeArgs);
-    }
-    if (clientTools.some(t => t.name === name)) {
-      return handleClientTool(name, safeArgs);
-    }
+  if (workspaceTools.some(t => t.name === name)) {
+    return handleWorkspaceTool(name, safeArgs);
+  }
+  if (intelligenceTools.some(t => t.name === name)) {
+    return handleIntelligenceTool(name, safeArgs);
+  }
+  if (insightTools.some(t => t.name === name)) {
+    return handleInsightTool(name, safeArgs);
+  }
+  if (contentTools.some(t => t.name === name)) {
+    return handleContentTool(name, safeArgs);
+  }
+  if (clientTools.some(t => t.name === name)) {
+    return handleClientTool(name, safeArgs);
+  }
 
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
-    };
-  });
+  return {
+    isError: true,
+    content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+  };
+});
 
-  return server;
-}
+const mcpTransport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined, // stateless — no session tracking
+});
+
+// Wire server to transport once at startup
+mcpServer.connect(mcpTransport).catch((err) => {
+  log.error({ err }, 'Failed to connect MCP server to transport');
+});
 
 export async function handleMcpRequest(req: Request, res: Response): Promise<void> {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless
-  });
-  const server = buildMcpServer();
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body as unknown);
+  await mcpTransport.handleRequest(req, res, req.body as unknown);
 }
 ```
 
