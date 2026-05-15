@@ -22,6 +22,7 @@ import type {
   ReferringDomain,
 } from '../seo-data-provider.js';
 import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
+import { fetchExternalJson, isExternalFetchError } from '../external-fetch.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -221,22 +222,29 @@ interface DataForSeoResponse {
 }
 
 async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoResponse> {
-  const res = await fetch(`https://api.dataforseo.com/v3/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': authHeader(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 402 || text.includes('balance')) markCreditsExhausted();
-    throw new Error(`DataForSEO ${endpoint} HTTP ${res.status}: ${text.slice(0, 300)}`);
+  let json: DataForSeoResponse;
+  try {
+    json = await fetchExternalJson<DataForSeoResponse>({
+      url: `https://api.dataforseo.com/v3/${endpoint}`,
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      timeoutMs: 20_000,
+      redirect: 'follow',
+      logContext: { module: 'dataforseo', endpoint },
+    });
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      if (err.kind === 'http' && err.status === 402) markCreditsExhausted();
+      const snippet = err.responseBodySnippet || '';
+      if (snippet.includes('balance')) markCreditsExhausted();
+      throw new Error(`DataForSEO ${endpoint} ${err.kind}${err.status ? ` ${err.status}` : ''}: ${snippet || err.message}`);
+    }
+    throw err;
   }
-
-  const json = await res.json() as DataForSeoResponse;
 
   // Check task-level errors
   const task = json.tasks?.[0];
