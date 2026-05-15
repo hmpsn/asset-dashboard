@@ -183,8 +183,9 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Choose one bounded context, preferably Schema or Inbox, and move business logic out of route files into server/domains/<domain>/ while preserving all existing URLs, response shapes, broadcasts, activity logs, and tests. Treat this as a proof of the organization pattern before expanding it."
+          "status": "done",
+          "notes": "Choose one bounded context, preferably Schema or Inbox, and move business logic out of route files into server/domains/<domain>/ while preserving all existing URLs, response shapes, broadcasts, activity logs, and tests. Treat this as a proof of the organization pattern before expanding it.\nShipped 2026-05-15: completed an Inbox route-to-service extraction pilot by introducing `server/domains/inbox/client-actions-mutations.ts` and delegating admin create/update + public respond mutation orchestration from `server/routes/client-actions.ts` into the domain module while preserving route URLs, response shapes, activity logging, broadcasts, and side effects (email + playbook enqueue). Also promoted `runWorkspaceMutation` helper ownership to `server/workspace-mutation-helper.ts` (with route shim compatibility) and refreshed the mutation-helper adoption contract to enforce helper usage on the extracted inbox domain module. Added extraction contract coverage (`tests/contract/inbox-route-service-extraction.test.ts`) plus targeted route/integration verification for behavior parity.",
+          "shippedAt": "2026-05-15"
         }
       ]
     },

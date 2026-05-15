@@ -14,7 +14,7 @@ describe('workspace mutation helper adoption contract', () => {
     const routeFiles: Array<{ file: string; minCalls: number }> = [
       { file: 'server/routes/content-templates.ts', minCalls: 4 },
       { file: 'server/routes/content-matrices.ts', minCalls: 4 },
-      { file: 'server/routes/client-actions.ts', minCalls: 3 },
+      { file: 'server/domains/inbox/client-actions-mutations.ts', minCalls: 3 },
     ];
     for (const { file, minCalls } of routeFiles) {
       const source = readRoute(file);

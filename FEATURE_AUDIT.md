@@ -5590,3 +5590,16 @@ Bug hardening included:
 **Mutual:** Adds regression guardrails in contract/unit coverage for unified approval panel wiring and resolver fallback behavior.
 
 **Files:** `src/components/SeoEditorWrapper.tsx`; `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorWorkflowPanels.tsx`; `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorShellPanels.tsx`; `src/components/cms-editor/CmsEditorCollections.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `tests/contract/seo-editor-unified-flag-gate.test.ts`; `tests/unit/seo-write-target-resolver.test.ts`; `data/roadmap.json`.
+
+---
+
+### 412. Platform Org Extraction Pilot (Inbox Route-to-Service)
+**What it does:** Delivers the platform-organization proof by extracting client-actions mutation orchestration out of the HTTP adapter route and into an Inbox domain module. `server/routes/client-actions.ts` now delegates admin create/update and public respond mutations to `server/domains/inbox/client-actions-mutations.ts`, preserving existing URLs, response serialization, side effects, and mutation error semantics. The shared mutation lifecycle helper ownership is promoted to `server/workspace-mutation-helper.ts`, while `server/routes/workspace-mutation-helper.ts` remains a compatibility shim export.
+
+**Agency value:** Creates a repeatable route-to-service extraction pattern for bounded-context ownership without changing external contracts.
+
+**Client value:** No client contract change; inbox mutation behavior remains stable while reducing regression risk in high-churn mutation paths.
+
+**Mutual:** Adds extraction guardrails so future edits keep route handlers thin and domain-owned mutation logic centralized.
+
+**Files:** `server/domains/inbox/client-actions-mutations.ts`; `server/routes/client-actions.ts`; `server/workspace-mutation-helper.ts`; `server/routes/workspace-mutation-helper.ts`; `server/routes/content-matrices.ts`; `server/routes/content-templates.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/contract/inbox-route-service-extraction.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.
