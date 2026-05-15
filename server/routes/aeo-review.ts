@@ -187,6 +187,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
           const pageKey = normalizePageUrl(page.path);
           pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(pageKey) || [] });
         }
+        // url-fetch-ok: per-page fetch may timeout or fail; skipping unreachable pages is intentional.
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'aeo-review/aeoIssueCount: programming error'); /* skip unreachable / timed-out pages */ }
     }));
 

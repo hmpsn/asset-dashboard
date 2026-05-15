@@ -16,7 +16,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export function Badge({ label, color = 'zinc', className }: BadgeProps) {
   return (
-    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${BADGE_COLORS[color] ?? BADGE_COLORS.zinc} ${className ?? ''}`}>{/* arbitrary-text-ok — Badge owns this size */}
+    <span className={`t-label normal-case tracking-normal px-1.5 py-0.5 rounded font-medium ${BADGE_COLORS[color] ?? BADGE_COLORS.zinc} ${className ?? ''}`}>
       {label}
     </span>
   );

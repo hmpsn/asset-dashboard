@@ -7,6 +7,7 @@ import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
 import { getOptional, getSafe } from '../../api/client';
+import { normalizePageUrl } from '../../lib/pathUtils';
 
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
@@ -88,7 +89,7 @@ function buildFixCategories(audit: AuditDetail, traffic: TrafficMap): FixCategor
   let manualIssues = 0;
 
   for (const page of audit.audit.pages) {
-    const slug = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
+    const slug = normalizePageUrl(page.slug);
     const t = traffic[slug] || { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
 
     for (const issue of page.issues) {
@@ -286,7 +287,7 @@ function buildCategoriesFromServer(recs: ServerRecommendation[]): FixCategory[] 
 
     const pages: AffectedPage[] = [...pageSet].map(slug => ({
       name: slug.replace(/^\//, '') || 'Home',
-      slug: slug.startsWith('/') ? slug : `/${slug}`,
+      slug: normalizePageUrl(slug),
       clicks: 0, impressions: 0, pageviews: 0, issueCount: 1, topIssue: '',
     }));
 

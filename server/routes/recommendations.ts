@@ -14,6 +14,7 @@ import {
 } from '../recommendations.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
+import { normalizePageUrl } from '../helpers.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
@@ -67,9 +68,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
       const snapshot = getLatestSnapshot(ws.webflowSiteId);
       if (snapshot) {
         for (const page of snapshot.audit.pages) {
-          const slug = page.slug.replace(/^\//, '');
-          slugToPageId.set(slug, page.pageId);
-          slugToPageId.set(`/${slug}`, page.pageId);
+          slugToPageId.set(normalizePageUrl(page.slug), page.pageId);
         }
       }
     }
@@ -79,14 +78,15 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
     if (allRecs) {
       for (const r of allRecs.recommendations) {
         if (r.id !== rec.id && r.status !== 'completed' && r.status !== 'dismissed') {
-          for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+          for (const p of r.affectedPages) pagesWithActiveRecs.add(normalizePageUrl(p));
         }
       }
     }
     for (const pageSlug of rec.affectedPages) {
-      if (pagesWithActiveRecs.has(pageSlug)) continue;
-      const resolvedPageId = slugToPageId.get(pageSlug)
-        ?? getPageIdBySlug(workspaceId, pageSlug)
+      const normalizedPageSlug = normalizePageUrl(pageSlug);
+      if (pagesWithActiveRecs.has(normalizedPageSlug)) continue;
+      const resolvedPageId = slugToPageId.get(normalizedPageSlug)
+        ?? getPageIdBySlug(workspaceId, normalizedPageSlug)
         ?? pageSlug;
       updatePageState(workspaceId, resolvedPageId, {
         status: 'live',

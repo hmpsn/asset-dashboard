@@ -1,6 +1,7 @@
 import { AlertTriangle, Copy, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import type { RefObject } from 'react';
 import { Icon } from '../ui';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import type { PageData } from './pageRewriteChatModel';
 
 type ExportMode = 'copy' | 'download' | 'docx';
@@ -79,7 +80,7 @@ export function PageRewriteDocumentPane({
               rel="noopener noreferrer"
               className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-accent-brand transition-colors flex-1 min-w-0"
             >
-              <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+              <span className="truncate">{pageData.slug ? normalizePageUrl(pageData.slug) : pageUrl}</span>
               <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
             </a>
             <div className="relative flex-shrink-0" ref={exportPopoverRef}>

@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { SCHEMA_ROLE_PRIMARY_TYPE, type SchemaSitePlan, type CanonicalEntity, type PageRoleAssignment, type SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callAI } from './ai.js';
-import { resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
+import { normalizePageUrl, resolvePagePath, findPageMapEntry, findPageMapEntryForPage } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
@@ -74,8 +74,7 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     pageList = pages.map((p) => {
       const pagePath = resolvePagePath(p);
       const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
-      // findPageMapEntryForPage handles the pre-hardening legacy format:
-      // entries stored as `/${slug}` for pages whose resolved path is `/parent/${slug}`.
+      // findPageMapEntryForPage handles legacy slug-only pageMap keys for nested paths.
       const strategyMatch = strategy?.pageMap ? findPageMapEntryForPage<PageKeywordMap>(strategy.pageMap, p) : undefined;
 
       return {
@@ -206,7 +205,7 @@ async function aiGeneratePlan(
       // Detect collection prefix: 2+ pages sharing the same first path segment
       const segments = p.path.split('/').filter(Boolean);
       if (segments.length >= 2) {
-        const prefix = `/${segments[0]}`;
+        const prefix = normalizePageUrl(segments[0]);
         if (!collections.has(prefix)) collections.set(prefix, []);
         collections.get(prefix)!.push(p);
       } else {

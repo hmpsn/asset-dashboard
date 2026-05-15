@@ -485,7 +485,7 @@ ${JSON.stringify(context, null, 2)}`;
       const session = getChatSession(ws.id, sessionId);
       // Log first exchange to activity log so agency sees what clients ask
       if (session && session.messages.length === 2) {
-        addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`);
+        addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`); // client-visibility-ok: admin activity signal; intentionally not shown in client-visible activity feed
         incrementUsage(ws.id, 'ai_chats');
       }
       // Auto-summarize after 6+ messages
@@ -519,7 +519,7 @@ ${JSON.stringify(context, null, 2)}`;
             triggerMessage: question.trim().slice(0, 500),
           });
           broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
-          addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
+          addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80)); // client-visibility-ok: internal ops signal for agency follow-up, not client feed content
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
       }

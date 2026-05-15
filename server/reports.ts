@@ -412,6 +412,7 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
 
     return null;
   } catch (err) {
+    // url-fetch-ok: remote site fetch/HTML parsing failures are expected; returning null is intentional degradation.
     if (isProgrammingError(err)) log.warn({ err }, 'reports/extractSiteLogo: programming error');
     return null;
   }

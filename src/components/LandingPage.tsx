@@ -142,7 +142,7 @@ function Problem() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {problems.map((p, i) => (
-            <div key={i} className="border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-6 hover:border-[var(--brand-border-hover)] transition-colors" style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
+            <div key={i} className="border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-6 hover:border-[var(--brand-border-hover)] transition-colors rounded-[var(--radius-signature)]">
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-red-500/8 border border-red-500/20 flex items-center justify-center mb-4">
                 <p.icon className="w-5 h-5 text-red-400/80" />
               </div>
@@ -209,7 +209,7 @@ function Solution() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pillars.map((p, i) => (
-            <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-[var(--surface-2)]/50 p-6 relative overflow-hidden`} style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
+            <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-[var(--surface-2)]/50 p-6 relative overflow-hidden rounded-[var(--radius-signature)]`}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-[var(--radius-pill)] bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
                 <div className={`w-10 h-10 rounded-[var(--radius-xl)] ${p.iconBg} flex items-center justify-center mb-4`}>
@@ -357,7 +357,7 @@ function Pricing() {
           {plans.map(plan => (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-6 transition-all ${plan.highlighted ? 'bg-teal-500/[0.03] border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] text-[10px] /* arbitrary-text-ok */ font-semibold uppercase tracking-wider bg-teal-500/20 border border-teal-500/30 text-teal-300">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] t-label font-semibold bg-teal-500/20 border border-teal-500/30 text-teal-300">
                   Most Popular
                 </div>
               )}

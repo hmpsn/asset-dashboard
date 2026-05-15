@@ -15,7 +15,7 @@ import {
 } from '../content-requests.js';
 import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
-import { sanitizeString, validateEnum } from '../helpers.js';
+import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
@@ -446,8 +446,8 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     if (siteBase.startsWith('sc-domain:')) {
       siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
     }
-    const slug = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
-    const pageUrl = `${siteBase}${slug}`;
+    const pagePath = normalizePageUrl(request.targetPageSlug);
+    const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
 
     const publishDate = request.updatedAt || request.requestedAt;
     const startDate = publishDate.split('T')[0];
@@ -478,11 +478,9 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
   if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
       const qpData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-      const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
+      const normalizedPageSlug = normalizePageUrl(pageSlug);
       topKeywords = qpData
-        .filter(r => {
-          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch (err) { return false; }
-        })
+        .filter(r => normalizePageUrl(r.page) === normalizedPageSlug)
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)
         .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));

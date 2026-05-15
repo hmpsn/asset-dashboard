@@ -49,6 +49,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Reset state when workspace changes
+  // effect-layout-ok — workspace-change reset is intentional post-prop sync, not derived layout state.
   useEffect(() => {
     setMessages([]);
     setInput('');

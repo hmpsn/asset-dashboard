@@ -546,7 +546,7 @@ export function getPageIdBySlug(workspaceId: string, slug: string): string | und
   }
   // Try with leading slash added
   if (!slug.startsWith('/')) {
-    const withSlash = `/${slug}`;
+    const withSlash = slug.replace(/^\/?/, '/');
     const row3 = stmts().getPageIdBySlug.get(workspaceId, withSlash) as { page_id: string } | undefined;
     if (row3) return row3.page_id;
   }
