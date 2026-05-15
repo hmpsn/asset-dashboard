@@ -30,7 +30,9 @@ import {
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
 
-const HEDGES = /\b(potentially|could|may|appears to|suggests|might|seems)\b/i;
+const HEDGES = /\b(potentially|could|appears to|suggests|might|seems)\b/i;
+const MAY_HEDGE = /\bmay\b/i;
+const MONTH_DAY = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}\b/g;
 const ctx = { workspaceId: 'ws_test', tier: 'growth' as const };
 
 function baseInsight<T extends string>(type: T, overrides: Record<string, unknown> = {}) {
@@ -62,8 +64,11 @@ function expectStoryShape(story: ReturnType<typeof rankingMover> | null) {
   expect(story.narrative).toMatch(/\d/);
   expect(story.narrative).not.toMatch(HEDGES);
   expect(story.headline).not.toMatch(HEDGES);
+  expect(story.narrative.replace(MONTH_DAY, '')).not.toMatch(MAY_HEDGE);
+  expect(story.headline.replace(MONTH_DAY, '')).not.toMatch(MAY_HEDGE);
   expect(story.dataReceipt).toBeTruthy();
   expect(story.dataReceipt!).not.toMatch(HEDGES);
+  expect(story.dataReceipt!.replace(MONTH_DAY, '')).not.toMatch(MAY_HEDGE);
   // Enum / discriminated fields
   expect(VALID_CATEGORIES).toContain(story.category);
   expect(VALID_DRILL_PAGES).toContain(story.drillIn.page);
