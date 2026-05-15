@@ -164,8 +164,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "2-4h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Improve first-hour confidence for humans and agents: one command to seed demo data, one command to run core smoke tests, documented env tiers, fake provider mode, fixture workspaces, and a concise local setup checklist."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 local onboarding confidence baseline. Added deterministic local fake-provider mode (`LOCAL_FAKE_PROVIDERS=true`) for SEO providers plus synthetic AI responses in OpenAI/Anthropic helpers so first-hour setup works without external keys. Added one-command demo workspace seeding (`npm run seed:demo`, script: `scripts/seed-demo-workspaces.ts`) and one-command core smoke bundle (`npm run smoke:core`). Documented onboarding workflow + environment tiers in `docs/workflows/local-dev-onboarding.md`, linked from codebase overview, and added unit coverage for local mode + fake provider contracts."
         },
         {
           "id": "platform-org-recurring-health-sprint",

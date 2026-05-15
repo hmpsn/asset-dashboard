@@ -13,6 +13,7 @@ This document is a quick orientation guide. For ownership and implementation pla
 - `docs/testing/platform-domain-smoke-matrix.md` — fast smoke signal per bounded context.
 - `docs/testing/critical-domain-coverage-baseline.md` — current critical-domain coverage baseline.
 - `docs/workflows/feature-class-definition-of-done.md` — completion gates by feature class.
+- `docs/workflows/local-dev-onboarding.md` — first-hour setup, demo seeding, smoke commands, and env tiers.
 
 ## Current Shape
 
