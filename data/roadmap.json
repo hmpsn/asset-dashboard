@@ -113,8 +113,9 @@
           "source": "Product engineering platform-health review 2026-05-13",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Review major platform capabilities through a product-surface lens: first-class navigation, context-triggered surfaces, internal-only tools, client-facing differentiators, monetizable capabilities, deprecated-but-present areas, and candidates for progressive disclosure. Goal: reduce cognitive load without deleting valuable capability."
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped Wave 5 product-surface governance baseline. Added typed capability map + report script (`scripts/product-surface-map.ts`) with placement/role/lifecycle/recommendation taxonomy, canonical bounded-context coverage checks, and explicit human-verification queue for non-obvious nav/deprecation decisions. Added test coverage in `tests/unit/product-surface-map.test.ts` and rule doc `docs/rules/product-surface-rationalization.md` that codifies manual approval gates. Added `npm run verify:product-surface` command and documented the capability in FEATURE_AUDIT entry 418."
         },
         {
           "id": "platform-confidence-feature-flag-lifecycle",

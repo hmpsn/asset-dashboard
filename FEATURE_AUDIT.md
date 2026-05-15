@@ -5668,3 +5668,16 @@ Bug hardening included:
 **Mutual:** Strengthens runtime security posture with test-backed audit logic that can fail fast on contract breaks while keeping advisory warnings explicit.
 
 **Files:** `scripts/platform-tenant-boundary-audit.ts`; `scripts/report-tenant-boundary-audit.ts`; `tests/unit/platform-tenant-boundary-audit.test.ts`; `docs/workflows/tenant-boundary-audit.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 418. Product Surface Rationalization Map (Wave 5)
+**What it does:** Adds a typed, repeatable product-surface governance map for major platform capabilities. New script `npm run verify:product-surface` (`scripts/product-surface-map.ts`) classifies major capabilities by placement (first-class navigation vs contextual vs progressive-disclosure vs internal-only), role (client differentiator vs agency operations vs support/infrastructure), lifecycle state (active, dark-launch, deprecated-but-present, legacy alias), and recommendation (promote/keep/hide/deprecate). It enforces canonical bounded-context coverage and emits a human-verification queue for non-obvious decisions (e.g., nav demotions and legacy alias retirement). Companion rule doc `docs/rules/product-surface-rationalization.md` codifies when humans must explicitly approve a surface decision.
+
+**Agency value:** Reduces dashboard sprawl and decision ambiguity by turning "what belongs in primary nav" into a documented, test-covered contract instead of opinion drift.
+
+**Client value:** Keeps client-facing workflows easier to discover by protecting first-class outcome surfaces while progressively disclosing operator-only tooling.
+
+**Mutual:** Creates a stable base for recurring platform-health cadences and future deprecation/flag lifecycle work without forcing immediate route removals.
+
+**Files:** `scripts/product-surface-map.ts`; `tests/unit/product-surface-map.test.ts`; `docs/rules/product-surface-rationalization.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
