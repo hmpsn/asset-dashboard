@@ -5655,3 +5655,16 @@ Bug hardening included:
 **Mutual:** Improves operational confidence without changing product UI by making release quality controls repeatable, auditable, and tied to shipped roadmap work.
 
 **Files:** `scripts/platform-release-safety.ts`; `scripts/report-release-safety.ts`; `tests/unit/platform-release-safety.test.ts`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 417. Recurring Permission & Tenant Boundary Audit
+**What it does:** Adds a recurring tenant-boundary audit command that inspects high-risk permission surfaces and reports pass/warn/fail findings. New script `npm run verify:tenant-boundary` (`scripts/platform-tenant-boundary-audit.ts`) audits workspace-scoped route guard coverage, file-upload middleware protection, Stripe webhook raw-body/signature trust boundaries, public-portal serialization hygiene, known foreign-ID regression test coverage, and client-user mutation `expectedWorkspaceId` assertion contracts. Companion wrapper `scripts/report-tenant-boundary-audit.ts` and workflow guide `docs/workflows/tenant-boundary-audit.md` make the audit easy to run in weekly platform-health sweeps and pre-release gates.
+
+**Agency value:** Gives operators a repeatable, concrete tenant-isolation safety check instead of relying on memory and ad hoc grep reviews.
+
+**Client value:** Reduces risk of cross-workspace data leaks or mutation regressions by keeping boundary checks continuously visible and actionable.
+
+**Mutual:** Strengthens runtime security posture with test-backed audit logic that can fail fast on contract breaks while keeping advisory warnings explicit.
+
+**Files:** `scripts/platform-tenant-boundary-audit.ts`; `scripts/report-tenant-boundary-audit.ts`; `tests/unit/platform-tenant-boundary-audit.test.ts`; `docs/workflows/tenant-boundary-audit.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

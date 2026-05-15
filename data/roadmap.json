@@ -102,72 +102,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave4-runtime-operability",
-      "name": "Platform Health Wave 4 — Runtime & Operational Confidence",
-      "hours": "18-30",
-      "rationale": "Improve runtime confidence: know when integrations fail, evaluate AI quality, recover data safely, observe operations, and protect tenant boundaries.",
-      "items": [
-        {
-          "id": "platform-reliability-integration-health-center",
-          "title": "Integration Health Center",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "4-7h",
-          "priority": "P0",
-          "status": "done",
-          "shippedAt": "2026-05-15",
-          "notes": "Shipped 2026-05-15: added a typed workspace-scoped Integration Health Center contract (`shared/types/integration-health.ts`), backend aggregator endpoint (`GET /api/integrations/health/:workspaceId`) in `server/routes/health.ts`, and frontend Connections-tab surface with React Query wiring (`useIntegrationHealth`, `queryKeys.admin.integrationHealth`). Health cards now report configured/missing/degraded state for Webflow, Google auth, GSC, GA4, SEMRush, DataForSEO, Stripe, OpenAI, Anthropic, and SMTP, including quota-status placeholders, token expiry visibility for Google auth, and affected feature mapping. Added integration endpoint coverage (`tests/integration/health-routes.test.ts`) and hook coverage (`tests/component/useIntegrationHealth.test.tsx`)."
-        },
-        {
-          "id": "platform-reliability-ai-evals",
-          "title": "AI Reliability & Evaluation Harness",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "5-8h",
-          "priority": "P0",
-          "status": "done",
-          "notes": "Shipped Wave 4 AI reliability closeout: added shared reliability contracts (`shared/types/ai-reliability.ts`), canonical trace/scenario registry (`scripts/ai-reliability-registry.ts`), reliability report (`scripts/report-ai-reliability.ts`, markdown + `--json` + `--soft-gate`), pipeline wiring advisory report (`scripts/report-ai-pipeline-wiring.ts`), trace-map docs (`docs/testing/ai-reliability-pipeline-trace-map.md`), and new contract/unit/integration coverage (`tests/contract/ai-pipeline-trace-map.test.ts`, `tests/unit/ai-reliability-harness.test.ts`, `tests/integration/ai-critical-domain-reliability.test.ts`). Coverage now traces schema, content brief/review, SEO assist, client decision support, diagnostics, admin chat, client search chat, and brand/voice provenance-sensitive paths."
-        },
-        {
-          "id": "platform-reliability-data-integrity-recovery",
-          "title": "Data Integrity & Recovery Drills",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "4-6h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Shipped 2026-05-15: added repeatable data integrity and recovery tooling (npm run verify:data-integrity) with SQLite quick/integrity checks, foreign-key violation reporting, workspace-orphan detection across workspace-scoped tables, explicit cross-table consistency checks, and a canonical artifact preserve-vs-rebuild map. Added recovery runbook notes covering backup/restore drills and restore-based migration rollback flow, plus unit coverage for healthy and corrupted database scenarios.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-reliability-observability-layer",
-          "title": "Observability as Product Infrastructure",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Shipped 2026-05-15: added platform observability telemetry capture for operation traces, slow-route tracking, AI outcomes, external provider outcomes (SEMRush/DataForSEO), and job lifecycle traces. Added typed workspace observability contracts and report builder in shared and server modules, workspace-scoped API endpoint /api/observability/:workspaceId, and a CLI report via npm run verify:observability. The report covers failed jobs, external API failure rates and latency, AI cost and latency by feature, slow-route leaderboards, and critical sync last-success timestamps. Added workflow docs and integration coverage for the endpoint.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-reliability-release-safety",
-          "title": "Release Safety Checklist & Smoke Flow",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Shipped 2026-05-15: added a practical release-safety workflow with roadmap-derived deploy notes and a repeatable checklist/report script (`npm run verify:release-safety`) covering feature-class release gates, staging smoke suite, rollback readiness, feature-flag rollout, and a post-release monitoring window. Added companion workflow documentation (`docs/workflows/release-safety.md`) with concrete command paths for health/smoke verification and release execution.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-reliability-tenant-boundary-audit",
-          "title": "Recurring Permission & Tenant Boundary Audit",
-          "source": "Product engineering platform-health review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Run a recurring audit over workspace scoping, client/admin route separation, public serialization, file upload access, billing/webhook trust boundaries, and known-foreign-ID tests. Focus on high-risk surfaces where a workspace A caller could infer or mutate workspace B data."
-        }
-      ]
-    },
-    {
       "id": "sprint-platform-health-wave5-product-lifecycle-discipline",
       "name": "Platform Health Wave 5 — Product & Lifecycle Discipline",
       "hours": "14-24",
@@ -1162,6 +1096,74 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave4-runtime-operability",
+      "name": "✅ SHIPPED — Platform Health Wave 4 — Runtime & Operational Confidence",
+      "hours": "18-30",
+      "rationale": "Improve runtime confidence: know when integrations fail, evaluate AI quality, recover data safely, observe operations, and protect tenant boundaries.",
+      "items": [
+        {
+          "id": "platform-reliability-integration-health-center",
+          "title": "Integration Health Center",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-7h",
+          "priority": "P0",
+          "status": "done",
+          "shippedAt": "2026-05-15",
+          "notes": "Shipped 2026-05-15: added a typed workspace-scoped Integration Health Center contract (`shared/types/integration-health.ts`), backend aggregator endpoint (`GET /api/integrations/health/:workspaceId`) in `server/routes/health.ts`, and frontend Connections-tab surface with React Query wiring (`useIntegrationHealth`, `queryKeys.admin.integrationHealth`). Health cards now report configured/missing/degraded state for Webflow, Google auth, GSC, GA4, SEMRush, DataForSEO, Stripe, OpenAI, Anthropic, and SMTP, including quota-status placeholders, token expiry visibility for Google auth, and affected feature mapping. Added integration endpoint coverage (`tests/integration/health-routes.test.ts`) and hook coverage (`tests/component/useIntegrationHealth.test.tsx`)."
+        },
+        {
+          "id": "platform-reliability-ai-evals",
+          "title": "AI Reliability & Evaluation Harness",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "5-8h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Shipped Wave 4 AI reliability closeout: added shared reliability contracts (`shared/types/ai-reliability.ts`), canonical trace/scenario registry (`scripts/ai-reliability-registry.ts`), reliability report (`scripts/report-ai-reliability.ts`, markdown + `--json` + `--soft-gate`), pipeline wiring advisory report (`scripts/report-ai-pipeline-wiring.ts`), trace-map docs (`docs/testing/ai-reliability-pipeline-trace-map.md`), and new contract/unit/integration coverage (`tests/contract/ai-pipeline-trace-map.test.ts`, `tests/unit/ai-reliability-harness.test.ts`, `tests/integration/ai-critical-domain-reliability.test.ts`). Coverage now traces schema, content brief/review, SEO assist, client decision support, diagnostics, admin chat, client search chat, and brand/voice provenance-sensitive paths."
+        },
+        {
+          "id": "platform-reliability-data-integrity-recovery",
+          "title": "Data Integrity & Recovery Drills",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added repeatable data integrity and recovery tooling (npm run verify:data-integrity) with SQLite quick/integrity checks, foreign-key violation reporting, workspace-orphan detection across workspace-scoped tables, explicit cross-table consistency checks, and a canonical artifact preserve-vs-rebuild map. Added recovery runbook notes covering backup/restore drills and restore-based migration rollback flow, plus unit coverage for healthy and corrupted database scenarios.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-reliability-observability-layer",
+          "title": "Observability as Product Infrastructure",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added platform observability telemetry capture for operation traces, slow-route tracking, AI outcomes, external provider outcomes (SEMRush/DataForSEO), and job lifecycle traces. Added typed workspace observability contracts and report builder in shared and server modules, workspace-scoped API endpoint /api/observability/:workspaceId, and a CLI report via npm run verify:observability. The report covers failed jobs, external API failure rates and latency, AI cost and latency by feature, slow-route leaderboards, and critical sync last-success timestamps. Added workflow docs and integration coverage for the endpoint.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-reliability-release-safety",
+          "title": "Release Safety Checklist & Smoke Flow",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-15: added a practical release-safety workflow with roadmap-derived deploy notes and a repeatable checklist/report script (`npm run verify:release-safety`) covering feature-class release gates, staging smoke suite, rollback readiness, feature-flag rollout, and a post-release monitoring window. Added companion workflow documentation (`docs/workflows/release-safety.md`) with concrete command paths for health/smoke verification and release execution.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-reliability-tenant-boundary-audit",
+          "title": "Recurring Permission & Tenant Boundary Audit",
+          "source": "Product engineering platform-health review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-15: Added recurring tenant-boundary audit CLI with fail/warn/pass findings across workspace route guards, upload protection, Stripe webhook trust boundary, public serialization hygiene, known foreign-ID regression coverage, and client-user workspace assertion contracts. Added report wrapper, workflow doc, package scripts, and unit tests.",
+          "shippedAt": "2026-05-15"
+        }
+      ],
+      "shippedAt": "2026-05-15"
     },
     {
       "id": "sprint-platform-health-wave3-silent-failure-rails",

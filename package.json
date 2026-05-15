@@ -33,7 +33,9 @@
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
     "prepare": "husky",
     "verify:release-safety": "tsx scripts/platform-release-safety.ts",
-    "report:release-safety": "tsx scripts/report-release-safety.ts"
+    "report:release-safety": "tsx scripts/report-release-safety.ts",
+    "verify:tenant-boundary": "tsx scripts/platform-tenant-boundary-audit.ts",
+    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
