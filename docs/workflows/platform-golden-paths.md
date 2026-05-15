@@ -45,6 +45,7 @@ Use for admin-only create/update/delete flows such as settings editors, internal
 **Activity logging**
 - Call `addActivity()` for meaningful create/update/delete actions.
 - Delete flows must read before delete so the log and broadcast payload have stable context.
+- For repeated workspace-scoped write lifecycles, prefer `runWorkspaceMutation()` (`server/routes/workspace-mutation-helper.ts`) to keep read-before-write, transaction, mapped error, activity, and broadcast steps consistent.
 
 **Tests**
 - Integration: route read/write coverage in `tests/integration/[domain].test.ts`

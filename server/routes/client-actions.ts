@@ -18,8 +18,15 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import { toClientInboxItem, toClientInboxItems } from '../serializers/client-safe.js';
+import { createLogger } from '../logger.js';
+import {
+  mutationError,
+  runWorkspaceMutation,
+  WorkspaceMutationError,
+} from './workspace-mutation-helper.js';
 
 const router = Router();
+const log = createLogger('routes:client-actions');
 
 const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay']);
 const statusSchema = z.enum(['pending', 'approved', 'changes_requested', 'completed', 'archived']);
@@ -55,26 +62,54 @@ function broadcastActionUpdate(workspaceId: string, actionId: string, action: st
 
 router.post('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createActionSchema), (req, res) => {
   const workspaceId = req.params.workspaceId;
-  const existing = req.body.sourceId
-    ? getActiveClientActionBySource(workspaceId, req.body.sourceType, req.body.sourceId)
-    : null;
-  if (existing) return res.json(existing);
-
-  const action = createClientAction({ workspaceId, ...req.body });
-  addActivity(workspaceId, 'client_action_sent', `Sent to client: ${action.title}`, action.summary, { actionId: action.id, sourceType: action.sourceType });
-  const ws = getWorkspace(workspaceId);
-  if (ws?.clientEmail) {
-    notifyApprovalReady({
-      clientEmail: ws.clientEmail,
-      workspaceName: ws.name,
+  try {
+    const { action } = runWorkspaceMutation({
       workspaceId,
-      batchName: action.title,
-      itemCount: 1,
-      dashboardUrl: getClientPortalUrl(ws),
+      defaultErrorMessage: 'Failed to create client action',
+      readBeforeWrite: ({ workspaceId: currentWorkspaceId }) => {
+        if (!req.body.sourceId) return null;
+        return getActiveClientActionBySource(currentWorkspaceId, req.body.sourceType, req.body.sourceId);
+      },
+      mutate: ({ workspaceId: currentWorkspaceId, existing }) => {
+        if (existing) {
+          return { action: existing, isDuplicate: true as const };
+        }
+        return {
+          action: createClientAction({ workspaceId: currentWorkspaceId, ...req.body }),
+          isDuplicate: false as const,
+        };
+      },
+      onActivity: ({ workspaceId: currentWorkspaceId, result }) => {
+        if (result.isDuplicate) return;
+        addActivity(currentWorkspaceId, 'client_action_sent', `Sent to client: ${result.action.title}`, result.action.summary, {
+          actionId: result.action.id,
+          sourceType: result.action.sourceType,
+        });
+      },
+      onBroadcast: ({ workspaceId: currentWorkspaceId, result }) => {
+        if (result.isDuplicate) return;
+        const ws = getWorkspace(currentWorkspaceId);
+        if (ws?.clientEmail) {
+          notifyApprovalReady({
+            clientEmail: ws.clientEmail,
+            workspaceName: ws.name,
+            workspaceId: currentWorkspaceId,
+            batchName: result.action.title,
+            itemCount: 1,
+            dashboardUrl: getClientPortalUrl(ws),
+          });
+        }
+        broadcastActionUpdate(currentWorkspaceId, result.action.id, 'created');
+      },
     });
+    res.json(toClientInboxItem(action));
+  } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    log.error({ err, workspaceId }, 'Failed to create client action');
+    res.status(500).json({ error: 'Failed to create client action' });
   }
-  broadcastActionUpdate(workspaceId, action.id, 'created');
-  res.json(toClientInboxItem(action));
 });
 
 router.get('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -82,23 +117,44 @@ router.get('/api/client-actions/:workspaceId', requireWorkspaceAccess('workspace
 });
 
 router.patch('/api/client-actions/:workspaceId/:actionId', requireWorkspaceAccess('workspaceId'), validate(adminUpdateSchema), (req, res) => {
-  const existing = getClientAction(req.params.workspaceId, req.params.actionId);
-  if (!existing) return res.status(404).json({ error: 'Client action not found' });
-  let updated;
   try {
-    updated = updateClientAction(req.params.workspaceId, req.params.actionId, req.body);
+    const updated = runWorkspaceMutation({
+      workspaceId: req.params.workspaceId,
+      defaultErrorMessage: 'Failed to update client action',
+      readBeforeWrite: ({ workspaceId }) => getClientAction(workspaceId, req.params.actionId),
+      mutate: ({ workspaceId, existing }) => {
+        if (!existing) throw mutationError(404, 'Client action not found');
+        const next = updateClientAction(workspaceId, req.params.actionId, req.body);
+        if (!next) throw mutationError(404, 'Client action not found');
+        return next;
+      },
+      onActivity: ({ workspaceId, existing, result }) => {
+        if (!existing) return;
+        if (req.body.status === 'completed' && existing.status !== 'completed') {
+          addActivity(workspaceId, 'client_action_completed', `Completed client action: ${result.title}`, result.summary, {
+            actionId: result.id,
+            sourceType: result.sourceType,
+          });
+        }
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        broadcastActionUpdate(workspaceId, result.id, 'updated');
+      },
+      mapError: error => {
+        if (error instanceof InvalidTransitionError) {
+          return { status: 409, error: error.message };
+        }
+        return null;
+      },
+    });
+    res.json(toClientInboxItem(updated));
   } catch (err) {
-    if (err instanceof InvalidTransitionError) {
-      return res.status(409).json({ error: err.message });
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
     }
-    throw err;
+    log.error({ err, workspaceId: req.params.workspaceId, actionId: req.params.actionId }, 'Failed to update client action');
+    res.status(500).json({ error: 'Failed to update client action' });
   }
-  if (!updated) return res.status(404).json({ error: 'Client action not found' });
-  if (req.body.status === 'completed' && existing.status !== 'completed') {
-    addActivity(req.params.workspaceId, 'client_action_completed', `Completed client action: ${updated.title}`, updated.summary, { actionId: updated.id, sourceType: updated.sourceType });
-  }
-  broadcastActionUpdate(req.params.workspaceId, req.params.actionId, 'updated');
-  res.json(toClientInboxItem(updated));
 });
 
 router.get('/api/public/client-actions/:workspaceId', requireClientPortalAuth(), (req, res) => {
@@ -106,50 +162,68 @@ router.get('/api/public/client-actions/:workspaceId', requireClientPortalAuth(),
 });
 
 router.patch('/api/public/client-actions/:workspaceId/:actionId/respond', requireClientPortalAuth(), validate(publicRespondSchema), (req, res) => {
-  const existing = getClientAction(req.params.workspaceId, req.params.actionId);
-  if (!existing) return res.status(404).json({ error: 'Client action not found' });
-  if (existing.status !== 'pending') {
-    return res.status(409).json({ error: 'This action is no longer awaiting client response' });
-  }
-  let updated;
-  try {
-    updated = updateClientAction(req.params.workspaceId, req.params.actionId, {
-      status: req.body.status,
-      clientNote: req.body.clientNote,
-    });
-  } catch (err) {
-    if (err instanceof InvalidTransitionError) {
-      return res.status(409).json({ error: err.message });
-    }
-    throw err;
-  }
-  if (!updated) return res.status(404).json({ error: 'Client action not found' });
   const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(
-    req.params.workspaceId,
-    req.body.status === 'approved' ? 'client_action_approved' : 'client_action_changes_requested',
-    `${actor?.name || 'Client'} ${req.body.status === 'approved' ? 'approved' : 'requested changes on'} ${updated.title}`,
-    req.body.clientNote || undefined,
-    { actionId: updated.id, sourceType: updated.sourceType },
-    actor,
-  );
-  broadcastActionUpdate(req.params.workspaceId, req.params.actionId, 'responded');
-
-  if (req.body.status === 'approved') {
-    const ws = getWorkspace(req.params.workspaceId);
-    notifyTeamActionApproved({
+  try {
+    const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
-      workspaceName: ws?.name || req.params.workspaceId,
-      actionTitle: updated.title,
-      sourceType: updated.sourceType,
-      actionSummary: updated.summary,
-      clientNote: req.body.clientNote,
-      dashboardUrl: ws ? getClientPortalUrl(ws) : undefined,
+      defaultErrorMessage: 'Failed to respond to client action',
+      readBeforeWrite: ({ workspaceId }) => getClientAction(workspaceId, req.params.actionId),
+      mutate: ({ workspaceId, existing }) => {
+        if (!existing) throw mutationError(404, 'Client action not found');
+        if (existing.status !== 'pending') {
+          throw mutationError(409, 'This action is no longer awaiting client response');
+        }
+        const next = updateClientAction(workspaceId, req.params.actionId, {
+          status: req.body.status,
+          clientNote: req.body.clientNote,
+        });
+        if (!next) throw mutationError(404, 'Client action not found');
+        return next;
+      },
+      onActivity: ({ workspaceId, result }) => {
+        addActivity(
+          workspaceId,
+          req.body.status === 'approved' ? 'client_action_approved' : 'client_action_changes_requested',
+          `${actor?.name || 'Client'} ${req.body.status === 'approved' ? 'approved' : 'requested changes on'} ${result.title}`,
+          req.body.clientNote || undefined,
+          { actionId: result.id, sourceType: result.sourceType },
+          actor,
+        );
+      },
+      onBroadcast: ({ workspaceId, result }) => {
+        broadcastActionUpdate(workspaceId, result.id, 'responded');
+      },
+      mapError: error => {
+        if (error instanceof InvalidTransitionError) {
+          return { status: 409, error: error.message };
+        }
+        return null;
+      },
     });
-    enqueuePlaybook(req.params.workspaceId, updated);
+    if (req.body.status === 'approved') {
+      const ws = getWorkspace(req.params.workspaceId);
+      notifyTeamActionApproved({
+        workspaceId: req.params.workspaceId,
+        workspaceName: ws?.name || req.params.workspaceId,
+        actionTitle: updated.title,
+        sourceType: updated.sourceType,
+        actionSummary: updated.summary,
+        clientNote: req.body.clientNote,
+        dashboardUrl: ws ? getClientPortalUrl(ws) : undefined,
+      });
+      enqueuePlaybook(req.params.workspaceId, updated);
+    }
+    res.json(toClientInboxItem(updated));
+  } catch (err) {
+    if (err instanceof WorkspaceMutationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    log.error(
+      { err, workspaceId: req.params.workspaceId, actionId: req.params.actionId },
+      'Failed to respond to client action',
+    );
+    res.status(500).json({ error: 'Failed to respond to client action' });
   }
-
-  res.json(toClientInboxItem(updated));
 });
 
 export default router;
