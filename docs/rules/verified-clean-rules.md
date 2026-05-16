@@ -178,9 +178,10 @@ explicit justification.
 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | customCheck-fixture | Wave 4 replaced remaining raw `/${pageSlug}` constructions with `normalizePageUrl`/`resolvePagePath` and added targeted hatch comments for display-only strings. Fixture coverage validates trigger and helper-based negatives. Full-repo scan now reports ✓. |
 | Arbitrary pixel text-size (use .t-* utility) | regex-shell + fixture | Wave 3 migrated remaining `text-[Npx]` usages to canonical `.t-*` typography utilities across admin and shared UI, with rare intentional exceptions hatched. Existing fixture coverage validates positive/negative cases. Full-repo scan now reports ✓. |
 | Inline asymmetric border-radius (use --radius-signature token) | regex-shell + fixture | Wave 3 migrated remaining inline asymmetric `borderRadius` literals to `--radius-signature` token usage (or shared primitives that already apply it), with explicit hatches for intentional one-offs. Existing fixture coverage validates detection and suppression semantics. Full-repo scan now reports ✓. |
+| Raw CTA class literal outside Button/IconButton | regex-shell | Styleguide lock-in Phase 1 foundation (2026-05-15). Rule blocks hand-rolled CTA class stacks (`bg-teal-*`, `text-white`, transition/button literals) outside shared `Button`/`IconButton` primitives. Pattern invocation and shell execution were validated; full-repo scan reports ✓ after Wave 2/3/4 primitive migration sweeps. |
 | Style exception registry entry missing required metadata | regex-manual | Styleguide lock-in Phase 1 foundation (2026-05-15). Rule validates `data/style-exceptions.json` contract (required fields, unique IDs, valid ISO dates, no expired entries, `expiresOn >= createdAt`). Ensures all style exceptions are owner-assigned and time-bounded. Full-repo scan reports ✓ with empty registry baseline. |
 
-**Count: 116 verified-clean rules.**
+**Count: 117 verified-clean rules.**
 
 ---
 
