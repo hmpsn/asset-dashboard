@@ -122,7 +122,7 @@ export function PageEditRow({
               variant="ghost"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onClearTracking(page.id); }}
-              className="gap-0.5 t-caption-sm px-1.5 py-0.5 rounded text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10"
+              className="gap-0.5 t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10"
               title="Clear page tracking status"
             >
               <Icon as={X} size="sm" /> clear
@@ -221,11 +221,11 @@ export function PageEditRow({
               type="button"
               onClick={() => onAiRewrite(page.id, 'both')}
               disabled={!!isAiLoading}
-              variant="secondary"
+              variant="primary"
               size="sm"
               loading={isAiLoading === 'both'}
               icon={isAiLoading === 'both' ? undefined : Sparkles}
-              className="gap-1 t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded"
+              className="gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-lg)] font-medium"
               title={hasAnalysis ? 'Generate paired title + description (using page analysis)' : 'Generate paired title + description'}
             >
               AI Generate Both
@@ -260,7 +260,7 @@ export function PageEditRow({
                       <CharacterCounter current={titleV.length} max={60} size="sm" />
                     </div>
                     <div className="flex items-center gap-2 ml-4">
-                      <span className="t-caption-sm px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">Desc</span>
+                      <span className="t-caption-sm px-1 py-0.5 rounded bg-amber-500/10 text-amber-400">Desc</span>
                       <span className="flex-1 text-[var(--brand-text)]">{descV}</span>
                       <CharacterCounter current={descV.length} max={160} size="sm" />
                     </div>
@@ -280,11 +280,11 @@ export function PageEditRow({
                   type="button"
                   onClick={() => onAiRewrite(page.id, 'title')}
                   disabled={!!isAiLoading}
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   loading={isAiLoading === 'title'}
                   icon={isAiLoading === 'title' ? undefined : Sparkles}
-                  className="gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded"
+                  className="gap-1 px-1.5 py-0.5 t-caption-sm rounded-[var(--radius-sm)]"
                   title="AI rewrite title only"
                 >
                   AI
@@ -329,11 +329,11 @@ export function PageEditRow({
                   type="button"
                   onClick={() => onAiRewrite(page.id, 'description')}
                   disabled={!!isAiLoading}
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   loading={isAiLoading === 'description'}
                   icon={isAiLoading === 'description' ? undefined : Sparkles}
-                  className="gap-1 px-1.5 py-0.5 t-caption-sm bg-teal-600/50 hover:bg-teal-500/50 rounded"
+                  className="gap-1 px-1.5 py-0.5 t-caption-sm rounded-[var(--radius-sm)]"
                   title="AI rewrite description only"
                 >
                   AI
@@ -375,12 +375,12 @@ export function PageEditRow({
                 type="button"
                 onClick={() => onSendToClient(page.id)}
                 disabled={!hasChanges || isSendingToClient}
-                variant="secondary"
+                variant={isSentToClient ? 'secondary' : 'primary'}
                 size="sm"
                 loading={isSendingToClient}
                 icon={isSendingToClient ? undefined : isSentToClient ? Check : Send}
-                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
-                  isSentToClient ? 'bg-emerald-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium ${
+                  isSentToClient ? 'bg-emerald-600 text-white border-0 hover:bg-emerald-500' : 'disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 {isSentToClient ? 'Sent!' : isSendingToClient ? 'Sending...' : 'Send to client'}
@@ -396,7 +396,7 @@ export function PageEditRow({
                 loading={isDraftSaving}
                 icon={isDraftSaving ? undefined : isDraftSaved ? Check : Save}
                 className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
-                  isDraftSaved ? 'bg-blue-600 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed'
+                  isDraftSaved ? 'bg-blue-600 text-white border-0' : 'disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 {isDraftSaved ? 'Draft Saved!' : isDraftSaving ? 'Saving...' : 'Save Draft'}
@@ -407,12 +407,12 @@ export function PageEditRow({
               onClick={() => onSave?.(page.id)}
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
-              variant="secondary"
+              variant={isSaved ? 'secondary' : 'primary'}
               size="sm"
               loading={isSaving}
               icon={isSaving ? undefined : isSaved ? Check : Save}
-              className={`gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
-                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed'
+              className={`gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium ${
+                isSaved ? 'bg-emerald-600 text-white border-0 hover:bg-emerald-500' : 'disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               {isSaved ? 'Saved!' : isSaving ? 'Saving...' : 'Save to Webflow'}

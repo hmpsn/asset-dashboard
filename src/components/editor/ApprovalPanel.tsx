@@ -22,10 +22,8 @@ export function ApprovalPanel({
       loading={sendingApproval}
       icon={approvalSent ? Check : Send}
       size="sm"
-      variant="secondary"
-      className={`rounded-[var(--radius-lg)] border-0 text-white ${
-        approvalSent ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-teal-600 hover:bg-teal-500'
-      }`}
+      variant={approvalSent ? 'secondary' : 'primary'}
+      className={approvalSent ? 'rounded-[var(--radius-lg)] border-0 bg-emerald-600 hover:bg-emerald-500 text-white' : 'rounded-[var(--radius-lg)]'}
     >
       {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send to Client (${approvalSelected.size})`}
     </Button>

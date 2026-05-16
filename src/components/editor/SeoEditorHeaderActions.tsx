@@ -48,12 +48,12 @@ export function SeoEditorHeaderActions({
           <span className="font-medium text-[var(--brand-text-bright)]">{pagesCount}</span> pages
         </div>
         {missingTitles > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-accent-warning">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/8 border border-amber-500/30 text-accent-warning">
             {missingTitles} missing SEO titles
           </span>
         )}
         {missingDescs > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-accent-danger">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-red-500/8 border border-red-500/30 text-accent-danger">
             {missingDescs} missing meta descriptions
           </span>
         )}
@@ -71,8 +71,7 @@ export function SeoEditorHeaderActions({
           disabled={bulkFixing || missingTitles === 0}
           icon={Wand2}
           size="sm"
-          variant="secondary"
-          className="bg-teal-600 hover:bg-teal-500 border-0 text-white rounded-[var(--radius-lg)] font-medium"
+          variant="primary"
         >
           AI Fix Titles ({missingTitles})
         </Button>
@@ -81,8 +80,7 @@ export function SeoEditorHeaderActions({
           disabled={bulkFixing || missingDescs === 0}
           icon={Wand2}
           size="sm"
-          variant="secondary"
-          className="bg-teal-600 hover:bg-teal-500 border-0 text-white rounded-[var(--radius-lg)] font-medium"
+          variant="primary"
         >
           AI Fix Descriptions ({missingDescs})
         </Button>
@@ -100,11 +98,11 @@ export function SeoEditorHeaderActions({
           loading={publishing}
           icon={published ? Check : Upload}
           size="sm"
-          variant="secondary"
+          variant={published ? 'secondary' : 'primary'}
           className={`rounded-[var(--radius-lg)] font-medium ${
             published
               ? 'bg-[var(--emerald)] text-white border-0 hover:bg-[var(--emerald)]/90'
-              : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-active)]'
+              : ''
           }`}
         >
           {published ? 'Published!' : publishing ? 'Publishing...' : 'Publish Site'}

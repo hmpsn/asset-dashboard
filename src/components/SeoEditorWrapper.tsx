@@ -72,19 +72,19 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
             <Button
               key={option.id}
               onClick={() => setSourceFilter(option.id)}
-              variant="ghost"
+              variant={sourceFilter === option.id ? 'primary' : 'secondary'}
               size="sm"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
                 sourceFilter === option.id
-                  ? 'bg-teal-500/10 border-teal-500/30 text-teal-300'
-                  : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)]'
+                  ? ''
+                  : 'bg-[var(--surface-2)]'
               }`}
             >
               {option.id === SEO_EDITOR_TARGET_TYPES.staticPage && <Icon as={Pencil} size="sm" />}
               {option.id === SEO_EDITOR_TARGET_TYPES.cmsItem && <Icon as={Database} size="sm" />}
               {option.id === SEO_EDITOR_TARGET_TYPES.manual && <Icon as={AlertCircle} size="sm" />}
               {option.label}
-              <span className="text-[var(--brand-text-muted)]">{option.count}</span>
+              <span className={sourceFilter === option.id ? 'text-white/80' : 'text-[var(--brand-text-muted)]'}>{option.count}</span>
             </Button>
           ))}
           {resolvedTargets.collectionOptions.length > 0 && sourceFilter !== SEO_EDITOR_TARGET_TYPES.staticPage && (
@@ -128,7 +128,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
         <section className="space-y-3">
           {sourceFilter === 'all' && (
             <div>
-              <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Static pages</h3>
+              <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Static pages</h3>
               <p className="t-caption-sm text-[var(--brand-text-muted)]">Direct Webflow page SEO writes.</p>
             </div>
           )}
@@ -147,7 +147,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
         <section className="space-y-3">
           {sourceFilter === 'all' && (
             <div>
-              <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">CMS collection items</h3>
+              <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">CMS collection items</h3>
               <p className="t-caption-sm text-[var(--brand-text-muted)]">Real collection item writes with publish controls.</p>
             </div>
           )}
@@ -165,7 +165,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
       {showManual && manualTargets.length > 0 && (
         <section className="space-y-3">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Manual CMS URLs</h3>
+            <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Manual CMS URLs</h3>
             <p className="t-caption-sm text-[var(--brand-text-muted)]">Sitemap URLs that could not be matched to editable collection items.</p>
           </div>
           <div className="space-y-2">
@@ -187,7 +187,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
 
       {sourceFilter === SEO_EDITOR_TARGET_TYPES.manual && manualTargets.length === 0 && (
         <SectionCard className="text-center">
-          <div className="text-sm font-medium text-[var(--brand-text-bright)]">No manual CMS URLs found</div>
+          <div className="t-ui font-medium text-[var(--brand-text-bright)]">No manual CMS URLs found</div>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
             Every discovered CMS URL currently maps to an editable Webflow collection item.
           </p>
