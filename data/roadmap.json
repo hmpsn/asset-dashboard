@@ -142,8 +142,8 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "3-5h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Create seeded QA/demo workspaces for repeatable manual and automated checks: empty/new workspace, free-tier client, growth-tier active client, premium client with content/schema/inbox history, broken-integration workspace, and rich CMS/Webflow workspace. Keep data deterministic enough for smoke tests and visual QA."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: expanded `npm run seed:demo` into a deterministic 6-scenario workspace matrix. Added explicit scenario coverage for `empty-new`, `free-client`, `growth-active`, `premium-history`, `broken-integrations`, and `rich-cms`, with fixed IDs and deterministic fixture values. Seeder now resets seeded workspace-scope artifacts each run (`requests`, `work_orders`, `approval_batches`, `client_actions`, `content_topic_requests`, `content_briefs`, `content_posts`, `schema_site_plans`, `schema_snapshots`, `schema_publish_history`, `page_edit_states`) and then applies scenario-specific history seeds so manual QA + smoke runs start from a repeatable baseline. Added guard tests for scenario coverage and broken-integration invariants, and updated local onboarding docs with the full fixture matrix and route list."
         },
         {
           "id": "platform-confidence-risky-module-dashboard",
