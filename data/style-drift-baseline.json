@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-05-15T17:20:38.076Z",
+  "generatedAt": "2026-05-16T19:34:17.885Z",
   "metrics": {
-    "raw_button_unallowlisted_count": 887,
-    "raw_typography_bypass_count": 28,
-    "raw_radius_literal_count": 2,
-    "disallowed_hue_count": 3,
-    "non_primitive_action_count": 872,
+    "raw_button_unallowlisted_count": 0,
+    "raw_typography_bypass_count": 0,
+    "raw_radius_literal_count": 0,
+    "disallowed_hue_count": 0,
+    "non_primitive_action_count": 0,
     "exception_count": 0
   }
 }

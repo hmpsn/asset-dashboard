@@ -4602,7 +4602,7 @@ export const CHECKS: Check[] = [
     message:
       'Use Button/IconButton or an approved UI primitive instead of raw <button>. ' +
       'For legitimate infra exceptions, add a time-bounded entry to data/style-exceptions.json (rule=raw-button-outside-primitives).',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Raw buttons are the highest-entropy source of style drift (variant, radius, typography, spacing, focus, and disabled-state divergence).',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
@@ -4642,7 +4642,7 @@ export const CHECKS: Check[] = [
     message:
       'Use <Button> / <IconButton> for action CTAs instead of inline teal CTA class stacks. ' +
       'Add // cta-literal-ok only for audited temporary exceptions.',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Prevents action-style drift by routing CTA styling through shared primitives instead of repeated class literals.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
@@ -5136,7 +5136,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// fixed-inset-ok'],
     message: 'Use <Modal> from src/components/ui/overlay/Modal.tsx instead of hand-rolling a fixed inset-0 backdrop. The primitive handles focus trap, escape key, scroll lock, and backdrop click.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -5206,7 +5206,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['chart-hex-ok', 'chartDotStroke', 'chartDotFill', 'chartGridColor', 'scoreColor(', 'url(#'],
     message:
       'Raw hex colors in chart props should use CHART_SERIES_COLORS from ui/constants.ts. Escape hatch: // chart-hex-ok',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
