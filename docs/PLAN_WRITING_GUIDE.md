@@ -70,6 +70,7 @@ Rules for the graph:
 
 Name the owning bounded context from [platform-organization.md](./rules/platform-organization.md). For cross-context work, name the primary owner, secondary integrations, shared contracts, and coordination files.
 Then check [platform-integration-surfaces.md](./rules/platform-integration-surfaces.md) for the context's external APIs, DB/storage, AI calls, background jobs, WebSocket events, React Query keys, public endpoints, and activity types.
+Before writing implementation tasks, fill [feature-spec-template.md](./workflows/feature-spec-template.md) so ownership, contracts, events, cache keys, and test owners are explicit.
 
 Every plan should state:
 

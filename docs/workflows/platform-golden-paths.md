@@ -9,9 +9,10 @@ Use these templates when scoping a new feature or substantial enhancement. Each 
 ## How to use this doc
 
 1. Pick the closest feature class below.
-2. Fill in the placeholders before writing implementation code.
-3. If the feature spans contexts, name the primary owner and secondary integrations up front.
-4. Copy the completed template into your plan or PR description.
+2. Fill `docs/workflows/feature-spec-template.md` first (required ownership + contract header).
+3. Fill in the placeholders before writing implementation code.
+4. If the feature spans contexts, name the primary owner and secondary integrations up front.
+5. Copy the completed template into your plan or PR description.
 
 ---
 

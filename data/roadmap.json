@@ -160,8 +160,8 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "1h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Update planning templates so every new feature spec names its owning bounded context, shared contracts, route/API surface, cache keys, WebSocket events, and test ownership before implementation begins. This can follow the ownership map once domain names are finalized."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added a required spec skeleton at `docs/workflows/feature-spec-template.md` that standardizes ownership + contract capture before implementation planning (owning bounded context, route/API surface, shared contracts, query keys/invalidation, WebSocket events/listeners, and test ownership). Wired the template into core planning workflow docs: `docs/PLAN_WRITING_GUIDE.md` now requires filling the spec skeleton before task breakdown, `docs/workflows/new-feature-checklist.md` now includes a mandatory pre-planning check, and `docs/workflows/platform-golden-paths.md` now points teams to fill the spec skeleton before selecting a feature-class template."
         },
         {
           "id": "platform-org-feature-maturity-scorecard",

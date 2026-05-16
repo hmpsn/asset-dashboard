@@ -5856,3 +5856,16 @@ Bug hardening included:
 **Mutual:** Makes platform-health cleanup measurable and repeatable by tracking risk concentration with explicit, test-backed signals.
 
 **Files:** `scripts/platform-risky-module-dashboard.ts`; `scripts/report-risky-modules.ts`; `tests/unit/platform-risky-module-dashboard.test.ts`; `scripts/verify-platform.ts`; `package.json`; `docs/workflows/risky-module-dashboard.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 427. Bounded-Context Spec Header Contract (Wave 6 Item 5)
+**What it does:** Adds a required feature-spec skeleton so ownership and integration contracts are captured before implementation planning starts. New doc `docs/workflows/feature-spec-template.md` standardizes seven pre-plan sections: ownership snapshot, route/API surface, shared contracts, query cache + WebSocket contract, test ownership, verification commands, and open risks. Updated planning workflow docs so this template is part of default execution: `docs/PLAN_WRITING_GUIDE.md` now requires filling the spec skeleton before task breakdown, `docs/workflows/new-feature-checklist.md` includes a mandatory pre-implementation checklist item for the skeleton, and `docs/workflows/platform-golden-paths.md` now points teams to complete the spec skeleton before selecting a feature-class template.
+
+**Agency value:** Reduces planning ambiguity and review churn by forcing explicit ownership boundaries and integration surfaces up front.
+
+**Client value:** Lowers regression risk by making cache invalidation, event wiring, and test coverage explicit before code is written.
+
+**Mutual:** Converts a previously prose-only expectation into a reusable planning artifact that is easy to copy and enforce across specs.
+
+**Files:** `docs/workflows/feature-spec-template.md`; `docs/PLAN_WRITING_GUIDE.md`; `docs/workflows/new-feature-checklist.md`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
