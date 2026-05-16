@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, ArrowUp, Minus, LayoutList, Layers } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, ArrowUp, Minus } from 'lucide-react';
 import { MetricRing, Icon, Button, IconButton, ClickableRow, SectionCard } from '../ui';
 import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
 import type { AuditSummary, AuditDetail, CwvStrategyResult } from './types';
+import { HealthTabAllPagesList } from './health-tab/HealthTabAllPagesList';
+import {
+  buildCategoryStats,
+  checkImpact,
+  countInfoIssues,
+  filterAuditPages,
+  type SeverityFilter,
+} from './health-tab/healthTabModel';
 import { STUDIO_NAME } from '../../constants';
 import { post, getSafe } from '../../api/client';
 import {
@@ -25,54 +33,13 @@ export interface HealthTabProps {
   actionPlanSlot?: ReactNode;
 }
 
-// Plain-English impact statements for each check type — shown below the raw issue message
-// to help clients understand WHY something matters without needing to know SEO terminology.
-const CHECK_IMPACT: Record<string, string> = {
-  'title': 'The page title is the first thing people see in Google search results. It directly controls whether they click or scroll past.',
-  'meta-description': 'Google shows this text below your link in search results. A missing or poor description means fewer people click through to your site.',
-  'h1': 'The main heading tells Google what your page is about. Without it, your page is harder to rank for relevant searches.',
-  'canonical': 'Without this, Google may split your ranking power across multiple URLs — weakening your position for all of them.',
-  'duplicate-title': 'Having two pages with the same title confuses Google about which one to show. It can reduce rankings for both.',
-  'duplicate-description': 'Duplicate descriptions make it harder for Google to understand what makes each page unique.',
-  'img-alt': 'Missing alt text hides your images from Google Image Search and creates accessibility barriers for screen reader users.',
-  'og-tags': 'Without these, links shared to social media show no title, description, or image — significantly reducing click-through.',
-  'og-image': 'Without a preview image, social shares look bare and get far fewer clicks than posts with rich previews.',
-  'structured-data': 'Schema markup can unlock rich results in Google — stars, FAQs, breadcrumbs — which stand out and get more clicks.',
-  'internal-links': 'Internal links spread authority across your site and help Google discover all your pages.',
-  'content-length': 'Pages with thin content are less likely to rank. Google prefers pages that fully answer a user\'s question.',
-  'redirect-chains': 'Every redirect hop slows your page down and weakens the SEO authority passed through the link.',
-  'mixed-content': 'HTTP content on an HTTPS page triggers browser security warnings that erode visitor trust.',
-  'ssl': 'Google gives a small ranking boost to secure HTTPS pages. Insecure pages also display warnings in browsers.',
-  'viewport': 'Without a viewport tag, your page won\'t scale correctly on mobile — and most searches now happen on phones.',
-  'lang': 'The language attribute helps Google serve your content to the right audience in the right language.',
-  'robots': 'The robots meta tag controls whether Google can index this page. An incorrect setting can hide it from search entirely.',
-  'heading-hierarchy': 'A clear heading structure (H1, H2, H3) helps Google understand your content and helps visitors scan the page.',
-  'cwv': 'Google uses page speed and stability as a ranking signal — slow or jumpy pages rank lower and lose visitors.',
-  'cwv-lcp': 'Slow loading speed causes visitors to leave before your page even appears. Google penalizes slow-loading pages.',
-  'cwv-cls': 'Content that shifts while loading frustrates visitors and can cause accidental clicks. Google flags this as poor experience.',
-  'aeo-author': 'AI answer engines (ChatGPT, Google AI Overviews) prefer citing content with named, credentialed authors.',
-  'aeo-date': 'Undated content gets deprioritized by AI systems that can\'t verify freshness — a quick fix with lasting benefit.',
-  'aeo-answer-first': 'AI systems extract the first substantive paragraph as their citation. Generic intros waste that prime position.',
-  'aeo-faq-no-schema': 'FAQ schema makes Q&A pairs directly extractable by AI answer engines and can unlock rich results in Google.',
-  'aeo-hidden-content': 'Content hidden in accordions or tabs often isn\'t read by search crawlers or AI systems.',
-  'aeo-citations': 'Pages that cite authoritative sources (.gov, .edu, journals) are trusted more by AI systems.',
-  'aeo-dark-patterns': 'Aggressive overlays and autoplay reduce content accessibility for AI retrieval systems.',
-};
-
-function checkImpact(check: string): string | null {
-  const chk = check.toLowerCase();
-  return CHECK_IMPACT[chk] || null;
-}
-
-
-
 export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested, actionPlanSlot }: HealthTabProps) {
   // State for accordion sections
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['site-wide-all']));
   
   // Ref for snap-to-section
   const allPagesRef = useRef<HTMLDivElement>(null);
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'warning');
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>(initialSeverity || 'warning');
   const [showInfoItems, setShowInfoItems] = useState(false);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'by-page' | 'by-fix-type'>('by-page');
@@ -106,29 +73,18 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
   const togglePage = (id: string) => setExpandedPages(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-  const filteredPages = auditDetail?.audit.pages.filter(p => {
-    if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
-    if (severityFilter === 'all') {
-      if (!showInfoItems) return p.issues.some(i => i.severity !== 'info');
-      return true;
-    }
-    if (severityFilter === 'info') return p.issues.some(i => i.severity === 'info');
-    return p.issues.some(i => i.severity === severityFilter);
-  }) || [];
+  const filteredPages = auditDetail
+    ? filterAuditPages(
+        auditDetail.audit.pages,
+        auditSearch,
+        severityFilter,
+        showInfoItems,
+        (url) => toLiveUrl(url, liveDomain),
+      )
+    : [];
 
-  const categoryStats = auditDetail ? (() => {
-    const cats: Record<string, { errors: number; warnings: number; infos: number }> = {};
-    auditDetail.audit.pages.forEach(p => p.issues.forEach(i => {
-      const cat = i.category || 'other';
-      if (!cats[cat]) cats[cat] = { errors: 0, warnings: 0, infos: 0 };
-      if (i.severity === 'error') cats[cat].errors++; else if (i.severity === 'warning') cats[cat].warnings++; else cats[cat].infos++;
-    }));
-    return cats;
-  })() : {};
-
-  const infoIssueCount = auditDetail
-    ? auditDetail.audit.pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0)
-    : 0;
+  const categoryStats = buildCategoryStats(auditDetail);
+  const infoIssueCount = countInfoIssues(auditDetail);
 
   // Share reports state
   const [shareOpen, setShareOpen] = useState(false);
@@ -566,209 +522,29 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       )}
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        <SectionCard noPadding>
-          <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-[var(--surface-1)]/50">
-            {/* View mode toggle */}
-            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
-              <button type="button" onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
-                <Icon as={LayoutList} size="sm" /> By Page
-              </button>
-              <button type="button" onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
-                <Icon as={Layers} size="sm" /> By Fix Type
-              </button>
-            </div>
-            {/* Severity filter */}
-            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
-              {(['all', 'error', 'warning'] as const).map(s => (
-                <button key={s} type="button" onClick={() => setSeverityFilter(s)}
-                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
-                    severityFilter === s ? (s === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
-                  }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
-              ))}
-            </div>
-            {infoIssueCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowInfoItems(!showInfoItems)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm transition-colors border ${
-                  showInfoItems
-                    ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] border-[var(--brand-border-strong)]'
-                    : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'
-                }`}
-              >
-                <Icon as={Info} size="sm" />
-                {showInfoItems ? 'Hide' : 'Show'} {infoIssueCount} informational
-              </button>
-            )}
-            {viewMode === 'by-page' && (
-              <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-                className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-[var(--brand-border-strong)] w-40" />
-            )}
-          </div>
-
-          {/* By-page view */}
-          {viewMode === 'by-page' && (
-          <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
-            {filteredPages.map(page => {
-              const errs = page.issues.filter(i => i.severity === 'error').length;
-              const warns = page.issues.filter(i => i.severity === 'warning').length;
-              const isExpanded = expandedPages.has(page.pageId);
-              return (
-                <div key={page.pageId} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
-                  <ClickableRow
-                    onClick={() => togglePage(page.pageId)}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="t-caption font-medium text-[var(--brand-text)] truncate">{page.page}</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {errs > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errs} err</span>}
-                      {warns > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warns} warn</span>}
-                      <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
-                      <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
-                    </div>
-                  </ClickableRow>
-
-                  {isExpanded && (
-                    <div className="px-4 pb-3">
-                      <div className="space-y-2">
-                        {page.issues.filter(i => showInfoItems || i.severity !== 'info').map((issue, i) => {
-                          const sc = SEV[issue.severity];
-                          return (
-                            <div key={i} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
-                              <div className="flex items-start gap-2">
-                                {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                                {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
-                                <div className="flex-1">
-                                  <div className="t-caption-sm text-[var(--brand-text)]">{issue.message}</div>
-                                  {issue.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {hasContentIssues(page.issues) && workspaceId && (
-                        <>
-                          <Button
-                            icon={FileEdit}
-                            onClick={() => { setRequestError(null); requestContentImprovement(page); }}
-                            disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                            className={`mt-3 ${
-                              requestedPages.has(page.pageId)
-                                ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20'
-                                : ''
-                            }`}
-                          >
-                            {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
-                          </Button>
-                          {requestError === page.pageId && (
-                            <p className="t-caption-sm text-accent-danger mt-1">Failed to create request. Please try again.</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {filteredPages.length === 0 && <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">No pages match your filters</div>}
-          </div>
-          )}
-
-          {/* By-fix-type view */}
-          {viewMode === 'by-fix-type' && (() => {
-            // Group all issues by category, then by check type
-            const FIX_TYPE_LABELS: Record<string, string> = {
-              'title': 'Page Titles', 'meta-description': 'Meta Descriptions', 'h1': 'Headings (H1)',
-              'canonical': 'Canonical Tags', 'img-alt': 'Image Alt Text', 'og-tags': 'Social Media Tags',
-              'og-image': 'Social Media Images', 'structured-data': 'Schema / Structured Data',
-              'internal-links': 'Internal Links', 'content-length': 'Content Length',
-              'redirect-chains': 'Redirect Chains', 'mixed-content': 'Mixed Content',
-              'ssl': 'SSL / HTTPS', 'viewport': 'Mobile Viewport', 'robots': 'Robots / Indexing',
-              'heading-hierarchy': 'Heading Structure', 'cwv': 'Core Web Vitals',
-              'duplicate-title': 'Duplicate Titles', 'duplicate-description': 'Duplicate Descriptions',
-            };
-            const groups = new Map<string, { check: string; label: string; severity: 'error' | 'warning' | 'info'; pages: { pageId: string; page: string; url: string; message: string; recommendation?: string }[] }>();
-
-            (auditDetail?.audit.pages || []).forEach(p => {
-              p.issues.forEach(issue => {
-                if (!showInfoItems && issue.severity === 'info') return;
-                if (severityFilter !== 'all' && issue.severity !== severityFilter) return;
-                const key = issue.check || 'other';
-                if (!groups.has(key)) {
-                  groups.set(key, {
-                    check: key,
-                    label: FIX_TYPE_LABELS[key.toLowerCase()] || (issue.category ? (CAT_LABELS[issue.category]?.label || issue.category) + ': ' + key : key),
-                    severity: issue.severity,
-                    pages: [],
-                  });
-                }
-                const g = groups.get(key)!;
-                // Keep highest severity
-                if (issue.severity === 'error' && g.severity !== 'error') g.severity = 'error';
-                else if (issue.severity === 'warning' && g.severity === 'info') g.severity = 'warning';
-                g.pages.push({ pageId: p.pageId, page: p.page, url: p.url, message: issue.message, recommendation: issue.recommendation });
-              });
-            });
-
-            const sorted = [...groups.values()].sort((a, b) => {
-              const sevScore = (s: string) => s === 'error' ? 3 : s === 'warning' ? 2 : 1;
-              const d = sevScore(b.severity) - sevScore(a.severity);
-              if (d !== 0) return d;
-              return b.pages.length - a.pages.length;
-            });
-
-            return (
-              <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
-                {sorted.length === 0 && <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">No issues match your filters</div>}
-                {sorted.map(group => {
-                  const sc = SEV[group.severity];
-                  const isExpanded = expandedPages.has(`fix-type-${group.check}`);
-                  return (
-                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
-                      <ClickableRow
-                        onClick={() => togglePage(`fix-type-${group.check}`)}
-                        className="flex items-center gap-3 px-4 py-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="t-caption font-medium text-[var(--brand-text)]">{group.label}</div>
-                          <div className="t-caption-sm text-[var(--brand-text-muted)]">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-sm)] ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
-                          <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
-                        </div>
-                      </ClickableRow>
-
-                      {isExpanded && (
-                        <div className="px-4 pb-3">
-                          {checkImpact(group.check) && (
-                            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2 leading-relaxed px-1">{checkImpact(group.check)}</div>
-                          )}
-                          <div className="space-y-1.5">
-                            {group.pages.map((p, i) => (
-                              <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
-                                <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{p.page}</div>
-                                <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(p.url, liveDomain)}</div>
-                                {p.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{p.recommendation}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </SectionCard>
+        <HealthTabAllPagesList
+          auditDetail={auditDetail}
+          liveDomain={liveDomain}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          severityFilter={severityFilter}
+          setSeverityFilter={setSeverityFilter}
+          showInfoItems={showInfoItems}
+          setShowInfoItems={setShowInfoItems}
+          auditSearch={auditSearch}
+          setAuditSearch={setAuditSearch}
+          infoIssueCount={infoIssueCount}
+          filteredPages={filteredPages}
+          expandedPages={expandedPages}
+          togglePage={togglePage}
+          workspaceId={workspaceId}
+          requestedPages={requestedPages}
+          requestingPage={requestingPage}
+          requestError={requestError}
+          onRequestContentImprovement={requestContentImprovement}
+          onResetRequestError={() => setRequestError(null)}
+          checkImpact={checkImpact}
+        />
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}

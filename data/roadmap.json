@@ -114,8 +114,9 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "4-8h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Continue behavior-preserving splits of large client/admin page containers into shells, hooks, and section components. Prioritize high-churn views such as ClientDashboard, InboxTab, HealthTab, and remaining large client views. Avoid visual redesign in the same PR unless the item is explicitly scoped as UI work."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: completed a behavior-preserving decomposition pass on client HealthTab (one of the highest-churn large client containers). Extracted all-pages filter/render controls into `src/components/client/health-tab/HealthTabAllPagesList.tsx`, moved reusable pure logic/labeling/grouping and issue-impact mapping into `src/components/client/health-tab/healthTabModel.ts`, and kept `HealthTab.tsx` as orchestration shell. Added extraction guardrails (`tests/contract/health-tab-all-pages-extraction.test.ts`) plus helper behavior coverage (`tests/unit/health-tab-model.test.ts`) to prevent drift back into monolith shape while preserving existing UX and route contracts.",
+          "shippedAt": "2026-05-16"
         },
         {
           "id": "platform-org-api-wrapper-cleanup",

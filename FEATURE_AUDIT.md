@@ -5779,3 +5779,16 @@ Bug hardening included:
 **Mutual:** Creates the enforcement foundation for phased admin-first/client-second migration without requiring a single mega-PR.
 
 **Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `data/style-exceptions.json`; `data/style-drift-baseline.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 422. HealthTab Container Decomposition (Wave 6)
+**What it does:** Completes a behavior-preserving decomposition slice on the large client `HealthTab` container by extracting the all-pages filter/render surface into `src/components/client/health-tab/HealthTabAllPagesList.tsx` and moving reusable pure logic (issue impact map, page filtering, category stats, info-count aggregation, fix-type grouping) into `src/components/client/health-tab/healthTabModel.ts`. `HealthTab.tsx` now remains the orchestration shell (state + section composition + request mutations) while delegated section/model modules own high-churn rendering and deterministic transforms.
+
+**Agency value:** Reduces future regression risk and review overhead when modifying site-health UX by isolating dense UI controls and pure data shaping from the parent container.
+
+**Client value:** No behavior or routing changes; existing site-health interactions remain stable while improving maintainability for faster iterative improvements.
+
+**Mutual:** Adds decomposition guardrails and helper coverage so extracted boundaries stay in place and monolith drift is caught early.
+
+**Files:** `src/components/client/HealthTab.tsx`; `src/components/client/health-tab/HealthTabAllPagesList.tsx`; `src/components/client/health-tab/healthTabModel.ts`; `tests/contract/health-tab-all-pages-extraction.test.ts`; `tests/unit/health-tab-model.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
