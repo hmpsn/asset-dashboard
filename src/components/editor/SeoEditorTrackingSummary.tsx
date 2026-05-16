@@ -26,9 +26,9 @@ export function SeoEditorTrackingSummary({
     return (
       <Button
         onClick={onResetAll}
-        variant="ghost"
+        variant="link"
         size="sm"
-        className="px-0 py-0 h-auto min-h-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2"
+        className="px-0 py-0 h-auto min-h-0 t-caption-sm !text-[var(--brand-text-muted)] hover:!text-accent-danger"
       >
         Reset page tracking
       </Button>
@@ -53,9 +53,9 @@ export function SeoEditorTrackingSummary({
       {workspaceId && (
         <Button
           onClick={onResetAll}
-          variant="ghost"
+          variant="link"
           size="sm"
-          className="ml-auto px-0 py-0 h-auto min-h-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2"
+          className="ml-auto px-0 py-0 h-auto min-h-0 t-caption-sm !text-[var(--brand-text-muted)] hover:!text-accent-danger"
         >
           reset all
         </Button>

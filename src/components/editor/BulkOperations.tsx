@@ -61,7 +61,7 @@ export function BulkOperations({
               icon={Type}
               size="sm"
               variant="secondary"
-              className="px-2 py-1 border-0 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]"
+              className="rounded-[var(--radius-lg)]"
             >
               Pattern Apply
             </Button>
@@ -69,8 +69,8 @@ export function BulkOperations({
               onClick={() => onBulkAiRewrite('both')}
               icon={Sparkles}
               size="sm"
-              variant="secondary"
-              className="px-2 py-1 border-0 bg-teal-600 hover:bg-teal-500 text-white font-medium"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium"
             >
               AI Rewrite Both
             </Button>
@@ -79,7 +79,7 @@ export function BulkOperations({
               icon={Sparkles}
               size="sm"
               variant="secondary"
-              className="px-2 py-1 border-0 bg-teal-600/60 hover:bg-teal-500/80 text-white"
+              className="rounded-[var(--radius-lg)]"
             >
               Titles Only
             </Button>
@@ -88,7 +88,7 @@ export function BulkOperations({
               icon={Sparkles}
               size="sm"
               variant="secondary"
-              className="px-2 py-1 border-0 bg-teal-600/60 hover:bg-teal-500/80 text-white"
+              className="rounded-[var(--radius-lg)]"
             >
               Descriptions Only
             </Button>
@@ -117,7 +117,7 @@ export function BulkOperations({
             <select
               value={bulkField}
               onChange={e => onSetBulkField(e.target.value as 'title' | 'description')}
-              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
             >
               <option value="title">SEO Title</option>
               <option value="description">Meta Description</option>
@@ -125,7 +125,7 @@ export function BulkOperations({
             <select
               value={patternAction}
               onChange={e => onSetPatternAction(e.target.value as 'append' | 'prepend')}
-              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
             >
               <option value="append">Append</option>
               <option value="prepend">Prepend</option>
@@ -135,7 +135,7 @@ export function BulkOperations({
               value={patternText}
               onChange={e => onSetPatternText(e.target.value)}
               placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
-              className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+              className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
               autoFocus
             />
             <Button
@@ -143,8 +143,8 @@ export function BulkOperations({
               disabled={!patternText.trim()}
               icon={Eye}
               size="sm"
-              variant="secondary"
-              className="border-0 bg-teal-600 hover:bg-teal-500 text-white font-medium"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium"
             >
               Preview
             </Button>
@@ -168,8 +168,8 @@ export function BulkOperations({
                 onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern}
                 icon={Check}
                 size="sm"
-                variant="secondary"
-                className="border-0 bg-teal-600 hover:bg-teal-500 text-white font-medium"
+                variant="primary"
+                className="rounded-[var(--radius-lg)] font-medium"
               >
                 Apply All
               </Button>
@@ -223,9 +223,9 @@ export function BulkOperations({
           {onCancelRewrite && (
             <Button
               onClick={onCancelRewrite}
-              variant="ghost"
+              variant="link"
               size="sm"
-              className="px-1.5 py-0.5 text-red-400 hover:text-red-300 hover:bg-transparent"
+              className="!text-red-400 no-underline"
             >
               Cancel
             </Button>

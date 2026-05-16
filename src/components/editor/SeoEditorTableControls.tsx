@@ -40,9 +40,9 @@ export function SeoEditorTableControls({
               </span>
               <Button
                 onClick={onCancelAnalyze}
-                variant="ghost"
+                variant="link"
                 size="sm"
-                className="ml-2 px-1.5 py-0.5 text-accent-danger hover:text-accent-danger hover:bg-transparent"
+                className="ml-2 !text-accent-danger no-underline"
               >
                 Cancel
               </Button>
@@ -53,8 +53,8 @@ export function SeoEditorTableControls({
               disabled={analyzeDisabled}
               icon={Sparkles}
               size="sm"
-              variant="secondary"
-              className="bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] border-0 font-medium disabled:opacity-40"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium disabled:opacity-40"
             >
               {analyzedPagesCount === totalPages && totalPages > 0
                 ? 'All Pages Analyzed'

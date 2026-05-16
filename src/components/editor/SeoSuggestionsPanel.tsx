@@ -94,8 +94,8 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
               onClick={(e) => { e.stopPropagation(); handleApply(); }}
               disabled={applying}
               size="sm"
-              variant="secondary"
-              className="text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white border-transparent disabled:opacity-50"
+              variant="primary"
+              className="text-xs font-medium rounded-[var(--radius-lg)] disabled:opacity-50"
             >
               <Icon as={applying ? Loader2 : Check} size="sm" className={applying ? 'animate-spin' : ''} />
               Apply {readyToApply} to Webflow
