@@ -25,9 +25,12 @@ Wave 5 item: `platform-reliability-local-dev-onboarding`
 
 `npm run seed:demo` creates or updates:
 
-- `ws_demo_growth` (tier: growth)
-- `ws_demo_premium` (tier: premium)
-- `ws_demo_free` (tier: free)
+- `ws_demo_empty` (tier: free, scenario: empty/new)
+- `ws_demo_free` (tier: free, scenario: free-tier client)
+- `ws_demo_growth` (tier: growth, scenario: active client workflow)
+- `ws_demo_premium` (tier: premium, scenario: content/schema/inbox history)
+- `ws_demo_broken_integrations` (tier: growth, scenario: missing/broken integrations)
+- `ws_demo_rich_cms` (tier: premium, scenario: rich CMS/Webflow workflow state)
 
 Client password for all demo workspaces: `demo-client`
 
@@ -36,12 +39,18 @@ Admin URLs:
 - `/ws/ws_demo_growth`
 - `/ws/ws_demo_premium`
 - `/ws/ws_demo_free`
+- `/ws/ws_demo_empty`
+- `/ws/ws_demo_broken_integrations`
+- `/ws/ws_demo_rich_cms`
 
 Client URLs:
 
 - `/client/ws_demo_growth`
 - `/client/ws_demo_premium`
 - `/client/ws_demo_free`
+- `/client/ws_demo_empty`
+- `/client/ws_demo_broken_integrations`
+- `/client/ws_demo_rich_cms`
 
 ## Environment Tiers
 

@@ -5830,3 +5830,16 @@ Bug hardening included:
 **Mutual:** Enables gradual migration away from catch-all wrapper files without breaking existing call sites, creating safer footing for subsequent Wave 6 cleanup items.
 
 **Files:** `src/api/platform.ts`; `src/api/schema.ts`; `src/api/misc.ts`; `src/api/seo.ts`; `src/api/index.ts`; `src/hooks/admin/useWorkspaceHome.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/hooks/admin/useNotifications.ts`; `src/components/FeatureLibrary.tsx`; `src/components/Roadmap.tsx`; `src/components/audit/BulkAcceptPanel.tsx`; `src/hooks/admin/useSchemaValidation.ts`; `src/components/schema/SchemaPlanPanel.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/contract/api-wrapper-domain-cleanup.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `tests/component/audit/BulkAcceptPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 425. Deterministic QA/Demo Workspace Matrix (Wave 6 Item 3)
+**What it does:** Upgrades `npm run seed:demo` from a three-workspace onboarding baseline to a deterministic six-scenario QA/demo matrix aligned with platform-confidence requirements. `scripts/seed-demo-workspaces.ts` now declares explicit scenario coverage (`empty-new`, `free-client`, `growth-active`, `premium-history`, `broken-integrations`, `rich-cms`) with fixed workspace IDs and deterministic fixture values. Seeding now runs as a transactional reset-and-reseed workflow for core workspace-scoped artifact tables (`requests`, `work_orders`, `approval_batches`, `client_actions`, `content_topic_requests`, `content_briefs`, `content_posts`, `schema_site_plans`, `schema_snapshots`, `schema_publish_history`, `page_edit_states`) so repeated runs produce stable manual QA and smoke-test starting states. Scenario-specific history population adds active workflow state (growth), content/schema/inbox history (premium), and rich CMS/edit-state context (rich-cms), while preserving an intentionally disconnected broken-integrations fixture.
+
+**Agency value:** Creates repeatable, low-variance QA environments for local validation and demos without hand-curating workspace state each run.
+
+**Client value:** Improves confidence that client-facing workflows are validated against realistic, scenario-specific data setups before changes ship.
+
+**Mutual:** Reduces “works on my machine” drift by making onboarding/demo seeds deterministic, test-backed, and aligned with planned smoke coverage.
+
+**Files:** `scripts/seed-demo-workspaces.ts`; `tests/unit/seed-demo-workspaces.test.ts`; `docs/workflows/local-dev-onboarding.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
