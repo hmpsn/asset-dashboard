@@ -161,26 +161,28 @@ export function HealthScoreSummarySection({ auditDetail, shell }: ScoreSummaryPr
       </div>
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--brand-border)]/50 t-caption">
         <span className="text-[var(--brand-text-muted)]">{auditDetail.audit.totalPages} pages scanned</span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             shell.setSeverityFilter(shell.severityFilter === 'error' ? 'all' : 'error');
             setTimeout(() => shell.allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
           }}
-          className={`transition-colors ${shell.severityFilter === 'error' ? 'text-accent-danger font-medium' : 'text-accent-danger hover:text-accent-danger'}`}
+          className={`!px-0 !py-0 !min-h-0 rounded-none bg-transparent hover:bg-transparent transition-colors ${shell.severityFilter === 'error' ? 'text-accent-danger font-medium' : 'text-accent-danger hover:text-accent-danger'}`}
         >
           {auditDetail.audit.errors} errors
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             shell.setSeverityFilter(shell.severityFilter === 'warning' ? 'all' : 'warning');
             setTimeout(() => shell.allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
           }}
-          className={`transition-colors ${shell.severityFilter === 'warning' ? 'text-accent-warning font-medium' : 'text-accent-warning hover:text-accent-warning'}`}
+          className={`!px-0 !py-0 !min-h-0 rounded-none bg-transparent hover:bg-transparent transition-colors ${shell.severityFilter === 'warning' ? 'text-accent-warning font-medium' : 'text-accent-warning hover:text-accent-warning'}`}
         >
           {auditDetail.audit.warnings} warnings
-        </button>
+        </Button>
       </div>
     </SectionCard>
   );
@@ -647,42 +649,46 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
       <SectionCard noPadding>
         <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-[var(--surface-1)]/50">
           <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => shell.setViewMode('by-page')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${shell.viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+              className={`rounded-[var(--radius-md)] ${shell.viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
             >
               <Icon as={LayoutList} size="sm" /> By Page
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => shell.setViewMode('by-fix-type')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${shell.viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+              className={`rounded-[var(--radius-md)] ${shell.viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
             >
               <Icon as={Layers} size="sm" /> By Fix Type
-            </button>
+            </Button>
           </div>
           <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
             {(['all', 'error', 'warning'] as const).map((severity) => (
-              <button
+              <Button
                 key={severity}
-                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => shell.setSeverityFilter(severity)}
-                className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${shell.severityFilter === severity ? (severity === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[severity].bg} ${SEV[severity].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`min-h-[44px] rounded-[var(--radius-md)] ${shell.severityFilter === severity ? (severity === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]' : `${SEV[severity].bg} ${SEV[severity].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >
                 {severity === 'all' ? 'Issues' : severity.charAt(0).toUpperCase() + severity.slice(1)}
-              </button>
+              </Button>
             ))}
           </div>
           {shell.infoIssueCount > 0 && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => shell.setShowInfoItems(!shell.showInfoItems)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm transition-colors border ${shell.showInfoItems ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] border-[var(--brand-border-strong)]' : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'}`}
+              className={`rounded-[var(--radius-lg)] border ${shell.showInfoItems ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] border-[var(--brand-border-strong)]' : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'}`}
             >
               <Icon as={Info} size="sm" />
               {shell.showInfoItems ? 'Hide' : 'Show'} {shell.infoIssueCount} informational
-            </button>
+            </Button>
           )}
           {shell.viewMode === 'by-page' && (
             <input

@@ -253,9 +253,10 @@ export function InboxTab({
         {/* Active / Completed toggle */}
         <div className="flex items-center gap-0.5 p-1 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border)]">
           {(['active', 'completed'] as InboxMode[]).map((m) => (
-            <button
+            <Button
               key={m}
-              type="button"
+              variant="ghost"
+              size="sm"
               aria-pressed={mode === m}
               onClick={() => setMode(m)}
               className={`px-3.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium capitalize transition-colors ${
@@ -265,7 +266,7 @@ export function InboxTab({
               }`}
             >
               {m === 'active' ? 'Active' : 'Completed'}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -359,13 +360,14 @@ export function InboxTab({
                               </div>
                             </div>
                             {!isFlagged && !isFlagging && (
-                              <button
-                                type="button"
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setFlaggingCell(cell.cellId)}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                               >
                                 <Icon as={Flag} size="sm" /> Request Changes
-                              </button>
+                              </Button>
                             )}
                           </div>
                           {isFlagging && (
@@ -381,8 +383,17 @@ export function InboxTab({
                                 <Button size="sm" variant="primary" disabled={flagSubmitting || !flagComment.trim()} onClick={() => handleFlagCell(cell)}>
                                   {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
                                 </Button>
-                                <button type="button" onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
-                                  className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setFlaggingCell(null);
+                                    setFlagComment('');
+                                  }}
+                                  className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                                >
+                                  Cancel
+                                </Button>
                               </div>
                             </div>
                           )}
@@ -692,13 +703,14 @@ export function InboxTab({
                               </div>
                             </div>
                             {!isFlagged && !isFlagging && (
-                              <button
-                                type="button"
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setFlaggingCell(cell.cellId)}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                               >
                                 <Icon as={Flag} size="sm" /> Request Changes
-                              </button>
+                              </Button>
                             )}
                           </div>
                           {isFlagging && (
@@ -719,11 +731,14 @@ export function InboxTab({
                                 >
                                   {flagSubmitting ? 'Submitting…' : 'Submit Feedback'}
                                 </Button>
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => { setFlaggingCell(null); setFlagComment(''); }}
                                   className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-                                >Cancel</button>
+                                >
+                                  Cancel
+                                </Button>
                               </div>
                             </div>
                           )}
@@ -757,8 +772,9 @@ export function InboxTab({
           {/* ── Section 2: SEO Changes ── */}
           {showSection2 && (
             <section aria-label="SEO Changes" className="space-y-4">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className="flex items-center gap-2 w-full text-left"
                 aria-expanded={seoSectionExpanded}
                 aria-controls="seo-changes-content"
@@ -778,7 +794,7 @@ export function InboxTab({
                     ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
                     : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
                 </span>
-              </button>
+              </Button>
 
               {seoSectionExpanded && (
                 <div id="seo-changes-content" className="space-y-4">

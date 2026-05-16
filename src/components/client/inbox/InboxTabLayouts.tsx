@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Button } from '../../ui';
 import type { InboxFilter } from './inbox-filter';
 import type { InboxMode } from './useInboxTabShell';
 
@@ -42,11 +43,12 @@ function Chip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       aria-pressed={selected}
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[var(--radius-pill)] t-caption-sm font-medium transition-colors ${
+      className={`min-h-[40px] rounded-[var(--radius-pill)] ${
         selected
           ? 'bg-teal-500/15 border border-teal-500/30 text-accent-brand'
           : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
@@ -61,7 +63,7 @@ function Chip({
           {count}
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 

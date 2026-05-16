@@ -100,6 +100,9 @@ jobs:
       - name: PR checks
         run: npm run pr-check
 
+      - name: Style drift checks
+        run: npm run verify:style-drift
+
       - name: AI reliability soft gate
         run: npx tsx scripts/report-ai-reliability.ts --soft-gate
 
