@@ -227,8 +227,8 @@ export function toClientSchemaSnapshotView(snapshot: SchemaSnapshot): ClientSche
       url: result.url,
       existingSchemas: result.existingSchemas || [],
       schemaTypes: (result.suggestedSchemas?.[0]?.template?.['@graph'] as Array<{ '@type'?: string }> || [])
-        .map((node) => String(node['@type']))
-        .filter(Boolean),
+        .map((node) => node['@type'])
+        .filter((t): t is string => typeof t === 'string' && t.length > 0),
       priority: result.suggestedSchemas?.[0]?.priority || 'medium',
     })),
     pageCount: snapshot.pageCount,
