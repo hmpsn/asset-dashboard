@@ -162,9 +162,14 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)]">Step {stepIdx} of {STEPS.length - 1}</span>
-              <button onClick={onSkip} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSkip}
+                className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
+              >
                 Skip for now
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -293,11 +298,16 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <label className={labelCls}>Where are most customers in their buying journey?</label>
                 <div className="grid grid-cols-2 gap-3 mt-1">
                   {BUYING_STAGE_OPTIONS.map(opt => (
-                    <button key={opt.value} onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
-                      className={cn('text-left px-3 py-2.5 rounded-[var(--radius-xl)] border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}>
+                    <Button
+                      key={opt.value}
+                      variant="ghost"
+                      aria-pressed={audience.buyingStage === opt.value}
+                      onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
+                      className={cn('w-full h-auto justify-start items-start text-left px-3 py-2.5 rounded-[var(--radius-xl)] border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
+                    >
                       <div className={cn('t-caption-sm font-semibold', audience.buyingStage === opt.value ? 'text-accent-brand' : 'text-[var(--brand-text)]')}>{opt.label}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{opt.desc}</div>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -323,10 +333,16 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <label className={labelCls}>Brand personality (select all that apply)</label>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {PERSONALITY_OPTIONS.map(p => (
-                    <button key={p} onClick={() => togglePersonality(p)}
-                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                    <Button
+                      key={p}
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={brand.personality.includes(p)}
+                      onClick={() => togglePersonality(p)}
+                      className={cn('h-auto px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}
+                    >
                       {brand.personality.includes(p) && <Check className="w-3 h-3 inline mr-1" />}{p}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -348,10 +364,16 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <label className={labelCls}>Preferred content formats (select all that apply)</label>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {CONTENT_FORMAT_OPTIONS.map(f => (
-                    <button key={f} onClick={() => toggleFormat(f)}
-                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                    <Button
+                      key={f}
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={brand.contentFormats.includes(f)}
+                      onClick={() => toggleFormat(f)}
+                      className={cn('h-auto px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}
+                    >
                       {brand.contentFormats.includes(f) && <Check className="w-3 h-3 inline mr-1" />}{f}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -451,18 +473,23 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
         <div className="px-6 py-4 border-t border-[var(--brand-border)]/50 flex items-center justify-between gap-3 flex-shrink-0">
           {step === 'intro' ? (
             <>
-              <button onClick={onSkip} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSkip}
+                className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
+              >
                 Skip for now
-              </button>
+              </Button>
               <Button variant="primary" onClick={next} className="flex items-center gap-1.5 px-5 py-2.5">
                 Get Started <ChevronRight className="w-3.5 h-3.5" />
               </Button>
             </>
           ) : step === 'review' ? (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+              <Button variant="secondary" onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
-              </button>
+              </Button>
               <Button variant="primary" onClick={handleSubmit} disabled={saving} loading={saving} className="flex items-center gap-2 px-5 py-2.5">
                 {!saving && <Check className="w-4 h-4" />}
                 {saving ? 'Saving...' : 'Submit & Continue'}
@@ -470,9 +497,9 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </>
           ) : (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+              <Button variant="secondary" onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
-              </button>
+              </Button>
               <Button variant="primary" onClick={next} className="flex items-center gap-1.5 px-5 py-2.5">
                 Continue <ChevronRight className="w-3.5 h-3.5" />
               </Button>
@@ -490,7 +517,12 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
   icon: typeof Building2; title: string; filled: boolean; onClick: () => void; children: React.ReactNode;
 }) {
   return (
-    <button onClick={onClick} className="w-full text-left px-4 py-3 bg-[var(--surface-3)]/40 border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all group" style={{ borderRadius: 'var(--radius-signature)' }}>
+    <Button
+      variant="ghost"
+      onClick={onClick}
+      className="w-full !block text-left px-4 py-3 bg-[var(--surface-3)]/40 border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all group"
+      style={{ borderRadius: 'var(--radius-signature)' }}
+    >
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Icon className={cn('w-3.5 h-3.5', filled ? 'text-accent-brand' : 'text-[var(--brand-border)]')} />
@@ -500,6 +532,6 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
         <span className="t-caption-sm text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>
       </div>
       {children}
-    </button>
+    </Button>
   );
 }

@@ -57,7 +57,7 @@ describe('StatusBadge', () => {
   it('uses smaller text for sm size', () => {
     const { container } = render(<StatusBadge status="approved" size="sm" />);
     const span = container.querySelector('span')!;
-    expect(span.className).toContain('text-[11px]');
+    expect(span.className).toContain('t-micro');
   });
 
   it('uses larger text for md size', () => {

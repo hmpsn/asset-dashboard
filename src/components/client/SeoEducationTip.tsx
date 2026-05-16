@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Lightbulb, ChevronRight } from 'lucide-react';
-import { Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 
 interface TabTip {
   title: string;
@@ -88,24 +88,34 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
             )}
             <div className="flex items-center gap-3 mt-2">
               {tip.learnMore && !showLearnMore && (
-                <button
+                <Button
                   onClick={() => setShowLearnMore(true)}
-                  className="flex items-center gap-1 t-caption-sm text-accent-brand hover:underline underline-offset-2 transition-colors font-medium"
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto min-h-0 p-0 rounded-[var(--radius-sm)] flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand hover:bg-transparent hover:underline underline-offset-2 transition-colors font-medium"
                 >
                   Learn more <ChevronRight className="w-3 h-3" />
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={dismiss}
-                className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto min-h-0 p-0 rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent transition-colors"
               >
                 Got it
-              </button>
+              </Button>
             </div>
           </div>
-          <button onClick={dismiss} className="p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-colors flex-shrink-0">
-            <Icon as={X} size="md" />
-          </button>
+          <IconButton
+            onClick={dismiss}
+            icon={X}
+            label="Dismiss SEO tip"
+            size="sm"
+            className="flex-shrink-0 rounded-[var(--radius-sm)]"
+          />
         </div>
       </div>
     </div>

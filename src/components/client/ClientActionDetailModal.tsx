@@ -225,15 +225,16 @@ export function ClientActionDetailModal({
             <p className="t-body text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
           )}
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onClose}
           aria-label="Close action review"
           autoFocus
-          className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+          className="flex-shrink-0 w-9 h-9 p-0 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]"
         >
           <X className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Scrollable body */}

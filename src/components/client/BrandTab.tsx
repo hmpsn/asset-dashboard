@@ -94,12 +94,14 @@ export function BrandTab({
           titleIcon={<Icon as={Building2} size="md" className="text-accent-brand" />}
           action={
             !editing ? (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setEditing(true)}
-                className="t-caption text-accent-brand hover:text-accent-brand transition-colors flex items-center gap-1"
+                className="gap-1 px-0 py-0 t-caption text-accent-brand hover:text-accent-brand"
               >
                 Edit <Icon as={ChevronRight} size="sm" />
-              </button>
+              </Button>
             ) : null
           }
         >
@@ -265,12 +267,13 @@ export function BrandTab({
                 <Button onClick={handleSave} disabled={saving} loading={saving}>
                   {saving ? 'Saving…' : 'Save Changes'}
                 </Button>
-                <button
+                <Button
+                  variant="ghost"
                   onClick={handleCancel}
-                  className="px-4 py-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] t-caption transition-colors"
+                  className="rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}

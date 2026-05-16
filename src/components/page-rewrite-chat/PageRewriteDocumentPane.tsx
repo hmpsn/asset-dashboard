@@ -89,7 +89,7 @@ export function PageRewriteDocumentPane({
                 onClick={onToggleExport}
                 variant="ghost"
                 size="sm"
-                className={"text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]" // arbitrary-text-ok
+                className={"t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]" // arbitrary-text-ok
                 }
               >
                 Export brief
@@ -124,7 +124,7 @@ export function PageRewriteDocumentPane({
               {pageData.issues.slice(0, 20).map((issue, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ // arbitrary-text-ok
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded t-micro border ${ // arbitrary-text-ok
                     issue.severity === 'error'
                       ? 'bg-red-950/40 border-red-500/40 text-accent-danger'
                       : issue.severity === 'warning'
@@ -162,9 +162,9 @@ export function PageRewriteDocumentPane({
                 I
               </Button>
               <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-              <Button onClick={onHeading2} variant="ghost" size="sm" className={"!px-2 !py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
+              <Button onClick={onHeading2} variant="ghost" size="sm" className={"!px-2 !py-1 t-micro text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
               }>H2</Button>
-              <Button onClick={onHeading3} variant="ghost" size="sm" className={"!px-2 !py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
+              <Button onClick={onHeading3} variant="ghost" size="sm" className={"!px-2 !py-1 t-micro text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
               }>H3</Button>
               <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
               <Button onClick={onClearFormatting} variant="ghost" size="sm" className="!px-2 !py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded">

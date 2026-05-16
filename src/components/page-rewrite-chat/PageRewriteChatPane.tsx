@@ -100,7 +100,7 @@ export function PageRewriteChatPane({
                         onClick={() => onApplyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
                         variant="ghost"
                         size="sm"
-                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
+                        className="flex items-center gap-1 px-2 py-0.5 rounded t-micro bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
                       >
                         <Icon as={Check} size="sm" />
                         Apply to {msg.sectionTarget}
@@ -109,7 +109,7 @@ export function PageRewriteChatPane({
                         onClick={() => onCopyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
                         variant="ghost"
                         size="sm"
-                        className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                        className={"flex items-center gap-1 px-2 py-0.5 rounded t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                         }
                       >
                         {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
@@ -127,7 +127,7 @@ export function PageRewriteChatPane({
                         onClick={() => onCopyToClipboard(msg.content, i)}
                         variant="ghost"
                         size="sm"
-                        className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                        className={"flex items-center gap-1 px-2 py-0.5 rounded t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                         }
                       >
                         {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}

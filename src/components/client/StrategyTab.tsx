@@ -4,7 +4,7 @@ import {
   Target,
   AlertTriangle,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier, Icon, PageHeader } from '../ui';
+import { TierGate, EmptyState, type Tier, Icon, PageHeader, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
@@ -692,13 +692,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {feedbackLoadError && (
             <p className="t-caption-sm text-accent-danger">
               Couldn't load your previous keyword feedback - your relevant and not relevant choices may not reflect correctly.{' '}
-              <button type="button" onClick={loadFeedback} className="underline hover:text-accent-danger">Retry</button>
+              <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadFeedback}>Retry</Button>
             </p>
           )}
           {trackedKeywordsError && (
             <p className="t-caption-sm text-accent-danger">
               Couldn't load your strategy keywords.{' '}
-              <button type="button" onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
+              <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadTrackedKeywords}>Retry</Button>
             </p>
           )}
         </div>

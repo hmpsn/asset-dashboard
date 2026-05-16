@@ -135,13 +135,15 @@ export function EmailCaptureGate({
             >
               {isSubmitting ? '' : 'Continue to Dashboard'}
             </Button>
-            <button
+            <Button
               type="button"
               onClick={handleSkip}
-              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
             >
               Skip for now
-            </button>
+            </Button>
           </form>
         </div>
       </div>

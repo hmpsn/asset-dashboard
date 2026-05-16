@@ -3,7 +3,7 @@ import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
-import { EmptyState, SectionCard } from '../ui';
+import { EmptyState, SectionCard, Button } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { get } from '../../api/client';
@@ -210,12 +210,13 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
           {data.pageBreakdown.length > 10 && (
             <div className="px-5 py-2.5 border-t border-[var(--brand-border)]/60 text-center">
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => setShowAllPages(!showAllPages)}
-                className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors"
+                className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors px-0 py-0"
               >
                 {showAllPages ? 'Show less' : `Show all ${data.pageBreakdown.length} pages`}
-              </button>
+              </Button>
             </div>
           )}
         </SectionCard>

@@ -106,7 +106,7 @@ export function PageIntelligencePageRow({
             <div className="flex items-center gap-1.5">
               <span className="t-caption text-[var(--brand-text-bright)] truncate">{page.title}</span>
               {page.source === 'cms' && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 shrink-0" // arbitrary-text-ok
+                <span className="t-micro px-1 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 shrink-0" // arbitrary-text-ok
                 >CMS</span>
               )}
             </div>
@@ -137,7 +137,7 @@ export function PageIntelligencePageRow({
             </span>
           )}
           {strategy?.validated === false && (
-            <span className="text-[10px] text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
+            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
               Unvalidated
             </span>
           )}

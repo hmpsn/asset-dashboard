@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { BarChart3, Ban, CheckCircle2, ChevronDown, Eye, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
-import { Button, Icon, SectionCard, TierGate, TrendBadge, type Tier } from '../../ui';
+import { Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type Tier } from '../../ui';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
 import { fmtNum, intentColor, kdColor } from './strategyKeywordDisplay';
 
@@ -167,9 +167,16 @@ function ContentGapCard({
             <div className="flex items-center gap-2 px-2 py-1 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
               <Icon as={Ban} size="sm" className="text-accent-danger flex-shrink-0" />
               <span className="t-caption-sm text-accent-danger">Not relevant</span>
-              <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex items-center gap-0.5 transition-colors disabled:opacity-50">
-                <Icon as={Undo2} size="sm" /> Undo
-              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Undo2}
+                onClick={() => undoFeedback(gap.targetKeyword)}
+                disabled={loading}
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0.5 py-0.5"
+              >
+                Undo
+              </Button>
             </div>
           );
           if (fbStatus === 'approved') return (
@@ -180,20 +187,26 @@ function ContentGapCard({
           );
           return (
             <div className="flex items-center gap-1.5">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={ThumbsUp}
                 onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
                 disabled={loading}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
+                className="px-2 py-1 rounded-[var(--radius-sm)] text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20"
               >
-                <Icon as={ThumbsUp} size="sm" /> Relevant
-              </button>
-              <button
+                Relevant
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={ThumbsDown}
                 onClick={() => onDeclineKeyword(gap.targetKeyword, 'content_gap')}
                 disabled={loading}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                className="px-2 py-1 rounded-[var(--radius-sm)] text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20"
               >
-                <Icon as={ThumbsDown} size="sm" /> Not relevant
-              </button>
+                Not relevant
+              </Button>
             </div>
           );
         })()}
@@ -208,23 +221,28 @@ function ContentGapCard({
             );
           })()
         ) : planStatus ? (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Layers}
             onClick={() => onTabChange?.('content-plan')}
-            className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
+            className="text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20"
             title="View in Content Plan"
           >
-            <Icon as={Layers} size="md" />
             {planStatus === 'published' ? 'Published' : planStatus === 'approved' ? 'Approved' : planStatus === 'in_progress' || planStatus === 'brief_generated' ? 'In Progress' : 'Planned'}
-          </button>
+          </Button>
         ) : (
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={FileText}
               onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand font-medium hover:bg-teal-600/40"
             >
-              <Icon as={FileText} size="sm" /> Get Brief
+              Get Brief
               {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
-            </button>
+            </Button>
             {(hidePrices || fullPostPrice != null) && (
               <Button
                 variant="primary"
@@ -273,9 +291,10 @@ export function StrategyContentOpportunitiesSection({
     <div ref={newContentRef}>
       <TierGate tier={effectiveTier} required="growth" feature="Create Content" teaser={`${newContentTopicCount} content ideas identified - upgrade to unlock recommendations`}>
         <SectionCard noPadding>
-          <button
+          <ClickableRow
             onClick={() => toggleSection('new-content')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+            className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
+            aria-expanded={expandedSections.has('new-content')}
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
@@ -290,7 +309,7 @@ export function StrategyContentOpportunitiesSection({
               <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-teal-500/20">{newContentTopicCount}</span>
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('new-content') ? '' : '-rotate-90'}`} />
             </div>
-          </button>
+          </ClickableRow>
 
           {expandedSections.has('new-content') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
@@ -333,12 +352,14 @@ export function StrategyContentOpportunitiesSection({
                       ))}
                   </div>
                   {strategyData.contentGaps.length > 6 && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleSection('new-content-gaps-all')}
-                      className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
+                      className="w-full mt-3 text-center py-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
                     >
                       {expandedSections.has('new-content-gaps-all') ? 'Show fewer' : `View all ${strategyData.contentGaps.length} opportunities`}
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
@@ -369,12 +390,14 @@ export function StrategyContentOpportunitiesSection({
                     ))}
                   </div>
                   {strategyData.keywordGaps.length > 6 && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleSection('competitor-gaps-all')}
-                      className="w-full mt-2 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-full mt-2 text-center py-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                     >
                       {expandedSections.has('competitor-gaps-all') ? 'Show fewer' : `View all ${strategyData.keywordGaps.length}`}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}

@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional, post } from '../../api/client';
-import { Button, EmptyState, Icon} from '../ui';
+import { Button, EmptyState, Icon } from '../ui';
 import {
   Loader2, CheckCircle, Globe, ChevronDown, ChevronRight,
   MessageSquare, Sparkles, Shield,
@@ -208,9 +208,10 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 const desc = SCHEMA_ROLE_CLIENT_DESC[role as SchemaPageRole] || '';
                 return (
                   <div key={role}>
-                    <button
+                    <Button
                       onClick={() => toggleRole(role)}
-                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+                      variant="ghost"
+                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left rounded-none"
                     >
                       {isExpanded
                         ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
@@ -220,7 +221,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                       </span>
                       <span className="t-caption text-[var(--brand-text-muted)] flex-1 min-w-0 truncate">{desc}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">{pages.length} page{pages.length !== 1 ? 's' : ''}</span>
-                    </button>
+                    </Button>
                     {isExpanded && (
                       <div className="px-5 pb-3 pl-12 space-y-1">
                         {pages.map(pr => (
@@ -276,30 +277,35 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                     >
                       Send Feedback
                     </Button>
-                    <button
+                    <Button
                       onClick={() => { setShowFeedback(false); setFeedbackNote(''); }}
-                      className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+                      variant="ghost"
+                      className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                    icon={CheckCircle}
+                    loading={submitting}
+                    variant="ghost"
+                    className="px-5 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-teal-600 hover:bg-teal-500 text-white"
                   >
-                    {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowFeedback(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-strong)] transition-colors"
+                    icon={MessageSquare}
+                    variant="secondary"
+                    className="px-4 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-strong)]"
                   >
-                    <Icon as={MessageSquare} size="md" /> Request Changes
-                  </button>
+                    Request Changes
+                  </Button>
                 </div>
               )}
             </div>

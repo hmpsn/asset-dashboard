@@ -198,9 +198,10 @@ export function ApprovalsTab({
               { id: 'applied', label: 'Applied', count: appliedCount },
             ] as { id: FilterState; label: string; count: number }[]
           ).map(tab => (
-            <button
-              type="button"
+            <Button
               key={tab.id}
+              variant="ghost"
+              size="sm"
               onClick={() => setBatchFilter(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors ${
                 batchFilter === tab.id
@@ -216,7 +217,7 @@ export function ApprovalsTab({
                   {tab.count}
                 </span>
               )}
-            </button>
+            </Button>
           ))}
         </div>
       )}

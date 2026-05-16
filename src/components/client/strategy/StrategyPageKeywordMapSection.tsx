@@ -1,5 +1,5 @@
 import { ChevronDown, Layers } from 'lucide-react';
-import { Icon, SectionCard, TierGate, type Tier } from '../../ui';
+import { Button, Icon, SectionCard, TierGate, type Tier } from '../../ui';
 import { PageKeywordMapContent } from '../PageKeywordMapContent';
 import type { ClientKeywordStrategy } from '../types';
 
@@ -38,9 +38,10 @@ export function StrategyPageKeywordMapSection({
     <div>
       <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${pageMap.length} pages tracked`}>
         <SectionCard noPadding>
-          <button
+          <Button
             onClick={() => toggleSection('page-keyword-map')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+            variant="ghost"
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors rounded-none"
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center">
@@ -52,7 +53,7 @@ export function StrategyPageKeywordMapSection({
               </div>
             </div>
             <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('page-keyword-map') ? '' : '-rotate-90'}`} />
-          </button>
+          </Button>
 
           {expandedSections.has('page-keyword-map') && (
             <PageKeywordMapContent

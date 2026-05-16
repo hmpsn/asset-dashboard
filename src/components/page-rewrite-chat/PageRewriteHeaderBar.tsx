@@ -76,7 +76,7 @@ export function PageRewriteHeaderBar({
               variant="ghost"
               size="sm"
               onClick={onOpenCombo}
-              className={"text-[10px] text-accent-brand hover:text-accent-brand font-medium flex-shrink-0 px-0 py-0 bg-transparent hover:bg-transparent" // arbitrary-text-ok
+              className={"t-micro text-accent-brand hover:text-accent-brand font-medium flex-shrink-0 px-0 py-0 bg-transparent hover:bg-transparent" // arbitrary-text-ok
               }
             >
               Change

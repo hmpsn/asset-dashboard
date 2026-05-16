@@ -271,9 +271,11 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
   return (
     <SectionCard staggerIndex={staggerIndex} interactive>
       {/* Entry header — clickable to expand */}
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 text-left"
+        className="w-full !p-0 hover:!bg-transparent flex items-center justify-between gap-3 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="w-4 h-4 text-[var(--brand-text)] shrink-0" />
@@ -296,7 +298,7 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
             <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)]" />
           )}
         </div>
-      </button>
+      </Button>
 
       {/* Approval progress bar */}
       {copyStatus.totalSections > 0 && (
@@ -390,12 +392,14 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
       <div className="flex flex-col items-center py-6 gap-2">
         <AlertCircle className="w-5 h-5 text-accent-danger" />
         <p className="t-caption text-[var(--brand-text)]">Could not load sections.</p>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => refetch()}
-          className="t-caption text-accent-brand hover:text-accent-brand transition-colors"
+          className="!p-0 hover:!bg-transparent t-caption text-accent-brand hover:text-accent-brand transition-colors"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -524,13 +528,15 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             {!isApproving && <Check className="w-3 h-3" />}
             Approve
           </Button>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setShowSuggestForm(!showSuggestForm)}
-            className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
+            className="flex items-center gap-1.5 t-caption !px-3 !py-1.5 !rounded-[var(--radius-sm)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             <MessageSquare className="w-3 h-3" />
             Suggest Changes
-          </button>
+          </Button>
         </div>
       )}
 
@@ -566,12 +572,14 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
               {!isSuggesting && <MessageSquare className="w-3 h-3" />}
               Submit Suggestion
             </Button>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => { setShowSuggestForm(false); setSuggestedText(''); }}
-              className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              className="!p-0 hover:!bg-transparent t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

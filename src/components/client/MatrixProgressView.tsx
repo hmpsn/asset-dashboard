@@ -84,21 +84,26 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
                 >
                   Submit Flag
                 </Button>
-                <button
+                <Button
                   onClick={() => { setShowFlagForm(false); setFlagComment(''); }}
-                  className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <button
+            <Button
               onClick={() => setShowFlagForm(true)}
-              className="flex items-center gap-1.5 t-caption text-[var(--brand-text)] hover:text-accent-warning transition-colors"
+              variant="ghost"
+              size="sm"
+              icon={Flag}
+              className="t-caption text-[var(--brand-text)] hover:text-accent-warning px-0 py-0 rounded-none"
             >
-              <Icon as={Flag} size="sm" /> Flag for changes
-            </button>
+              Flag for changes
+            </Button>
           )}
         </div>
       </Modal.Body>
@@ -145,18 +150,24 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           icon={<Icon as={FileText} size="lg" className="text-accent-brand" />}
         />
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => onDownload('docx')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
+            variant="secondary"
+            size="sm"
+            icon={FileDown}
+            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
           >
-            <Icon as={FileDown} size="sm" /> Word Doc
-          </button>
-          <button
+            Word Doc
+          </Button>
+          <Button
             onClick={() => onDownload('pdf')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
           >
-            <Icon as={Download} size="sm" /> PDF
-          </button>
+            PDF
+          </Button>
         </div>
       </div>
 
