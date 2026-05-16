@@ -5869,3 +5869,16 @@ Bug hardening included:
 **Mutual:** Converts a previously prose-only expectation into a reusable planning artifact that is easy to copy and enforce across specs.
 
 **Files:** `docs/workflows/feature-spec-template.md`; `docs/PLAN_WRITING_GUIDE.md`; `docs/workflows/new-feature-checklist.md`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 428. Feature Maturity Scorecard (Wave 6 Item 6)
+**What it does:** Introduces a standardized maturity rubric for major capability placement decisions. New workflow doc `docs/workflows/feature-maturity-scorecard.md` defines an 8-dimension score (`shipped`, `documented`, `tested`, `client-visible value`, `monitored`, `monetizable`, `owner assigned`, and `intelligence/reporting integration where relevant`) with 0-2 scoring semantics, total-score thresholds, hard-stop promotion gates, and a reusable worksheet template with evidence links. Product-surface governance now requires this maturity evidence for placement recommendations via `docs/rules/product-surface-rationalization.md`, and PR process wiring now prompts scorecard completion when promoting/demoting major surfaces via `docs/workflows/pr-readiness-checklist.md`.
+
+**Agency value:** Makes surface-priority decisions less subjective by introducing repeatable, evidence-backed criteria.
+
+**Client value:** Reduces churn in navigation and feature discoverability by promoting only surfaces with proven delivery maturity.
+
+**Mutual:** Aligns product simplification decisions with operational readiness so teams can balance visibility, reliability, and monetization intentionally.
+
+**Files:** `docs/workflows/feature-maturity-scorecard.md`; `docs/rules/product-surface-rationalization.md`; `docs/workflows/pr-readiness-checklist.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

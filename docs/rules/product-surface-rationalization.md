@@ -39,6 +39,8 @@ When a new major surface is added or an existing one materially changes:
    - `npm run verify:product-surface -- --markdown`
    - `npx vitest run tests/unit/product-surface-map.test.ts`
 
+For placement recommendations (`promote`, `keep`, `hide-behind-progressive-disclosure`, `deprecate-after-redirect-window`), include a maturity score using `docs/workflows/feature-maturity-scorecard.md` so first-class navigation decisions are evidence-backed.
+
 ## Human Verification Gates
 
 These decisions must be explicitly approved by a human reviewer before rollout:

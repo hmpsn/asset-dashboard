@@ -169,8 +169,8 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "2-3h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Define a scorecard for major features: shipped, documented, tested, client-visible, monitored, monetizable, owner assigned, and integrated into intelligence/reporting where relevant. Use it to decide which features deserve first-class navigation vs support-system placement."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added `docs/workflows/feature-maturity-scorecard.md` with an explicit 8-dimension maturity rubric (shipped, documented, tested, client-visible value, monitored, monetizable, owner assigned, intelligence/reporting integration where relevant), 0-2 scoring guidance, placement thresholds, hard-stop promotion gates, and a copy/paste worksheet for evidence links. Wired the scorecard into product-surface governance and PR workflow: `docs/rules/product-surface-rationalization.md` now requires maturity scoring for placement recommendations, and `docs/workflows/pr-readiness-checklist.md` now asks for a completed scorecard when a PR promotes/demotes major surfaces."
         },
         {
           "id": "platform-org-product-surface-audit",
