@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { integrationHealth } from '../../api/misc';
+import { integrationHealth } from '../../api/platform';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 

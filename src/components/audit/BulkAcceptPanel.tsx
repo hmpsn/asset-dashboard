@@ -4,7 +4,7 @@ import { AlertTriangle, X } from 'lucide-react';
 import { IconButton } from '../ui';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { jobs as jobsApi } from '../../api/misc';
+import { jobs as jobsApi } from '../../api/platform';
 import { seoBulkJobs } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';

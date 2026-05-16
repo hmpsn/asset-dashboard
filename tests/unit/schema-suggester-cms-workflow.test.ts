@@ -34,14 +34,16 @@ describe('SchemaSuggester CMS workflow extraction', () => {
 
   it('removes legacy free-form CMS template and consistency routes from schema routes', () => {
     const routes = readFileSync('server/routes/webflow-schema.ts', 'utf-8'); // readFile-ok — legacy route removal guard
-    const api = readFileSync('src/api/seo.ts', 'utf-8'); // readFile-ok — legacy frontend wrapper removal guard
+    const schemaApi = readFileSync('src/api/schema.ts', 'utf-8'); // readFile-ok — schema wrapper ownership guard
+    const seoApi = readFileSync('src/api/seo.ts', 'utf-8'); // readFile-ok — compatibility re-export guard
 
     expect(routes).not.toContain('schema-cms-template');
     expect(routes).not.toContain('cms-template-pages');
     expect(routes).not.toContain('schema-validate-consistency');
     expect(routes).toContain('schema-graph-validation');
-    expect(api).not.toContain('/api/schema/${wsId}');
-    expect(api).toContain('schema-retract');
+    expect(schemaApi).not.toContain('/api/schema/${wsId}');
+    expect(schemaApi).toContain('schema-retract');
+    expect(seoApi).toContain("from './schema'");
   });
 
   it('keeps saved page types below active schema plans in generation authority', () => {

@@ -2,7 +2,7 @@
  * React Query hooks for schema validation data.
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { schemaValidation, type SchemaValidationRecord } from '../../api/seo';
+import { schemaValidation, type SchemaValidationRecord } from '../../api/schema';
 import type { WholeSiteSchemaGraphValidationResult } from '../../../shared/types/schema-validation';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';

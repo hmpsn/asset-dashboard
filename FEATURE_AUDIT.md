@@ -5817,3 +5817,16 @@ Bug hardening included:
 **Mutual:** Adds extraction guardrails and helper-level unit tests to lock the split and prevent model logic from drifting back into rendering modules.
 
 **Files:** `src/components/client/health-tab/healthTabModel.ts`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `tests/contract/health-tab-model-extraction.test.ts`; `tests/unit/health-tab-model.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 424. API Wrapper Domain Cleanup (Wave 6 Item 2)
+**What it does:** Completes an incremental domain split of broad frontend API wrappers while preserving compatibility. Added `src/api/platform.ts` for platform-foundation API surfaces (jobs, roadmap/features, notifications, workspace overview/home badges, integration health, observability) and `src/api/schema.ts` for schema-domain surfaces (schema retract, schema validation, schema plan, schema impact). `src/api/misc.ts` and `src/api/seo.ts` now act as compatibility facades by re-exporting moved wrappers, so existing imports continue to work while new work can target focused modules. Updated adjacent consumers to import from new domain wrappers in place (`useWorkspaceHome`, `useIntegrationHealth`, `useNotifications`, `FeatureLibrary`, `Roadmap`, `BulkAcceptPanel`, `useSchemaValidation`, `SchemaPlanPanel`, `SchemaImpactPanel`, `useSchemaSuggesterPublishingWorkflow`). Added contract coverage to lock module ownership boundaries and updated schema wrapper compatibility tests.
+
+**Agency value:** Lowers API-surface sprawl and makes ownership clearer, so wrapper edits are easier to review and less likely to cause cross-domain regressions.
+
+**Client value:** No behavior change to API calls or UX; this is a maintainability pass with preserved runtime contracts.
+
+**Mutual:** Enables gradual migration away from catch-all wrapper files without breaking existing call sites, creating safer footing for subsequent Wave 6 cleanup items.
+
+**Files:** `src/api/platform.ts`; `src/api/schema.ts`; `src/api/misc.ts`; `src/api/seo.ts`; `src/api/index.ts`; `src/hooks/admin/useWorkspaceHome.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/hooks/admin/useNotifications.ts`; `src/components/FeatureLibrary.tsx`; `src/components/Roadmap.tsx`; `src/components/audit/BulkAcceptPanel.tsx`; `src/hooks/admin/useSchemaValidation.ts`; `src/components/schema/SchemaPlanPanel.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/contract/api-wrapper-domain-cleanup.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `tests/component/audit/BulkAcceptPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

@@ -1,6 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { post, put } from '../../api/client';
-import { schema as schemaApi } from '../../api/seo';
+import { schema as schemaApi } from '../../api/schema';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../../../shared/types/schema-generation';
 import type { SchemaPageSuggestion, SchemaSuggestion } from './schemaSuggesterTypes';

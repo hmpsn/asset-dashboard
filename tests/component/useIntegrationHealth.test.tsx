@@ -4,13 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { WorkspaceIntegrationHealth } from '../../shared/types/integration-health';
 
-vi.mock('../../src/api/misc', () => ({
+vi.mock('../../src/api/platform', () => ({
   integrationHealth: {
     get: vi.fn(),
   },
 }));
 
-import { integrationHealth } from '../../src/api/misc';
+import { integrationHealth } from '../../src/api/platform';
 import { useIntegrationHealth } from '../../src/hooks/admin/useIntegrationHealth';
 
 const mockGet = vi.mocked(integrationHealth.get);
