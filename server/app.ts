@@ -91,6 +91,7 @@ import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 import { registerWebflowRoutes } from './route-groups/webflow.js';
 import { registerPublicRoutes } from './route-groups/public.js';
 import { registerContentRoutes } from './route-groups/content.js';
+import mcpRouter from './mcp/index.js';
 
 // ─── Register SEO data providers ───
 if (isLocalFakeProviderModeEnabled()) {
@@ -204,6 +205,9 @@ export function createApp(): express.Express {
     }
     next();
   });
+
+  // ─── MCP server (own Bearer-token auth, not behind APP_PASSWORD gate) ───
+  app.use('/mcp', mcpRouter);
 
   // --- Populate req.user from JWT when present (non-blocking) ---
   app.use(optionalAuth);

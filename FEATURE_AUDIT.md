@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **362 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **363 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 363. MCP Server — Intelligence Facade
+
+**What it does:** Exposes 10 read-only workspace intelligence tools via the Model Context Protocol at `POST /mcp`. Tools call the existing intelligence layer (`buildWorkspaceIntelligence()`, insights store, keyword tables) directly. Bearer-token auth via `MCP_API_KEY` env var. Compatible with Claude.ai and Claude Code MCP clients. Tools: `list_workspaces`, `get_workspace_overview`, `get_workspace_intelligence`, `get_insights`, `get_anomalies`, `get_content_decay`, `get_keyword_analysis`, `get_seo_context`, `get_client_signals`, `get_pending_work`.
+
+**Agency value:** Query workspace health, surface insights, and diagnose client issues from within Claude chat sessions without opening the dashboard. Seeds the content rewrite workflow (identify decaying pages via MCP, rewrite in Claude).
+
+**Client value:** Foundation for v2 client MCP tokens — eventually clients can query their own workspace data from any MCP-compatible AI tool.
+
+**Mutual:** Turns the intelligence layer into an agentic interface. The same data assembly that powers AdminChat becomes directly addressable by AI sessions.
 
 ---
 

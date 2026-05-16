@@ -1,5 +1,5 @@
 const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
-const LOCAL_ALLOWED_NODE_ENVS = new Set(['', 'development']);
+const LOCAL_ALLOWED_NODE_ENVS = new Set(['development']);
 
 /**
  * Local fake-provider mode is for developer onboarding only.
