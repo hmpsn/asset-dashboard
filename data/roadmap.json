@@ -151,8 +151,8 @@
           "source": "Product engineering confidence review 2026-05-13",
           "est": "3-5h",
           "priority": "P3",
-          "status": "pending",
-          "notes": "Create a script or report that ranks risky modules by line count, churn, import/export fan-in/out, TODO or hatch comments, test coverage presence, route writes without nearby integration tests, and pr-check warning concentration. Use it to prioritize refactors where they reduce real shipping risk."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added `scripts/platform-risky-module-dashboard.ts` risk analyzer and `scripts/report-risky-modules.ts` CLI wrapper. The dashboard ranks modules by weighted risk signals: line count, 90/180-day git churn, internal import fan-in/fan-out, TODO/FIXME/HACK + `*-ok` hatch density, test linkage, route write handlers lacking nearby integration tests, and `pr-check` warning-hit concentration. Added package commands (`verify:risky-modules`, `report:risky-modules`), integrated the audit into `scripts/verify-platform.ts`, documented workflow in `docs/workflows/risky-module-dashboard.md`, and added unit coverage in `tests/unit/platform-risky-module-dashboard.test.ts`."
         },
         {
           "id": "platform-org-context-required-in-specs",

@@ -5843,3 +5843,16 @@ Bug hardening included:
 **Mutual:** Reduces “works on my machine” drift by making onboarding/demo seeds deterministic, test-backed, and aligned with planned smoke coverage.
 
 **Files:** `scripts/seed-demo-workspaces.ts`; `tests/unit/seed-demo-workspaces.test.ts`; `docs/workflows/local-dev-onboarding.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 426. Risky Module Health Dashboard (Wave 6 Item 4)
+**What it does:** Adds a repeatable risk-ranking analyzer for platform-health prioritization. New script `scripts/platform-risky-module-dashboard.ts` scans module files across `server/`, `src/`, `shared/`, and `scripts/` and computes weighted risk scores from seven signals: module line count, recent git churn touch frequency, internal import graph fan-in/fan-out, TODO/FIXME/HACK + `*-ok` hatch density, test-linkage presence, route write-handler coverage gaps (write routes with no nearby integration test), and `pr-check` warning-hit concentration by file. Added a CLI wrapper (`scripts/report-risky-modules.ts`) plus package commands (`verify:risky-modules`, `report:risky-modules`) and wired the audit into `scripts/verify-platform.ts` so the scorecard can run with routine platform verification. Added workflow guidance for operational use in `docs/workflows/risky-module-dashboard.md` and unit coverage for scoring primitives and route-coverage detection in `tests/unit/platform-risky-module-dashboard.test.ts`.
+
+**Agency value:** Creates an objective triage lens so refactor effort targets modules with highest combined change/regression risk instead of ad hoc intuition.
+
+**Client value:** Lowers regression probability in high-touch areas by surfacing fragile hotspots before they cause client-visible incidents.
+
+**Mutual:** Makes platform-health cleanup measurable and repeatable by tracking risk concentration with explicit, test-backed signals.
+
+**Files:** `scripts/platform-risky-module-dashboard.ts`; `scripts/report-risky-modules.ts`; `tests/unit/platform-risky-module-dashboard.test.ts`; `scripts/verify-platform.ts`; `package.json`; `docs/workflows/risky-module-dashboard.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

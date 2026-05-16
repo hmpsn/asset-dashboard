@@ -77,6 +77,7 @@ const steps: Step[] = [
   { label: 'Deprecation lifecycle audit', cmd: 'npm', args: ['run', 'verify:deprecations'] },
   { label: 'Platform health cadence audit', cmd: 'npm', args: ['run', 'verify:platform-health-cadence'] },
   { label: 'ADR log audit', cmd: 'npm', args: ['run', 'verify:adr-log'] },
+  { label: 'Risky module dashboard audit', cmd: 'npm', args: ['run', 'verify:risky-modules', '--', '--top', '30'] },
 ];
 
 if (!isQuick) {
