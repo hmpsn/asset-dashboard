@@ -10,7 +10,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
-import { SectionCard, Icon, TierGate } from '../../ui';
+import { SectionCard, Icon, TierGate, Button } from '../../ui';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { fmtNum } from '../../../utils/formatNumbers';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming';
@@ -169,21 +169,27 @@ export function RecommendedForYou({
                 {/* Tier-aware CTA buttons */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {tier === 'premium' ? (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
                     >
-                      <Icon as={Check} size="sm" className="text-accent-brand" />
                       Generate Brief (included) &rarr;
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Sparkles}
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
                     >
-                      <Icon as={Sparkles} size="sm" className="text-accent-brand" />
                       Generate Brief &rarr;
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -275,19 +281,25 @@ export function RecommendedForYou({
       {hiddenCount > 0 && (
         <div className="mt-3 text-center">
           {expanded ? (
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => setExpanded(false)}
-              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors no-underline"
             >
               Show less
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => setExpanded(true)}
-              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors"
+              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors no-underline"
             >
               Show {hiddenCount} more
-            </button>
+            </Button>
           )}
         </div>
       )}

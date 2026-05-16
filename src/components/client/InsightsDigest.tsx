@@ -19,6 +19,7 @@ import type {
 } from './types';
 import { fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/Button';
 
 // ─── Types ───
 
@@ -520,11 +521,13 @@ export function InsightsDigest(props: InsightsDigestProps) {
           const InsightIcon = insight.icon;
           return (
             // pr-check-disable-next-line -- InsightsDigest insight card is a top-level client card intentionally using brand signature shape
-            <button
+            <Button
               key={insight.id}
+              variant="ghost"
+              size="md"
               onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
-              className="w-full bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 text-left hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group"
-              style={{ borderRadius: 'var(--radius-signature-lg)' }}
+              className="w-full block bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 text-left hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group hover:bg-[var(--surface-2)]"
+              style={{ borderRadius: 'var(--radius-signature)' }}
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">
@@ -557,19 +560,21 @@ export function InsightsDigest(props: InsightsDigestProps) {
                   {insight.action.label} <Icon as={ArrowRight} size="sm" />
                 </span>
               )}
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {hasMore && !expanded && (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setExpanded(true)}
-          className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+          className="px-0 py-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
         >
           <Icon as={ChevronDown} size="sm" />
           Show {all.length - INITIAL_COUNT} more insight{all.length - INITIAL_COUNT > 1 ? 's' : ''}
-        </button>
+        </Button>
       )}
     </div>
   );

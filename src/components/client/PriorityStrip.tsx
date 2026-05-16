@@ -1,7 +1,7 @@
 // src/components/client/PriorityStrip.tsx
 import type { LucideIcon } from 'lucide-react';
 import { CheckCircle } from 'lucide-react';
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 
 const SECTION_LABELS: Record<string, string> = {
   decisions: 'Decisions',
@@ -64,14 +64,16 @@ export function PriorityStrip({ items, showAllCaughtUp = false }: PriorityStripP
             >
               {SECTION_LABELS[item.section] ?? item.section}
             </span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={item.onCta}
               aria-label={`${item.ctaLabel} ${item.title}`}
-              className="flex-shrink-0 t-caption font-medium text-accent-brand hover:text-[var(--brand-text-bright)] transition-colors min-h-[36px] px-2"
+              className="flex-shrink-0 t-caption font-medium text-accent-brand hover:text-[var(--brand-text-bright)] hover:bg-transparent transition-colors min-h-[36px] px-2 py-0 h-auto rounded-[var(--radius-sm)]"
             >
               {item.ctaLabel}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

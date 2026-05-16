@@ -3,7 +3,7 @@ import {
   LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
-import { StatCard, EmptyState, Icon, PageHeader, SectionCard, ChartCard } from '../ui';
+import { StatCard, EmptyState, Icon, PageHeader, SectionCard, ChartCard, Button } from '../ui';
 import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -316,9 +316,8 @@ export function AnalyticsTab({
         const isSelected = ga4SelectedEvent === c.eventName;
         const pinned = isEventPinned(c.eventName);
         return (
-          <button key={i} onClick={() => loadEventTrend(c.eventName)}
-            className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}
-            style={{ borderRadius: 'var(--radius-signature)' }}>
+          <Button key={i} variant="ghost" size="sm" onClick={() => loadEventTrend(c.eventName)}
+            className={`w-full !p-4 !rounded-[var(--radius-signature)] !text-left !justify-start !items-start !flex !flex-col border transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
@@ -328,7 +327,7 @@ export function AnalyticsTab({
             </div>
             <div className="t-stat text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{c.users.toLocaleString()} users</div>
-          </button>
+          </Button>
         );
       };
       const renderPageFilter = (moduleId: string, allowedPages?: string[]) => {
@@ -398,7 +397,12 @@ export function AnalyticsTab({
           {ga4SelectedEvent && ga4EventTrend.length > 2 && (
             <ChartCard
               title={eventDisplayName(ga4SelectedEvent)}
-              action={<button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>}
+              action={(
+                <Button variant="ghost" size="sm" onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }}
+                  className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption-sm text-[var(--brand-text-muted)] hover:!text-[var(--brand-text)]">
+                  Clear
+                </Button>
+              )}
             >
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Daily event count over the selected period</p>
               <ResponsiveContainer width="100%" height={112}>
@@ -440,13 +444,14 @@ export function AnalyticsTab({
 
     {/* ── Collapsible Event Explorer ── */}
     <SectionCard noPadding>
-      <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
+      <Button variant="ghost" onClick={() => setShowExplorer(!showExplorer)}
+        className="w-full !rounded-none !px-5 !py-3 !flex !items-center !justify-between hover:!bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-accent-brand" />
           <span className="t-ui font-medium text-[var(--brand-text-bright)]">Event Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
-      </button>
+      </Button>
       {showExplorer && (
         <div className="px-5 pb-5">
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Break down events by page, or see which events fire on a specific page.</p>
@@ -469,13 +474,17 @@ export function AnalyticsTab({
                 onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
                 className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
             </div>
-            <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-              className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors flex items-center gap-1.5">
-              {explorerLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" />} Explore
-            </button>
+            <Button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+              loading={explorerLoading}
+              icon={Search}
+              className="!px-4 !py-1.5 !rounded-[var(--radius-lg)] !t-caption !font-medium transition-colors">
+              Explore
+            </Button>
             {explorerData.length > 0 && (
-              <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
-                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Clear</button>
+              <Button variant="ghost" size="sm" onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
+                className="!px-3 !py-1.5 !rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:!text-[var(--brand-text)] transition-colors">
+                Clear
+              </Button>
             )}
           </div>
           {explorerData.length > 0 && (
@@ -496,12 +505,16 @@ export function AnalyticsTab({
                     return (
                       <tr key={i} className="border-b border-[var(--brand-border)] hover:bg-[var(--surface-3)]">
                         <td className="py-2 pr-3">
-                          <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                            className="t-caption text-accent-brand hover:text-accent-brand">{eventDisplayName(row.eventName)}</button>
+                          <Button variant="ghost" size="sm" onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
+                            className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption !text-accent-brand hover:!text-accent-brand">
+                            {eventDisplayName(row.eventName)}
+                          </Button>
                         </td>
                         <td className="py-2 pr-3">
-                          <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                            className="t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                          <Button variant="ghost" size="sm" onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
+                            className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption !text-[var(--brand-text)] hover:!text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">
+                            {row.pagePath}
+                          </Button>
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">

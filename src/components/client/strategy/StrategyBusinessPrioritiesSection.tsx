@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { Briefcase, ChevronDown, Plus, X } from 'lucide-react';
-import { Icon, SectionCard } from '../../ui';
+import { Button, Icon, IconButton, SectionCard } from '../../ui';
 import type { StrategyBusinessPriority } from './useStrategyBusinessPriorities';
 
 interface StrategyBusinessPrioritiesSectionProps {
@@ -52,9 +52,10 @@ export function StrategyBusinessPrioritiesSection({
   return (
     <div ref={businessPrioritiesRef}>
       <SectionCard noPadding>
-        <button
+        <Button
           onClick={() => toggleSection('business-priorities')}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+          variant="ghost"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors rounded-none"
         >
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
@@ -70,7 +71,7 @@ export function StrategyBusinessPrioritiesSection({
             </div>
           </div>
           <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('business-priorities') ? '' : '-rotate-90'}`} />
-        </button>
+        </Button>
 
         {expandedSections.has('business-priorities') && (
           <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
@@ -84,17 +85,18 @@ export function StrategyBusinessPrioritiesSection({
                   <div key={`${p.category}:${p.text}`} className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/50 group">
                     <span className={`t-micro font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${priorityCategoryClass(p.category)}`}>{p.category}</span>
                     <span className="t-caption-sm text-[var(--brand-text)] flex-1">{p.text}</span>
-                    <button
+                    <IconButton
                       onClick={() => {
                         const next = priorities.filter((_, j) => j !== i);
                         savePriorities(next);
                       }}
                       disabled={savingPriorities}
-                      aria-label={`Remove ${p.category} priority: ${p.text}`}
-                      className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all disabled:opacity-50"
-                    >
-                      <Icon as={X} size="md" />
-                    </button>
+                      icon={X}
+                      label={`Remove ${p.category} priority: ${p.text}`}
+                      size="sm"
+                      variant="danger"
+                      className="opacity-0 group-hover:opacity-100 transition-all"
+                    />
                   </div>
                 ))}
               </div>
@@ -124,13 +126,16 @@ export function StrategyBusinessPrioritiesSection({
                 placeholder="e.g., We're launching a new product line in Q3..."
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
               />
-              <button
+              <Button
                 onClick={addPriority}
                 disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
-                className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
+                variant="secondary"
+                size="sm"
+                icon={Plus}
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand font-medium hover:bg-teal-600/30 transition-colors disabled:opacity-40"
               >
-                <Icon as={Plus} size="sm" /> Add
-              </button>
+                Add
+              </Button>
             </div>
             {priorities.length >= 10 && (
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">Maximum 10 priorities reached</p>

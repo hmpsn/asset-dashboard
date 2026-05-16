@@ -164,15 +164,17 @@ export function ClientAuthGate({
 
           {/* Mode switch link when both modes are available */}
           {showsBothModes && loginTab === 'password' && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={() => {
                 setLoginTab('user');
                 setAuthError('');
               }}
-              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] mb-4 transition-colors"
+              className="w-full py-1 mb-4 text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
             >
               Sign in with your email instead
-            </button>
+            </Button>
           )}
 
           {/* Individual user login / forgot / reset form */}
@@ -188,17 +190,20 @@ export function ClientAuthGate({
                         If an account exists with that email, we've sent a password reset link.
                       </p>
                     </div>
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="lg"
                       onClick={() => {
                         setLoginView('login');
                         setForgotSent(false);
                         setForgotEmail('');
                         setAuthError('');
                       }}
-                      className="w-full py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-body font-medium transition-all"
+                      className="w-full rounded-[var(--radius-xl)] text-[var(--brand-text)]"
                     >
                       Back to Sign In
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <form onSubmit={handleForgotPasswordSubmit} className="space-y-3">
@@ -227,16 +232,18 @@ export function ClientAuthGate({
                     >
                       {authLoading ? '' : 'Send Reset Link'}
                     </Button>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setLoginView('login');
                         setAuthError('');
                       }}
-                      className="w-full py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-full py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                     >
                       Back to Sign In
-                    </button>
+                    </Button>
                   </form>
                 )}
               </div>
@@ -339,27 +346,31 @@ export function ClientAuthGate({
                 >
                   {authLoading ? '' : 'Sign In'}
                 </Button>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setLoginView('forgot');
                     setAuthError('');
                   }}
-                  className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                  className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                 >
                   Forgot your password?
-                </button>
+                </Button>
                 {showsBothModes && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setLoginTab('password');
                       setAuthError('');
                     }}
-                    className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                    className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                   >
                     Have a shared password instead?
-                  </button>
+                  </Button>
                 )}
               </form>
             )

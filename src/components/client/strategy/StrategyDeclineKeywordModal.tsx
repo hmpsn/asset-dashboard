@@ -1,5 +1,5 @@
 import { ThumbsDown } from 'lucide-react';
-import { Icon } from '../../ui';
+import { Button } from '../../ui';
 import { Modal } from '../../ui/overlay/Modal';
 
 interface StrategyDeclineKeywordModalProps {
@@ -35,18 +35,23 @@ export function StrategyDeclineKeywordModal({
       </Modal.Body>
       <Modal.Footer>
         <div className="flex items-center justify-end gap-2 w-full">
-          <button
+          <Button
             onClick={onClose}
-            className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+            variant="ghost"
+            size="sm"
+            className="px-3 py-1.5 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-red-600/20 border border-red-500/30 t-caption-sm text-accent-danger font-medium hover:bg-red-600/30 transition-colors flex items-center gap-1"
+            variant="secondary"
+            size="sm"
+            icon={ThumbsDown}
+            className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-red-600/20 border border-red-500/30 text-accent-danger font-medium hover:bg-red-600/30 transition-colors"
           >
-            <Icon as={ThumbsDown} size="sm" /> Decline Keyword
-          </button>
+            Decline Keyword
+          </Button>
         </div>
       </Modal.Footer>
     </Modal>

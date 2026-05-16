@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { IconButton } from '../ui';
 
 interface GlossaryEntry {
   term: string;
@@ -160,13 +161,15 @@ export function Explainer({ term }: { term: string }) {
 
   return (
     <span className="relative inline-flex items-center" ref={ref}>
-      <button
+      <IconButton
         onClick={() => setOpen(!open)}
-        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors focus:outline-none"
-        aria-label={`Learn about ${entry.term}`}
-      >
-        <HelpCircle className="w-3 h-3" />
-      </button>
+        icon={HelpCircle}
+        label={`Learn about ${entry.term}`}
+        size="sm"
+        variant="ghost"
+        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand hover:bg-transparent transition-colors"
+        aria-expanded={open}
+      />
       {open && (
         // pr-check-disable-next-line -- Glossary term tooltip/popover; absolutely positioned floating element, not a content card
         <div className="absolute z-[var(--z-modal)] bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">

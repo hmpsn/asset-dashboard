@@ -23,12 +23,12 @@ function renderBodyParagraph(body: string, extraClass = '', marginLeftPx?: numbe
   if (!body) return '';
   const classPart = extraClass ? ` ${extraClass}` : '';
   const stylePart = typeof marginLeftPx === 'number' ? ` style="margin-left:${marginLeftPx}px"` : '';
-  return `<p class="text-[13px] text-slate-500 leading-[1.7] mb-3${classPart}"${stylePart}>${escapeHtml(body)}</p>`; // arbitrary-text-ok
+  return `<p class="t-caption text-slate-500 leading-[1.7] mb-3${classPart}"${stylePart}>${escapeHtml(body)}</p>`; // arbitrary-text-ok
 }
 
 export function buildDocHtml(data: PageData): string {
   const parts: string[] = [
-    `<h1 data-section="${escapeHtml(toSectionSlug(data.title))}" class="text-[20px] font-bold text-slate-100 mb-3">${escapeHtml(data.title)}</h1>`, // arbitrary-text-ok
+    `<h1 data-section="${escapeHtml(toSectionSlug(data.title))}" class="text-xl font-bold text-slate-100 mb-3">${escapeHtml(data.title)}</h1>`, // arbitrary-text-ok
   ];
 
   if (data.preamble) parts.push(renderBodyParagraph(data.preamble));
@@ -36,15 +36,15 @@ export function buildDocHtml(data: PageData): string {
   for (const section of data.sections) {
     const slug = toSectionSlug(section.heading);
     if (section.level === 1) {
-      parts.push(`<h1 data-section="${escapeHtml(slug)}" class="text-[20px] font-bold text-slate-100 mb-2 mt-5">${escapeHtml(section.heading)}</h1>${renderBodyParagraph(section.body)}`); // arbitrary-text-ok
+      parts.push(`<h1 data-section="${escapeHtml(slug)}" class="text-xl font-bold text-slate-100 mb-2 mt-5">${escapeHtml(section.heading)}</h1>${renderBodyParagraph(section.body)}`); // arbitrary-text-ok
     } else if (section.level === 2) {
-      parts.push(`<h2 data-section="${escapeHtml(slug)}" class="text-[15px] font-semibold text-slate-300 mb-2 mt-5">${escapeHtml(section.heading)}</h2>${renderBodyParagraph(section.body)}`); // arbitrary-text-ok
+      parts.push(`<h2 data-section="${escapeHtml(slug)}" class="t-page font-semibold text-slate-300 mb-2 mt-5">${escapeHtml(section.heading)}</h2>${renderBodyParagraph(section.body)}`); // arbitrary-text-ok
     } else if (section.level === 3) {
-      parts.push(`<h3 data-section="${escapeHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">${escapeHtml(section.heading)}</h3>${renderBodyParagraph(section.body, 'ml-3')}`); // arbitrary-text-ok
+      parts.push(`<h3 data-section="${escapeHtml(slug)}" class="text-xs font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">${escapeHtml(section.heading)}</h3>${renderBodyParagraph(section.body, 'ml-3')}`); // arbitrary-text-ok
     } else {
       const extraIndent = (section.level - 3) * 12;
       const marginLeftPx = 12 + extraIndent;
-      parts.push(`<h4 data-section="${escapeHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style="margin-left:${marginLeftPx}px">${escapeHtml(section.heading)}</h4>${renderBodyParagraph(section.body, '', marginLeftPx)}`); // arbitrary-text-ok
+      parts.push(`<h4 data-section="${escapeHtml(slug)}" class="text-xs font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style="margin-left:${marginLeftPx}px">${escapeHtml(section.heading)}</h4>${renderBodyParagraph(section.body, '', marginLeftPx)}`); // arbitrary-text-ok
     }
   }
 

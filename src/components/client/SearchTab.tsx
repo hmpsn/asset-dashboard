@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, PageHeader} from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, PageHeader, Button } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -178,9 +178,15 @@ export function SearchTab({
         <>
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
-              <button key={st} type="button" onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-[var(--radius-md)] t-ui font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
-              >{st === 'queries' ? 'Queries' : 'Pages'}</button>
+              <Button
+                key={st}
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchSubTab(st)}
+                className={`rounded-[var(--radius-md)] t-ui font-medium ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+              >
+                {st === 'queries' ? 'Queries' : 'Pages'}
+              </Button>
             ))}
           </div>
           <table className="w-full t-caption">
@@ -188,11 +194,16 @@ export function SearchTab({
               <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
               {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                 <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                  <button type="button" onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text)]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort(key)}
+                    className="ml-auto px-0 py-0 hover:bg-transparent hover:text-[var(--brand-text)]"
+                  >
                     {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
                     {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                  </button>
+                  </Button>
                 </th>
               ))}
             </tr></thead>

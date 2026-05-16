@@ -161,10 +161,11 @@ export function OnboardingWizard({
 
             <div className="px-6 py-4 space-y-2">
               {suggestedActions.map((a, i) => (
-                <button
+                <Button
                   key={i}
+                  variant="ghost"
                   onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab, betaMode)); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
+                  className={`w-full justify-start gap-3 px-4 py-3 rounded-[var(--radius-xl)] border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
                 >
                   <div className={`w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 flex items-center justify-center flex-shrink-0`}>
                     <a.icon className={`w-4 h-4 ${a.color}`} />
@@ -174,7 +175,7 @@ export function OnboardingWizard({
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{a.desc}</div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-[var(--brand-border)] group-hover:text-[var(--brand-text)] transition-colors flex-shrink-0" />
-                </button>
+                </Button>
               ))}
             </div>
           </>
@@ -183,13 +184,13 @@ export function OnboardingWizard({
         {/* Navigation */}
         <div className="px-6 pb-6 flex items-center justify-between gap-3">
           {stepIdx > 0 ? (
-            <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+            <Button variant="secondary" onClick={prev} className="gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]">
               <ChevronLeft className="w-3.5 h-3.5" /> Back
-            </button>
+            </Button>
           ) : (
-            <button onClick={onDismiss} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+            <Button variant="ghost" size="sm" onClick={onDismiss} className="px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
               Skip for now
-            </button>
+            </Button>
           )}
 
           {stepIdx < STEPS.length - 1 ? (

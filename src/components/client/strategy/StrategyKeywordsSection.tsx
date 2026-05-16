@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Target, Trash2, X } from 'lucide-react';
-import { Button, EmptyState, Icon, SectionCard, Skeleton } from '../../ui';
+import { Button, EmptyState, Icon, IconButton, SectionCard, Skeleton } from '../../ui';
 import {
   ROLE_DISPLAY_LABELS,
   type PriorityKeywordItem,
@@ -167,19 +167,20 @@ export function StrategyKeywordsSection({
                       {isOpen ? (
                         <span className="text-teal-400 t-caption flex-shrink-0 select-none">→</span>
                       ) : (
-                        <button
+                        <IconButton
                           type="button"
-                          aria-label={`Remove ${row.label} from strategy`}
+                          icon={Trash2}
+                          label={`Remove ${row.label} from strategy`}
                           title="Remove from strategy"
-                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-2)] transition-colors disabled:opacity-40"
+                          size="sm"
+                          variant="ghost"
+                          className="flex-shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-[var(--surface-2)]"
                           disabled={isRemoving}
                           onClick={e => {
                             e.stopPropagation();
                             void removePriorityKeyword(row);
                           }}
-                        >
-                          <Icon as={Trash2} size="xs" />
-                        </button>
+                        />
                       )}
                     </div>
                   );
@@ -233,10 +234,12 @@ export function StrategyKeywordsSection({
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      size="sm"
                       aria-label={`Add ${row.label} to strategy`}
-                      className="t-caption text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap disabled:opacity-40"
+                      className="t-caption text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap no-underline"
                       disabled={addingKeyword}
                       onClick={e => {
                         e.stopPropagation();
@@ -244,19 +247,20 @@ export function StrategyKeywordsSection({
                       }}
                     >
                       Add to strategy
-                    </button>
-                    <button
+                    </Button>
+                    <IconButton
                       type="button"
-                      aria-label={`Dismiss ${row.label}`}
-                      className="w-6 h-6 flex items-center justify-center text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
+                      icon={X}
+                      label={`Dismiss ${row.label}`}
+                      size="sm"
+                      variant="ghost"
+                      className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                       disabled={isLoadingFeedback(row.label)}
                       onClick={e => {
                         e.stopPropagation();
                         void submitFeedback(row.label, 'declined', 'suggestion');
                       }}
-                    >
-                      <Icon as={X} size="xs" />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}

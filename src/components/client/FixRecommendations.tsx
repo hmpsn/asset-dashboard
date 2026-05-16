@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, ArrowUp, ArrowDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
-import { SectionCard } from '../ui';
+import { Button, SectionCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
@@ -481,10 +481,15 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   {/* Top affected pages (traffic-sorted) */}
                   {hasPages && !cat.isManual && (
                     <div className="mt-3">
-                      <button onClick={() => toggleCategory(cat.id)} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors mb-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCategory(cat.id)}
+                        className="!p-0 !rounded-none hover:!bg-transparent flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors mb-1.5"
+                      >
                         <Icon as={ChevronDown} size="sm" className={`transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         Top pages that would benefit most
-                      </button>
+                      </Button>
                       {isExpanded && (
                         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] overflow-hidden">
                           <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-1.5 t-micro text-[var(--brand-text-muted)] border-b border-[var(--brand-border)]">
@@ -526,10 +531,14 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                         <span className="t-caption-sm text-accent-warning">Included in your Premium plan</span>
                       </div>
                     ) : cat.isManual ? (
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-1.5 !px-3 !py-1.5 !rounded-[var(--radius-md)] t-caption-sm font-medium"
+                      >
                         <Icon as={MessageSquare} size="sm" />
                         Request a Quote
-                      </button>
+                      </Button>
                     ) : inCart ? (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                         <Icon as={ShoppingCart} size="sm" />
@@ -538,8 +547,10 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {cat.options.map((opt, idx) => (
-                          <button
+                          <Button
                             key={idx}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => cart?.addItem({
                               productType: opt.productType as ProductType,
                               displayName: opt.displayName,
@@ -549,13 +560,13 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                             })}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                               opt.isSuggested
-                                ? 'bg-teal-600 hover:bg-teal-500 text-white'
-                                : 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                                ? '!bg-teal-600 hover:!bg-teal-500 !text-white'
+                                : '!bg-[var(--surface-3)] hover:!bg-[var(--brand-border-hover)] !text-[var(--brand-text-bright)]'
                             }`}
                           >
                             <Icon as={ShoppingCart} size="sm" />
                             {opt.buttonLabel}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     )}
@@ -581,7 +592,9 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                 </div>
               )}
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 autoCategories.forEach(cat => {
                   const suggested = cat.options.find(o => o.isSuggested);
@@ -596,11 +609,11 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   }
                 });
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              className="flex items-center gap-1.5 !px-3 !py-1.5 !rounded-[var(--radius-md)] t-caption-sm font-medium !bg-teal-600 hover:!bg-teal-500 !text-white transition-colors"
             >
               <Icon as={ShoppingCart} size="sm" />
               Add All to Cart
-            </button>
+            </Button>
           </div>
         </div>
       )}

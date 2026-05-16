@@ -1,5 +1,5 @@
 import { Ban, ChevronDown, Undo2 } from 'lucide-react';
-import { Icon, SectionCard } from '../../ui';
+import { Button, Icon, SectionCard } from '../../ui';
 import type { KeywordFeedbackStatus } from './useStrategyKeywordFeedback';
 
 interface StrategyDeclinedKeywordsSectionProps {
@@ -22,9 +22,10 @@ export function StrategyDeclinedKeywordsSection({
 
   return (
     <SectionCard noPadding>
-      <button
+      <Button
         onClick={() => toggleSection('declined-keywords')}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+        variant="ghost"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors rounded-none"
       >
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-red-500/20 flex items-center justify-center">
@@ -36,7 +37,7 @@ export function StrategyDeclinedKeywordsSection({
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('declined-keywords') ? '' : '-rotate-90'}`} />
-      </button>
+      </Button>
 
       {expandedSections.has('declined-keywords') && (
         <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
@@ -45,13 +46,16 @@ export function StrategyDeclinedKeywordsSection({
             {declined.map(([kw]) => (
               <div key={kw} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
                 <span className="t-caption-sm text-accent-danger">{kw}</span>
-                <button
+                <Button
                   onClick={() => undoFeedback(kw)}
                   disabled={isLoadingFeedback(kw)}
-                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors flex items-center gap-0.5 disabled:opacity-50"
+                  variant="ghost"
+                  size="sm"
+                  icon={Undo2}
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors px-1 py-0.5 disabled:opacity-50"
                 >
-                  <Icon as={Undo2} size="sm" /> Restore
-                </button>
+                  Restore
+                </Button>
               </div>
             ))}
           </div>

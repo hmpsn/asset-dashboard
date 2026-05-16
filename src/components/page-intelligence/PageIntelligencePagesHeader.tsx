@@ -143,7 +143,7 @@ export function PageIntelligencePagesHeader({
           <div className="flex items-center gap-2 mb-2">
             <Icon as={Zap} size="md" className="text-accent-warning" />
             <span className="t-caption font-semibold text-accent-warning">Fix These First</span>
-            <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>{/* // arbitrary-text-ok */}
+            <span className="t-micro text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>{/* // arbitrary-text-ok */}
           </div>
           <div className="space-y-1.5">
             {fixQueue.map((item, i) => (
@@ -152,21 +152,21 @@ export function PageIntelligencePagesHeader({
                 onClick={() => onToggleFixQueuePage(item.page.id)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
-                <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>{/* // arbitrary-text-ok */}
+                <span className="t-micro font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>{/* // arbitrary-text-ok */}
                 <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
                 {item.impressions > 0 && (
                   <span
-                    className="text-[10px] text-[var(--brand-text-muted)]" // arbitrary-text-ok
+                    className="t-micro text-[var(--brand-text-muted)]" // arbitrary-text-ok
                   >{item.impressions.toLocaleString()} imp</span>
                 )}
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
+                <span className={`t-micro font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
                   item.score < 40 ? 'text-accent-danger bg-red-500/10' :
                   item.score < 60 ? 'text-accent-warning bg-amber-500/10' :
                   'text-accent-warning bg-yellow-500/10'
                 }`}>
                   {item.score}/100
                 </span>
-                <span className="text-[10px] text-accent-warning font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
+                <span className="t-micro text-accent-warning font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
               </ClickableRow>
             ))}
           </div>

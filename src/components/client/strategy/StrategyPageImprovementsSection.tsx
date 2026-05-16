@@ -1,7 +1,7 @@
 import { useState, type RefObject } from 'react';
 import { ChartNoAxesCombined, ChevronDown, MessageCircle, Zap } from 'lucide-react';
 import { post } from '../../../api';
-import { Icon, SectionCard } from '../../ui';
+import { Button, Icon, SectionCard } from '../../ui';
 import type { ClientKeywordStrategy } from '../types';
 import { kdColor } from './strategyKeywordDisplay';
 
@@ -68,9 +68,11 @@ export function StrategyPageImprovementsSection({
   return (
     <div ref={optimizeExistingRef}>
       <SectionCard noPadding>
-        <button
+        <Button
+          variant="ghost"
+          aria-expanded={expandedSections.has('optimize-existing')}
           onClick={() => toggleSection('optimize-existing')}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors rounded-none"
         >
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center">
@@ -85,7 +87,7 @@ export function StrategyPageImprovementsSection({
             <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-amber-500/20">{totalPageImprovements}</span>
             <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('optimize-existing') ? '' : '-rotate-90'}`} />
           </div>
-        </button>
+        </Button>
 
         {expandedSections.has('optimize-existing') && (
           <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
@@ -114,12 +116,14 @@ export function StrategyPageImprovementsSection({
                     );
                   })}
                   {strategyData.quickWins.length > 3 && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleSection('quick-wins-all')}
-                      className="w-full text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-full text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors bg-transparent hover:bg-transparent"
                     >
                       {expandedSections.has('quick-wins-all') ? 'Show fewer' : `View all ${strategyData.quickWins.length}`}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -156,7 +160,10 @@ export function StrategyPageImprovementsSection({
                           )}
                         </div>
                         {workspaceId && (
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={MessageCircle}
                             onClick={async () => {
                               if (discussingGrowthPage === page.pagePath) return;
                               const topic = `Discuss optimization for ${page.pageTitle || page.pagePath}`;
@@ -178,23 +185,24 @@ export function StrategyPageImprovementsSection({
                               }
                             }}
                             disabled={discussingGrowthPage === page.pagePath}
-                            className="px-2.5 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] transition-colors flex items-center gap-1 disabled:opacity-50"
+                            className="px-2.5 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] transition-colors"
                           >
-                            <Icon as={MessageCircle} size="sm" />
                             {discussingGrowthPage === page.pagePath ? 'Requesting...' : 'Request Review'}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
                 {growthOpportunityPages.length > 3 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => toggleSection('growth-opportunities-all')}
-                    className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
+                    className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)] bg-transparent hover:bg-transparent"
                   >
                     {expandedSections.has('growth-opportunities-all') ? 'Show fewer' : `View all ${growthOpportunityPages.length} opportunities`}
-                  </button>
+                  </Button>
                 )}
               </>
             )}

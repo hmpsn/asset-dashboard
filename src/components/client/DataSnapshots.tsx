@@ -11,7 +11,7 @@ import type {
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { fmtNum as formatNum } from '../../utils/formatNumbers';
-import { SectionCard, TrendBadge } from '../ui';
+import { Button, SectionCard, TrendBadge } from '../ui';
 
 // ─── Helpers ───
 
@@ -58,9 +58,15 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       title="Google Search"
       titleIcon={<Icon as={Globe} size="md" className="text-accent-info" />}
       action={
-        <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
+        <Button
+          onClick={onViewMore}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto min-h-0 p-0 gap-0.5 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand hover:text-accent-brand hover:bg-transparent"
+        >
           View details <Icon as={ArrowRight} size="sm" />
-        </button>
+        </Button>
       }
     >
       <div className="space-y-4">
@@ -168,9 +174,15 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       title="Website Visitors"
       titleIcon={<Icon as={Users} size="md" className="text-accent-brand" />}
       action={
-        <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
+        <Button
+          onClick={onViewMore}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto min-h-0 p-0 gap-0.5 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand hover:text-accent-brand hover:bg-transparent"
+        >
           View details <Icon as={ArrowRight} size="sm" />
-        </button>
+        </Button>
       }
     >
       <div className="space-y-4">

@@ -39,9 +39,9 @@ export interface ChatMessage {
 // className assignment, not to React UI chrome. Exempt from Phase 5
 // arbitrary-px rule (kickoff §6.4 document-content exception).
 export const HEADING_CLASSES: Record<string, string> = { // arbitrary-text-ok
-  h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5', // arbitrary-text-ok
-  h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5', // arbitrary-text-ok
-  h3: 'text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700', // arbitrary-text-ok
+  h1: 'text-xl font-bold text-slate-100 mb-2 mt-5', // arbitrary-text-ok
+  h2: 't-page font-semibold text-slate-300 mb-2 mt-5', // arbitrary-text-ok
+  h3: 'text-xs font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700', // arbitrary-text-ok
 };
 
 export const QUICK_PROMPTS = [
