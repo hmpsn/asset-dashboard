@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart3, Clock } from 'lucide-react';
-import { schemaImpact as schemaImpactApi, type SchemaDeploymentImpact, type SchemaImpactData } from '../../api/seo';
+import { schemaImpact as schemaImpactApi, type SchemaDeploymentImpact, type SchemaImpactData } from '../../api/schema';
 import { Button, Icon, cn, TrendBadge } from '../ui';
 
 export function useSchemaImpactData(workspaceId?: string) {

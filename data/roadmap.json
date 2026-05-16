@@ -123,8 +123,8 @@
           "source": "Product engineering organization review 2026-05-13",
           "est": "2-4h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Gradually split broad API wrappers such as src/api/misc.ts and src/api/seo.ts into domain-specific API modules as adjacent features are touched. Keep exports backward-compatible during each migration and avoid moving unrelated endpoints purely for tidiness."
+          "status": "done",
+          "notes": "Shipped 2026-05-16: completed an incremental, backward-compatible API-wrapper domain split. Added `src/api/platform.ts` (jobs/roadmap/features/notifications/workspace-home/observability surfaces) and `src/api/schema.ts` (schema/schema-validation/schema-plan/schema-impact surfaces), then converted `src/api/misc.ts` and `src/api/seo.ts` into compatibility re-export facades for those moved wrappers. Updated adjacent consumers to import from new domain modules (`useWorkspaceHome`, `useIntegrationHealth`, `useNotifications`, `FeatureLibrary`, `Roadmap`, `BulkAcceptPanel`, `useSchemaValidation`, `SchemaPlanPanel`, `SchemaImpactPanel`, `useSchemaSuggesterPublishingWorkflow`). Added contract guardrails (`tests/contract/api-wrapper-domain-cleanup.test.ts`) plus compatibility test updates to lock ownership boundaries while preserving legacy import paths."
         },
         {
           "id": "platform-org-architecture-drift-checks",

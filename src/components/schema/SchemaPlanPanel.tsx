@@ -7,7 +7,7 @@ import {
   Loader2, Sparkles, Send, CheckCircle, AlertCircle,
   ChevronDown, ChevronRight, Globe, Zap, HelpCircle, Trash2,
 } from 'lucide-react';
-import { schemaPlan } from '../../api/seo';
+import { schemaPlan } from '../../api/schema';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
 import { Icon, cn, Button } from '../ui';
