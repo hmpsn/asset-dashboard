@@ -3,6 +3,11 @@ import { getSafe, post } from '../../../api/client';
 import type { AuditDetail, PageAuditResult } from '../types';
 import { toLiveUrl } from '../utils';
 import { buildContentImprovementRequest } from '../../../lib/health-tab-content-request';
+import {
+  buildCategoryStats,
+  countInfoIssues,
+  filterAuditPages,
+} from './healthTabModel';
 
 export type SeverityFilter = 'all' | 'error' | 'warning' | 'info';
 export type ViewMode = 'by-page' | 'by-fix-type';
@@ -112,48 +117,26 @@ export function useHealthTabShell({
   };
 
   const filteredPages = useMemo(
-    () =>
-      auditDetail?.audit.pages.filter((page) => {
-        if (
-          auditSearch &&
-          !page.page.toLowerCase().includes(auditSearch.toLowerCase()) &&
-          !toLiveUrl(page.url, liveDomain).toLowerCase().includes(auditSearch.toLowerCase())
-        ) {
-          return false;
-        }
-        if (severityFilter === 'all') {
-          if (!showInfoItems) return page.issues.some((issue) => issue.severity !== 'info');
-          return true;
-        }
-        if (severityFilter === 'info') return page.issues.some((issue) => issue.severity === 'info');
-        return page.issues.some((issue) => issue.severity === severityFilter);
-      }) ?? [],
+    () => {
+      if (!auditDetail) return [];
+
+      return filterAuditPages(
+        auditDetail.audit.pages,
+        auditSearch,
+        severityFilter,
+        showInfoItems,
+        (url) => toLiveUrl(url, liveDomain),
+      );
+    },
     [auditDetail, auditSearch, liveDomain, severityFilter, showInfoItems],
   );
 
   const categoryStats = useMemo(() => {
-    const cats: Record<string, { errors: number; warnings: number; infos: number }> = {};
-    if (!auditDetail) return cats;
-    auditDetail.audit.pages.forEach((page) =>
-      page.issues.forEach((issue) => {
-        const category = issue.category || 'other';
-        if (!cats[category]) cats[category] = { errors: 0, warnings: 0, infos: 0 };
-        if (issue.severity === 'error') cats[category].errors++;
-        else if (issue.severity === 'warning') cats[category].warnings++;
-        else cats[category].infos++;
-      }),
-    );
-    return cats;
+    return buildCategoryStats(auditDetail);
   }, [auditDetail]);
 
   const infoIssueCount = useMemo(
-    () =>
-      auditDetail
-        ? auditDetail.audit.pages.reduce(
-            (sum, page) => sum + page.issues.filter((issue) => issue.severity === 'info').length,
-            0,
-          )
-        : 0,
+    () => countInfoIssues(auditDetail),
     [auditDetail],
   );
 

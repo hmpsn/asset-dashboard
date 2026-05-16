@@ -5792,3 +5792,16 @@ Bug hardening included:
 **Mutual:** Establishes extraction contracts (`tests/contract/*-shell-extraction.test.ts`) and updates deep-link route-map parsing to keep architecture improvements measurable and guarded in CI.
 
 **Files:** `src/components/client/HealthTab.tsx`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `src/components/client/InboxTab.tsx`; `src/components/client/inbox/useInboxTabShell.ts`; `src/components/client/inbox/inbox-filter.ts`; `src/components/client/inbox/InboxTabLayouts.tsx`; `src/components/ClientDashboard.tsx`; `src/components/client/client-dashboard/useClientWorkspaceBootstrap.ts`; `src/components/client/client-dashboard/clientDashboardNav.ts`; `src/components/client/client-dashboard/ClientDashboardTabContent.tsx`; `tests/contract/health-tab-phase1-shell-extraction.test.ts`; `tests/contract/inbox-tab-phase2-shell-extraction.test.ts`; `tests/contract/client-dashboard-phase3-shell-extraction.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 423. HealthTab Model Centralization Follow-Up (Wave 6)
+**What it does:** Adds a focused follow-up on top of the existing HealthTab shell/sections decomposition by extracting repeated pure model logic into `src/components/client/health-tab/healthTabModel.ts`. The new model module now owns check-impact copy lookup, filtered page derivation, category-stat aggregation, informational-issue counting, and by-fix-type grouping logic. `useHealthTabShell` now delegates derived state calculation to model helpers, and `HealthTabSections` delegates fix-type grouping and impact-text lookup to the same shared model module.
+
+**Agency value:** Reduces duplicated logic across shell and section modules, making behavior changes easier to review and less likely to drift between views.
+
+**Client value:** No route/UI contract change; health-tab behavior remains consistent while maintainability improves.
+
+**Mutual:** Adds extraction guardrails and helper-level unit tests to lock the split and prevent model logic from drifting back into rendering modules.
+
+**Files:** `src/components/client/health-tab/healthTabModel.ts`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `tests/contract/health-tab-model-extraction.test.ts`; `tests/unit/health-tab-model.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
