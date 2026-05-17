@@ -146,7 +146,7 @@ export function PageRewriteDocumentPane({
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none"
+            className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
           />
 
           {toolbarPos && (

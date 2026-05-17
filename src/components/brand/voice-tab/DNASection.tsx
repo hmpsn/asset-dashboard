@@ -86,7 +86,7 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
             onChange={setNewTrait}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
             placeholder="e.g. Witty but never sarcastic"
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
           <Button
             type="button"
@@ -145,7 +145,7 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
             value={dna.sentenceStyle}
             onChange={value => setDna(prev => ({ ...prev, sentenceStyle: value }))}
             placeholder="e.g. Short punchy lines with occasional longer payoff"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
 
@@ -157,7 +157,7 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
             value={dna.vocabularyLevel}
             onChange={value => setDna(prev => ({ ...prev, vocabularyLevel: value }))}
             placeholder="e.g. Conversational, 8th grade reading level"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
 
@@ -169,7 +169,7 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
             value={dna.humorStyle ?? ''}
             onChange={value => setDna(prev => ({ ...prev, humorStyle: value }))}
             placeholder="e.g. Self-deprecating, observational"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
       </div>

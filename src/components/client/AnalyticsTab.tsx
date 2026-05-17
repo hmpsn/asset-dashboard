@@ -471,7 +471,7 @@ export function AnalyticsTab({
               <FormInput value={explorerPage} onChange={setExplorerPage}
                 placeholder="/contact, /blog, etc."
                 onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
             </div>
             <Button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
               loading={explorerLoading}

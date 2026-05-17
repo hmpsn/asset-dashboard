@@ -58,7 +58,7 @@ export function PageIntelligenceAnalysisSection({
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
           <div className="t-label text-[var(--brand-text-muted)] mb-1">Optimization</div>
-          <div className={`t-stat ${scoreColorClass(analysis.optimizationScore)}`}>
+          <div className={`t-h2 ${scoreColorClass(analysis.optimizationScore)}`}>
             {analysis.optimizationScore}<span className="t-caption font-normal text-[var(--brand-text-muted)]">/100</span>
           </div>
           <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -204,14 +204,14 @@ export function PageIntelligenceAnalysisSection({
           </div>
           <div className="grid grid-cols-4 gap-3 mb-3">
             <div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentScore.wordCount}</div>
+              <div className="t-page font-semibold text-[var(--brand-text-bright)]">{contentScore.wordCount}</div>
               <div className="t-label text-[var(--brand-text-muted)]">Words</div>
             </div>
             <div>
               <div className="flex items-center gap-3">
                 <MetricRing score={contentScore.readabilityScore} size={64} noAnimation />
                 <div>
-                  <div className={`t-stat-sm ${contentScore.readabilityScore >= 60 ? 'text-accent-success' : contentScore.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                  <div className={`t-page font-semibold ${contentScore.readabilityScore >= 60 ? 'text-accent-success' : contentScore.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
                     {contentScore.readabilityScore}
                   </div>
                   <div className="t-label text-[var(--brand-text-muted)]">Readability</div>
@@ -219,11 +219,11 @@ export function PageIntelligenceAnalysisSection({
               </div>
             </div>
             <div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentScore.headings.total}</div>
+              <div className="t-page font-semibold text-[var(--brand-text-bright)]">{contentScore.headings.total}</div>
               <div className="t-label text-[var(--brand-text-muted)]">Headings</div>
             </div>
             <div>
-              <div className="t-stat-sm text-[var(--brand-text-bright)]">{contentScore.avgWordsPerSentence}</div>
+              <div className="t-page font-semibold text-[var(--brand-text-bright)]">{contentScore.avgWordsPerSentence}</div>
               <div className="t-label text-[var(--brand-text-muted)]">Words/Sent</div>
             </div>
           </div>

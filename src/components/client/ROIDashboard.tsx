@@ -3,7 +3,7 @@ import {
   DollarSign, BarChart3, Target, TrendingUp,
   Lock, Shield, MousePointerClick, Eye, Layers,
 } from 'lucide-react';
-import { EmptyState, SectionCard, Button } from '../ui';
+import { EmptyState, SectionCard, Button, StatCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull } from '../../utils/formatNumbers';
 import { get } from '../../api/client';
@@ -106,64 +106,40 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     <div className="space-y-8">
       {/* Hero metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Organic Traffic Value */}
-        <div className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border border-emerald-500/20 p-5" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-[var(--radius-md)] bg-emerald-500/15 flex items-center justify-center">
-              <Icon as={DollarSign} size="md" className="text-accent-success" />
-            </div>
-            <span className="t-caption text-[var(--brand-text)] font-medium">Organic Traffic Value</span>
-          </div>
-          <div className="t-stat text-accent-success tracking-tight">{fmtMoneyFull(data.organicTrafficValue)}</div>
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-            Monthly value based on {data.totalClicks.toLocaleString()} clicks × ${data.avgCPC.toFixed(2)} avg CPC
-          </div>
-        </div>
+        <StatCard
+          label="Organic Traffic Value"
+          value={fmtMoneyFull(data.organicTrafficValue)}
+          icon={DollarSign}
+          valueColor="text-accent-success"
+          sub={`Monthly value based on ${data.totalClicks.toLocaleString()} clicks × $${data.avgCPC.toFixed(2)} avg CPC`}
+          className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+        />
 
-        {/* Ad Spend Equivalent */}
-        <div className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border border-blue-500/20 p-5" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-[var(--radius-md)] bg-blue-500/15 flex items-center justify-center">
-              <Icon as={BarChart3} size="md" className="text-accent-info" />
-            </div>
-            <span className="t-caption text-[var(--brand-text)] font-medium">Ad Spend Equivalent</span>
-          </div>
-          <div className="t-stat text-accent-info tracking-tight">{fmtMoneyFull(data.adSpendEquivalent)}</div>
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-            What this traffic would cost via Google Ads (incl. management fees)
-          </div>
-        </div>
+        <StatCard
+          label="Ad Spend Equivalent"
+          value={fmtMoneyFull(data.adSpendEquivalent)}
+          icon={BarChart3}
+          valueColor="text-accent-info"
+          sub="What this traffic would cost via Google Ads (incl. management fees)"
+          className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20"
+        />
 
-        {/* MoM Growth or Pages Tracked */}
-        <div className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10' : 'from-amber-500/10') : 'from-teal-500/10'} via-[var(--surface-2)] to-[var(--surface-2)] border ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'border-teal-500/20' : 'border-amber-500/20') : 'border-teal-500/20'} p-5`} style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`w-8 h-8 rounded-[var(--radius-md)] ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'bg-teal-500/15' : 'bg-amber-500/15') : 'bg-teal-500/15'} flex items-center justify-center`}>
-              {data.growthPercent != null
-                ? <Icon as={TrendingUp} size="md" className={data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'} />
-                : <Icon as={Shield} size="md" className="text-accent-brand" />}
-            </div>
-            <span className="t-caption text-[var(--brand-text)] font-medium">
-              {data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
-            </span>
-          </div>
-          {data.growthPercent != null ? (
-            <>
-              <div className={`t-stat tracking-tight ${data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'}`}>
-                {data.growthPercent >= 0 ? '+' : ''}{data.growthPercent.toFixed(1)}%
-              </div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                Traffic value growth vs. 30 days ago · {data.trackedPages} pages tracked
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="t-stat text-accent-brand tracking-tight">{data.trackedPages}</div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
-                Pages generating organic value · growth tracking starts next month
-              </div>
-            </>
-          )}
-        </div>
+        <StatCard
+          label={data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
+          value={
+            data.growthPercent != null
+              ? `${data.growthPercent >= 0 ? '+' : ''}${data.growthPercent.toFixed(1)}%`
+              : data.trackedPages
+          }
+          icon={data.growthPercent != null ? TrendingUp : Shield}
+          valueColor={data.growthPercent != null ? (data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning') : 'text-accent-brand'}
+          sub={
+            data.growthPercent != null
+              ? `Traffic value growth vs. 30 days ago · ${data.trackedPages} pages tracked`
+              : 'Pages generating organic value · growth tracking starts next month'
+          }
+          className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
+        />
       </div>
 
       {/* Page breakdown table */}

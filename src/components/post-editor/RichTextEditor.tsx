@@ -82,7 +82,7 @@ export function RichTextEditor({ initialValue, onChange, className, variant = 'a
               if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl(''); }
             }}
             placeholder="https://..."
-            className="w-44 bg-transparent text-[var(--brand-text)] text-xs px-1 py-0.5 focus:outline-none border-b border-teal-500/50"
+            className="w-44 bg-transparent text-[var(--brand-text)] text-xs px-1 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 border-b border-teal-500/50"
           />
           <Button
             onMouseDown={e => { e.preventDefault(); applyLink(); }}

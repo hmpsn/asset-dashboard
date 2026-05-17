@@ -97,7 +97,7 @@ export function ConnectionsTab({
                   onChange={setDomainDraft}
                   onKeyDown={e => e.key === 'Enter' && handleDomainSave()}
                   placeholder="www.example.com"
-                  className="flex-1 px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+                  className="flex-1 px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                   autoFocus
                 />
                 <Button onClick={handleDomainSave} size="sm" className="px-2.5">

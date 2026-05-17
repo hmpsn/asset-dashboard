@@ -42,7 +42,7 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
             value={promptType}
             onChange={setPromptType}
             options={PROMPT_TYPE_OPTIONS.map(pt => ({ value: pt, label: pt.replace(/_/g, ' ') }))}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
         <Button
@@ -143,7 +143,7 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                     value={localFeedback[i] ?? ''}
                     onChange={value => setLocalFeedback(prev => ({ ...prev, [i]: value }))}
                     placeholder="e.g. Good tone but too long"
-                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
                   />
                 </div>
 

@@ -206,7 +206,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Published', value: stats.published, color: 'text-accent-success', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
         ].map(s => (
           <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className={`t-stat ${s.color}`}>{s.value}</div>
+            <div className={`t-h2 ${s.color}`}>{s.value}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.label}</div>
           </div>
         ))}

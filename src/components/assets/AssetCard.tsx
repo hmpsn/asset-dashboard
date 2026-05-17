@@ -103,7 +103,7 @@ export function AssetCard({
               value={renameDraft}
               onChange={onRenameDraftChange}
               onKeyDown={e => e.key === 'Enter' && onSaveRename(asset.id)}
-              className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-3)] border border-teal-600 rounded text-xs focus:outline-none"
+              className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-3)] border border-teal-600 rounded text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
               autoFocus
             />
             <IconButton
@@ -175,7 +175,7 @@ export function AssetCard({
               value={altDraft}
               onChange={onAltDraftChange}
               onKeyDown={e => e.key === 'Enter' && onSaveAlt(asset.id)}
-              className="flex-1 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded text-xs focus:outline-none"
+              className="flex-1 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
               autoFocus
             />
             <IconButton

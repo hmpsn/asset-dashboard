@@ -476,7 +476,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                       value: role,
                       label: SCHEMA_ROLE_LABELS[role],
                     }))}
-                    className={cn('px-2 py-1 rounded t-caption-sm font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 bg-transparent', ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR)}
+                    className={cn('px-2 py-1 rounded t-caption-sm font-medium border cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-1 focus:ring-teal-500 bg-transparent', ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR)}
                   />
                   {pr.entityRefs.length > 0 && (
                     <span className="t-caption-sm text-[var(--brand-text-muted)]" title={pr.entityRefs.join(', ')}>

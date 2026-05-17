@@ -63,7 +63,8 @@ from the `CHECKS` array.
   `StatusBadge` domain mappings (`request` + `job`) and promoted
   `status-semantic-mapping-drift` to error after advisory backlog reached zero.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
-  none.
+  `muted-text-two-tier-only` (typography/muted-hierarchy signal with
+  `// muted-tier-ok` hatch).
 - Wave 17 pre-plan audit (2026-05-17) expanded the canonical registry with
   additional planned warn/manual directives (focus-visible ring contract,
   reduced-motion contract, embedded-tab heading duplication, muted-tier usage,
@@ -71,6 +72,10 @@ from the `CHECKS` array.
   spacing/styleguide specimen manual checks). These are tracked in
   `data/styleguide-rule-registry.json` as `planned`/`manual-review` and are not
   blocking until detectors, fixtures, and ratchet evidence are added.
+- Wave 19 follow-up (2026-05-17) activated three Wave 17 planned directives as
+  warn-tier advisories with fixture coverage and drift-report breakdowns:
+  `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and
+  `stat-primitive-bypass-signal`.
 
 ## Escape hatch
 

@@ -359,7 +359,7 @@ export function StripeSettings() {
                             value={product.priceUsd}
                             onChange={value => updateProduct(idx, { priceUsd: Math.max(0, Number(value)) })}
                             disabled={!product.enabled}
-                            className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           {product.recurring && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-0.5">/mo</span>}
                         </div>
@@ -369,7 +369,7 @@ export function StripeSettings() {
                           onChange={value => updateProduct(idx, { stripePriceId: value.trim() })}
                           placeholder="price_..."
                           disabled={!product.enabled}
-                          className="flex-1 px-2 py-1 rounded t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
+                          className="flex-1 px-2 py-1 rounded t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500/50 font-mono disabled:opacity-30"
                         />
                       </div>
                     </div>

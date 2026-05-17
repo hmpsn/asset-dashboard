@@ -11,7 +11,7 @@ import type {
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { fmtNum as formatNum } from '../../utils/formatNumbers';
-import { Button, SectionCard, TrendBadge } from '../ui';
+import { Button, SectionCard, TrendBadge, CompactStatBar } from '../ui';
 
 // ─── Helpers ───
 
@@ -278,27 +278,32 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
       {/* Organic overview row */}
       <SectionCard title="Organic Search Traffic" titleIcon={<div className="w-6 h-6 rounded-[var(--radius-md)] bg-emerald-500/15 flex items-center justify-center"><Icon as={Globe} size="md" className="text-accent-success" /></div>} action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic visitors</div>
-            <div className="t-stat-sm text-accent-success">{formatNum(organic.organicUsers)}</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{organic.shareOfTotalUsers}% of all traffic</div>
-          </div>
-          <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic sessions</div>
-            <div className="t-stat-sm text-accent-info">{formatNum(organic.organicSessions)}</div>
-          </div>
-          <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Engagement rate</div>
-            <div className="t-stat-sm text-accent-brand">{organic.engagementRate}%</div>
-          </div>
-          <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
-            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Avg time on site</div>
-            <div className="t-stat-sm text-accent-warning">
-              {Math.floor(organic.avgEngagementTime / 60)}m {Math.floor(organic.avgEngagementTime % 60)}s
-            </div>
-          </div>
-        </div>
+        <CompactStatBar
+          className="bg-[var(--surface-3)]/40 border-[var(--brand-border)]"
+          items={[
+            {
+              label: 'Organic visitors',
+              value: formatNum(organic.organicUsers),
+              valueColor: 'text-accent-success',
+              sub: `${organic.shareOfTotalUsers}% of all traffic`,
+            },
+            {
+              label: 'Organic sessions',
+              value: formatNum(organic.organicSessions),
+              valueColor: 'text-accent-info',
+            },
+            {
+              label: 'Engagement rate',
+              value: `${organic.engagementRate}%`,
+              valueColor: 'text-accent-brand',
+            },
+            {
+              label: 'Avg time on site',
+              value: `${Math.floor(organic.avgEngagementTime / 60)}m ${Math.floor(organic.avgEngagementTime % 60)}s`,
+              valueColor: 'text-accent-warning',
+            },
+          ]}
+        />
 
         {/* Organic share bar */}
         <div className="mt-4">

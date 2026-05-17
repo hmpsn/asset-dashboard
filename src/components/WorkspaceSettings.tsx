@@ -170,7 +170,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 }
                 if (e.key === 'Escape') { setNameDraft(workspaceName); setEditingName(false); }
               }}
-              className="text-lg font-semibold text-[var(--brand-text-bright)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded px-2 py-0.5 focus:outline-none focus:border-teal-500"
+              className="text-lg font-semibold text-[var(--brand-text-bright)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded px-2 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
             />
             <IconButton
               type="button"

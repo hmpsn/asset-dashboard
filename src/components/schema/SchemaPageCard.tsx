@@ -163,7 +163,7 @@ export function SchemaPageCard({
               { value: 'recipe', label: 'Recipe' },
               { value: 'generic', label: 'General Page' },
             ]}
-            className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
             title="Page type hint for schema generation"
           />
           <IconButton

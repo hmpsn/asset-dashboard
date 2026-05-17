@@ -5722,6 +5722,194 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'muted-text-two-tier-only',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential muted-tier drift detected. Body/caption copy should usually stay on canonical body/muted tiers; reserve dim for tertiary metadata only. Hatch intentional exceptions with // muted-tier-ok.',
+    rationale:
+      'Type hierarchy drift often comes from overusing dim text on primary copy, reducing contrast and making live surfaces feel noisier/less legible than styleguide specimens.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const eligibleTagRe = /<(p|span|div|li|small|BodyText)\b/;
+      const bodyLikeTypeRe = /\b(?:t-body|t-page|t-caption|t-caption-sm|t-ui)\b/;
+      const dimToneRe = /\btext-\[var\(--brand-text-dim\)\]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!eligibleTagRe.test(lines[index])) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 10); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (hasHatch(lines, index, 'muted-tier-ok')) continue;
+
+          if (/<BodyText\b/.test(tagText)) {
+            if (!/\btone\s*=\s*["']dim["']/.test(tagText)) continue;
+            hits.push({
+              file,
+              line: index + 1,
+              text: 'BodyText tone="dim" on visible copy',
+            });
+            continue;
+          }
+
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (!bodyLikeTypeRe.test(tagText)) continue;
+          if (/\b(?:t-label|t-micro)\b/.test(tagText)) continue;
+          if (!dimToneRe.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: 'body/caption typography using --brand-text-dim',
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'raw-z-index-inline-literal',
+    severity: 'warn',
+    fileGlobs: ['*.ts', '*.tsx', '*.css'],
+    pathFilter: 'src/',
+    exclude: ['src/tokens.css'],
+    message:
+      'Raw numeric z-index literal detected. Use z-[var(--z-*)] classes or var(--z-*) tokens instead. Hatch intentional exceptions with // z-index-ok.',
+    rationale:
+      'Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals.',
+    claudeMdRef: '#token-authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const jsLiteralRe = /\bzIndex\s*:\s*(\d+)\b/;
+      const cssLiteralRe = /\bz-index\s*:\s*(\d+)\b/;
+
+      for (const file of files) {
+        const src = readFileOrEmpty(file);
+        if (!src) continue;
+        const lines = src.split('\n');
+
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (!jsLiteralRe.test(line) && !cssLiteralRe.test(line)) continue;
+          if (hasHatch(lines, index, 'z-index-ok')) continue;
+          if (/z-index\s*:\s*var\(/.test(line) || /zIndex\s*:\s*['"`]?var\(/.test(line)) continue;
+          if (/--z-/.test(line)) continue;
+          const match = line.match(jsLiteralRe) ?? line.match(cssLiteralRe);
+          const literal = match?.[1] ?? 'unknown';
+          hits.push({
+            file,
+            line: index + 1,
+            text: `raw z-index literal (${literal})`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'focus-visible-ring-contract',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    message:
+      'Keyboard-focusable controls that disable outline (`focus:outline-none`) should define explicit focus-visible styling. Add focus-visible:ring-* / focus-visible:outline-* or hatch with // focus-ring-ok.',
+    rationale:
+      'Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const outlineNoneRe = /\bfocus:outline-none\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!outlineNoneRe.test(lines[index])) continue;
+          if (hasHatch(lines, index, 'focus-ring-ok')) continue;
+          const start = Math.max(0, index - 5);
+          const end = Math.min(lines.length, index + 7);
+          const windowText = lines.slice(start, end).join(' ');
+          if (!/\bclassName\s*=/.test(windowText)) continue;
+          if (/\bfocus-visible:(?:ring|outline)-/.test(windowText)) continue;
+          hits.push({
+            file,
+            line: index + 1,
+            text: 'focus:outline-none without focus-visible ring/outline fallback',
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'stat-primitive-bypass-signal',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential hand-rolled stat typography detected. Prefer StatCard/CompactStatBar (or hatch with // stat-primitive-ok for intentional custom metric shells).',
+    rationale:
+      'Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const statClassRe = /\bt-stat(?:-lg|-sm)?\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        if (/<(?:StatCard|CompactStatBar|Stat)\b/.test(src)) continue;
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!statClassRe.test(lines[index])) continue;
+          if (!/\bclassName\b/.test(lines[index])) continue;
+          if (hasHatch(lines, index, 'stat-primitive-ok')) continue;
+          hits.push({
+            file,
+            line: index + 1,
+            text: 't-stat typography used outside StatCard/CompactStatBar primitive',
+          });
+        }
+      }
+      return hits;
+    },
+  },
 
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;

@@ -123,7 +123,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                         onClick={() => onToggleStatus(item.id, item.sprintId)}
                         variant="ghost"
                         size="sm"
-                        className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-teal-400/50 rounded p-0 min-h-0 h-auto"
+                        className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-1 focus:ring-teal-400/50 rounded p-0 min-h-0 h-auto"
                         aria-label={`Cycle status (currently ${item.status.replace('_', ' ')})`}
                         title={`Status: ${item.status} — click to cycle`}
                       >

@@ -129,7 +129,7 @@ export function AuditIssueRow({
                 onChange={value => onSetEditedSuggestion(fixKey, value)}
                 onBlur={() => onSetEditingKey(null)}
                 onKeyDown={e => { if (e.key === 'Escape') onSetEditingKey(null); }}
-                className="w-full t-caption-sm text-emerald-300 bg-emerald-950/60 border border-emerald-700/40 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500/50 resize-none"
+                className="w-full t-caption-sm text-emerald-300 bg-emerald-950/60 border border-emerald-700/40 rounded px-1.5 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-emerald-500/50 resize-none"
                 rows={2}
                 autoFocus
               />

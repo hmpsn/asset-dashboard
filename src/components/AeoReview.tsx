@@ -8,7 +8,7 @@ import {
   FileText, User, Calendar, Quote, ListChecks, LayoutList, Table2,
   BookOpen, EyeOff, RefreshCw, Send, Check,
 } from 'lucide-react';
-import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, ClickableRow, FormTextarea } from './ui';
+import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, ClickableRow, FormTextarea, StatCard } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
@@ -245,35 +245,41 @@ export function AeoReview({ workspaceId }: Props) {
     <div className="space-y-8">
       {/* Summary bar */}
       <div className="grid grid-cols-5 gap-3">
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
-          <div className={`t-stat-lg ${aeoScoreColorClass(avgScore)}`}>{avgScore}</div>
-          <div className="mt-2 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-            <div className={`h-full rounded-[var(--radius-pill)] ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
-          </div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
-          <div className="t-stat text-[var(--brand-text-bright)]">{review.pages.length}</div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Total Changes</div>
-          {/* styleguide brand accent (AEO review total) */}
-          <div className="t-stat text-accent-brand">{review.totalChanges}</div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Quick Wins</div>
-          <div className="t-stat text-accent-success">{review.quickWins}</div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Est. Time</div>
-          <div className="t-stat text-[var(--brand-text-bright)]">
-            {(() => {
-              const mins = review.pages.reduce((s, p) => s + p.estimatedTimeMinutes, 0);
-              return mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins}m`;
-            })()}
-          </div>
-        </div>
+        <StatCard
+          label="Avg AEO Score"
+          value={avgScore}
+          valueColor={aeoScoreColorClass(avgScore)}
+          size="hero"
+          sub=""
+          className="relative"
+        />
+        <StatCard
+          label="Pages Reviewed"
+          value={review.pages.length}
+          valueColor="text-[var(--brand-text-bright)]"
+        />
+        <StatCard
+          label="Total Changes"
+          value={review.totalChanges}
+          valueColor="text-accent-brand"
+        />
+        <StatCard
+          label="Quick Wins"
+          value={review.quickWins}
+          valueColor="text-accent-success"
+        />
+        <StatCard
+          label="Est. Time"
+          value={(() => {
+            const mins = review.pages.reduce((s, p) => s + p.estimatedTimeMinutes, 0);
+            return mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins}m`;
+          })()}
+          valueColor="text-[var(--brand-text-bright)]"
+        />
+      </div>
+
+      <div className="h-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden mt-1">
+        <div className={`h-full rounded-[var(--radius-pill)] ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
       </div>
 
       {/* Site summary */}
@@ -428,7 +434,7 @@ export function AeoReview({ workspaceId }: Props) {
                           placeholder="Add a note for your client (optional)"
                           value={pageNotes[page.pageUrl] ?? ''}
                           onChange={value => setPageNotes(prev => ({ ...prev, [page.pageUrl]: value }))}
-                          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] focus-visible:ring-2 focus-visible:ring-teal-400/60 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       )}
                     </div>

@@ -155,7 +155,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 text-center rounded-[var(--radius-signature)]">
-              <div className="t-stat text-[var(--brand-text-bright)]">{analysis.summary.totalDecaying}</div>
+              <div className="t-h2 text-[var(--brand-text-bright)]">{analysis.summary.totalDecaying}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Declining Pages</div>
             </div>
             {(['critical', 'warning', 'watch'] as const).map(sev => {
@@ -166,7 +166,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                   size="md"
                   variant="ghost"
                   className={`border p-4 text-center transition-colors rounded-[var(--radius-signature)] ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
-                  <div className={`t-stat ${cfg.text}`}>{count}</div>
+                  <div className={`t-h2 ${cfg.text}`}>{count}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{cfg.label}</div>
                 </Button>
               );
@@ -272,7 +272,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                                   placeholder="Add a note for your client (optional)"
                                   value={pageNotes[page.page] ?? ''}
                                   onChange={value => setPageNotes(prev => ({ ...prev, [page.page]: value }))}
-                                  className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] focus-visible:ring-2 focus-visible:ring-teal-400/60 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                               )}
                             </div>

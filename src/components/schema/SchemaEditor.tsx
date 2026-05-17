@@ -19,7 +19,7 @@ export function SchemaEditor({ pageId, schemaJson, parseError, hasEdits, onChang
       <FormTextarea
         value={schemaJson}
         onChange={value => onChange(pageId, value)}
-        className={`w-full t-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 text-[var(--brand-text)] border ${parseError ? 'border-red-500/50' : 'border-emerald-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus:border-teal-500/60`}
+        className={`w-full t-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 text-[var(--brand-text)] border ${parseError ? 'border-red-500/50' : 'border-emerald-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500/60`}
         spellCheck={false}
       />
       {parseError && (
