@@ -12,6 +12,9 @@ backlog that is not yet safe to fail in CI.
 
 For the active lock-in contract (authority order, invariants, scorecard schema,
 and ratchet gates), see [styleguide-lockdown-contract.md](./styleguide-lockdown-contract.md).
+For canonical rule inventory and tier/status tracking, see
+[styleguide-rule-registry.md](./styleguide-rule-registry.md) and
+`data/styleguide-rule-registry.json`.
 
 ---
 
@@ -31,6 +34,8 @@ from the `CHECKS` array.
   an audit proves they are already zero-hit and fixture-covered.
 - Promote warnings to errors only after the backlog reaches zero and the rule has
   tests in `tests/pr-check.test.ts`.
+- Every style directive under migration must be represented in the styleguide
+  rule registry with owner, metric key, and promotion prerequisites.
 
 ## Escape hatch
 
