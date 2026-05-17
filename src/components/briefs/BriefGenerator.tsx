@@ -54,7 +54,7 @@ export function BriefGenerator({
               value={keyword}
               onChange={onKeywordChange}
               placeholder="e.g. dental implants near me"
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+              className="w-full"
               onKeyDown={e => e.key === 'Enter' && !generating && onGenerate()}
             />
           </div>
@@ -73,7 +73,7 @@ export function BriefGenerator({
                 { value: 'pillar', label: 'Pillar Page' },
                 { value: 'resource', label: 'Resource / Guide' },
               ]}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none cursor-pointer"
+              className="w-full cursor-pointer"
             />
           </div>
         </div>
@@ -94,7 +94,7 @@ export function BriefGenerator({
             value={businessCtx}
             onChange={onBusinessCtxChange}
             placeholder="e.g. Local dental practice in Austin, TX specializing in cosmetic dentistry"
-            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+            className="w-full"
           />
         </div>
       </div>
@@ -121,7 +121,7 @@ export function BriefGenerator({
               onChange={onRefUrlsChange}
               placeholder={"https://competitor.com/their-great-article\nhttps://example.com/inspiring-content"}
               rows={3}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none font-mono"
+              className="w-full"
             />
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">We&apos;ll scrape these pages and use their structure/tone as context (up to 5 URLs)</p>
           </div>

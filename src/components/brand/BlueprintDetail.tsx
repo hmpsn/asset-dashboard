@@ -593,7 +593,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       value={newEntryName}
                       onChange={setNewEntryName}
                       placeholder="e.g. Home, Services, About Us"
-                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                      className="w-full t-body"
                       disabled={addEntryMutation.isPending}
                       onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
                     />

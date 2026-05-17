@@ -345,7 +345,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           value={newKeyword}
           onChange={setNewKeyword}
           placeholder="Add keyword to track..."
-          className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]"
+          className="flex-1"
           onKeyDown={e => e.key === 'Enter' && !adding && addKeyword()}
         />
         <Button

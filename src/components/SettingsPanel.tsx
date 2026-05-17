@@ -450,7 +450,7 @@ export function SettingsPanel() {
               value={bookingUrl}
               onChange={setBookingUrl}
               placeholder="https://cal.com/yourname or https://calendly.com/yourname"
-              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+              className="flex-1 t-caption"
             />
             <Button
               onClick={async () => {

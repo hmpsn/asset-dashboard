@@ -451,7 +451,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   value={competitors}
                   onChange={setCompetitors}
                   placeholder="e.g. competitor1.com, competitor2.com"
-                  className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
+                  className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                 />
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses your configured SEO data provider to find organic competitors. These persist between strategy runs.</p>
                 {discoverError && <p className="t-caption-sm text-accent-danger mt-1">{discoverError}</p>}
@@ -511,7 +511,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     onChange={setBusinessContext}
                     placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
                     rows={3}
-                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
+                    className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                   />
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
                 </div>

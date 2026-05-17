@@ -300,7 +300,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             value={brandVoice}
             onChange={setBrandVoice}
             placeholder="e.g., Professional but approachable. Use active voice. Avoid jargon. Speak directly to the reader. Our tone is confident and helpful, never salesy..."
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed min-h-[80px]"
+            className="w-full t-caption min-h-[80px]"
             rows={5}
           />
           <div className="flex items-center gap-2">

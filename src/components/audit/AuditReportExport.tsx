@@ -256,7 +256,7 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
           <FormTextarea
             readOnly
             value={getCSV(data)}
-            className="w-full h-full p-4 bg-[var(--surface-1)] text-[var(--brand-text)] t-mono resize-none focus:outline-none"
+            className="w-full h-full t-mono"
           />
         )}
       </div>

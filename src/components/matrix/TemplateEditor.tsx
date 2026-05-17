@@ -323,7 +323,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               value={name}
               onChange={setName}
               placeholder="e.g. Service \u00d7 Location Page"
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 transition-colors"
             />
           </div>
           <div>
@@ -333,7 +333,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               value={description}
               onChange={setDescription}
               placeholder="What is this template for?"
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 transition-colors"
             />
           </div>
           <div>
@@ -369,7 +369,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarName}
                       onChange={setNewVarName}
                       placeholder="Variable name (e.g. city)"
-                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full transition-colors"
                     />
                   </div>
                   <div className="flex-1">
@@ -378,7 +378,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarLabel}
                       onChange={setNewVarLabel}
                       placeholder="Display label (e.g. City)"
-                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full transition-colors"
                     />
                   </div>
                 </div>
@@ -387,7 +387,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={newVarDesc}
                   onChange={setNewVarDesc}
                   placeholder="Description (optional)"
-                  className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full transition-colors"
                 />
                 <div className="flex items-center gap-2">
                   <Button variant="primary" size="sm" onClick={handleAddVariable}>
@@ -419,7 +419,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={urlPattern}
                   onChange={setUrlPattern}
                   placeholder="/services/{city}/{service}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 transition-colors"
                 />
                 {urlPattern && (
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(urlPattern, variables)}</p>
@@ -434,7 +434,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={keywordPattern}
                   onChange={setKeywordPattern}
                   placeholder="{service} in {city}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 transition-colors"
                 />
                 {keywordPattern && (
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(keywordPattern, variables)}</p>
@@ -449,7 +449,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   onChange={setToneAndStyle}
                   placeholder="Optional brand voice override..."
                   rows={2}
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 transition-colors"
                 />
               </div>
             </div>

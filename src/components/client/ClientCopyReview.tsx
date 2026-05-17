@@ -559,7 +559,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             onChange={setSuggestedText}
             placeholder="Type your suggested version here..."
             rows={4}
-            className="w-full t-body bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
+            className="w-full t-body"
           />
           <div className="flex items-center gap-2">
             <Button

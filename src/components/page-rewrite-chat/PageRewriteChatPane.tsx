@@ -163,7 +163,7 @@ export function PageRewriteChatPane({
             onChange={onInputChange}
             onKeyDown={onInputKeyDown}
             placeholder={pageData ? 'Ask me to rewrite a section, optimize headings, add FAQs...' : 'Load a page first, or ask a general rewriting question...'}
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
+            className="flex-1 min-h-[40px] max-h-[120px]"
             rows={2}
           />
           <IconButton

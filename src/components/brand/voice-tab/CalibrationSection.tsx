@@ -188,7 +188,7 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                     value={refineDirection}
                     onChange={setRefineDirection}
                     placeholder="e.g. Make it punchier and shorter"
-                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full"
                   />
                 </div>
                 <Button

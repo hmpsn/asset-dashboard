@@ -46,7 +46,7 @@ export function AuditToolbar({
             value={search}
             onChange={onSearchChange}
             placeholder="Search pages or issues..."
-            className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full pl-10 pr-4 t-body"
           />
         </div>
         <Button

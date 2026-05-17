@@ -300,7 +300,7 @@ export function CellDetailPanel({
                 onChange={setFlagComment}
                 placeholder="Describe what needs to change..."
                 rows={2}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full t-caption-sm transition-colors"
               />
               <div className="flex items-center gap-2">
                 <Button

@@ -307,14 +307,14 @@ export function ApprovalBatchCard({
                                       type="text"
                                       value={editDraft}
                                       onChange={setEditDraft}
-                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400"
+                                      className="w-full t-caption"
                                     />
                                   ) : (
                                     <FormTextarea
                                       value={editDraft}
                                       onChange={setEditDraft}
                                       rows={2}
-                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400 resize-none"
+                                      className="w-full t-caption"
                                     />
                                   )}
                                   <div className="flex gap-1.5">
@@ -373,7 +373,7 @@ export function ApprovalBatchCard({
                               onChange={setRejectDraft}
                               rows={2}
                               placeholder="Reason for rejection (optional)"
-                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-red-500/30 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-red-400 resize-none placeholder:text-[var(--brand-text-faint)]"
+                              className="w-full t-caption placeholder:text-[var(--brand-text-faint)]"
                             />
                             <div className="flex gap-1.5">
                               <Button variant="danger" size="sm" icon={X} onClick={() => {

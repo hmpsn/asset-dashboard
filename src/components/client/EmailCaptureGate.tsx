@@ -98,7 +98,7 @@ export function EmailCaptureGate({
                     value={field.value ?? ''}
                     placeholder="Your name"
                     autoComplete="name"
-                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                    className="t-body"
                   />
                 </FormField>
               )}
@@ -120,7 +120,7 @@ export function EmailCaptureGate({
                     value={field.value}
                     placeholder="Your email address"
                     autoComplete="email"
-                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                    className="t-body"
                     autoFocus
                   />
                 </FormField>

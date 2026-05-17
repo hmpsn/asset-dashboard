@@ -155,7 +155,7 @@ export function AuditIssueRow({
               value={flagNote}
               onChange={onSetFlagNote}
               placeholder="Note for client (optional)..."
-              className="flex-1 px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-purple-500/50"
+              className="flex-1 t-caption"
               onKeyDown={e => e.key === 'Enter' && onFlagForClient(page, issue, flagNote)}
               autoFocus
             />

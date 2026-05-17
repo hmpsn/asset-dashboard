@@ -222,7 +222,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           placeholder="Add a note for your client (optional)"
           value={note}
           onChange={setNote}
-          className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-2 w-full t-caption placeholder:text-[var(--brand-text-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
         />
       )}
 
@@ -294,7 +294,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             value={search}
             onChange={setSearch}
             placeholder="Filter by page or anchor text..."
-            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3"
           />
         </div>
         <div className="flex items-center gap-0.5 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">

@@ -80,7 +80,7 @@ export default function SearchableSelect({
               value={search}
               onChange={setSearch}
               placeholder={placeholder}
-              className="flex-1 bg-transparent t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none"
+              className="flex-1 t-caption-sm placeholder:text-[var(--brand-text-muted)]"
             />
             {search && (
               <IconButton onClick={() => setSearch('')} icon={X} label="Clear search" variant="ghost" size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />

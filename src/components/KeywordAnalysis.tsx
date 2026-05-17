@@ -259,7 +259,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           value={search}
           onChange={setSearch}
           placeholder="Search pages..."
-          className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="w-full pl-10 pr-4"
         />
       </div>
 

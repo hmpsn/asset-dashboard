@@ -256,12 +256,12 @@
       "intent": "Prevent className overrides on form primitives from bypassing typography/radius/tone contracts.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": "// form-override-ok",
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "form_primitive_override_drift_count",
       "owner": "admin-editor + client + enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "duplicate-heading-signal",

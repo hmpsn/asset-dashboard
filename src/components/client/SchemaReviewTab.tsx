@@ -257,7 +257,7 @@ export function SchemaReviewTab({ workspaceId, setToast, showHeader = true }: Pr
                     onChange={setFeedbackNote}
                     placeholder="What changes would you like? (optional)"
                     rows={3}
-                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
+                    className="w-full t-caption"
                   />
                   <div className="flex items-center gap-2">
                     <Button

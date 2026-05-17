@@ -118,20 +118,20 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Your Name</label>
             <FormInput value={newReqName} onChange={setNewReqName}
               placeholder="So we know who to follow up with..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
+              className="w-full t-caption" />
           </div>
           )}
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Title</label>
             <FormInput value={newReqTitle} onChange={setNewReqTitle}
               placeholder="Brief summary of your request..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
+              className="w-full t-caption" />
           </div>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Description</label>
             <FormTextarea value={newReqDesc} onChange={setNewReqDesc} rows={3}
               placeholder="Describe what you need in detail..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none" />
+              className="w-full t-caption" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -154,7 +154,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Related Page URL <span className="text-[var(--brand-text-muted)]">(optional)</span></label>
               <FormInput value={newReqPage} onChange={setNewReqPage}
                 placeholder="/about or full URL..."
-                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
+                className="w-full t-caption" />
             </div>
           </div>
           <div>

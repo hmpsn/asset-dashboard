@@ -686,7 +686,7 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
               value={shell.auditSearch}
               onChange={shell.setAuditSearch}
               placeholder="Search pages..."
-              className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-[var(--brand-border-strong)] w-40"
+              className="t-caption-sm w-40"
             />
           )}
         </div>

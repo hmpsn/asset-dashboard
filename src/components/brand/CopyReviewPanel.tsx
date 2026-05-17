@@ -157,7 +157,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 value={editText}
                 onChange={setEditText}
                 rows={8}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
+                className="w-full"
                 aria-label={`Edit copy for ${sectionLabel}`}
                 disabled={updateText.isPending}
               />
@@ -243,7 +243,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 onChange={setRegenNote}
                 rows={3}
                 placeholder="e.g. Make it more concise, lead with the value prop..."
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                className="w-full"
                 disabled={regenerate.isPending}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRegenerate();

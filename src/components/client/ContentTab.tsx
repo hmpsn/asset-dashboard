@@ -169,9 +169,9 @@ export function ContentTab({
     {showTopicForm && (
       <SectionCard title="Suggest a Content Topic" className="border-teal-500/20">
         <div className="space-y-3">
-        <FormInput type="text" value={newTopicName} onChange={setNewTopicName} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
-        <FormInput type="text" value={newTopicKeyword} onChange={setNewTopicKeyword} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
-        <FormTextarea value={newTopicNotes} onChange={setNewTopicNotes} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
+        <FormInput type="text" value={newTopicName} onChange={setNewTopicName} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full t-caption" />
+        <FormInput type="text" value={newTopicKeyword} onChange={setNewTopicKeyword} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full t-caption" />
+        <FormTextarea value={newTopicNotes} onChange={setNewTopicNotes} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full t-caption" />
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">What would you like?</div>
           <div className="flex items-center gap-2">
@@ -654,7 +654,7 @@ export function ContentTab({
                 {feedbackReqId === req.id && (
                   <div className="bg-orange-500/5 border border-orange-500/20 rounded-[var(--radius-lg)] p-4 space-y-3">
                     <div className="t-caption text-accent-orange font-medium">What changes would you like?</div>
-                    <FormTextarea value={feedbackText} onChange={setFeedbackText} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
+                    <FormTextarea value={feedbackText} onChange={setFeedbackText} placeholder="Describe what you'd like changed..." rows={3} className="w-full t-caption" />
                     <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
@@ -673,7 +673,7 @@ export function ContentTab({
                 {declineReqId === req.id && (
                   <div className="bg-red-500/5 border border-red-500/20 rounded-[var(--radius-lg)] p-4 space-y-3">
                     <div className="t-caption text-accent-danger font-medium">Why are you declining? (optional)</div>
-                    <FormInput type="text" value={declineReason} onChange={setDeclineReason} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
+                    <FormInput type="text" value={declineReason} onChange={setDeclineReason} placeholder="e.g. Not relevant to our current goals" className="w-full t-caption" />
                     <div className="flex items-center gap-2">
                       <Button variant="danger" onClick={() => declineTopic(req.id)}>Confirm Decline</Button>
                       <Button variant="ghost" onClick={() => setDeclineReqId(null)}>Cancel</Button>
@@ -709,7 +709,7 @@ export function ContentTab({
                 {/* Add comment */}
                 {!['delivered', 'published', 'declined'].includes(req.status) && (
                   <div className="flex items-center gap-2">
-                    <FormInput type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={setContentComment} placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
+                    <FormInput type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={setContentComment} placeholder="Add a comment..." className="flex-1 t-caption" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
                     <IconButton
                       icon={Send}
                       label="Send comment"

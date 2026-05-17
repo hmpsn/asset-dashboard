@@ -452,7 +452,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             value={feedback}
             onChange={setFeedback}
             placeholder="e.g. 'Please make the tone less formal' or 'Add more specifics about our pricing model in section 2'"
-            className="mt-2 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:border-teal-500/50 focus:outline-none resize-y"
+            className="mt-2 w-full t-caption"
             rows={3}
           />
         )}

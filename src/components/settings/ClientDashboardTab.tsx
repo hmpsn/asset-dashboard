@@ -732,7 +732,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                                 <Icon as={Search} size="xs" className="text-[var(--brand-text-muted)]" />
                                 <FormInput value={groupPageSearch} onChange={setGroupPageSearch}
                                   placeholder="Filter pages..."
-                                  className="flex-1 bg-transparent t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none" />
+                                  className="flex-1 t-caption-sm placeholder:text-[var(--brand-text-muted)]" />
                                 {(g.allowedPages || []).length > 0 && (
                                   <Button
                                     onClick={() => setLocalGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, allowedPages: undefined } : gr))}

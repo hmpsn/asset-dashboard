@@ -403,7 +403,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
               placeholder="Search pages…"
               value={searchQuery}
               onChange={setSearchQuery}
-              className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
+              className="flex-1"
             />
             <div className="flex items-center gap-1">
               {(['all', 'existing', 'planned', 'strategy', 'gap'] as const).map(f => (

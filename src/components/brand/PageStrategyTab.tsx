@@ -110,7 +110,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
                 value={name}
                 onChange={setName}
                 placeholder="e.g. Main Site Blueprint"
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                className="w-full"
                 disabled={isCreating || isGenerating}
               />
             </div>
@@ -122,7 +122,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
                 value={industryType}
                 onChange={setIndustryType}
                 placeholder="e.g. SaaS, E-commerce, Agency"
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                className="w-full"
                 disabled={isCreating || isGenerating}
               />
             </div>

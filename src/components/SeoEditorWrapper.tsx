@@ -110,7 +110,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
             value={search}
             onChange={setSearch}
             placeholder="Search pages and CMS items..."
-            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full pl-9 pr-3 t-caption-sm"
           />
         </div>
       </div>

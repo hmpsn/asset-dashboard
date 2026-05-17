@@ -168,7 +168,7 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
               onChange={setRefineInput}
               disabled={isLoading}
               placeholder="Refinement direction..."
-              className="flex-1 min-w-0 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
+              className="flex-1 min-w-0 disabled:opacity-50"
             />
             <Button
               type="submit"

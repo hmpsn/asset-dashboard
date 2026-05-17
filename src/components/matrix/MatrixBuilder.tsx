@@ -121,7 +121,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={values.length === 0 ? placeholder : 'Add more...'}
-        className="flex-1 min-w-[100px] bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] outline-none"
+        className="flex-1 min-w-[100px] outline-none"
       />
     </div>
   );
@@ -348,7 +348,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                 value={matrixName}
                 onChange={setMatrixName}
                 placeholder="e.g. Houston Area Service Pages"
-                className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 transition-colors"
               />
             </div>
 

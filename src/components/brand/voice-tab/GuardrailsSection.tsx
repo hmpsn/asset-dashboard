@@ -133,7 +133,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               value={newTermUse}
               onChange={setNewTermUse}
               placeholder="e.g. clients"
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              className="w-full"
             />
           </div>
           <div className="space-y-1 flex-1">
@@ -144,7 +144,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               value={newTermInsteadOf}
               onChange={setNewTermInsteadOf}
               placeholder="e.g. customers"
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              className="w-full"
             />
           </div>
           <Button

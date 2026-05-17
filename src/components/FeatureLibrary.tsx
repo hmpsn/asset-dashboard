@@ -129,7 +129,7 @@ export default function FeatureLibrary() {
             placeholder="Search features..."
             value={search}
             onChange={setSearch}
-            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
+            className="w-full pl-9 pr-3 placeholder:text-[var(--brand-text-dim)]"
           />
         </div>
         <div className="flex rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">

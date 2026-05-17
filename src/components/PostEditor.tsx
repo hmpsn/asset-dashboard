@@ -360,7 +360,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
-              <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
+              <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1" />
               <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
               <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTitle(false)} />
             </div>

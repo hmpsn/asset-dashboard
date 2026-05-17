@@ -103,7 +103,7 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
                   onChange={setContent}
                   placeholder="Paste an example of on-brand copy..."
                   rows={4}
-                  className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
+                  className="w-full"
                 />
               </div>
 

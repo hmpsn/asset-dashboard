@@ -222,7 +222,7 @@ export function StripeSettings() {
                     value={secretKey}
                     onChange={setSecretKey}
                     placeholder={config?.hasSecretKey ? '••••••••••••••••' : 'sk_test_... or sk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full t-caption pr-8"
                   />
                   <IconButton
                     onClick={() => setShowSecretKey(!showSecretKey)}
@@ -245,7 +245,7 @@ export function StripeSettings() {
                     value={webhookSecret}
                     onChange={setWebhookSecret}
                     placeholder={config?.hasWebhookSecret ? '••••••••••••••••' : 'whsec_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full t-caption pr-8"
                   />
                   <IconButton
                     onClick={() => setShowWebhookSecret(!showWebhookSecret)}
@@ -268,7 +268,7 @@ export function StripeSettings() {
                     value={publishableKey}
                     onChange={setPublishableKey}
                     placeholder={config?.hasPublishableKey ? config.publishableKey.slice(0, 12) + '...' : 'pk_test_... or pk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono"
+                    className="w-full t-caption"
                   />
                 </div>
               </div>

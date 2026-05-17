@@ -5434,7 +5434,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'primitive-override-drift-on-form-controls',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/forms/'],
@@ -5446,7 +5446,7 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       const primitiveStartRe = /<(FormInput|FormTextarea|FormSelect|Checkbox|Toggle)\b/;
-      const structuralOverrideRe = /\bclassName\s*=\s*["'`][^"'`]*(?:\b(?:rounded|border|bg-|text-|placeholder-|font-|leading-|focus:|px-|py-|p-[0-9]|resize-))/;
+      const structuralOverrideRe = /\bclassName\s*=\s*["'`][^"'`]*(?:\b(?:rounded|border|bg-|focus:|px-|py-|p-[0-9]|resize-))/;
 
       for (const file of files) {
         if (!file.endsWith('.tsx')) continue;

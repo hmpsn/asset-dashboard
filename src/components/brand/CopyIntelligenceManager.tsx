@@ -158,7 +158,7 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
             onBlur={handleEditCommit}
             onKeyDown={handleKeyDown}
             disabled={isSaving}
-            className="w-full bg-[var(--surface-3)] border border-teal-500/50 rounded px-2 py-0.5 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 disabled:opacity-60"
+            className="w-full disabled:opacity-60"
             aria-label="Edit pattern text"
           />
         ) : (
