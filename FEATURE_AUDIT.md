@@ -6012,3 +6012,16 @@ Bug hardening included:
 **Mutual:** Preserves ratchet discipline: discover comprehensively, register canonically, enforce gradually with fixtures and zero-hit evidence.
 
 **Files:** `data/styleguide-rule-registry.json`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-wave17-pre-plan-audit.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 438. Staging Merge Integrity Guardrail (Stacked PR Landing Audit)
+**What it does:** Adds an automated integrity audit for stacked-branch merge flows so we can detect when merged PRs do not actually land on `staging`. New script `scripts/report-staging-merge-integrity.ts` scans recent merged PRs using GitHub metadata, enforces that `base=staging` merge commits are reachable from `origin/staging`, and verifies patch-equivalence for non-`staging` stacked merges via `git cherry`. Known historical anomalies are explicitly tracked in `data/staging-merge-integrity-exceptions.json` with reason and expiry to avoid silent drift. Wired into CI (`.github/workflows/ci.yml`) and nightly checks (`.github/workflows/pr-check-nightly.yml`) via `npm run verify:staging-merge-integrity`.
+
+**Agency value:** Prevents silent loss of stacked-wave work by turning branch-flow integrity into a machine-checked contract.
+
+**Client value:** Reduces risk of “we thought this shipped” regressions in styleguide and UX polish work that directly affect product consistency.
+
+**Mutual:** Complements the styleguide ratchet by adding delivery-path integrity gates, not just code-style enforcement.
+
+**Files:** `scripts/report-staging-merge-integrity.ts`; `data/staging-merge-integrity-exceptions.json`; `package.json`; `.github/workflows/ci.yml`; `.github/workflows/pr-check-nightly.yml`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

@@ -37,6 +37,7 @@
     "verify:adr-log": "tsx scripts/adr-log.ts",
     "verify:risky-modules": "tsx scripts/platform-risky-module-dashboard.ts",
     "verify:style-drift": "tsx scripts/report-style-drift.ts",
+    "verify:staging-merge-integrity": "tsx scripts/report-staging-merge-integrity.ts",
     "report:style-drift": "tsx scripts/report-style-drift.ts --json --output reports/style-drift-report.json",
     "report:risky-modules": "tsx scripts/report-risky-modules.ts --json --top 40 --since-days 180",
     "verify:performance-budgets": "tsx scripts/performance-budgets.ts",
