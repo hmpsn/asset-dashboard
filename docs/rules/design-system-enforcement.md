@@ -64,6 +64,13 @@ from the `CHECKS` array.
   `status-semantic-mapping-drift` to error after advisory backlog reached zero.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
   none.
+- Wave 17 pre-plan audit (2026-05-17) expanded the canonical registry with
+  additional planned warn/manual directives (focus-visible ring contract,
+  reduced-motion contract, embedded-tab heading duplication, muted-tier usage,
+  raw inline z-index, report-metric parity, stat primitive bypass, and chart/
+  spacing/styleguide specimen manual checks). These are tracked in
+  `data/styleguide-rule-registry.json` as `planned`/`manual-review` and are not
+  blocking until detectors, fixtures, and ratchet evidence are added.
 
 ## Escape hatch
 

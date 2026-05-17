@@ -5999,3 +5999,16 @@ Bug hardening included:
 **Mutual:** Advances the ratchet model from detection to lock-in: advisory reaches zero, then immediately graduates to error with registry/docs/test synchronization.
 
 **Files:** `src/components/ui/statusConfig.ts`; `src/components/client/RequestsTab.tsx`; `src/components/workspace-home/ActiveRequestsAnnotations.tsx`; `src/components/brand/BatchGenerationPanel.tsx`; `src/components/RedirectManager.tsx`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `DESIGN_SYSTEM.md`; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 437. Styleguide Parity Ratchet Wave 17 (Pre-Plan Audit + Registry Expansion)
+**What it does:** Starts Wave 17 by rebasing parity work onto `staging` baseline (including Wave 16 status-semantic migration), running a parallel pre-plan audit across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing, then registering newly discovered directives in the canonical parity registry as non-blocking backlog contracts. Added `docs/rules/styleguide-wave17-pre-plan-audit.md` as the execution artifact and expanded `data/styleguide-rule-registry.json` with planned warn/manual directives (focus-visible contract, reduced-motion contract, embedded-tab heading duplication, muted-tier discipline, raw inline z-index detection, report-metric parity, stat primitive bypass signal, and chart/spacing/specimen manual checks). Updated parity governance docs so the new backlog is tracked before detector rollout/promotion.
+
+**Agency value:** Converts the next migration wave from ad hoc cleanup into an owned, parallelizable workstream with explicit detector candidates and promotion sequencing.
+
+**Client value:** Keeps live-surface polish moving toward styleguide parity while avoiding noisy CI by classifying ambiguous directives as warn/manual first.
+
+**Mutual:** Preserves ratchet discipline: discover comprehensively, register canonically, enforce gradually with fixtures and zero-hit evidence.
+
+**Files:** `data/styleguide-rule-registry.json`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-wave17-pre-plan-audit.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
