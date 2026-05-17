@@ -300,7 +300,7 @@ For ranked lists (top pages, keywords, sources).
 ```
 
 - Use `<Badge>` for category, metadata, counters, and non-lifecycle pills.
-- Use `<StatusBadge>` for workflow/status/severity/priority states. The default domain is `page-edit`; pass `domain="content"`, `domain="approval"`, `domain="client-action"`, `domain="schema"`, `domain="matrix"`, `domain="integration"`, `domain="job"`, `domain="severity"`, or `domain="priority"` for other lifecycle maps.
+- Use `<StatusBadge>` for workflow/status/severity/priority states. The default domain is `page-edit`; pass `domain="content"`, `domain="approval"`, `domain="client-action"`, `domain="request"`, `domain="schema"`, `domain="matrix"`, `domain="integration"`, `domain="job"`, `domain="severity"`, or `domain="priority"` for other lifecycle maps.
 - Tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`. The old `color` prop is supported as a compatibility alias; new code should use `tone`.
 - Variants: `soft` (default), `outline`, `solid`. Shapes: `sm` for compact labels and `pill` for filters/counters. Sizes: `sm`, `md`.
 - Optional `icon`, `dot`, and `ariaLabel` support icon-leading and dot-only dense-table badges without hand-rolled spans.

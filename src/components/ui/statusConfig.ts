@@ -6,6 +6,7 @@ export type StatusBadgeDomain =
   | 'content'
   | 'approval'
   | 'client-action'
+  | 'request'
   | 'schema'
   | 'matrix'
   | 'integration'
@@ -84,6 +85,18 @@ export const STATUS_BADGE_REGISTRY: Record<StatusBadgeDomain, Record<string, Sta
     changes_requested: { label: 'Changes Requested', tone: 'orange' },
     implemented: { label: 'Implemented', tone: 'emerald' },
     resolved: { label: 'Resolved', tone: 'emerald' },
+  },
+  request: {
+    awaiting_team: { label: 'Awaiting Team', tone: 'teal' },
+    team_replied: { label: 'Team Replied', tone: 'teal' },
+    in_progress: { label: 'In Progress', tone: 'amber' },
+    on_hold: { label: 'On Hold', tone: 'zinc' },
+    resolved: { label: 'Resolved', tone: 'emerald' },
+    new: { label: 'Awaiting Team', tone: 'teal' },
+    open: { label: 'Open', tone: 'teal' },
+    in_review: { label: 'Awaiting Team', tone: 'teal' },
+    completed: { label: 'Resolved', tone: 'emerald' },
+    closed: { label: 'Resolved', tone: 'emerald' },
   },
   schema: {
     draft: { label: 'Awaiting Review', tone: 'amber' },

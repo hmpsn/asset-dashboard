@@ -30,11 +30,28 @@ The machine-readable companion is `data/styleguide-rule-registry.json`.
 - `warn`: useful automated signal but not yet promotion-safe.
 - `manual`: visual/editorial checks requiring reviewer judgment.
 
-## Current Snapshot (2026-05-17, Wave 15)
+## Current Snapshot (2026-05-17, Wave 17 Pre-Plan Audit)
 
-- `error`: 23
-- `warn`: 1
-- `manual`: 0
+- `error`: 24
+- `warn`: 7
+- `manual`: 4
+
+## Wave 17 Additions
+
+Wave 17 pre-plan audit registered additional parity directives as non-blocking
+backlog contracts (warn/manual) before detector rollout:
+
+- `focus-visible-ring-contract`
+- `reduced-motion-global-contract`
+- `embedded-tab-pageheader-duplication`
+- `muted-text-two-tier-only`
+- `raw-z-index-inline-literal`
+- `report-style-drift-metric-parity`
+- `stat-primitive-bypass-signal`
+- `styleguide-specimen-bad-example-labeling` (manual)
+- `spacing-rhythm-mix-signal` (manual)
+- `chart-semantic-hue-contract` (manual)
+- `chart-missing-data-gap-contract` (manual)
 
 ## Promotion Contract
 
