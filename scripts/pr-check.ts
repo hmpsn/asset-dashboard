@@ -5794,7 +5794,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: ['src/tokens.css'],
     message:
-      'Raw numeric z-index literal detected. Use z-[var(--z-*)] classes or var(--z-*) tokens instead. Hatch intentional exceptions with // z-index-ok.',
+      'Raw numeric z-index literal detected. Use a concrete z token class such as z-[var(--z-sticky)] or var(--z-*) tokens instead. Hatch intentional exceptions with // z-index-ok.',
     rationale:
       'Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals.',
     claudeMdRef: '#token-authority',
@@ -6030,7 +6030,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Raw z-index class (use z-[var(--z-*)] tokens)',
+    name: 'Raw z-index class (use z token classes)',
     pattern: '\\bz-(10|20|30|40|50|60)\\b',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',

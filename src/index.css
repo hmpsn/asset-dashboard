@@ -1,6 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import './tokens.css';
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* ─── D-DIN PRO (self-hosted) ─── */
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-400-Regular.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }

@@ -78,12 +78,83 @@ export default defineConfig(async () => ({
     },
   },
   test: {
-    environment: 'jsdom',
+    silent: 'passed-only',
     globalSetup: ['tests/global-setup.ts'],
-    setupFiles: ['tests/db-setup.ts', 'tests/component/setup.ts'],
-    include: [
-      'tests/**/*.test.{ts,tsx}',
-      'server/__tests__/**/*.test.ts',
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'component',
+          environment: 'jsdom',
+          setupFiles: ['tests/component/setup.ts'],
+          include: [
+            'tests/**/*.test.tsx',
+            'tests/unit/cms-editor-publish-bulk-workflow.test.ts',
+            'tests/unit/cms-editor-save-workflow.test.ts',
+            'tests/unit/cms-editor-shell-state-hook.test.ts',
+            'tests/unit/page-rewrite-chat-shell-hook.test.ts',
+            'tests/unit/smart-placeholder.test.ts',
+            'tests/unit/strategy-keyword-feedback.test.ts',
+            'tests/unit/use-page-join.test.ts',
+            'tests/unit/useAutoSave.test.ts',
+            'tests/unit/useClientBriefing.test.ts',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'contract',
+          environment: 'node',
+          setupFiles: ['tests/db-setup.ts'],
+          include: [
+            'tests/contract/**/*.test.ts',
+            'tests/pr-check.test.ts',
+            'tests/meta-port-uniqueness.test.ts',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          environment: 'node',
+          setupFiles: ['tests/db-setup.ts'],
+          include: [
+            'tests/integration/**/*.test.ts',
+            'tests/smoke.test.ts',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          setupFiles: ['tests/db-setup.ts'],
+          include: [
+            'tests/**/*.test.ts',
+            'server/__tests__/**/*.test.ts',
+          ],
+          exclude: [
+            'tests/contract/**/*.test.ts',
+            'tests/integration/**/*.test.ts',
+            'tests/**/*.test.tsx',
+            'tests/smoke.test.ts',
+            'tests/unit/cms-editor-publish-bulk-workflow.test.ts',
+            'tests/unit/cms-editor-save-workflow.test.ts',
+            'tests/unit/cms-editor-shell-state-hook.test.ts',
+            'tests/unit/page-rewrite-chat-shell-hook.test.ts',
+            'tests/unit/smart-placeholder.test.ts',
+            'tests/unit/strategy-keyword-feedback.test.ts',
+            'tests/unit/use-page-join.test.ts',
+            'tests/unit/useAutoSave.test.ts',
+            'tests/unit/useClientBriefing.test.ts',
+            'tests/pr-check.test.ts',
+            'tests/meta-port-uniqueness.test.ts',
+          ],
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
