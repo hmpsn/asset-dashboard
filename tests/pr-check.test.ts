@@ -4677,10 +4677,15 @@ describe('Meta: customCheck rule name registry', () => {
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
     'styleguide-css-must-import-public-tokens',
+    'src-index-css-no-token-declarations',
     // Phase 6A — .t-* typography parity between styleguide.css and index.css
     'styleguide-typography-parity',
     'styleguide-typography-extra-class-drift',
     'global-token-declaration-outside-canonical-token-files',
+    'badge-like-span-outside-primitives',
+    'badge-color-prop-deprecation',
+    'interactive-div-role-button',
+    'primitive-override-drift-on-form-controls',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -7069,6 +7074,195 @@ describe('Rule: global-token-declaration-outside-canonical-token-files', () => {
       lines(':root {', '  --allowed-mirror: #111;', '}'),
     );
     expect(runRule(RULE, [srcTokens, publicTokens])).toHaveLength(0);
+  });
+});
+
+describe('Rule: src-index-css-no-token-declarations', () => {
+  const RULE = 'src-index-css-no-token-declarations';
+
+  it('flags --* declarations in src/index.css', () => {
+    const file = write(
+      uniqPath('rule-src-index-token-decl', 'src/index.css'),
+      lines(
+        "@import './tokens.css';",
+        ':root {',
+        '  --rogue: #fff;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('--rogue');
+  });
+
+  it('passes when src/index.css has no token declarations', () => {
+    const file = write(
+      uniqPath('rule-src-index-token-decl', 'src/index.css'),
+      lines(
+        "@import './tokens.css';",
+        '.app-root { color: var(--brand-text); }',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: badge-like-span-outside-primitives', () => {
+  const RULE = 'badge-like-span-outside-primitives';
+
+  it('flags a hand-rolled badge-like span', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="rounded-[var(--radius-pill)] px-2 py-1 bg-teal-500/10 text-teal-300 border border-teal-400/30">Active</span>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('passes with inline badge-span-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="rounded-[var(--radius-pill)] px-2 py-1 bg-teal-500/10 text-teal-300 border border-teal-400/30">Active</span>; // badge-span-ok: static demo',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-badge spans', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="text-sm text-[var(--brand-text)]">Body copy</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: badge-color-prop-deprecation', () => {
+  const RULE = 'badge-color-prop-deprecation';
+
+  it('flags Badge color prop usage', () => {
+    const file = write(
+      uniqPath('rule-badge-color-prop', 'src/components/Foo.tsx'),
+      lines(
+        "import { Badge } from '../ui/Badge';",
+        'export function Foo() {',
+        '  return <Badge label="Live" color="emerald" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('passes when Badge uses tone prop', () => {
+    const file = write(
+      uniqPath('rule-badge-color-prop', 'src/components/Foo.tsx'),
+      lines(
+        "import { Badge } from '../ui/Badge';",
+        'export function Foo() {',
+        '  return <Badge label="Live" tone="emerald" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: interactive-div-role-button', () => {
+  const RULE = 'interactive-div-role-button';
+
+  it('flags div role=\"button\" usage in components', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Bad.tsx'),
+      lines(
+        'export function Bad() {',
+        '  return <div role="button" tabIndex={0}>Open</div>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('respects the button-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Hatched.tsx'),
+      lines(
+        'export function Hatched() {',
+        '  return <div role="button">Open</div>; // button-ok: legacy keyboard handler',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-button divs', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Good.tsx'),
+      lines(
+        'export function Good() {',
+        '  return <div aria-hidden="true">Overlay</div>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: primitive-override-drift-on-form-controls', () => {
+  const RULE = 'primitive-override-drift-on-form-controls';
+
+  it('flags structural className overrides on form primitives', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="w-full px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('FormInput');
+  });
+
+  it('passes for lightweight layout-only className', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="w-full" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('passes with form-override-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="px-3 py-2 border border-[var(--brand-border)] rounded-[var(--radius-lg)]" />; // form-override-ok: compact legacy row',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 

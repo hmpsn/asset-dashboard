@@ -1,7 +1,7 @@
 import { useState, type RefObject } from 'react';
 import { ChartNoAxesCombined, ChevronDown, MessageCircle, Zap } from 'lucide-react';
 import { post } from '../../../api';
-import { Button, Icon, SectionCard } from '../../ui';
+import { Badge, Button, Icon, SectionCard } from '../../ui';
 import type { ClientKeywordStrategy } from '../types';
 import { kdColor } from './strategyKeywordDisplay';
 
@@ -144,7 +144,16 @@ export function StrategyPageImprovementsSection({
                           <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate">{page.pagePath}</div>
                         </div>
-                        {page.hasImpressions && <span className="t-caption-sm text-accent-info bg-blue-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-blue-500/20 flex-shrink-0 ml-2">Almost there</span>}
+                        {page.hasImpressions && (
+                          <Badge
+                            label="Almost there"
+                            tone="blue"
+                            variant="outline"
+                            shape="sm"
+                            size="sm"
+                            className="flex-shrink-0 ml-2"
+                          />
+                        )}
                       </div>
                       {page.primaryKeyword && (
                         <div className="t-caption-sm text-accent-brand mb-2">Keyword: &ldquo;{page.primaryKeyword}&rdquo;</div>

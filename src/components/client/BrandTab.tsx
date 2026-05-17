@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
-import { Icon, Button, FormInput } from '../ui';
+import { Badge, Icon, Button, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { BusinessProfile } from './types';
 
@@ -277,7 +277,7 @@ export function BrandTab({
         <SectionCard
           title="Brand Positioning"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand border border-teal-500/20">AI-generated</span>}
+          titleExtra={<Badge label="AI-generated" tone="teal" variant="outline" shape="pill" size="sm" />}
         >
           {brandVoiceSummary ? (
             <div className="space-y-3">

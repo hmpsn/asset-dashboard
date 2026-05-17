@@ -4335,9 +4335,54 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
     ],
     message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    name: 'badge-like-span-outside-primitives',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: [
+      'src/components/ui/',
+    ],
+    message: 'Use <Badge> or <StatusBadge> instead of hand-rolled badge-like <span> elements. Add // badge-span-ok with reason for intentional one-off specimens.',
+    severity: 'error',
+    rationale: 'Hand-rolled badge spans drift in shape, spacing, and tone semantics. Shared badge primitives keep status and category labels consistent across domains.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const normalized = file.replaceAll('\\', '/');
+        if (normalized.includes('/src/components/ui/')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!/<span\b/.test(lines[index])) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 8); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/<span\b/.test(tagText)) continue;
+          if (!/rounded-\[var\(--radius-(?:sm|pill|md)\)\]/.test(tagText)) continue;
+          if (!/\bpx-/.test(tagText)) continue;
+          if (!/\b(?:bg|text|border)-(?:teal|blue|emerald|amber|red|orange|zinc)-/.test(tagText)) continue;
+          if (/badge-span-ok/.test(tagText)) continue;
+          hits.push({ file, line: index + 1, text: lines[index].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'radius-signature-lg used outside SectionCard',
@@ -5137,7 +5182,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'styleguide-css-must-import-public-tokens',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.css'],
     message:
       "public/styleguide.css must include @import url('/tokens.css'); without it, specimen styles can drift from canonical tokens.",
@@ -5173,7 +5218,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'styleguide-typography-extra-class-drift',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.css'],
     message:
       'public/styleguide.css contains .t-* classes not defined in src/index.css. Remove stale styleguide-only typography aliases.',
@@ -5231,7 +5276,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'global-token-declaration-outside-canonical-token-files',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.css'],
     message:
       'Token declarations (--*) are only allowed in src/tokens.css and public/tokens.css. Move declarations into src/tokens.css.',
@@ -5261,6 +5306,177 @@ export const CHECKS: Check[] = [
             file,
             line,
             text: `token declaration ${match[1]} found outside src/tokens.css/public/tokens.css`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'src-index-css-no-token-declarations',
+    severity: 'warn',
+    fileGlobs: ['*.css'],
+    displayScope: 'src/index.css',
+    message:
+      'Token declarations (--*) are not allowed in src/index.css. Move declarations to src/tokens.css and keep index.css as import + utility glue only.',
+    rationale:
+      'Token authority requires one canonical declaration source. Local declarations in src/index.css silently fork theme values from src/tokens.css.',
+    claudeMdRef: 'Design System — Token authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const indexPath = files.find(
+        f => f.endsWith(path.join('src', 'index.css')) || f.endsWith('src/index.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'src/index.css') : null);
+      if (!indexPath) return hits;
+
+      let css: string;
+      try {
+        css = readFileSync(indexPath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      const tokenDeclarationRe = /^\s*(--[\w-]+)\s*:/gm;
+      let match: RegExpExecArray | null;
+      while ((match = tokenDeclarationRe.exec(css)) !== null) {
+        const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+        hits.push({
+          file: indexPath,
+          line,
+          text: `token declaration ${match[1]} found in src/index.css`,
+        });
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'badge-color-prop-deprecation',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: [
+      'src/components/ui/Badge.tsx',
+      'src/components/ui/StatusBadge.tsx',
+    ],
+    message:
+      'Prefer Badge tone semantics over legacy color prop. Replace color={...} with tone={...} (and variant/shape when needed).',
+    rationale:
+      'The color alias is a compatibility bridge only. Continued callsite usage slows semantic badge convergence and keeps status mapping fragmented.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const badgeTagRe = /<Badge\b[\s\S]*?>/g;
+        let match: RegExpExecArray | null;
+        while ((match = badgeTagRe.exec(src)) !== null) {
+          const tagText = match[0];
+          if (!/\bcolor\s*=/.test(tagText)) continue;
+          if (/badge-color-ok/.test(tagText)) continue;
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          hits.push({
+            file,
+            line,
+            text: tagText.replace(/\s+/g, ' ').slice(0, 180),
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'interactive-div-role-button',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// button-ok'],
+    message:
+      'Button-like interactions should use Button/IconButton primitives, not <div role="button"> wrappers.',
+    rationale:
+      'Div-based interactive controls drift on keyboard/focus semantics and visual states. Primitive buttons centralize accessibility and style contracts.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (!/<div\b/.test(line)) continue;
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 10); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/\brole\s*=\s*["']button["']/.test(tagText)) continue;
+          if (hasHatch(lines, index, 'button-ok')) continue;
+          hits.push({ file, line: index + 1, text: tagText.trim().slice(0, 220) });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'primitive-override-drift-on-form-controls',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/forms/'],
+    message:
+      'Avoid heavy style overrides on form primitives. If the primitive contract is insufficient, extend the primitive instead of per-callsite restyling.',
+    rationale:
+      'Large className overrides on FormInput/FormTextarea/FormSelect/Checkbox/Toggle reintroduce raw-control drift and defeat typography/radius/tone standardization.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const primitiveStartRe = /<(FormInput|FormTextarea|FormSelect|Checkbox|Toggle)\b/;
+      const structuralOverrideRe = /\bclassName\s*=\s*["'`][^"'`]*(?:\b(?:rounded|border|bg-|text-|placeholder-|font-|leading-|focus:|px-|py-|p-[0-9]|resize-))/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const startMatch = lines[index].match(primitiveStartRe);
+          if (!startMatch) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 12); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (/form-override-ok/.test(tagText)) continue;
+          if (!structuralOverrideRe.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: `${startMatch[1]} with structural className override`,
           });
         }
       }
