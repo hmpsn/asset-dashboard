@@ -246,7 +246,7 @@ export function AssetCard({
             icon={compressing ? undefined : Minimize2}
             className={cn(
               'p-1.5 rounded',
-              compressDisabled ? 'text-[var(--brand-text-dim)] cursor-not-allowed' : 'text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)]',
+              compressDisabled ? 'text-[var(--brand-text-dim)] cursor-not-allowed' : 'text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)]',
             )}
             title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
             aria-label={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
@@ -258,7 +258,7 @@ export function AssetCard({
           href={asset.hostedUrl || asset.url}
           target="_blank"
           rel="noopener"
-          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)] transition-colors"
+          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
           title="Open in new tab"
         >
           <Icon as={ExternalLink} size="md" />

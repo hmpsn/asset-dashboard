@@ -435,7 +435,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
               disabled={!!bulkCompressProgress}
               size="sm"
               icon={Minimize2}
-              className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-lg)] t-caption font-medium"
+              className="bg-teal-700 hover:bg-teal-600 rounded-[var(--radius-lg)] t-caption font-medium"
             >
               {bulkCompressProgress
                 ? `${bulkCompressProgress.done}/${bulkCompressProgress.total}`
@@ -472,7 +472,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                   disabled={!!bulkCompressProgress}
                   size="sm"
                   icon={Minimize2}
-                  className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-lg)] t-caption font-medium"
+                  className="bg-teal-700 hover:bg-teal-600 rounded-[var(--radius-lg)] t-caption font-medium"
                 >
                   Compress All ({audit.oversized + unoptimizedPngCount})
                 </Button>
@@ -693,7 +693,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                       size="sm"
                       icon={Minimize2}
                       loading={compressing.has(lightboxIssue.assetId)}
-                      className="bg-blue-700 hover:bg-blue-600 rounded-[var(--radius-sm)] t-caption font-medium"
+                      className="bg-teal-700 hover:bg-teal-600 rounded-[var(--radius-sm)] t-caption font-medium"
                     >
                       Compress
                     </Button>

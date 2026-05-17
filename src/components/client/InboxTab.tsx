@@ -605,6 +605,7 @@ export function InboxTab({
                               <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
                             )}
                           </div>
+                          {/* duplicate-heading-ok -- repeated dynamic action title across queue/history sections */}
                           <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">{action.title}</h4>
                           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
                         </div>
@@ -799,6 +800,7 @@ export function InboxTab({
                               <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
                             )}
                           </div>
+                          {/* duplicate-heading-ok -- mirrored schema title across feature-flagged inbox layouts */}
                           <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
                             Schema strategy — {schemaPlan.pageRoles.length} page{schemaPlan.pageRoles.length !== 1 ? 's' : ''}
                           </h4>
@@ -861,6 +863,7 @@ export function InboxTab({
           {mode === 'completed' && (
             <div className="space-y-6">
               <div className="space-y-4">
+                {/* duplicate-heading-ok -- intentionally duplicated with new inbox layout while flag migration remains live */}
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — SEO Changes</h3>
                 <ApprovalsTab
                   workspaceId={workspaceId}
@@ -876,6 +879,7 @@ export function InboxTab({
               </div>
               {completedClientActions.length > 0 && (
                 <div className="space-y-4">
+                  {/* duplicate-heading-ok -- intentionally duplicated with new inbox layout while flag migration remains live */}
                   <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Completed — Actions</h3>
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
@@ -887,6 +891,7 @@ export function InboxTab({
                           <Badge label="Completed" tone="zinc" variant="outline" shape="pill" />
                         )}
                       </div>
+                      {/* duplicate-heading-ok -- repeated dynamic action title across queue/history sections */}
                       <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
                     </div>
                   ))}

@@ -330,7 +330,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     return (
                       <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium max-w-xs truncate">
-                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-teal-400 transition-colors">
                             {pagePath}
                             <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>

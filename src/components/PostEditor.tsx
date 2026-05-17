@@ -366,6 +366,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
+              {/* duplicate-heading-ok -- inline editor title and exported html heading intentionally share post.title */}
               <h2 className="text-lg font-semibold text-[var(--brand-text-bright)] truncate">{post.title}</h2>
               <IconButton
                 icon={Pencil}

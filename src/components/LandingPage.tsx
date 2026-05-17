@@ -217,6 +217,7 @@ function Solution() {
                   <p.icon className={`w-5 h-5 ${p.iconColor}`} />
                 </div>
                 <div className={`t-label ${p.iconColor} mb-1`}>{p.label}</div>
+                {/* duplicate-heading-ok -- dynamic card title mirrors another section token but renders distinct content */}
                 <h3 className="text-lg font-bold text-[var(--brand-text-bright)] mb-2">{p.title}</h3>
                 <p className="t-ui text-[var(--brand-text)] leading-relaxed mb-5">{p.desc}</p>
                 <div className="space-y-2.5">
