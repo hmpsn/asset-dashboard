@@ -1,6 +1,6 @@
 import { Clipboard, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, Badge, Icon, Button } from '../ui';
+import { SectionCard, StatusBadge, Icon, Button } from '../ui';
 import { adminPath } from '../../routes';
 import { timeAgo } from '../../lib/timeAgo';
 
@@ -49,14 +49,13 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         >
           <div className="divide-y divide-[var(--brand-border)]">
             {requests.slice(0, 5).map(req => {
-              const statusColor = req.status === 'new' || req.status === 'open' ? 'red' : req.status === 'in_progress' ? 'teal' : 'zinc';
               return (
                 <div key={req.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="t-caption text-[var(--brand-text-bright)] truncate">{req.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
                   </div>
-                  <Badge label={req.status} tone={statusColor} />
+                  <StatusBadge domain="request" status={req.status} fallback="neutral" />
                 </div>
               );
             })}

@@ -5986,3 +5986,16 @@ Bug hardening included:
 **Mutual:** Continues the ratchet pattern: promote what’s clean, instrument what’s still noisy, and keep docs + machine registry in sync in the same PR.
 
 **Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 436. Styleguide Parity Ratchet Wave 16 (Status Semantics Promotion)
+**What it does:** Closes the remaining status-semantic parity gap and promotes `status-semantic-mapping-drift` from warn-tier to error-tier. Live surfaces with local status tone maps were migrated to shared `StatusBadge` semantics: client Requests now uses `toClientRequestStatus()` + `StatusBadge domain="request"`, workspace-home request summaries use `StatusBadge` instead of local tone ternaries, and batch generation progress uses `StatusBadge domain="job"` for lifecycle state rendering. Redirect-manager HTTP code badges remain intentionally local protocol semantics and are explicitly annotated with `status-semantic-ok` as a scoped exception. Added a new canonical `request` registry domain in `statusConfig` for request lifecycle states (`awaiting_team`, `team_replied`, `in_progress`, `resolved`, plus raw request aliases).
+
+**Agency value:** Removes the final known status-semantic drift hotspot and hardens badge consistency through blocking enforcement rather than advisory monitoring.
+
+**Client value:** Request and job lifecycle states now render with one shared semantic contract across client/admin surfaces, improving visual predictability and reducing conflicting tone behavior.
+
+**Mutual:** Advances the ratchet model from detection to lock-in: advisory reaches zero, then immediately graduates to error with registry/docs/test synchronization.
+
+**Files:** `src/components/ui/statusConfig.ts`; `src/components/client/RequestsTab.tsx`; `src/components/workspace-home/ActiveRequestsAnnotations.tsx`; `src/components/brand/BatchGenerationPanel.tsx`; `src/components/RedirectManager.tsx`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `DESIGN_SYSTEM.md`; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

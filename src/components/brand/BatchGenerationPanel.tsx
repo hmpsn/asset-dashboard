@@ -12,7 +12,7 @@ import {
   useBatchJob,
   useCopyStatus,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn, FormInput } from '../ui';
+import { SectionCard, Badge, StatusBadge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
 import type { BatchMode, BatchJob } from '../../../shared/types/copy-pipeline';
@@ -81,30 +81,15 @@ interface BatchProgressProps {
 function BatchProgressBar({ job }: BatchProgressProps) {
   const { total, generated, reviewed, approved } = job.progress;
   const percentage = total > 0 ? (generated / total) * 100 : 0;
-
-  const statusLabel: Record<BatchJob['status'], string> = {
-    pending:  'Queued',
-    running:  'Generating',
-    paused:   'Paused',
-    complete: 'Complete',
-    failed:   'Failed',
-  };
-
-  const statusColor: Record<BatchJob['status'], string> = {
-    pending:  'text-[var(--brand-text-muted)]',
-    running:  'text-blue-400',
-    paused:   'text-amber-400',
-    complete: 'text-emerald-400',
-    failed:   'text-red-400',
-  };
+  const jobStatus = job.status === 'complete' ? 'completed' : job.status;
 
   return (
     <div className="space-y-2 pt-1">
       <div className="flex items-center justify-between t-caption">
-        <span className={`font-medium ${statusColor[job.status]}`}>
-          {statusLabel[job.status]}
+        <span className="inline-flex items-center gap-1">
+          <StatusBadge domain="job" status={jobStatus} variant="soft" />
           {job.status === 'running' && (
-            <Loader2 className="inline-block ml-1 w-3 h-3 animate-spin" />
+            <Loader2 className="inline-block w-3 h-3 animate-spin text-amber-400" />
           )}
         </span>
         <span className="text-[var(--brand-text-muted)]">

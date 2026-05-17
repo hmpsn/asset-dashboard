@@ -76,6 +76,16 @@ describe('StatusBadge', () => {
     expect(screen.getByText('Keyword Validated')).toBeInTheDocument();
   });
 
+  it('renders request-domain lifecycle states', () => {
+    render(<StatusBadge domain="request" status="awaiting_team" />);
+    expect(screen.getByText('Awaiting Team')).toBeInTheDocument();
+  });
+
+  it('renders request-domain raw status aliases', () => {
+    render(<StatusBadge domain="request" status="completed" />);
+    expect(screen.getByText('Resolved')).toBeInTheDocument();
+  });
+
   it('hides unknown statuses by default', () => {
     const { container } = render(<StatusBadge domain="content" status="mystery" />);
     expect(container.innerHTML).toBe('');

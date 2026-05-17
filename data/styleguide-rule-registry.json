@@ -308,12 +308,12 @@
       "intent": "Flag local status tone maps and hand-rolled status badge functions that bypass StatusBadge domain mappings.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": "// status-semantic-ok",
       "fixtureRequirement": "tests/pr-check.test.ts + report-style-drift file breakdown before promotion",
       "metricKey": "status_semantic_mapping_drift_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "advisory"
+      "status": "enforced"
     }
   ]
 }

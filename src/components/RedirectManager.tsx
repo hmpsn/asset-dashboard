@@ -208,7 +208,8 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
     });
   };
 
-  const statusBadge = (status: number | 'error') => {
+  // status-semantic-ok -- HTTP response code presentation is protocol semantics, not app lifecycle status.
+  const httpCodeBadge = (status: number | 'error') => {
     if (status === 'error') return <Badge label="ERR" tone="red" className="font-mono" />;
     if (status >= 200 && status < 300) return <Badge label={`${status}`} tone="emerald" className="font-mono" />;
     if (status >= 300 && status < 400) return <Badge label={`${status}`} tone="amber" className="font-mono" />;
@@ -327,7 +328,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                     <div className="space-y-1">
                       {chain.hops.map((hop, i) => (
                         <div key={i} className="flex items-center gap-2 t-caption-sm">
-                          {statusBadge(hop.status)}
+                          {httpCodeBadge(hop.status)}
                           <span className="text-[var(--brand-text)] font-mono truncate">{hop.url}</span>
                           {i < chain.hops.length - 1 && <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                         </div>
@@ -494,7 +495,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
               return (
                 <div key={idx} className="border-b border-[var(--brand-border)]/30 hover:bg-[var(--surface-2)]/10">
                   <div className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 px-4 py-2 items-center">
-                    {statusBadge(page.status)}
+                    {httpCodeBadge(page.status)}
                     <div className="min-w-0 pl-3">
                       <span className="t-caption text-[var(--brand-text-bright)] font-mono truncate block">{page.path}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] truncate block">{page.title}</span>

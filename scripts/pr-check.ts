@@ -5652,7 +5652,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'status-semantic-mapping-drift',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/'],
