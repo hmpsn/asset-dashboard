@@ -10,7 +10,7 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { Icon } from './ui';
+import { ClickableRow, FormInput, Icon } from './ui';
 
 interface PaletteItem {
   id: string;
@@ -289,7 +289,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     const ItemIcon = item.icon;
     const isSelected = idx === selectedIndex;
     return (
-      <button
+      <ClickableRow
         key={item.id + (item.type === 'recent' ? '-recent' : '')}
         onClick={() => { item.action(); setOpen(false); }}
         onMouseEnter={() => setSelectedIndex(idx)}
@@ -304,7 +304,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         </div>
         {item.type === 'workspace' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">workspace</span>}
         {item.type === 'action' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">action</span>}
-      </button>
+      </ClickableRow>
     );
   };
 
@@ -330,13 +330,13 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--brand-border)]">
           <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-          <input
+          <FormInput
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             onKeyDown={handleKeyDown}
             placeholder="Search tools, workspaces, actions..."
-            className="flex-1 bg-transparent t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] outline-none"
+            className="flex-1 t-body outline-none"
           />
           <kbd className="flex-shrink-0 t-caption-sm font-medium text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
             ESC

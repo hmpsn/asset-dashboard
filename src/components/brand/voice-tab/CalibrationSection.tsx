@@ -1,5 +1,5 @@
 import { Loader2, Save, Sparkles } from 'lucide-react';
-import { SectionCard, Skeleton, Button, Icon, cn } from '../../ui';
+import { SectionCard, Skeleton, Button, Icon, cn, FormInput, FormSelect } from '../../ui';
 import { useToast } from '../../Toast';
 import { PROMPT_TYPE_OPTIONS } from './voiceTabModel';
 import { useVoiceCalibrationWorkflow } from './useVoiceCalibrationWorkflow';
@@ -37,16 +37,13 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
       <div className="flex items-end gap-3">
         <div className="space-y-1 flex-1">
           <label htmlFor="calib-prompt-type" className="t-caption text-[var(--brand-text-muted)]">Prompt type</label>
-          <select
+          <FormSelect
             id="calib-prompt-type"
             value={promptType}
-            onChange={e => setPromptType(e.target.value)}
+            onChange={setPromptType}
+            options={PROMPT_TYPE_OPTIONS.map(pt => ({ value: pt, label: pt.replace(/_/g, ' ') }))}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-          >
-            {PROMPT_TYPE_OPTIONS.map(pt => (
-              <option key={pt} value={pt}>{pt.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
+          />
         </div>
         <Button
           type="button"
@@ -117,9 +114,11 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                       { value: 'wrong' as const, label: 'Wrong', activeClass: 'bg-red-600 text-white' },
                     ] as const
                   ).map(({ value, label, activeClass }) => (
-                    <button
+                    <Button
                       key={value}
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       aria-pressed={rating === value}
                       onClick={() => setLocalRatings(prev => ({ ...prev, [i]: value }))}
                       className={cn(
@@ -130,7 +129,7 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                       )}
                     >
                       {label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 
@@ -138,11 +137,11 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                   <label htmlFor={`calib-feedback-${i}`} className="t-caption text-[var(--brand-text-muted)]">
                     Feedback (optional)
                   </label>
-                  <input
+                  <FormInput
                     id={`calib-feedback-${i}`}
                     type="text"
                     value={localFeedback[i] ?? ''}
-                    onChange={e => setLocalFeedback(prev => ({ ...prev, [i]: e.target.value }))}
+                    onChange={value => setLocalFeedback(prev => ({ ...prev, [i]: value }))}
                     placeholder="e.g. Good tone but too long"
                     className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                   />
@@ -183,13 +182,13 @@ export function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSe
                   <label htmlFor="calib-refine-direction" className="t-caption text-[var(--brand-text-muted)]">
                     Steering direction (optional)
                   </label>
-                  <input
+                  <FormInput
                     id="calib-refine-direction"
                     type="text"
                     value={refineDirection}
-                    onChange={e => setRefineDirection(e.target.value)}
+                    onChange={setRefineDirection}
                     placeholder="e.g. Make it punchier and shorter"
-                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full"
                   />
                 </div>
                 <Button

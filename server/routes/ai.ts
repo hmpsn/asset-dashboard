@@ -100,7 +100,7 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
 });
 
 // --- AI Context Completeness ---
-router.get('/api/ai/context/:workspaceId', (req, res) => {
+router.get('/api/ai/context/:workspaceId', /* tenant-boundary-audit-ok: admin HMAC gate + workspace is explicit query target */ (req, res) => {
   res.json(checkAIContext(req.params.workspaceId));
 });
 

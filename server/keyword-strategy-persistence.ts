@@ -7,14 +7,13 @@ import { listQuickWins, replaceAllQuickWins } from './quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
-import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
-import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin } from '../shared/types/workspace.js';
+import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin, SeoDataStatus } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
 import type {
   KeywordStrategyCannibalizationIssue,
@@ -24,8 +23,6 @@ import type {
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { StrategyOutput } from './keyword-strategy-ai-synthesis.js';
-
-const log = createLogger('keyword-strategy:persistence');
 
 export interface PersistKeywordStrategyOptions {
   ws: Workspace;
@@ -40,6 +37,7 @@ export interface PersistKeywordStrategyOptions {
   questionKeywords: QuestionKeywordGroup[];
   businessContext: string;
   seoDataMode: KeywordStrategySeoDataMode;
+  seoDataStatus: SeoDataStatus;
   searchData: Pick<KeywordStrategySearchData, 'deviceBreakdown' | 'countryBreakdown' | 'periodComparison' | 'organicLandingPages' | 'organicOverview'>;
 }
 
@@ -62,6 +60,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords,
     businessContext,
     seoDataMode,
+    seoDataStatus,
     searchData,
   } = options;
   const {
@@ -86,67 +85,15 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     rationale: quickWin.rationale ?? quickWin.action,
     roiScore: quickWin.roiScore,
   }));
-  // Snapshot previous page map AND content gaps BEFORE replacing (needed for
-  // strategy diff). The previous strategy blob no longer holds contentGaps
-  // (#365 normalized them out), so we read from the table — those rows
-  // represent the previous strategy until replaceAllContentGaps overwrites
-  // them below.
-  // NOTE: for incremental mode the orchestrator already reads page keywords during discovery,
-  // but we re-read here to get the freshest snapshot right before writing.
-  const prevPageMapForHistory = listPageKeywords(ws.id);
-  const prevContentGapsForHistory = listContentGaps(ws.id);
-  const prevQuickWinsForHistory = listQuickWins(ws.id);
-  const prevKeywordGapsForHistory = listKeywordGaps(ws.id);
-  const prevTopicClustersForHistory = listTopicClusters(ws.id);
-  const prevCannibalizationForHistory = listCannibalizationIssues(ws.id);
-
-  // Save pageMap to dedicated table.
-  // Full mode: upsert + delete stale rows (clean replacement).
-  // Incremental mode: only upsert analyzed pages (preserve existing rows for fresh pages).
-  // Both modes stamp analysisGeneratedAt = now so incremental freshness checks work correctly
-  // on the next run. Without this, analysis_generated_at stays NULL indefinitely and every
-  // incremental run re-analyzes everything (COALESCE preserves NULL, not the current time).
   const now = new Date().toISOString();
-  if (strategyMode === 'full') {
-    const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-    upsertAndCleanPageKeywords(ws.id, stampedMap);
-  } else {
-    // Only update the pages that were actually re-analyzed in this incremental run.
-    // Pages with fresh analysis_generated_at are left untouched in the DB.
-    const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
-    const analyzedMappings = pageMap
-      .filter((pm) => analyzedPaths.has(pm.pagePath))
-      .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-    upsertPageKeywordsBatch(ws.id, analyzedMappings);
-  }
-  // Bridge #5: page keywords replaced — invalidate page caches
-  debouncedPageAnalysisInvalidate(ws.id, () => {
-    invalidateIntelligenceCache(ws.id);
-    invalidateSubCachePrefix(ws.id, 'slice:seoContext');
-    invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
-  });
-
-  // Save contentGaps to dedicated table (replaces any existing rows for this workspace).
-  // The blob copy below has contentGaps stripped so the table is the single source of truth.
-  replaceAllContentGaps(ws.id, newContentGaps);
-  // Save quickWins to dedicated table (replaces any existing rows for this workspace).
-  // The blob copy below has quickWins stripped so the table is the single source of truth.
-  replaceAllQuickWins(ws.id, newQuickWins);
-  // Save keywordGaps to dedicated table (replaces any existing rows for this workspace).
-  // The blob copy below has keywordGaps stripped so the table is the single source of truth.
-  replaceAllKeywordGaps(ws.id, keywordGaps);
-  // Save topicClusters to dedicated table (replaces any existing rows for this workspace).
-  // The blob copy below has topicClusters stripped so the table is the single source of truth.
-  replaceAllTopicClusters(ws.id, topicClusters);
-  // Save cannibalization to dedicated table (replaces any existing rows for this workspace).
-  // The blob copy below has cannibalization stripped so the table is the single source of truth.
-  replaceAllCannibalizationIssues(ws.id, cannibalization);
-
   // Strategy-level data (no pageMap, no contentGaps) goes to workspace JSON blob
-  const strategyMeta = { ...strategy };
+  const strategyMeta = { ...strategy } as Partial<KeywordStrategy>;
   delete strategyMeta.pageMap;
   delete strategyMeta.contentGaps;
   delete strategyMeta.quickWins;
+  delete strategyMeta.keywordGaps;
+  delete strategyMeta.topicClusters;
+  delete strategyMeta.cannibalization;
   const keywordStrategy = {
     ...strategyMeta,
     siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
@@ -154,6 +101,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords: questionKeywords.length > 0 ? questionKeywords : undefined,
     businessContext: businessContext || undefined,
     seoDataMode,
+    seoDataStatus,
     // Enriched search signals
     searchSignals: {
       deviceBreakdown: deviceBreakdown.length > 0 ? deviceBreakdown : undefined,
@@ -165,53 +113,52 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     generatedAt: new Date().toISOString(),
   };
 
-  // Save previous strategy to history (keep last 5).
-  // Wrapped in db.transaction() so that the INSERT and the prune-DELETE
-  // are atomic — without it, an INSERT that succeeds followed by a
-  // DELETE that fails would leave the table over-quota and the next
-  // generation would re-attempt the same prune on a stale snapshot,
-  // potentially corrupting history ordering for the workspace.
-  // Capture into a local so the closure inside db.transaction() preserves
-  // the narrowed type from the if-guard above (TS can't propagate the
-  // narrowing through the closure boundary on its own).
-  const previousStrategy = ws.keywordStrategy;
-  if (previousStrategy?.generatedAt) {
-    // Merge the previous-state contentGaps from the table back into the
-    // history snapshot so the diff endpoint can reassemble the full prior
-    // strategy without needing to query the table for historical state.
-    const previousStrategySnapshot = {
-      ...previousStrategy,
-      contentGaps: prevContentGapsForHistory,
-      quickWins: prevQuickWinsForHistory,
-      keywordGaps: prevKeywordGapsForHistory,
-      topicClusters: prevTopicClustersForHistory,
-      cannibalization: prevCannibalizationForHistory,
-    };
-    const previousStrategyJson = JSON.stringify(previousStrategySnapshot);
-    const previousGeneratedAt = previousStrategy.generatedAt;
-    const saveStrategyHistory = db.transaction(() => {
-      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
-        ws.id, previousStrategyJson, JSON.stringify(prevPageMapForHistory), previousGeneratedAt
-      );
-      // Prune old entries, keep last 5
-      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
-    });
-    saveStrategyHistory();
-  }
+  const writeKeywordStrategy = db.transaction(() => {
+    // Snapshot previous table-backed state before replacing it, so history can
+    // represent the exact prior generation without reading live tables later.
+    const prevPageMapForHistory = listPageKeywords(ws.id);
+    const prevContentGapsForHistory = listContentGaps(ws.id);
+    const prevQuickWinsForHistory = listQuickWins(ws.id);
+    const prevKeywordGapsForHistory = listKeywordGaps(ws.id);
+    const prevTopicClustersForHistory = listTopicClusters(ws.id);
+    const prevCannibalizationForHistory = listCannibalizationIssues(ws.id);
 
-  updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
-  addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
-    pageCount: pageMap.length,
-    siteKeywords: keywordStrategy.siteKeywords?.length || 0,
-  });
-  invalidateIntelligenceCache(ws.id);
-  // Bridge #3: strategy updated — debounced intelligence invalidation
-  debouncedStrategyInvalidate(ws.id, () => {
-    invalidateIntelligenceCache(ws.id);
-    invalidateSubCachePrefix(ws.id, 'slice:seoContext');
-  });
-  try {
+    if (strategyMode === 'full') {
+      const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
+      upsertAndCleanPageKeywords(ws.id, stampedMap);
+    } else {
+      // Only update pages actually re-analyzed in this incremental run.
+      const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
+      const analyzedMappings = pageMap
+        .filter((pm) => analyzedPaths.has(pm.pagePath))
+        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
+      upsertPageKeywordsBatch(ws.id, analyzedMappings);
+    }
+
+    replaceAllContentGaps(ws.id, newContentGaps);
+    replaceAllQuickWins(ws.id, newQuickWins);
+    replaceAllKeywordGaps(ws.id, keywordGaps);
+    replaceAllTopicClusters(ws.id, topicClusters);
+    replaceAllCannibalizationIssues(ws.id, cannibalization);
+
+    const previousStrategy = ws.keywordStrategy;
+    if (previousStrategy?.generatedAt) {
+      const previousStrategySnapshot = {
+        ...previousStrategy,
+        contentGaps: prevContentGapsForHistory,
+        quickWins: prevQuickWinsForHistory,
+        keywordGaps: prevKeywordGapsForHistory,
+        topicClusters: prevTopicClustersForHistory,
+        cannibalization: prevCannibalizationForHistory,
+      };
+      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run( // txn-ok: enclosed by writeKeywordStrategy transaction
+        ws.id, JSON.stringify(previousStrategySnapshot), JSON.stringify(prevPageMapForHistory), previousStrategy.generatedAt
+      );
+      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+    }
+
+    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
+    addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
     if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
       workspaceId: ws.id,
       actionType: 'strategy_keyword_added',
@@ -222,9 +169,23 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       baselineSnapshot: { captured_at: new Date().toISOString() },
       attribution: 'platform_executed',
     });
-  } catch (err) {
-    log.warn({ err }, 'Failed to record outcome action for strategy generation');
-  }
+  });
+  writeKeywordStrategy();
+
+  debouncedPageAnalysisInvalidate(ws.id, () => {
+    invalidateIntelligenceCache(ws.id);
+    invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+    invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
+  });
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    pageCount: pageMap.length,
+    siteKeywords: keywordStrategy.siteKeywords?.length || 0,
+  });
+  invalidateIntelligenceCache(ws.id);
+  debouncedStrategyInvalidate(ws.id, () => {
+    invalidateIntelligenceCache(ws.id);
+    invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+  });
 
   return {
     keywordStrategy: keywordStrategy as KeywordStrategy,

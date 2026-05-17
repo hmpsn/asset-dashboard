@@ -5,7 +5,7 @@ import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { SchemaFieldTarget } from '../../../shared/types/site-inventory';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { adminPath } from '../../routes';
-import { Icon } from '../ui';
+import { Button, FormInput, FormSelect, Icon, IconButton } from '../ui';
 import type { SchemaMappingCollection, SchemaPageOption } from './schemaSuggesterTypes';
 
 export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -15,6 +15,7 @@ export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> =
 
 interface SchemaBusinessProfileCalloutProps {
   businessProfile?: BusinessProfileContact | null;
+  localBusinessIntent?: 'unknown' | 'local' | 'non-local-saas';
   dismissed: boolean;
   workspaceId?: string;
   onDismiss: () => void;
@@ -22,11 +23,15 @@ interface SchemaBusinessProfileCalloutProps {
 
 export function SchemaBusinessProfileCallout({
   businessProfile,
+  localBusinessIntent = 'unknown',
   dismissed,
   workspaceId,
   onDismiss,
 }: SchemaBusinessProfileCalloutProps) {
-  const showCallout = !dismissed && !!workspaceId && !(businessProfile?.address?.street || businessProfile?.address?.city);
+  const showCallout = !dismissed
+    && !!workspaceId
+    && localBusinessIntent !== 'non-local-saas'
+    && !(businessProfile?.address?.street || businessProfile?.address?.city);
 
   if (!showCallout) {
     return null;
@@ -49,13 +54,14 @@ export function SchemaBusinessProfileCallout({
           </Link>
         )}
       </div>
-      <button
+      <IconButton
+        icon={X}
+        label="Dismiss"
+        size="sm"
+        variant="ghost"
         onClick={onDismiss}
         className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
-        aria-label="Dismiss"
-      >
-        <X size={14} />
-      </button>
+      />
     </div>
   );
 }
@@ -76,12 +82,14 @@ export function SchemaGeneratorHero({
         <p className="t-body font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
         <p className="t-caption text-[var(--brand-text-muted)] max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
       </div>
-      <button
+      <Button
         onClick={onRunScan}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors mt-2"
+        size="md"
+        icon={Sparkles}
+        className="t-body font-medium bg-teal-600 hover:bg-teal-500 text-white mt-2"
       >
-        <Icon as={Sparkles} size="md" /> Generate All Pages
-      </button>
+        Generate All Pages
+      </Button>
     </div>
   );
 }
@@ -128,21 +136,23 @@ export function SchemaInitialPageTypePicker({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="t-caption text-[var(--brand-text-muted)]">{availablePages.length} pages — set page types for better AI prompts</span>
-          <button
+          <Button
             onClick={() => setShowTypeGuide(value => !value)}
-            className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+            variant="ghost"
+            size="sm"
+            className="!px-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
             title="Page Type Guide"
           >
             <Icon as={HelpCircle} size="sm" />
             Guide
-          </button>
+          </Button>
         </div>
-        <input
+        <FormInput
           type="text"
           value={pageSearch}
-          onChange={event => onPageSearchChange(event.target.value)}
+          onChange={onPageSearchChange}
           placeholder="Filter pages..."
-          className="px-3 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] w-48 focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="t-caption w-48"
         />
       </div>
       {showTypeGuide && <SchemaPageTypeGuide />}
@@ -153,26 +163,22 @@ export function SchemaInitialPageTypePicker({
               <div className="t-caption text-[var(--brand-text)] truncate">{page.title}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
             </div>
-            <select
+            <FormSelect
               value={pageTypes[page.id] || 'auto'}
-              onChange={event => {
-                const pageType = event.target.value;
-                onPageTypeSelect(page.id, pageType);
-              }}
+              onChange={pageType => onPageTypeSelect(page.id, pageType)}
+              options={SCHEMA_PAGE_TYPE_OPTIONS}
               className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 cursor-pointer"
-            >
-              {SCHEMA_PAGE_TYPE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <button
+            />
+            <Button
               onClick={() => onGenerateSinglePage(page.id)}
               disabled={generatingSingle === page.id}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+              size="sm"
+              loading={generatingSingle === page.id}
+              icon={Sparkles}
+              className="t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 disabled:opacity-50"
             >
-              {generatingSingle === page.id ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
               Generate
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -252,19 +258,19 @@ export function SchemaCmsFieldMappingPanel({
               return (
                 <label key={target} className="block">
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">{label}</span>
-                  <select
+                  <FormSelect
                     value={selected}
                     disabled={savingCmsMapping === `${collection.collectionId}:${target}`}
-                    onChange={event => onSaveCmsFieldMapping(collection, target, event.target.value)}
+                    onChange={value => onSaveCmsFieldMapping(collection, target, value)}
+                    options={[
+                      { value: '', label: 'Not mapped' },
+                      ...collection.fields.map(field => ({
+                        value: field.slug,
+                        label: `${field.displayName || field.slug} (${field.type})`,
+                      })),
+                    ]}
                     className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 disabled:opacity-50"
-                  >
-                    <option value="">Not mapped</option>
-                    {collection.fields.map(field => (
-                      <option key={field.slug} value={field.slug}>
-                        {field.displayName || field.slug} ({field.type})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
               );
             })}

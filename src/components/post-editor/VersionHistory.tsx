@@ -3,7 +3,7 @@
  * Extracted from PostEditor.tsx version history section.
  */
 import { Loader2, X, History, RotateCcw } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { Button, Icon, IconButton, SectionCard } from '../ui';
 
 interface Version {
   id: string;
@@ -33,7 +33,15 @@ export function VersionHistory({
           <span className="text-xs font-medium text-[var(--brand-text-bright)]">Version History</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"><Icon as={X} size="sm" /></button>
+        <IconButton
+          type="button"
+          icon={X}
+          label="Close version history"
+          size="sm"
+          variant="ghost"
+          onClick={onClose}
+          className="p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+        />
       </div>
       <div className="px-4 py-3 max-h-64 overflow-y-auto">
         {versionsLoading ? (
@@ -59,7 +67,7 @@ export function VersionHistory({
               return (
                 <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
                       <span className="t-caption-sm font-semibold text-teal-400">v{v.versionNumber}</span>
                     </div>
                     <div className="min-w-0">
@@ -67,14 +75,18 @@ export function VersionHistory({
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(v.createdAt).toLocaleString()} · {v.totalWordCount.toLocaleString()}w</div>
                     </div>
                   </div>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onRevert(v.id)}
                     disabled={reverting === v.id}
-                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    loading={reverting === v.id}
+                    icon={reverting === v.id ? undefined : RotateCcw}
+                    className="flex-shrink-0 gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-teal-500/10 opacity-0 group-hover:opacity-100 disabled:opacity-50"
                   >
-                    <Icon as={reverting === v.id ? Loader2 : RotateCcw} size="sm" className={reverting === v.id ? 'animate-spin' : ''} />
                     Revert
-                  </button>
+                  </Button>
                 </div>
               );
             })}

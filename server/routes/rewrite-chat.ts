@@ -18,6 +18,7 @@ import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import type { SeoIssue, PageSeoResult } from '../seo-audit.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
+import { fetchPublicWebText, isExternalFetchError } from '../external-fetch.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -180,10 +181,12 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   try {
-    const htmlRes = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15_000) });
-    if (!htmlRes.ok) return res.status(502).json({ error: `Failed to fetch page: ${htmlRes.status}` });
-
-    const html = await htmlRes.text();
+    const html = await fetchPublicWebText({
+      url,
+      redirect: 'follow',
+      timeoutMs: 15_000,
+      logContext: { module: 'rewrite-chat', fetchPath: 'load-page' },
+    });
     const { title, sections, bodyText, preamble } = extractPageSections(html);
 
     // Get audit issues for this page
@@ -199,6 +202,11 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
 
     res.json({ title, sections, bodyText, preamble, html: html.slice(0, 50000), issues, slug });
   } catch (err) {
+    if (isExternalFetchError(err)) {
+      const status = err.kind === 'http' ? 502 : 500;
+      const detail = err.kind === 'http' && err.status ? `: ${err.status}` : '';
+      return res.status(status).json({ error: `Failed to fetch page${detail}` });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg }, 'Failed to load page for rewrite chat');
     res.status(500).json({ error: msg });

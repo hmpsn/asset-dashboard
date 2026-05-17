@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Clock, ChevronDown, ChevronRight } from 'lucide-react';
-import { Icon } from '../ui';
+import { ClickableRow, Icon } from '../ui';
 import { useBlueprintVersions } from '../../hooks/admin/useBlueprints';
 import type { BlueprintVersion } from '../../../shared/types/page-strategy';
 
@@ -48,57 +48,57 @@ export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
             const includedCount =
               v.snapshot?.entries?.filter((e) => e.scope === 'included').length ?? 0;
             const isExpanded = expandedVersion === v.id;
-            const timeStr = formatVersionDate(v.createdAt);
+              const timeStr = formatVersionDate(v.createdAt);
 
-            return (
-              <li key={v.id} className="rounded-md border border-[var(--brand-border)] bg-[var(--surface-2)]">
-                <button
-                  type="button"
-                  onClick={() => toggleVersion(v.id)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 transition-colors rounded-md"
-                >
-                  <Icon as={Clock} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
-                  <span className="t-mono text-xs text-teal-400 shrink-0">
-                    v{v.version}
-                  </span>
-                  <span className="t-caption text-[var(--brand-text)] shrink-0">{timeStr}</span>
-                  <span className="ml-auto t-caption text-[var(--brand-text-muted)] shrink-0">
-                    {includedCount}/{entryCount} pages
-                  </span>
-                  {isExpanded ? (
-                    <Icon as={ChevronDown} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
-                  ) : (
-                    <Icon as={ChevronRight} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
-                  )}
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-[var(--brand-border)] px-3 py-2 space-y-2">
-                    {v.changeNotes && (
-                      <p className="t-caption text-[var(--brand-text)] italic">{v.changeNotes}</p>
-                    )}
-                    {entryCount > 0 ? (
-                      <ul className="space-y-1">
-                        {v.snapshot.entries.map((entry) => (
-                          <li
-                            key={entry.id}
-                            className="flex items-center justify-between t-caption"
-                          >
-                            <span className="text-[var(--brand-text)] truncate">{entry.name}</span>
-                            <span className="ml-2 shrink-0 text-[var(--brand-text-muted)]">
-                              {entry.sectionPlan?.length ?? 0} sections
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+              return (
+                <li key={v.id} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
+                  <ClickableRow
+                    onClick={() => toggleVersion(v.id)}
+                    active={isExpanded}
+                    className="flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] bg-transparent"
+                  >
+                    <Icon as={Clock} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
+                    <span className="t-mono text-xs text-teal-400 shrink-0">
+                      v{v.version}
+                    </span>
+                    <span className="t-caption text-[var(--brand-text)] shrink-0">{timeStr}</span>
+                    <span className="ml-auto t-caption text-[var(--brand-text-muted)] shrink-0">
+                      {includedCount}/{entryCount} pages
+                    </span>
+                    {isExpanded ? (
+                      <Icon as={ChevronDown} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
                     ) : (
-                      <p className="t-caption text-[var(--brand-text-muted)]">No entries in this snapshot.</p>
+                      <Icon as={ChevronRight} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
                     )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+                  </ClickableRow>
+
+                  {isExpanded && (
+                    <div className="border-t border-[var(--brand-border)] px-3 py-2 space-y-2">
+                      {v.changeNotes && (
+                        <p className="t-caption text-[var(--brand-text)] italic">{v.changeNotes}</p>
+                      )}
+                      {entryCount > 0 ? (
+                        <ul className="space-y-1">
+                          {v.snapshot.entries.map((entry) => (
+                            <li
+                              key={entry.id}
+                              className="flex items-center justify-between t-caption"
+                            >
+                              <span className="text-[var(--brand-text)] truncate">{entry.name}</span>
+                              <span className="ml-2 shrink-0 text-[var(--brand-text-muted)]">
+                                {entry.sectionPlan?.length ?? 0} sections
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="t-caption text-[var(--brand-text-muted)]">No entries in this snapshot.</p>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
         </ul>
       )}
     </div>

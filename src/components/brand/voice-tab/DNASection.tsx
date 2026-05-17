@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { voice } from '../../../api/brand-engine';
 import type { VoiceDNA } from '../../../../shared/types/brand-engine';
-import { Button, Icon } from '../../ui';
+import { Button, IconButton, FormInput } from '../../ui';
 import { useToast } from '../../Toast';
 import { appendUniqueListValue, defaultDNA } from './voiceTabModel';
 
@@ -65,24 +65,25 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)]"
             >
               {trait}
-              <button
+              <IconButton
                 type="button"
                 onClick={() => removeTrait(trait)}
-                aria-label={`Remove trait: ${trait}`}
+                icon={Trash2}
+                label={`Remove trait: ${trait}`}
+                variant="ghost"
+                size="sm"
                 className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
-              >
-                <Icon as={Trash2} size="sm" />
-              </button>
+              />
             </span>
           ))}
         </div>
         <div className="flex gap-2">
           <label htmlFor="dna-new-trait" className="sr-only">New trait</label>
-          <input
+          <FormInput
             id="dna-new-trait"
             type="text"
             value={newTrait}
-            onChange={e => setNewTrait(e.target.value)}
+            onChange={setNewTrait}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
             placeholder="e.g. Witty but never sarcastic"
             className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
@@ -117,14 +118,14 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
               </label>
               <span className="t-caption font-medium text-teal-400">{dna.toneSpectrum[key]}</span>
             </div>
-            <input
+            <FormInput
               id={`tone-${key}`}
               type="range"
               min={1}
               max={10}
               step={1}
               value={dna.toneSpectrum[key]}
-              onChange={e => updateSpectrum(key, Number(e.target.value))}
+              onChange={value => updateSpectrum(key, Number(value))}
               className="w-full accent-teal-500"
             />
             <div className="flex justify-between t-caption text-[var(--brand-text-muted)]">
@@ -138,11 +139,11 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
       <div className="space-y-4">
         <div className="space-y-1">
           <label htmlFor="dna-sentence-style" className="t-caption text-[var(--brand-text-muted)]">Sentence Style</label>
-          <input
+          <FormInput
             id="dna-sentence-style"
             type="text"
             value={dna.sentenceStyle}
-            onChange={e => setDna(prev => ({ ...prev, sentenceStyle: e.target.value }))}
+            onChange={value => setDna(prev => ({ ...prev, sentenceStyle: value }))}
             placeholder="e.g. Short punchy lines with occasional longer payoff"
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
@@ -150,11 +151,11 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
 
         <div className="space-y-1">
           <label htmlFor="dna-vocabulary-level" className="t-caption text-[var(--brand-text-muted)]">Vocabulary Level</label>
-          <input
+          <FormInput
             id="dna-vocabulary-level"
             type="text"
             value={dna.vocabularyLevel}
-            onChange={e => setDna(prev => ({ ...prev, vocabularyLevel: e.target.value }))}
+            onChange={value => setDna(prev => ({ ...prev, vocabularyLevel: value }))}
             placeholder="e.g. Conversational, 8th grade reading level"
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
@@ -162,11 +163,11 @@ export function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps
 
         <div className="space-y-1">
           <label htmlFor="dna-humor-style" className="t-caption text-[var(--brand-text-muted)]">Humor Style</label>
-          <input
+          <FormInput
             id="dna-humor-style"
             type="text"
             value={dna.humorStyle ?? ''}
-            onChange={e => setDna(prev => ({ ...prev, humorStyle: e.target.value }))}
+            onChange={value => setDna(prev => ({ ...prev, humorStyle: value }))}
             placeholder="e.g. Self-deprecating, observational"
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { CheckCircle2 } from 'lucide-react';
 import { Badge } from '../../src/components/ui/Badge';
 
 describe('Badge', () => {
@@ -30,6 +31,31 @@ describe('Badge', () => {
       expect(span.className).toContain(`text-${color}-`);
       unmount();
     }
+  });
+
+  it('prefers tone over the compatibility color alias', () => {
+    const { container } = render(<Badge label="Action" color="red" tone="teal" />);
+    const span = container.querySelector('span')!;
+    expect(span.className).toContain('text-teal-400');
+    expect(span.className).not.toContain('text-red-400');
+  });
+
+  it('renders outline, solid, size, and shape variants', () => {
+    const { container, rerender } = render(<Badge label="Outline" tone="blue" variant="outline" shape="pill" />);
+    let span = container.querySelector('span')!;
+    expect(span.className).toContain('border-blue-500/25');
+    expect(span.className).toContain('rounded-[var(--radius-pill)]');
+
+    rerender(<Badge label="Solid" tone="emerald" variant="solid" size="md" />);
+    span = container.querySelector('span')!;
+    expect(span.className).toContain('bg-emerald-600');
+    expect(span.className).toContain('t-caption');
+  });
+
+  it('renders an optional icon and dot', () => {
+    const { container } = render(<Badge label="Done" tone="emerald" icon={CheckCircle2} dot />);
+    expect(container.querySelector('svg')).not.toBeNull();
+    expect(container.querySelector('.bg-emerald-400\\/80')).not.toBeNull();
   });
 
   it('applies custom className', () => {

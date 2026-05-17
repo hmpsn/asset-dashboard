@@ -16,6 +16,7 @@ interface UseCmsEditorApprovalWorkflowArgs {
   edits: Record<string, Record<string, string>>;
   collections: CmsCollection[];
   refreshStates: () => void;
+  onApprovalBatchMutated?: () => void;
 }
 
 function toggleStringSet(previous: Set<string>, id: string): Set<string> {
@@ -42,6 +43,7 @@ export function useCmsEditorApprovalWorkflow({
   edits,
   collections,
   refreshStates,
+  onApprovalBatchMutated,
 }: UseCmsEditorApprovalWorkflowArgs) {
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
@@ -61,7 +63,7 @@ export function useCmsEditorApprovalWorkflow({
     setApprovalSelected(previous => toggleStringIds(previous, collectionItemIds));
   }, []);
 
-  const sendForApproval = useCallback(async () => {
+  const sendForApproval = useCallback(async (note?: string) => {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     setApprovalError(null);
@@ -80,12 +82,14 @@ export function useCmsEditorApprovalWorkflow({
         siteId,
         name: `CMS SEO Changes — ${new Date().toLocaleDateString()}`,
         items,
+        ...(note?.trim() ? { note: note.trim() } : {}),
       });
 
       setApprovalSent(true);
       refreshStates();
       setApprovalSelected(new Set());
       setApprovalRefreshKey(key => key + 1);
+      onApprovalBatchMutated?.();
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
@@ -97,7 +101,7 @@ export function useCmsEditorApprovalWorkflow({
     } finally {
       setSendingApproval(false);
     }
-  }, [workspaceId, approvalSelected, edits, collections, siteId, refreshStates, clearApprovalErrorLater]);
+  }, [workspaceId, approvalSelected, edits, collections, siteId, refreshStates, clearApprovalErrorLater, onApprovalBatchMutated]);
 
   return {
     approvalSelected,

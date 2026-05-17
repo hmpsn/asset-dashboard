@@ -24,7 +24,7 @@ import {
   useGenerateCopy,
   useSendEntryToClientReview,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, IconButton, FormTextarea } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopySection, QualityFlag } from '../../../shared/types/copy-pipeline';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
@@ -131,19 +131,20 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
       titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
       titleExtra={
         <div className="flex items-center gap-1.5">
-          <Badge label={statusConfig.label} color={statusConfig.color} />
-          {hasErrors && <Badge label="Has errors" color="red" />}
-          {hasFlags && !hasErrors && <Badge label="Warnings" color="amber" />}
+          <Badge label={statusConfig.label} tone={statusConfig.color} />
+          {hasErrors && <Badge label="Has errors" tone="red" />}
+          {hasFlags && !hasErrors && <Badge label="Warnings" tone="amber" />}
         </div>
       }
       action={
-        <button
+        <IconButton
           onClick={() => setExpanded(v => !v)}
+          icon={Chevron}
+          label={expanded ? `Collapse section ${sectionLabel}` : `Expand section ${sectionLabel}`}
+          variant="ghost"
+          size="sm"
           className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
-          aria-label={expanded ? `Collapse section ${sectionLabel}` : `Expand section ${sectionLabel}`}
-        >
-          <Icon as={Chevron} size="md" />
-        </button>
+        />
       }
     >
       {expanded && (
@@ -152,11 +153,11 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
           {/* Generated copy */}
           {editMode ? (
             <div className="space-y-2">
-              <textarea
+              <FormTextarea
                 value={editText}
-                onChange={e => setEditText(e.target.value)}
+                onChange={setEditText}
                 rows={8}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
+                className="w-full"
                 aria-label={`Edit copy for ${sectionLabel}`}
                 disabled={updateText.isPending}
               />
@@ -194,17 +195,18 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 <p className="text-sm text-[var(--brand-text-muted)] italic">No copy generated yet.</p>
               )}
               {section.generatedCopy && (
-                <button
+                <IconButton
                   onClick={() => {
                     setEditText(section.generatedCopy ?? '');
                     setEditMode(true);
                   }}
+                  icon={Pencil}
+                  label={`Edit copy for ${sectionLabel}`}
+                  variant="ghost"
+                  size="sm"
                   className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-all"
-                  aria-label={`Edit copy for ${sectionLabel}`}
                   tabIndex={0}
-                >
-                  <Icon as={Pencil} size="md" />
-                </button>
+                />
               )}
             </div>
           )}
@@ -235,13 +237,13 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
               <label htmlFor={`regen-note-${section.id}`} className="t-caption text-[var(--brand-text-muted)]">
                 Steering note for regeneration
               </label>
-              <textarea
+              <FormTextarea
                 id={`regen-note-${section.id}`}
                 value={regenNote}
-                onChange={e => setRegenNote(e.target.value)}
+                onChange={setRegenNote}
                 rows={3}
                 placeholder="e.g. Make it more concise, lead with the value prop..."
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                className="w-full"
                 disabled={regenerate.isPending}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRegenerate();
@@ -337,7 +339,7 @@ function ProgressBar({ approved, total, percentage }: ProgressBarProps) {
         <span className="t-caption font-medium text-[var(--brand-text)]">{Math.round(percentage)}%</span>
       </div>
       <div
-        className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden"
+        className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(percentage)}
         aria-valuemin={0}

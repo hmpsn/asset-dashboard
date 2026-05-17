@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { scoreColorClass } from '../ui';
+import { Button, scoreColorClass } from '../ui';
 
 interface Props {
   page: UnifiedPage;
@@ -18,10 +18,14 @@ export function PageIntelligencePersistedAnalysisSummary({
     <div className="pt-2 border-t border-[var(--brand-border)]">
       <div className="flex items-center justify-between">
         <span className="t-caption-sm text-accent-success">Analysis on file (run {new Date(sp.analysisGeneratedAt).toLocaleDateString()})</span>
-        <button onClick={() => onAnalyzePage(page)}
-          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand flex items-center gap-1 transition-colors">
+        <Button
+          onClick={() => onAnalyzePage(page)}
+          variant="ghost"
+          size="sm"
+          className="px-0 py-0 h-auto min-h-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand gap-1"
+        >
           <Sparkles className="w-2.5 h-2.5" /> Run fresh analysis
-        </button>
+        </Button>
       </div>
       {(sp.optimizationIssues?.length || sp.recommendations?.length || sp.contentGaps?.length) ? (
         <div className="mt-2 space-y-2">

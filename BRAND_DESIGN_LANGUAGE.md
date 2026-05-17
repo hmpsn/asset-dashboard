@@ -41,9 +41,11 @@
 ### The Four Laws of Color
 
 1. **Teal for actions.** Every CTA, active state, toggle, accent highlight, tier badge, and interactive element uses teal. Never violet, blue, or indigo for buttons or interactive highlights.
-2. **Blue for data.** Clicks, sessions, impressions, links, info badges, "Needs Review" status, "unsaved" state, progress bars for data metrics — all blue. Blue is read-only, never actionable.
+2. **Blue for data.** Clicks, sessions, impressions, links, info badges, "unsaved" state, and progress bars for data metrics — all blue. Blue is read-only, never actionable. Review/action-required statuses use teal.
 3. **Emerald for success.** `scoreColorClass()` returns `text-emerald-400` for score ≥80; `scoreColor()` hex is `#34d399` (emerald-400). Never `text-green-400` for success/score indicators — green and emerald are distinct hues, emerald is canonical.
 4. **Purple for admin AI only.** The admin chatbot (`AdminChat.tsx`) and admin-only AI features (`SeoAudit.tsx` "Flag for Client") use purple to visually distinguish admin intelligence from client-facing teal UI. Purple never appears in any client-facing view.
+
+Action-link nuance: links that initiate user actions (review, open-tool, perform/fix flows) use teal hover/active states; blue link treatment is reserved for informational/data navigation only.
 
 ### Primary Palette
 
@@ -58,7 +60,7 @@
 
 | Name | Dark | Light | Tailwind | Allowed Usage |
 |------|------|-------|----------|---------------|
-| **Blue** | `#60a5fa` | `#2563eb` | `blue-400`/`blue-600` | Clicks, sessions, links, info badges, "Needs Review", progress bars, commercial intent |
+| **Blue** | `#60a5fa` | `#2563eb` | `blue-400`/`blue-600` | Clicks, sessions, links, info badges, progress bars, commercial intent |
 | **Emerald** | `#34d399` | `#047857` | `emerald-400` | Success, good scores (80+), score ring fill |
 | **Green / Emerald** | `#34d399` | `#047857` | `emerald-400/80` | Positive deltas, approved states, success indicators. Use `emerald-400/80` (not `green-400`) to match muted palette |
 | **Amber** | `#fbbf24` | `#b45309` | `amber-400/80` | Warnings, medium scores (60–79), trial badges, premium tier gate (TierGate only). Use `/80` opacity for status indicators |
@@ -124,7 +126,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-[var(--brand-border)]`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), `.t-ui` inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature card radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
-| **Badge** | `Badge.tsx` | 7 colors: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
+| **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
+| **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
@@ -147,7 +150,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
 | **Icon** | `ui/Icon.tsx` | Inherits `currentColor`; consumer supplies hue via `className` (e.g. `text-teal-400`). Inner SVG `aria-hidden="true"` by default — pass `aria-label` for semantic icons. | Phase 5. Wraps any Lucide component. Strict size enum: `xs\|sm\|md\|lg\|xl\|2xl` (8/12/16/20/24/32px). Inline-flex `<span>` wrapper so it is safe inside `<p>`, `<li>`, flex rows. forwardRef. |
 | **FormField** | `ui/forms/FormField.tsx` | Label text: `text-[var(--brand-text-bright)]`; error message: `text-red-400`; success message: `text-emerald-400`; hint: `text-[var(--brand-text-muted)]`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/success/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. Errors are authoritative over valid state. forwardRef. |
-| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Surface: `bg-[var(--surface-3)]`; default border: `border-[var(--brand-border)]`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Valid border: `border-emerald-500/50`. Placeholder: `text-[var(--brand-text-muted)]`. | Phase 5. Tokenized theme-aware inputs, mint focus ring. Consume error/valid state + id from FormFieldContext and wire `aria-invalid` / `aria-describedby`. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
+| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Surface: `bg-[var(--surface-3)]`; default border: `border-[var(--brand-border)]`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Valid border: `border-emerald-500/50`. Placeholder: `text-[var(--brand-text-muted)]`. | Phase 5. Tokenized theme-aware inputs, mint focus ring. Consume error/valid state + id from FormFieldContext and wire `aria-invalid` / `aria-describedby`. FormInput/FormTextarea support `commitOnBlur` for editor fields. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
 | **Checkbox** | `ui/forms/Checkbox.tsx` | Checked: `bg-[var(--brand-mint)] border-[var(--brand-mint)]` (Law 01). Unchecked: `bg-zinc-800 border-zinc-700`. Check icon: `text-zinc-900`. | Phase 5. Custom visual checkbox over hidden native input (preserves Space-key + a11y). Required `label` string. forwardRef to input. |
 | **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
 | **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Sizes preserve hierarchy: `.t-caption-sm` / `.t-caption` / `.t-body`. Spinner replaces icon while `loading`. `link` variant skips size padding. |
@@ -204,12 +207,12 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | All CTAs (submit, upgrade, pay, suggest) | `from-teal-600 to-emerald-600` | Brand CTA |
 | Soft CTAs (suggest topic, custom date) | `bg-teal-600/20 text-teal-300` | Soft variant |
 | Tab active state | `bg-zinc-800 text-zinc-300` | Segmented control |
-| Content pipeline review badge | `bg-blue-500/10 text-blue-400` | Info/attention — blue for "needs review" |
+| Content pipeline review badge | `StatusBadge domain="content"` (`teal` for client-review states) | Action-required review status |
 | Content request "client" chat bubbles | `bg-blue-500/10 text-blue-300` | Client = blue (read-only context) |
 | Clicks metric | `text-blue-400` | Blue = data metric |
 | Sessions metric | `text-blue-400` | Blue = data metric |
 | Approval batch "applied" badge | `bg-blue-500/10 text-blue-400` | Info state |
-| Request status "new" badge | `bg-blue-500/10 text-blue-400` | Info state |
+| Request status badge | `StatusBadge domain="request"` (`teal` awaiting/team-replied, `amber` in progress, `emerald` resolved) | Canonical request lifecycle semantics |
 | Informational intent badge | `text-blue-400 bg-blue-500/10` | Intent = info |
 | Full Post service badge | `bg-teal-500/10 text-teal-300` | Brand accent (was blue, fixed) |
 | Page type badge | `bg-teal-500/10 text-teal-400` | Brand accent |
@@ -218,6 +221,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | AI chat FAB + messages | `from-teal-600 to-emerald-600` (FAB), `bg-teal-600/20` (user msg) | Client chat = teal |
 | Welcome modal | `from-teal-500 to-emerald-500` icon/glow | Brand accent |
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
+| Client header at mobile widths | Responsive stacked toolbar (`flex-col` on mobile, `sm:flex-row` on desktop) with contained horizontal scrollers | Prevent document-level horizontal overflow at 375px while preserving tab/date-range scroll affordances |
 
 #### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
 
@@ -485,7 +489,7 @@ Two-zone flat list + slide-in detail drawer introduced in the May 2026 rebuild.
 |--------|-------|--------|
 | **Information density** | Full detail — priority badges, all metadata, raw data | Curated — less noise, guided actions |
 | **AI chat accent** | Purple (distinguished from client) | Teal (brand accent) |
-| **Content briefs** | Blue badges, full editing, status management | Teal badges, preview-only, approve/request changes |
+| **Content briefs** | StatusBadge registry for lifecycle states, blue only for read-only metadata | Teal review badges, preview-only, approve/request changes |
 | **Design tokens** | Same primitives (`SectionCard`, `Badge`, etc.) | Same primitives |
 | **Purple allowed?** | Yes — admin AI chat, Flag for Client, CMS badges | **Never** |
 
@@ -509,12 +513,11 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 
 | Component | Radius | Implementation |
 |-----------|--------|----------------|
-| `SectionCard` (page-level) | `10px 24px 10px 24px` | `style={{ borderRadius: '10px 24px 10px 24px' }}` |
-| `StatCard` | `6px 12px 6px 12px` | `style={{ borderRadius: '6px 12px 6px 12px' }}` |
-| Insight cards (standalone) | `8px 16px 8px 16px` | inline style |
-| Nested cards (inside SectionCard) | `8px` uniform | `rounded-lg` |
-| Badges, pills | `4px` uniform | `rounded` |
-| Buttons | unchanged | `rounded-lg` (8px) |
+| `SectionCard` / `ChartCard` signature surfaces | `--radius-signature-lg` (`10px 24px 10px 24px`) | Owned by the primitive; do not inline in consumers |
+| `StatCard` | `--radius-signature` (`6px 12px 6px 12px`) | Owned by the primitive |
+| Generic panels / nested cards | `--radius-lg` (`10px`) | `rounded-[var(--radius-lg)]` |
+| Buttons, inputs | `--radius-md` (`8px`) | `rounded-[var(--radius-md)]` |
+| Badges, pills | `--radius-sm` (`4px`) or `--radius-pill` | Tokenized primitive styles |
 
 ---
 
@@ -700,5 +703,13 @@ When shipping UI changes that affect color or design patterns:
 | 2026-05-03 | **Strategy Keywords rebuild** (PRs #430–#434 + task commits): Two-zone flat list (confirmed rows = standard surface, suggestion rows = `bg-blue-950/60 border border-blue-900/50`). Role badge coloring: content=emerald, page=blue, strategy=teal, idea=zinc/muted. KD difficulty coloring: ≤29=emerald-400, 30–49=amber-400, ≥50=red-400. Trend coloring: rising=emerald-400, declining=red-400, stable/unknown=muted. Drawer: right slide-in on desktop, bottom sheet on mobile. No sort controls. Per-component map section added. |
 | 2026-05-09 | **Client Inbox Redesign** (feat/client-inbox-redesign, 5 phases): `PriorityStrip` urgency component (teal CTA, renders null when nothing pending). `InboxTab` restructured into 3 collapsible sections (SEO Changes / Actions / Needs Your Attention) with Active/Completed mode toggle and 4 filter chips. `schema-review` standalone tab retired — schema plan card moves to InboxTab SEO Changes. New `--z-modal-fullscreen: 55` token in `src/tokens.css` (between `--z-modal: 50` and `--z-toast: 60`). `SchemaReviewModal` + `ClientActionDetailModal`: full-screen WAI-ARIA dialogs following canonical shell contract (`fixed inset-0 z-[var(--z-modal-fullscreen)]`, `role="dialog"`, `aria-modal`, `aria-labelledby` → `<h2>`, `autoFocus` on close, Escape key dismiss). `ClientActionDetailModal` has four typed payload renderers (internal_link, redirect_proposal, keyword_strategy, aeo_change) + default JSON fallback. `safeHref()` helper for XSS-safe URL rendering. pr-check rule `inbox-legacy-filter-literal` prevents re-introduction of retired filter literals. |
 | 2026-05-11 | **InboxTab Phase 3.5 — Action Playbooks Resolution** (client-inbox-phase35-action-playbooks-resolution): Closes the approval dead-end. Client approves an action → admin team notified via `action_approved` email event. `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`. Other action types (aeo_change, internal_link, keyword_strategy, redirect_proposal) surface in admin UI with "Awaiting implementation" badge (`bg-amber-500/10 text-amber-400 border-amber-500/20`) and teal "Mark complete" CTA button (`bg-teal-600 hover:bg-teal-500`). Badge styling follows Law 2 (amber for warning/pending state), button follows Law 1 (teal for action CTAs). `ClientActionsTab.tsx` renders approved actions with inline approval acknowledgment and action metadata. |
+| 2026-05-16 | **Styleguide migration audit cleanup**: Parallel audit pass removed duplicate embedded page headers in client tabs and PageSpeed, tokenized SectionCard's signature radius, aligned StatCard to `.t-stat*` utilities, and corrected drifted hue usage. Schema/editor actions now use teal, read-only progress/data metrics use blue, saved states use emerald, schema role badges stay within approved hue families, and stale styleguide enforcement copy now matches current pr-check behavior. |
+| 2026-05-16 | **Full styleguide migration ratchet**: Migrated all visible raw form controls to shared form primitives, added buffered `commitOnBlur` support for editor-style inputs, cleared static styleguide note/radius advisory debt, and promoted raw-form/static-styleguide drift to blocking pr-check rules with fixture coverage. Native hidden/file/color inputs remain allowed exceptions. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
+
+### Workspace Settings — Integration Health Center (May 2026)
+- `ConnectionsTab` now includes an **Integration Health Center** card.
+- **Blue** remains the data/observability hue for the module icon and quota-detail chips (`bg-blue-500/10 text-blue-400`).
+- Integration state badges follow semantic status mapping: **emerald** (`configured/healthy`), **amber** (`degraded`), **red** (`missing/error`).
+- No purple usage; the surface is admin operational telemetry, not admin AI interaction.

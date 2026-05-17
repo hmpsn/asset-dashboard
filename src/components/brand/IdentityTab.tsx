@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Check, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, FormInput } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -138,17 +138,19 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
           <div className="space-y-1">
             <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
             {showToggle && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setExpanded(prev => !prev)}
-                className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                variant="ghost"
+                size="sm"
+                className="gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0 py-0 bg-transparent hover:bg-transparent"
               >
                 {expanded ? (
                   <><Icon as={ChevronUp} size="md" /> Show less</>
                 ) : (
                   <><Icon as={ChevronDown} size="md" /> Show more</>
                 )}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -159,14 +161,14 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
             <label htmlFor={`refine-${deliverableType}`} className="sr-only">
               Refine direction for {label}
             </label>
-            <input
+            <FormInput
               id={`refine-${deliverableType}`}
               type="text"
               value={refineInput}
-              onChange={e => setRefineInput(e.target.value)}
+              onChange={setRefineInput}
               disabled={isLoading}
               placeholder="Refinement direction..."
-              className="flex-1 min-w-0 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
+              className="flex-1 min-w-0 disabled:opacity-50"
             />
             <Button
               type="submit"
@@ -345,13 +347,15 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     return (
       <div className="text-sm text-[var(--brand-text-muted)] py-8 text-center">
         Failed to load brand deliverables.{' '}
-        <button
+        <Button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) })}
-          className="text-teal-400 hover:underline"
+          variant="link"
+          size="sm"
+          className="text-teal-400 hover:underline align-baseline"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

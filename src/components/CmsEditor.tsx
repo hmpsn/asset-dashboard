@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Wand2, Sparkles, Search,
 } from 'lucide-react';
@@ -19,12 +20,30 @@ import { useCmsEditorSaveWorkflow } from './cms-editor/useCmsEditorSaveWorkflow'
 interface Props {
   siteId: string;
   workspaceId?: string;
+  collectionFilter?: string;
+  externalSearch?: string;
+  showPendingApprovals?: boolean;
+  onApprovalBatchMutated?: () => void;
 }
 
-export function CmsEditor({ siteId, workspaceId }: Props) {
+export function CmsEditor({
+  siteId,
+  workspaceId,
+  collectionFilter = 'all',
+  externalSearch,
+  showPendingApprovals = true,
+  onApprovalBatchMutated,
+}: Props) {
+  const queryClient = useQueryClient();
   const { data: cmsData, isLoading } = useCmsEditor(siteId, workspaceId);
   const collections = cmsData?.collections || [];
   const approvalBatches = cmsData?.approvalBatches || [];
+  const displayCollections = useMemo(
+    () => collectionFilter === 'all'
+      ? collections
+      : collections.filter(collection => collection.collectionId === collectionFilter),
+    [collections, collectionFilter],
+  );
 
   const {
     expandedCollections,
@@ -50,6 +69,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     togglePreview,
     updateField,
   } = useCmsEditorShellState({ siteId, collections });
+  const effectiveSearch = externalSearch ?? search;
 
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
   const {
@@ -67,6 +87,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     edits,
     collections,
     refreshStates,
+    onApprovalBatchMutated,
   });
 
   // Build per-item approval lookup: itemId → approval items across all batches
@@ -108,6 +129,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setExpandedItems,
     aiRewrite,
     aiRewriteBoth,
+    queryClient,
   });
 
   const { saveItem } = useCmsEditorSaveWorkflow({
@@ -119,6 +141,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     setDirty,
     setSaved,
     refreshStates,
+    queryClient,
   });
 
   if (isLoading) {
@@ -137,14 +160,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   }
 
   const totalItems = collections.reduce((s, c) => s + c.items.length, 0);
+  const visibleItems = displayCollections.reduce((sum, collection) => sum + collection.items.length, 0);
   const dirtyCount = dirty.size;
   const savedCount = saved.size;
 
   return (
     <div className="space-y-8">
       <CmsEditorShellPanels
-        collections={collections}
-        totalItems={totalItems}
+        collections={displayCollections}
+        totalItems={collectionFilter === 'all' ? totalItems : visibleItems}
         dirtyCount={dirtyCount}
         savedCount={savedCount}
         approvalSelectedCount={approvalSelected.size}
@@ -160,14 +184,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         workspaceId={workspaceId}
         approvalRefreshKey={approvalRefreshKey}
         onApprovalRetracted={refreshStates}
+        showPendingApprovals={showPendingApprovals}
         summary={summary}
-        search={search}
+        search={effectiveSearch}
         onSearchChange={setSearch}
+        showSearch={externalSearch === undefined}
       />
 
+      {displayCollections.length === 0 && (
+        <EmptyState icon={Search} title="No CMS items match this collection filter" />
+      )}
+
       <CmsEditorCollections
-        collections={collections}
-        search={search}
+        collections={displayCollections}
+        search={effectiveSearch}
         workspaceId={workspaceId}
         edits={edits}
         dirty={dirty}

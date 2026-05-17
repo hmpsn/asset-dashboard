@@ -11,7 +11,7 @@ import { requireWorkspaceAccess, requireWorkspaceSiteAccessFromQuery } from '../
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
-import { buildSchemaContext } from '../helpers.js';
+import { buildSchemaContext, normalizePageUrl } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
@@ -52,6 +52,12 @@ import {
 import { validateLeanSchema } from '../schema/validator.js';
 import { validateWholeSiteSchemaGraph } from '../schema/whole-site-graph-validator.js';
 import { isProgrammingError } from '../errors.js';
+import {
+  toAdminSchemaSnapshotView,
+  toAdminSchemaView,
+  toClientSchemaSnapshotView,
+  toClientSchemaView,
+} from '../serializers/client-safe.js';
 
 const router = Router();
 const log = createLogger('webflow-schema');
@@ -196,12 +202,8 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccess
 router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const snapshot = getSchemaSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
-  // Annotate each page result with its last publish date (for stale schema detection)
   const publishDates = getPublishDatesForSite(req.params.siteId);
-  for (const result of snapshot.results) {
-    (result as unknown as Record<string, unknown>).lastPublishedAt = publishDates[result.pageId] || null;
-  }
-  res.json(snapshot);
+  res.json(toAdminSchemaSnapshotView(snapshot, publishDates));
 });
 
 // ── Page Type Persistence ──
@@ -440,7 +442,9 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         recordSchemaPublish(req.params.siteId, pageId, cmsWs.id || '', schema);
         addActivity(cmsWs.id, 'schema_published', 'Schema written to CMS field', cmsDelivery.message, { pageId });
         updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-        recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-cms-field');
+        const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
+        const cmsPublishedPath = rawCmsPublishedPath ? normalizePageUrl(rawCmsPublishedPath) : '';
+        recordSeoChange(cmsWs.id, pageId, cmsPublishedPath, req.body.pageTitle || '', ['schema'], 'schema-cms-field');
       }
       return res.json({ success: true, published: !!publishAfter, cmsDeliveryStatus: cmsDelivery });
     }
@@ -489,10 +493,12 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
 
     // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const rawPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
+    const publishedPath = rawPublishedPath ? normalizePageUrl(rawPublishedPath) : '';
     if (pubWs) {
       addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${sitePublished ? 'site published' : 'saved as draft'}`, { pageId });
       updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-      recordSeoChange(pubWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema');
+      recordSeoChange(pubWs.id, pageId, publishedPath, req.body.pageTitle || '', ['schema'], 'schema');
     }
 
     res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
@@ -510,7 +516,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         actionType: 'schema_deployed',
         sourceType: 'schema',
         sourceId: pageId,
-        pageUrl: req.body.pageSlug ? `/${req.body.pageSlug}` : null,
+        pageUrl: publishedPath || null,
         targetKeyword: null,
         baselineSnapshot: {
           captured_at: new Date().toISOString(),
@@ -519,9 +525,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
         },
         attribution: 'platform_executed',
       });
-      if (req.body.pageSlug) {
-        void captureBaselineFromGsc(schemaAction.id, pubWs.id, `/${req.body.pageSlug}`);
-      }
+      if (publishedPath) void captureBaselineFromGsc(schemaAction.id, pubWs.id, publishedPath);
     } catch (err) {
       log.warn({ err, pageId }, 'Failed to record outcome action for schema deployment');
     }
@@ -640,7 +644,7 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQu
 router.get('/api/webflow/schema-plan/:siteId', requireWorkspaceSiteAccessFromQuery(), (req, res) => {
   const plan = getSchemaPlan(req.params.siteId);
   if (!plan) return res.json(null);
-  res.json(plan);
+  res.json(toAdminSchemaView(plan));
 });
 
 // PUT: update page roles / canonical entities on the plan
@@ -806,18 +810,7 @@ router.get('/api/public/schema-snapshot/:workspaceId', requireClientPortalAuth()
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const snapshot = getSchemaSnapshot(ws.webflowSiteId);
   if (!snapshot) return res.json(null);
-  // Return a simplified view — page titles, slugs, schema types only
-  const pages = snapshot.results.map(r => ({
-    pageId: r.pageId,
-    pageTitle: r.pageTitle,
-    slug: r.slug,
-    url: r.url,
-    existingSchemas: r.existingSchemas || [],
-    schemaTypes: (r.suggestedSchemas?.[0]?.template?.['@graph'] as Array<{ '@type'?: string }> || [])
-      .map(n => String(n['@type'])).filter(Boolean),
-    priority: r.suggestedSchemas?.[0]?.priority || 'medium',
-  }));
-  res.json({ pages, pageCount: snapshot.pageCount, createdAt: snapshot.createdAt });
+  res.json(toClientSchemaSnapshotView(snapshot));
 });
 
 // GET: client-readable schema plan (read-only)
@@ -827,7 +820,7 @@ router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (r
   const plan = getSchemaPlan(ws.webflowSiteId);
   if (!plan) return res.json(null);
   if (!['sent_to_client', 'client_approved', 'client_changes_requested', 'active'].includes(plan.status)) return res.json(null);
-  res.json(plan);
+  res.json(toClientSchemaView(plan));
 });
 
 // POST: client feedback on schema plan (approve / request changes)
@@ -845,8 +838,12 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
 
   const label = action === 'approve' ? 'approved' : 'requested changes on';
   addActivity(ws.id, 'changes_requested', `Client ${label} schema plan`, note || undefined);
-  broadcastToWorkspace(ws.id, WS_EVENTS.APPROVAL_UPDATE, { action: 'schema_plan_feedback', status: newStatus });
-  res.json(plan);
+  broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, {
+    siteId: ws.webflowSiteId,
+    action: 'schema_plan_feedback',
+    status: newStatus,
+  });
+  res.json(toClientSchemaView(plan));
 });
 
 // ── Pending Schemas (D7: pre-generated schema skeletons) ──

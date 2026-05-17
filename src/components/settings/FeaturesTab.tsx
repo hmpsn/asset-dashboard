@@ -4,7 +4,7 @@ import {
   Users, Shield, SlidersHorizontal, Brain, CreditCard,
 } from 'lucide-react';
 import { post } from '../../api/client';
-import { SectionCard, Icon } from '../ui';
+import { Badge, SectionCard, Icon, Button, Checkbox, FormInput } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 
 interface WorkspaceData {
@@ -73,23 +73,26 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Workspace Tier</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Controls which features the client can access</p>
           </div>
-          <span className={`t-caption-sm font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
-            (ws?.tier || 'free') === 'premium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-              : (ws?.tier || 'free') === 'growth' ? 'text-teal-400 bg-teal-500/10 border-teal-500/20'
-              : 'text-[var(--brand-text)] bg-[var(--surface-3)] border-[var(--brand-border)]'
-          }`}>
-            {ws?.tier || 'free'}
-          </span>
+          <Badge
+            label={ws?.tier || 'free'}
+            tone={(ws?.tier || 'free') === 'premium' ? 'amber' : (ws?.tier || 'free') === 'growth' ? 'teal' : 'zinc'}
+            variant="outline"
+            shape="pill"
+            size="md"
+            className="font-semibold uppercase tracking-wider"
+          />
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-center gap-2">
             {(['free', 'growth', 'premium'] as const).map(t => (
-              <button
+              <Button
                 key={t}
                 onClick={async () => {
                   await patchWorkspace({ tier: t });
                   toast(`Tier set to ${t}`);
                 }}
+                variant="secondary"
+                size="sm"
                 className={`flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium border transition-all ${
                   (ws?.tier || 'free') === t
                     ? t === 'premium' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
@@ -100,7 +103,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               >
                 {t === 'premium' && <Icon as={Sparkles} size="xs" className="mr-1" />}
                 {t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
+              </Button>
             ))}
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -135,18 +138,20 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Master toggle — enable or disable the client dashboard entirely</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const val = !(ws?.clientPortalEnabled !== false);
               await patchWorkspace({ clientPortalEnabled: val });
               toast(val ? 'Client portal enabled' : 'Client portal disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.clientPortalEnabled !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.clientPortalEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {/* External Billing */}
           <label className="flex items-center justify-between cursor-pointer group">
@@ -157,19 +162,21 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Bypass payment for content requests — billed off-platform</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const isExternal = ws?.billingMode === 'external';
               const next = isExternal ? 'platform' : 'external';
               await patchWorkspace({ billingMode: next });
               toast(next === 'external' ? 'External billing enabled — payment bypassed' : 'External billing disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.billingMode === 'external' ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.billingMode === 'external' ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {/* SEO Client View */}
           <label className="flex items-center justify-between cursor-pointer group">
@@ -180,18 +187,20 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Show SEO audit scores and detailed findings to the client (paid upgrade)</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const val = !ws?.seoClientView;
               await patchWorkspace({ seoClientView: val });
               toast(val ? 'SEO view enabled for client' : 'SEO view hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.seoClientView ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.seoClientView ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {/* Analytics Client View */}
           <label className="flex items-center justify-between cursor-pointer group">
@@ -202,18 +211,20 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Show Google Analytics and Search Console data to the client</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const val = !(ws?.analyticsClientView !== false);
               await patchWorkspace({ analyticsClientView: val });
               toast(val ? 'Analytics view enabled for client' : 'Analytics view hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.analyticsClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {/* Site Intelligence Client View */}
           <label className="flex items-center justify-between cursor-pointer group">
@@ -224,18 +235,20 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Show the AI-powered insights summary card to the client on their Overview tab</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const val = !(ws?.siteIntelligenceClientView !== false);
               await patchWorkspace({ siteIntelligenceClientView: val });
               toast(val ? 'Site Intelligence summary enabled for client' : 'Site Intelligence summary hidden from client');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.siteIntelligenceClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.siteIntelligenceClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {/* Client Onboarding Questionnaire */}
           <label className="flex items-center justify-between cursor-pointer group">
@@ -251,27 +264,31 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             </div>
             <div className="flex items-center gap-2">
               {ws?.onboardingCompleted && (
-                <button onClick={async (e) => {
+                <Button onClick={async (e) => {
                   e.stopPropagation();
                   await patchWorkspace({ onboardingCompleted: false });
                   toast('Onboarding reset — client will see the questionnaire again');
                 }}
-                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
+                  variant="secondary"
+                  size="sm"
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
                   Reset
-                </button>
+                </Button>
               )}
-              <button onClick={async () => {
+              <Button onClick={async () => {
                 const val = !ws?.onboardingEnabled;
                 await patchWorkspace({ onboardingEnabled: val });
                 toast(val ? 'Onboarding questionnaire enabled' : 'Onboarding questionnaire disabled');
               }}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                variant="ghost"
+                size="sm"
+                className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                   ws?.onboardingEnabled ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-                }`}>
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                } px-0 py-0 min-w-0`}>
+                <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                   ws?.onboardingEnabled ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
-              </button>
+              </Button>
             </div>
           </label>
         </div>
@@ -297,38 +314,42 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">Send scheduled SEO audit reports to the client email{ws?.clientEmail ? ` (${ws.clientEmail})` : ' — set email in Client Dashboard tab'}</div>
               </div>
             </div>
-            <button onClick={async () => {
+            <Button onClick={async () => {
               const val = !ws?.autoReports;
               await patchWorkspace({ autoReports: val });
               toast(val ? 'Auto-reports enabled' : 'Auto-reports disabled');
             }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.autoReports ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-              }`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              } px-0 py-0 min-w-0`}>
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.autoReports ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
-            </button>
+            </Button>
           </label>
           {ws?.autoReports && (
             <div className="space-y-3 pl-7">
               <div className="flex items-center gap-3">
                 <span className="t-caption text-[var(--brand-text-muted)]">Frequency:</span>
                 {(['monthly', 'weekly'] as const).map(freq => (
-                  <button key={freq} onClick={async () => {
+                  <Button key={freq} onClick={async () => {
                     await patchWorkspace({ autoReportFrequency: freq });
                     toast(`Report frequency set to ${freq}`);
                   }}
+                    variant="secondary"
+                    size="sm"
                     className={`px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors ${
                       (ws?.autoReportFrequency || 'monthly') === freq
                         ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
                         : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text)]'
                     }`}>
                     {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <button
+              <Button
                 disabled={sendingReport}
                 onClick={async () => {
                   setSendingReport(true);
@@ -342,10 +363,12 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                     setSendingReport(false);
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
               >
                 <Icon as={Mail} size="xs" /> Send Report Now
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -366,10 +389,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Logo URL</div>
             <div className="flex items-center gap-2">
-              <input type="url" value={logoUrlDraft}
+              <FormInput type="url" value={logoUrlDraft}
                 data-schema-deeplink="brandLogoUrl"
                 placeholder="https://example.com/logo.svg"
-                onChange={e => setLogoUrlDraft(e.target.value)}
+                onChange={setLogoUrlDraft}
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
                   if (val !== (ws?.brandLogoUrl || '')) {
@@ -379,7 +402,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   }
                 }}
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500" />
-              {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded" />}
+              {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded-[var(--radius-sm)]" />}
             </div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
               Also used as publisher logo in your schema. Required for Article rich snippets in Google search results.
@@ -414,18 +437,14 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
       <SectionCard title="Site capabilities">
         <div className="space-y-3">
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Tell schema what your live site supports.</p>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              data-schema-deeplink="siteHasSearch"
+          <div className="flex items-start gap-3">
+            <div data-schema-deeplink="siteHasSearch" className="mt-0.5">
+              <Checkbox
               // Controlled — reads current ws state on every render so the box
               // reflects the loaded value even if FeaturesTab mounts before ws
               // resolves (e.g. via deep-link). (Devin Review BUG-0002 round 3.)
               checked={!!ws?.siteHasSearch}
-              onChange={async (e) => {
-                // Capture sync value before await — currentTarget access after
-                // await is implementation-defined in React's synthetic event lifecycle.
-                const nextChecked = e.currentTarget.checked;
+              onChange={async (nextChecked) => {
                 try {
                   await patchWorkspace({ siteHasSearch: nextChecked });
                   toast(nextChecked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
@@ -435,15 +454,17 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   throw err;
                 }
               }}
-              className="mt-0.5"
+              label="My site has a working search endpoint"
+              className="[&>span:last-child]:sr-only"
             />
+            </div>
             <span>
               <span className="t-body font-medium text-[var(--brand-text)]">My site has a working search endpoint</span>
               <span className="block t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                 When enabled, schema generation emits <code className="t-mono text-[var(--brand-text)]">WebSite.potentialAction</code> (sitelinks SearchAction) so Google can offer in-SERP search. Your site must actually expose <code className="t-mono">https://yoursite.com/?s=&#123;query&#125;</code> or equivalent — verify this works before enabling.
               </span>
             </span>
-          </label>
+          </div>
         </div>
       </SectionCard>
 

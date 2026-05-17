@@ -106,8 +106,8 @@ export async function assemblePageProfile(
   let auditIssues: string[] = [];
   try {
     if (ws?.webflowSiteId) {
-      const { getLatestSnapshot } = await import('../reports.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const snap = getLatestSnapshot(ws.webflowSiteId);
+      const { getLatestEffectiveSnapshot } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions);
       if (snap?.audit?.pages) {
         const pagData = (snap.audit.pages as PageSeoResult[]).find(p =>
           matchPageIdentity(toAuditFindingPageId(p), pagePath)
@@ -291,7 +291,7 @@ export async function assemblePageProfile(
     const ws = getWorkspace(workspaceId);
     if (ws?.webflowSiteId) {
       const { getPageSpeed } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const speedSnap = getPageSpeed(ws.webflowSiteId);
+      const speedSnap = getPageSpeed(ws.webflowSiteId, 'mobile');
       if (speedSnap?.result) {
         const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
         const pages = result.pages ?? [];

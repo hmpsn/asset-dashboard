@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react'; // trend-icon-ok — used as severity/status glyphs in feed badges, not directional metric trends.
 import { Icon } from '../ui/Icon.js';
+import { Button } from '../ui';
 import type { FeedInsight } from '../../../shared/types/insights.js';
 import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag.js';
@@ -41,24 +42,28 @@ function DiagnosticCTA({ workspaceId, insightId }: { workspaceId: string; insigh
 
   if (report?.status === 'failed') {
     return (
-      <button
+      <Button
         onClick={() => run(insightId)}
-        className="mt-3 inline-flex items-center gap-1.5 t-caption font-medium text-amber-400 hover:text-amber-300"
+        variant="ghost"
+        size="sm"
+        className="mt-3 inline-flex items-center gap-1.5 t-caption font-medium text-amber-400 hover:text-amber-300 !px-0 !py-0 bg-transparent hover:bg-transparent"
       >
         <Icon as={FileSearch} size="md" />
         Retry Diagnostic
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
+    <Button
       onClick={() => run(insightId)}
-      className="mt-3 inline-flex items-center gap-1.5 t-caption font-medium text-teal-400 hover:text-teal-300"
+      variant="ghost"
+      size="sm"
+      className="mt-3 inline-flex items-center gap-1.5 t-caption font-medium text-teal-400 hover:text-teal-300 !px-0 !py-0 bg-transparent hover:bg-transparent"
     >
       <Icon as={FileSearch} size="md" />
       Run Deep Diagnostic
-    </button>
+    </Button>
   );
 }
 

@@ -5,6 +5,7 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Link as LinkIcon, Bold, Italic, Heading2, Heading3 } from 'lucide-react';
+import { Button, FormInput, IconButton } from '../ui';
 
 export interface RichTextEditorProps {
   initialValue: string;
@@ -71,11 +72,11 @@ export function RichTextEditor({ initialValue, onChange, className, variant = 'a
     <>
       {showLinkInput ? (
         <div className="flex items-center gap-1 px-1">
-          <input
+          <FormInput
             ref={linkInputRef}
             type="url"
             value={linkUrl}
-            onChange={e => setLinkUrl(e.target.value)}
+            onChange={setLinkUrl}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
               if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl(''); }
@@ -83,70 +84,84 @@ export function RichTextEditor({ initialValue, onChange, className, variant = 'a
             placeholder="https://..."
             className="w-44 bg-transparent text-[var(--brand-text)] text-xs px-1 py-0.5 focus:outline-none border-b border-teal-500/50"
           />
-          <button
+          <Button
             onMouseDown={e => { e.preventDefault(); applyLink(); }}
-            className="t-caption-sm text-teal-300 hover:text-teal-200 px-1 py-0.5"
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm text-teal-300 hover:text-teal-200 !px-1 !py-0.5"
           >
             OK
-          </button>
-          <button
+          </Button>
+          <Button
             onMouseDown={e => { e.preventDefault(); setShowLinkInput(false); setLinkUrl(''); }}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-1 py-0.5"
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] !px-1 !py-0.5"
           >
             x
-          </button>
+          </Button>
         </div>
       ) : (
         <>
-          <button
+          <Button
             aria-label="Bold"
             aria-pressed={editor.isActive('bold')}
             onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
-            className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('bold') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`!px-2 !py-1 text-xs font-bold ${editor.isActive('bold') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
             title="Bold"
           >
             {variant === 'client' ? <Bold className="w-3.5 h-3.5" /> : 'B'}
-          </button>
-          <button
+          </Button>
+          <Button
             aria-label="Italic"
             aria-pressed={editor.isActive('italic')}
             onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
-            className={`px-2 py-1 rounded text-xs italic transition-colors ${editor.isActive('italic') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`!px-2 !py-1 text-xs italic ${editor.isActive('italic') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
             title="Italic"
           >
             {variant === 'client' ? <Italic className="w-3.5 h-3.5" /> : 'I'}
-          </button>
-          <button
+          </Button>
+          <Button
             aria-label="Heading 2"
             aria-pressed={editor.isActive('heading', { level: 2 })}
             onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 2 }).run(); }}
-            className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${editor.isActive('heading', { level: 2 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`!px-2 !py-1 text-xs font-semibold ${editor.isActive('heading', { level: 2 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
             title="Heading 2"
           >
             {variant === 'client' ? <Heading2 className="w-3.5 h-3.5" /> : 'H2'}
-          </button>
-          <button
+          </Button>
+          <Button
             aria-label="Heading 3"
             aria-pressed={editor.isActive('heading', { level: 3 })}
             onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 3 }).run(); }}
-            className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${editor.isActive('heading', { level: 3 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`!px-2 !py-1 text-xs font-semibold ${editor.isActive('heading', { level: 3 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
             title="Heading 3"
           >
             {variant === 'client' ? <Heading3 className="w-3.5 h-3.5" /> : 'H3'}
-          </button>
-          <button
+          </Button>
+          <IconButton
+            icon={LinkIcon}
             aria-label="Insert link"
+            label="Insert link"
             onMouseDown={e => {
               e.preventDefault();
               const href = editor.getAttributes('link').href as string | undefined;
               if (href) setLinkUrl(href);
               setShowLinkInput(true);
             }}
-            className={`px-2 py-1 rounded text-xs transition-colors ${editor.isActive('link') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
+            size="sm"
+            variant="ghost"
+            className={`${editor.isActive('link') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
             title="Link"
-          >
-            <LinkIcon className="w-3 h-3" />
-          </button>
+          />
         </>
       )}
     </>

@@ -6,6 +6,7 @@
  */
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { IconButton } from '../ui';
 import { SchemaReviewTab } from './SchemaReviewTab';
 
 interface SchemaReviewModalProps {
@@ -37,20 +38,20 @@ export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaRevi
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
         <h2 id="schema-review-modal-title" className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
         {/* autoFocus moves keyboard focus into the modal on open (WAI-ARIA focus management) */}
-        <button
-          type="button"
+        <IconButton
+          icon={X}
+          label="Close schema review"
+          size="md"
+          variant="ghost"
           onClick={onClose}
-          aria-label="Close schema review"
           autoFocus
           className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        />
       </div>
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-6 py-6 max-w-4xl mx-auto w-full">
-        <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
+        <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} showHeader={false} />
       </div>
     </div>
   );

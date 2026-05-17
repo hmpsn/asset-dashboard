@@ -28,6 +28,10 @@ jobs:
         run: |
           set -o pipefail
           npm run pr-check:all 2>&1 | tee pr-check-full-scan.txt
+      - name: Run staging merge integrity audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run verify:staging-merge-integrity -- --since-days 365 --soft-gate
       - name: Upload scan output on failure
         if: failure()
         uses: actions/upload-artifact@v5

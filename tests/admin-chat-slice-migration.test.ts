@@ -34,6 +34,20 @@ describe('admin-chat-context Task 8 migration — structural checks', () => {
     expect(src).toMatch(/performanceSummary/);
   });
 
+  it('supplements performance context from saved PageSpeed snapshots even when siteHealth is absent', () => {
+    const perfPartsIndex = src.indexOf('const perfParts: string[] = []');
+    const healthIndex = src.indexOf('if (health)', perfPartsIndex);
+    const savedSnapshotIndex = src.indexOf('Saved ${strategy} PageSpeed average', healthIndex);
+    const pushSectionIndex = src.indexOf('SITE PERFORMANCE', savedSnapshotIndex);
+
+    expect(perfPartsIndex).toBeGreaterThan(0);
+    expect(healthIndex).toBeGreaterThan(perfPartsIndex);
+    expect(savedSnapshotIndex).toBeGreaterThan(healthIndex);
+    expect(pushSectionIndex).toBeGreaterThan(savedSnapshotIndex);
+    expect(src).toMatch(/for \(const strategy of \['mobile', 'desktop'\] as const\)/);
+    expect(src).toMatch(/getPageSpeed\(ws\.webflowSiteId, strategy\)/);
+  });
+
   it('uses intel.clientSignals for client health', () => {
     expect(src).toMatch(/intel\.clientSignals/);
     expect(src).toMatch(/compositeHealthScore/);

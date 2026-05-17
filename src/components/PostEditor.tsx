@@ -1,22 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
   History,
 } from 'lucide-react';
 import { useAutoSave } from '../hooks/useAutoSave';
-import { contentPosts } from '../api/content';
+import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
-import { SectionCard, Icon } from './ui';
+import { SectionCard, Icon, Modal, Button, IconButton, FormInput } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
 import { FixDiffModal } from './post-editor/FixDiffModal';
-import type { AiFixResult, IssueKey } from '../../shared/types/content';
+import type { AiFixResult, ContentBrief, ContentReviewEvidence, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 
@@ -83,13 +83,30 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
     approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', label: 'Approved' },
   };
   const c = cfg[status] || cfg.draft;
-  return <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${c.color}`}>{c.label}</span>;
+  return <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${c.color}`}>{c.label}</span>;
 }
 
 export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
   const queryClient = useQueryClient();
   const postQ = useAdminPost(workspaceId, postId);
   const post = (postQ.data ?? null) as GeneratedPost | null;
+  const briefQ = useQuery({
+    queryKey: post?.briefId ? queryKeys.admin.brief(workspaceId, post.briefId) : queryKeys.admin.brief(workspaceId, 'none'),
+    queryFn: () => contentBriefs.getById(workspaceId, post!.briefId),
+    enabled: !!post?.briefId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const reviewEvidence: ContentReviewEvidence | undefined = (() => {
+    const brief = briefQ.data as ContentBrief | undefined;
+    const peopleAlsoAsk = brief?.realPeopleAlsoAsk?.filter(Boolean).slice(0, 8) ?? [];
+    const topResults = brief?.realTopResults?.filter(result => result.title && result.url).slice(0, 8) ?? [];
+    if (!peopleAlsoAsk.length && !topResults.length) return undefined;
+    return {
+      peopleAlsoAsk,
+      topResults,
+      note: 'SERP evidence used for grounding support. Verify important factual claims against the original sources before checking provenance-sensitive items.',
+    };
+  })();
   const loading = postQ.isLoading;
   const error = postQ.error ? (postQ.error instanceof Error ? postQ.error.message : 'Failed to load') : '';
   const hasPublishTarget = usePublishTarget(workspaceId).data ?? false;
@@ -98,7 +115,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const versions = (versionsQ.data ?? []) as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>;
   const versionsLoading = versionsQ.isLoading;
 
-  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+  const [expandedSectionsByPost, setExpandedSectionsByPost] = useState<Record<string, Set<number>>>({});
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editingIntro, setEditingIntro] = useState(false);
   const [editingConclusion, setEditingConclusion] = useState(false);
@@ -139,17 +156,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
-
-  // Auto-expand all done sections on first load
-  const postLoaded = !!post;
-  useEffect(() => {
-    if (!postLoaded) return;
-    const sections = post!.sections;
-    if (sections.some(s => s.status === 'done')) {
-      setExpandedSections(new Set(sections.filter(s => s.status === 'done').map(s => s.index)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postLoaded]);
 
   const handlePublish = async (generateImage = false) => {
     if (!post) return;
@@ -301,10 +307,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const toggleSection = (i: number) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
+    setExpandedSectionsByPost(prev => {
+      const autoExpanded = new Set(post?.sections.filter(s => s.status === 'done').map(s => s.index) ?? []);
+      const next = new Set(prev[postId] ?? autoExpanded);
       if (next.has(i)) next.delete(i); else next.add(i);
-      return next;
+      return { ...prev, [postId]: next };
     });
   };
 
@@ -322,31 +329,30 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const completedSections = post.sections.filter(s => s.status === 'done').length;
   const totalSections = post.sections.length;
   const progress = isGenerating ? Math.round(((completedSections + (post.introduction ? 1 : 0)) / (totalSections + 2)) * 100) : 100;
+  const autoExpandedSections = new Set(post.sections.filter(s => s.status === 'done').map(s => s.index));
+  const expandedSections = expandedSectionsByPost[postId] ?? autoExpandedSections;
 
   return (
     <div className="space-y-8">
       {/* Delete Confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+        <Modal open={deleteConfirm} onClose={() => setDeleteConfirm(false)} size="sm">
+          <Modal.Header title="Delete Post?" onClose={() => setDeleteConfirm(false)} />
+          <Modal.Body>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-[var(--radius-pill)] bg-red-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={AlertTriangle} size="lg" className="text-red-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete Post?</div>
-                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">This action cannot be undone</div>
+                <div className="text-xs text-[var(--brand-text-muted)]">This action cannot be undone</div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={() => setDeleteConfirm(false)} className="px-4 py-2 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
-              <button onClick={handleDelete} className="px-4 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
-                <Icon as={Trash2} size="md" /> Delete
-              </button>
-            </div>
-          </div>
-        </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="danger" size="sm" icon={Trash2} onClick={handleDelete}>Delete</Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       {/* Header */}
@@ -354,14 +360,22 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
-              <input value={titleBuffer} onChange={e => setTitleBuffer(e.target.value)} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
-              <button onClick={saveTitleEdit} className="p-1.5 rounded bg-teal-600/20 text-teal-300 hover:bg-teal-600/30"><Icon as={Check} size="md" /></button>
-              <button onClick={() => setEditingTitle(false)} className="p-1.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>
+              <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1" />
+              <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
+              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTitle(false)} />
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
+              {/* duplicate-heading-ok -- inline editor title and exported html heading intentionally share post.title */}
               <h2 className="text-lg font-semibold text-[var(--brand-text-bright)] truncate">{post.title}</h2>
-              <button onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all"><Icon as={Pencil} size="sm" /></button>
+              <IconButton
+                icon={Pencil}
+                label="Edit title"
+                size="sm"
+                variant="ghost"
+                className="opacity-0 group-hover:opacity-100 transition-all"
+                onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }}
+              />
             </div>
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -369,7 +383,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Hash} size="sm" />{post.targetKeyword}</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={FileText} size="sm" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
             {post.unificationStatus && post.unificationStatus !== 'pending' && (
-              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded border font-medium flex items-center gap-1 ${
+              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok border font-medium flex items-center gap-1 ${
                 post.unificationStatus === 'success' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
                 post.unificationStatus === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
                 'text-[var(--brand-text)] bg-[var(--surface-3)]/10 border-[var(--brand-border)]'
@@ -384,48 +398,65 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!isGenerating && (
             <>
-              <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium border transition-colors ${showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
-                <Icon as={Eye} size="sm" /> Preview
-              </button>
-              <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={copied ? Check : Copy} size="sm" className={copied ? 'text-emerald-400' : ''} /> {copied ? 'Copied' : 'Copy'}
-              </button>
-              <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={Download} size="sm" /> .md
-              </button>
-              <button onClick={exportHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={Download} size="sm" /> .html
-              </button>
-              <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                <Icon as={Download} size="sm" /> Export PDF
-              </button>
-              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium border transition-colors ${showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}`}>
-                <Icon as={History} size="sm" /> History
-              </button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Eye}
+                onClick={() => setShowPreview(!showPreview)}
+                className={showPreview ? 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                Preview
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={copied ? Check : Copy}
+                onClick={copyAllHTML}
+                className={copied ? 'text-emerald-400 hover:text-emerald-300' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportMarkdown} className="text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+                .md
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportHTML} className="text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+                .html
+              </Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={exportPDF} className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30">
+                Export PDF
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={History}
+                onClick={() => setShowVersions(!showVersions)}
+                className={showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'}
+              >
+                History
+              </Button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
                 post.publishedAt ? (
-                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <Icon as={Check} size="sm" /> Published {post.publishedSlug && <Icon as={ExternalLink} size="sm" className="ml-0.5" />}
                   </span>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => setPublishConfirm(true)}
                     disabled={publishing}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                    size="sm"
+                    variant="secondary"
+                    loading={publishing}
+                    icon={Globe}
+                    className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                   >
-                    <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
                     {publishing ? 'Publishing...' : 'Publish to Webflow'}
-                  </button>
+                  </Button>
                 )
               )}
             </>
           )}
-          <button onClick={() => setDeleteConfirm(true)} className="p-1.5 rounded-lg text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
-            <Icon as={Trash2} size="md" />
-          </button>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-            <Icon as={X} size="md" />
-          </button>
+          <IconButton icon={Trash2} label="Delete post" variant="danger" size="sm" onClick={() => setDeleteConfirm(true)} />
+          <IconButton icon={X} label="Close editor" variant="ghost" size="sm" onClick={onClose} />
         </div>
       </div>
 
@@ -437,8 +468,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="text-xs font-medium text-amber-300">Generating post... {completedSections}/{totalSections} sections</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{progress}%</span>
           </div>
-          <div className="w-full h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-            <div className="h-full bg-amber-400/60 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div className="w-full h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+            <div className="h-full bg-amber-400/60 rounded-[var(--radius-pill)] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </SectionCard>
       )}
@@ -469,9 +500,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           onChangeStatus={(status) => saveField({ status })}
           onRunAIReview={async () => {
             const res = await contentPosts.aiReview(workspaceId, postId);
-            return res?.review ?? null;
+            return res ?? null;
           }}
           onRequestFix={handleRequestFix}
+          evidence={reviewEvidence}
         />
       )}
 
@@ -498,9 +530,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.introduction)}w</span>}
               </div>
               {post.introduction && !editingIntro && (
-                <button onClick={() => setEditingIntro(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-                  <Icon as={Pencil} size="sm" /> Edit
-                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  onClick={() => setEditingIntro(true)}
+                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
+                >
+                  Edit
+                </Button>
               )}
             </div>
             <div className="px-4 py-3">
@@ -513,12 +551,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     onChange={scheduleIntroSave}
                   />
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={async () => { await flushIntro(); setEditingIntro(false); }}
-                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
-                      <Icon as={Check} size="sm" /> Done
-                    </button>
+                      Done
+                    </Button>
                     {introSaveStatus === 'saving' && (
                       <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
@@ -561,9 +602,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.conclusion)}w</span>}
               </div>
               {post.conclusion && !editingConclusion && (
-                <button onClick={() => setEditingConclusion(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
-                  <Icon as={Pencil} size="sm" /> Edit
-                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  onClick={() => setEditingConclusion(true)}
+                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
+                >
+                  Edit
+                </Button>
               )}
             </div>
             <div className="px-4 py-3">
@@ -576,12 +623,15 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     onChange={scheduleConclusionSave}
                   />
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
-                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                      className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
-                      <Icon as={Check} size="sm" /> Done
-                    </button>
+                      Done
+                    </Button>
                     {conclusionSaveStatus === 'saving' && (
                       <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
@@ -615,33 +665,41 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <p><span className="text-[var(--brand-text-bright)] font-medium">Status:</span> {post.status}</p>
           </div>
           {publishError && (
-            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-3 py-2">
               {publishError}
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => handlePublish(false)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
+              size="sm"
+              variant="primary"
+              loading={publishing}
+              icon={Globe}
+              className="bg-teal-600 hover:bg-teal-500"
             >
-              <Icon as={publishing ? Loader2 : Globe} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update' : 'Publish'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePublish(true)}
               disabled={publishing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+              size="sm"
+              variant="secondary"
+              loading={publishing}
+              icon={Sparkles}
+              className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
             >
-              <Icon as={publishing ? Loader2 : Sparkles} size="sm" className={publishing ? 'animate-spin' : ''} />
               {post.webflowItemId ? 'Update + New Image' : 'Publish + Generate Image'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => { setPublishConfirm(false); setPublishError(''); }}
-              className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+              size="sm"
+              variant="ghost"
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

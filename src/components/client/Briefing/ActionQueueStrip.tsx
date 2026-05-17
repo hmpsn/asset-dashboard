@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Clipboard, Clock } from 'lucide-react';
 import { clientPath } from '../../../routes';
+import { Button } from '../../ui/Button';
 
 /**
  * Phase 2.5b — stale-item escalation. The composer (T2.5b.10) computes
@@ -148,27 +149,27 @@ export function ActionQueueStrip({
     <div className="flex flex-row flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 px-4 py-3 rounded-[var(--radius-xl)]">
       <Clipboard className="w-4 h-4 text-accent-warning flex-shrink-0" aria-hidden="true" />
       {chips.map((chip, idx) => (
-        <button
+        <Button
           // index-based key because briefs/posts both target section='reviews'
           // — section alone is not unique once those two chips coexist.
           key={`${chip.section}-${idx}`}
-          type="button"
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=${chip.section}`)}
-          className="t-caption font-medium text-accent-warning hover:text-accent-warning transition-colors"
+          variant="link"
+          className="t-caption font-medium text-accent-warning hover:text-accent-warning transition-colors no-underline hover:no-underline"
         >
           {chip.count} {chip.label}
-        </button>
+        </Button>
       ))}
       {showEscalation && escalationLabel && (
-        <button
-          type="button"
+        <Button
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=decisions`)}
+          variant="ghost"
           className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
           aria-label={`${staleCount} urgent items pending`}
         >
           <Clock className="w-3.5 h-3.5" aria-hidden="true" />
           {escalationLabel}
-        </button>
+        </Button>
       )}
     </div>
   );

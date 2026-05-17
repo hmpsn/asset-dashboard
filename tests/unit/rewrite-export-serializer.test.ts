@@ -68,6 +68,6 @@ describe('rewrite export serializer', () => {
 
     const html = buildDocHtml(pageData);
     expect(html).toContain('margin-left:24px');
-    expect(html).toContain('<p class="text-[13px] text-slate-500 leading-[1.7] mb-3" style="margin-left:24px">Nested body</p>');
+    expect(html).toContain('<p class="t-caption text-slate-500 leading-[1.7] mb-3" style="margin-left:24px">Nested body</p>');
   });
 });

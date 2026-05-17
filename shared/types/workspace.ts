@@ -1,5 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
-import type { MetricsSource } from './keywords.ts';
+import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 
 export interface EventGroup {
   id: string;
@@ -36,6 +36,10 @@ export interface PageKeywordMap {
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   metricsSource?: MetricsSource;
   validated?: boolean;
+  /** Page-specific provider keywords for this exact URL. Prefer over domain-level fallback when present. */
+  urlLevelKeywords?: UrlLevelKeyword[];
+  urlLevelKeywordSource?: 'semrush' | 'dataforseo';
+  optimizationScoreHistory?: PageOptimizationScoreSnapshot[];
   // Persisted page analysis (generated via keyword analysis, feeds into AI rewrites)
   optimizationIssues?: string[];
   recommendations?: string[];
@@ -114,9 +118,20 @@ export interface CannibalizationItem {
   pages: { path: string; position?: number; impressions?: number; clicks?: number; source: 'keyword_map' | 'gsc' }[];
   severity: 'high' | 'medium' | 'low'; // high = 3+ pages, medium = 2 pages with close positions
   recommendation: string;
+  canonicalPath?: string;
+  canonicalUrl?: string;
+  action?: 'canonical_tag' | 'redirect_301' | 'differentiate' | 'noindex';
 }
 
 export type SeoDataMode = 'quick' | 'full' | 'none';
+
+export interface SeoDataStatus {
+  mode: SeoDataMode;
+  provider?: string;
+  status: 'disabled' | 'available' | 'degraded';
+  reasons?: string[];
+  fallbackProviderAvailable?: boolean;
+}
 
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
@@ -152,6 +167,7 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
+  seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
   /** @deprecated use seoDataMode. Kept for strategies generated before provider-neutral naming. */
   semrushMode?: SeoDataMode;
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
@@ -192,7 +208,7 @@ export interface PageEditState {
   status: PageEditStatus;
   auditIssues?: string[];
   fields?: string[];
-  source?: 'audit' | 'editor' | 'cms' | 'schema' | 'bulk-fix' | 'bulk-rewrite' | 'pattern-apply' | 'cart-fix' | 'content-delivery' | 'recommendation' | 'request-resolved';
+  source?: 'audit' | 'editor' | 'cms' | 'cms-draft' | 'cms-publish' | 'approval' | 'schema' | 'bulk-fix' | 'bulk-rewrite' | 'pattern-apply' | 'cart-fix' | 'content-delivery' | 'recommendation' | 'request-resolved';
   approvalBatchId?: string;
   contentRequestId?: string;
   workOrderId?: string;

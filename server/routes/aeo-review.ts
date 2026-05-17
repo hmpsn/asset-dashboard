@@ -12,7 +12,7 @@ import { discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
-import { resolvePagePath, decodeEntities } from '../helpers.js';
+import { matchPageIdentity, normalizePageUrl, resolvePagePath, decodeEntities } from '../helpers.js';
 import type { SeoIssue } from '../seo-audit.js';
 import { createLogger } from '../logger.js';
 
@@ -54,7 +54,15 @@ router.post('/api/aeo-review/:workspaceId/page', requireWorkspaceAccess('workspa
 
   try {
     // Fetch page HTML
-    const targetUrl = pageUrl || (ws.liveDomain ? `https://${ws.liveDomain}/${pageSlug || ''}` : '');
+    const requestedPath = typeof pageUrl === 'string' && pageUrl
+      ? normalizePageUrl(pageUrl)
+      : (typeof pageSlug === 'string' && pageSlug ? normalizePageUrl(pageSlug) : '');
+    const baseDomain = ws.liveDomain
+      ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+      : '';
+    const targetUrl = pageUrl?.startsWith?.('http')
+      ? pageUrl
+      : (baseDomain && requestedPath ? `${baseDomain.replace(/\/+$/, '')}${requestedPath === '/' ? '' : requestedPath}` : '');
     if (!targetUrl) return res.status(400).json({ error: 'No pageUrl provided and workspace has no liveDomain configured' });
     const htmlRes = await fetch(targetUrl, { redirect: 'follow', signal: AbortSignal.timeout(10_000) });
     if (!htmlRes.ok) return res.status(400).json({ error: `Failed to fetch page: ${htmlRes.status}` });
@@ -65,9 +73,9 @@ router.post('/api/aeo-review/:workspaceId/page', requireWorkspaceAccess('workspa
     if (ws.webflowSiteId) {
       const snapshot = getLatestSnapshot(ws.webflowSiteId);
       if (snapshot) {
-        const slug = pageSlug || new URL(targetUrl).pathname.replace(/^\//, '');
+        const targetPath = normalizePageUrl(targetUrl);
         const pageData = snapshot.audit.pages.find(
-          (p: { slug: string }) => p.slug === slug || p.slug === `/${slug}`
+          (p: { slug: string; url?: string }) => matchPageIdentity(p.url || p.slug, targetPath)
         );
         if (pageData) pageIssues = pageData.issues;
       }
@@ -116,13 +124,13 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
     const issueMap = new Map<string, SeoIssue[]>();
     if (snapshot) {
       for (const p of snapshot.audit.pages) {
-        const slugKey = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+        const slugKey = normalizePageUrl(p.url || p.slug);
         issueMap.set(slugKey, p.issues);
       }
     }
 
     // ── Discover ALL pages: static (Webflow API) + CMS (sitemap) ──
-    const allPageUrls: { url: string; slug: string; name: string }[] = [];
+    const allPageUrls: { url: string; path: string; name: string }[] = [];
 
     // 1. Static pages from Webflow API
     try {
@@ -130,8 +138,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
       for (const p of published) {
         if (isExcludedPage(p.slug, p.title)) continue;
         const pagePath = resolvePagePath(p);
-        const slug = pagePath.replace(/^\//, '') || p.slug || '';
-        allPageUrls.push({ url: `${baseUrl}${pagePath}`, slug, name: p.title });
+        allPageUrls.push({ url: `${baseUrl.replace(/\/+$/, '')}${pagePath === '/' ? '' : pagePath}`, path: pagePath, name: p.title });
       }
 
       // 2. CMS pages from sitemap
@@ -139,15 +146,16 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
       const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
       for (const cms of cmsUrls) {
         if (isExcludedPage(cms.path, cms.pageName)) continue;
-        const slug = cms.path.replace(/^\//, '');
-        allPageUrls.push({ url: cms.url, slug, name: cms.pageName });
+        const pagePath = normalizePageUrl(cms.path);
+        allPageUrls.push({ url: cms.url, path: pagePath, name: cms.pageName });
       }
     } catch (err) {
       log.warn({ err }, 'Page discovery failed, falling back to audit snapshot');
       // Fallback: use audit snapshot pages
       if (snapshot) {
         for (const p of snapshot.audit.pages) {
-          allPageUrls.push({ url: p.url || `${baseUrl}${resolvePagePath(p)}`, slug: p.slug, name: p.page });
+          const pagePath = resolvePagePath(p);
+          allPageUrls.push({ url: p.url || `${baseUrl.replace(/\/+$/, '')}${pagePath === '/' ? '' : pagePath}`, path: pagePath, name: p.page });
         }
       }
     }
@@ -160,8 +168,8 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
 
     // Prioritize content pages (blog, articles, guides) then pages with AEO issues
     const scored = allPageUrls.map(p => {
-      const isContent = isContentPage(p.slug) ? 2 : 0;
-      const lookupKey = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+      const isContent = isContentPage(p.path) ? 2 : 0;
+      const lookupKey = normalizePageUrl(p.path);
       const aeoIssueCount = (issueMap.get(lookupKey) || []).filter(i => i.check.startsWith('aeo-')).length;
       return { ...p, priority: isContent + aeoIssueCount };
     });
@@ -176,9 +184,10 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const title = decodeEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name);
-          const pageKey = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
+          const pageKey = normalizePageUrl(page.path);
           pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(pageKey) || [] });
         }
+        // url-fetch-ok: per-page fetch may timeout or fail; skipping unreachable pages is intentional.
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'aeo-review/aeoIssueCount: programming error'); /* skip unreachable / timed-out pages */ }
     }));
 

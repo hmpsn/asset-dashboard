@@ -260,10 +260,10 @@ input::placeholder, textarea::placeholder {
 /* ─── Visual depth & premium interactions ─── */
 
 /* Card hover: subtle lift + border glow */
-[class*="rounded-xl"][class*="border"] {
+[class*="rounded-[var(--radius-xl)]"][class*="border"] {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
-[class*="rounded-xl"][class*="border"]:hover {
+[class*="rounded-[var(--radius-xl)]"][class*="border"]:hover {
   border-color: rgba(63, 63, 70, 0.8);
   box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3);
 }
@@ -596,8 +596,7 @@ body::after {
 .dashboard-light .text-sky-400 { color: #0369a1 !important; }        /* sky-700   · 7.0:1 */
 .dashboard-light .text-yellow-500 { color: #a16207 !important; }     /* yellow-700 · 5.2:1 */
 .dashboard-light .text-yellow-600 { color: #854d0e !important; }     /* yellow-800 · 7.0:1 */
-.dashboard-light .text-purple-400 { color: #7c3aed !important; }     /* violet-600 · 4.6:1 */
-.dashboard-light .text-violet-400 { color: #7c3aed !important; }     /* violet-600 · 4.6:1 */
+.dashboard-light .text-purple-400 { color: #7c3aed !important; }     /* purple-600 · 4.6:1 */
 
 /* === Accent Tinted Backgrounds (slightly stronger on light) === */
 .dashboard-light .bg-teal-500\/5 { background-color: rgba(13,148,136,0.05) !important; }

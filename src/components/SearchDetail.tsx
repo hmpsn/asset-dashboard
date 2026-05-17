@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
-import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon } from './ui';
+import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon, Button } from './ui';
 import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
@@ -256,14 +256,24 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-[var(--brand-border)] shrink-0">
-                <button
-                  className={`text-xs font-semibold pb-1 ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`text-xs font-semibold pb-1 px-0 py-0 rounded-none bg-transparent hover:bg-transparent ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
                   onClick={() => setTableView('queries')}
-                >Queries</button>
-                <button
-                  className={`text-xs font-semibold pb-1 ${tableView === 'pages' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
+                >
+                  Queries
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`text-xs font-semibold pb-1 px-0 py-0 rounded-none bg-transparent hover:bg-transparent ${tableView === 'pages' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-[var(--brand-text-muted)]'}`}
                   onClick={() => setTableView('pages')}
-                >Pages</button>
+                >
+                  Pages
+                </Button>
               </div>
 
               <div className="overflow-y-auto flex-1 min-h-0">
@@ -275,13 +285,16 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     </th>
                     {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                       <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleSort(key)}
-                          className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text-bright)] transition-colors"
+                          className="gap-1 ml-auto px-0 py-0 rounded-none bg-transparent hover:bg-transparent hover:text-[var(--brand-text-bright)]"
                         >
                           {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                           {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                        </button>
+                        </Button>
                       </th>
                     ))}
                   </tr>
@@ -294,7 +307,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium">
                           {q.query}
                           {badge && (
-                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
@@ -317,12 +330,12 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     return (
                       <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium max-w-xs truncate">
-                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-teal-400 transition-colors">
                             {pagePath}
                             <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>
                           {badge && (
-                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded-[var(--radius-sm)] ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
@@ -363,8 +376,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <span className="text-[var(--brand-text-bright)] capitalize">{d.device.toLowerCase()}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}% · pos {d.position}</span>
                           </div>
-                          <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
                           <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
                             <span>{d.clicks.toLocaleString()} clicks</span>
@@ -381,7 +394,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 <SectionCard title="Top Countries">
                   <div className="space-y-1.5">
                     {countries.slice(0, 8).map((c, i) => (
-                      <div key={c.country} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)]/30">
+                      <div key={c.country} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                         <div className="flex items-center gap-2">
                           <span className="text-[var(--brand-text-dim)] w-3 text-right">{i + 1}</span>
                           <span className="text-[var(--brand-text-bright)]">{c.country}</span>
@@ -408,8 +421,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <span className="text-[var(--brand-text-bright)] capitalize">{st.searchType}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}%</span>
                           </div>
-                          <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
                           <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
                             <span>{st.clicks.toLocaleString()} clicks · {st.impressions.toLocaleString()} imp</span>

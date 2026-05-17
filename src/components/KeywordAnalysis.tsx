@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, ClickableRow, FormInput, PageHeader } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 import { resolvePagePath } from '../lib/pathUtils';
@@ -116,13 +116,14 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
       // Run keyword analysis and content score in parallel
       const [kwData, csData] = await Promise.all([
-        post<KeywordData & { error?: string }>('/api/webflow/keyword-analysis', {
+        keywords.analyze({
+          workspaceId,
           pageTitle: page.title,
           seoTitle: page.seo?.title,
           metaDescription: page.seo?.description,
           slug,
           pageContent,
-        }),
+        }) as Promise<KeywordData & { error?: string }>,
         post<ContentScore & { error?: string }>('/api/webflow/content-score', {
           pageTitle: page.title,
           seoTitle: page.seo?.title,
@@ -139,6 +140,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
             await keywords.persistAnalysis({
               workspaceId,
               pagePath: resolvePagePath(page),
+              pageTitle: page.title,
               analysis: {
                 primaryKeyword: kwData.primaryKeyword,
                 secondaryKeywords: kwData.secondaryKeywords,
@@ -205,6 +207,15 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
   return (
     <div className="space-y-8">
+      <PageHeader
+        title="Keyword Analysis"
+        subtitle={
+          pages.some(p => p.source === 'cms')
+            ? `${pages.length} pages · ${pages.filter(p => p.source === 'cms').length} CMS`
+            : `${pages.length} pages`
+        }
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      />
       {/* Stats + Analyze All */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-[var(--brand-text)]">
@@ -223,7 +234,9 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           <div className="flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
             <span className="text-xs text-[var(--brand-text)]">{bulkProgress.done}/{bulkProgress.total} pages...</span>
-            <button onClick={() => { cancelBulkRef.current = true; }} className="t-caption-sm text-accent-danger hover:text-accent-danger">Cancel</button>
+            <Button onClick={() => { cancelBulkRef.current = true; }} variant="link" size="sm" className="t-caption-sm text-accent-danger hover:text-accent-danger">
+              Cancel
+            </Button>
           </div>
         ) : (
           <Button
@@ -241,12 +254,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       {/* Search */}
       <div className="relative">
         <Icon as={SearchIcon} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-        <input
+        <FormInput
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={setSearch}
           placeholder="Search pages..."
-          className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="w-full pl-10 pr-4"
         />
       </div>
 
@@ -261,9 +274,10 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           return (
             // pr-check-disable-next-line -- brand asymmetric signature on page-level keyword analysis card; intentional non-SectionCard chrome
             <div key={page.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-              <button
+              <ClickableRow
                 onClick={() => toggleExpand(page.id, page)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
+                active={isExpanded}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 text-left bg-transparent"
               >
                 {isAnalyzing ? (
                   <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin shrink-0" />
@@ -276,7 +290,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.title}</span>
                     {page.source === 'cms' && (
-                      <span className="t-micro px-1 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/15 text-accent-brand border border-teal-500/20 shrink-0">CMS</span>
+                      <span className="t-micro px-1 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/15 text-accent-brand border border-teal-500/20 shrink-0">CMS</span>
                     )}
                   </div>
                   <div className="text-xs text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
@@ -291,7 +305,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                     </span>
                   </div>
                 )}
-              </button>
+              </ClickableRow>
 
               {isExpanded && (
                 <div className="px-4 pb-4 bg-[var(--surface-2)]/30">

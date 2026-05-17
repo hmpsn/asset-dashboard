@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Loader2, MessageSquare } from 'lucide-react';
-import { Icon } from './ui';
+import { Button, ClickableRow, FormInput, Icon } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { pickPhrase } from '../lib/loadingPhrases';
 import { ServiceInterestCTA } from './client/ServiceInterestCTA';
@@ -119,14 +119,14 @@ export function ChatPanel({
             <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your data:</p>
             <div className="grid grid-cols-1 gap-2">
               {quickQuestions.map((q, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => onSend(q)}
                   className="text-left px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] t-caption-sm text-[var(--brand-text)] transition-colors"
                 >
                   <Icon as={MessageSquare} size="sm" className={`${a.iconText} mb-1`} />
                   {q}
-                </button>
+                </ClickableRow>
               ))}
             </div>
             {emptyExtra}
@@ -164,9 +164,9 @@ export function ChatPanel({
                     <span className="t-caption-sm text-[var(--brand-text-muted)] animate-pulse">{phrase}</span>
                   ) : (
                     <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   )}
                 </div>
@@ -194,35 +194,39 @@ export function ChatPanel({
       {suggestionChips && suggestionChips.length > 0 && (
         <div className="px-3 pb-2 flex flex-wrap gap-1.5">
           {suggestionChips.map((chip, i) => (
-            <button
+            <Button
               key={i}
               onClick={() => onChipClick?.(chip)}
-              className="t-caption-sm px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+              variant="secondary"
+              size="sm"
+              className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
             >
               {chip}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
       {/* Input bar — pinned at bottom */}
       <div className="px-4 py-3 border-t border-[var(--brand-border)] flex gap-2 flex-shrink-0">
-        <input
+        <FormInput
           type="text"
           value={input}
-          onChange={e => onInputChange(e.target.value)}
+          onChange={onInputChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={`flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none ${a.focusBorder}`}
           disabled={disabled || loading}
         />
-        <button
+        <Button
           onClick={() => onSend(input)}
           disabled={disabled || loading || !input.trim()}
-          className={`px-3 py-2 ${a.btn} disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors`}
+          icon={Send}
+          size="sm"
+          variant="secondary"
+          className={`px-3 py-2 ${a.btn} disabled:opacity-50 rounded-[var(--radius-lg)]`}
         >
-          <Icon as={Send} size="sm" />
-        </button>
+        </Button>
       </div>
     </>
   );

@@ -56,7 +56,7 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
     <div>
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-blue-400" /><span className="t-caption-sm text-accent-info">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-teal-400" /><span className="t-caption-sm text-accent-brand">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-[var(--radius-sm)] bg-blue-400/60" /><span className="t-caption-sm text-accent-info">Impressions</span></div>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -66,8 +66,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
               <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.1} />
-              <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.1} />
+              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis dataKey="date" hide />
@@ -75,11 +75,11 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
           <YAxis yAxisId="imps" hide domain={['dataMin', 'dataMax']} orientation="right" />
           <Tooltip content={<DarkTooltip metrics={[
             { label: 'Clicks', key: 'clicks', color: CHART_SERIES_COLORS.blue },
-            { label: 'Impressions', key: 'impressions', color: CHART_SERIES_COLORS.teal },
+            { label: 'Impressions', key: 'impressions', color: CHART_SERIES_COLORS.blue },
             { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
             { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
           ]} />} />
-          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
           <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
           {anns?.map(ann => {
             const idx = data.findIndex(d => d.date === ann.date);

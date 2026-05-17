@@ -22,12 +22,15 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
@@ -79,13 +82,19 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.ACTIVITY_NEW]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
       qc.invalidateQueries({ queryKey: queryKeys.client.activity(workspaceId) });
     },
     [WS_EVENTS.AUDIT_COMPLETE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.auditSummary(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.auditSummary(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.auditDetail(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.intelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
     },
     [WS_EVENTS.ANOMALIES_UPDATE]: () => {
       if (!workspaceId) return;
@@ -96,6 +105,18 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceDetail(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceOverview() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.auditSuppressions(workspaceId) });
+    },
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.cmsEditorAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.seoSuggestions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.pageJoinPagesAll() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.CONTENT_PUBLISHED]: () => {
       if (!workspaceId) return;
@@ -107,9 +128,34 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
     },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.contentCalendar(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.workOrders(workspaceId) });
     },
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;
@@ -255,6 +301,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.STRATEGY_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.strategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.pageKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     },
     [WS_EVENTS.BRANDSCRIPT_UPDATED]: () => {
       if (!workspaceId) return;

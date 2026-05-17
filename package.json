@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:server": "tsx server/index.ts",
     "dev:all": "concurrently -n server,ui -c blue,green \"npm run dev:server\" \"npm run dev\"",
+    "seed:demo": "tsx scripts/seed-demo-workspaces.ts",
+    "smoke:core": "vitest run tests/smoke.test.ts tests/unit/platform-domain-smoke-matrix.test.ts tests/unit/performance-budgets.test.ts",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
@@ -20,15 +22,39 @@
     "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
+    "verify:organization": "tsx scripts/report-platform-organization.ts",
+    "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
+    "verify:ai-reliability": "tsx scripts/report-ai-reliability.ts",
+    "verify:ai-pipeline-wiring": "tsx scripts/report-ai-pipeline-wiring.ts",
+    "verify:coverage-ratchet": "tsx scripts/report-coverage-ratchet.ts",
+    "verify:domain-events": "tsx scripts/report-domain-event-definitions.ts",
+    "verify:product-surface": "tsx scripts/product-surface-map.ts",
+    "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
+    "verify:observability": "tsx scripts/report-platform-observability.ts",
+    "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
+    "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
+    "verify:platform-health-cadence": "tsx scripts/platform-health-cadence.ts",
+    "verify:adr-log": "tsx scripts/adr-log.ts",
+    "verify:risky-modules": "tsx scripts/platform-risky-module-dashboard.ts",
+    "verify:style-drift": "tsx scripts/report-style-drift.ts",
+    "verify:staging-merge-integrity": "tsx scripts/report-staging-merge-integrity.ts",
+    "report:style-drift": "tsx scripts/report-style-drift.ts --json --output reports/style-drift-report.json",
+    "report:risky-modules": "tsx scripts/report-risky-modules.ts --json --top 40 --since-days 180",
+    "verify:performance-budgets": "tsx scripts/performance-budgets.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
     "verify:platform:quick": "tsx scripts/verify-platform.ts --quick",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify:release-safety": "tsx scripts/platform-release-safety.ts",
+    "report:release-safety": "tsx scripts/report-release-safety.ts",
+    "verify:tenant-boundary": "tsx scripts/platform-tenant-boundary-audit.ts",
+    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@aws-sdk/client-s3": "^3.1009.0",
     "@hookform/resolvers": "^5.2.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@sentry/node": "^10.43.0",
     "@sentry/react": "^10.43.0",
     "@tailwindcss/vite": "^4.2.1",
@@ -80,6 +106,8 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@emnapi/core": "^1.10.0",
+    "@emnapi/runtime": "^1.10.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.58.2",
     "@sentry/vite-plugin": "^5.1.1",
@@ -114,5 +142,9 @@
   },
   "engines": {
     "node": ">=24 <25"
+  },
+  "optionalDependencies": {
+    "@emnapi/core": "1.10.0",
+    "@emnapi/runtime": "1.10.0"
   }
 }

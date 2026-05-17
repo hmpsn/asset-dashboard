@@ -100,6 +100,41 @@ describe('keywordStrategySchema', () => {
     expect((result as any).quickWins).toBeDefined();
   });
 
+  it('keeps strategy provider status and cannibalization metadata in schema shape', () => {
+    const data = {
+      siteKeywords: ['seo'],
+      opportunities: [],
+      seoDataStatus: {
+        mode: 'full',
+        provider: 'dataforseo',
+        status: 'degraded',
+        reasons: ['provider_returned_no_keyword_data'],
+        fallbackProviderAvailable: true,
+      },
+      cannibalization: [
+        {
+          keyword: 'seo services',
+          pages: [{ path: '/services', source: 'keyword_map' }],
+          severity: 'high',
+          recommendation: 'Set a canonical target.',
+          canonicalPath: '/services',
+          canonicalUrl: 'https://example.com/services',
+          action: 'canonical_tag',
+        },
+      ],
+    };
+    const result = parseJsonSafe(JSON.stringify(data), keywordStrategySchema, fallback);
+    expect((result as any).seoDataStatus).toEqual(expect.objectContaining({
+      status: 'degraded',
+      fallbackProviderAvailable: true,
+    }));
+    expect((result as any).cannibalization?.[0]).toEqual(expect.objectContaining({
+      canonicalPath: '/services',
+      canonicalUrl: 'https://example.com/services',
+      action: 'canonical_tag',
+    }));
+  });
+
   it('keeps extended PageKeywordMap optional fields in schema shape', () => {
     const map = {
       pagePath: '/services/seo',
@@ -116,12 +151,23 @@ describe('keywordStrategySchema', () => {
       difficulty: 42,
       cpc: 9.2,
       secondaryMetrics: [{ keyword: 'seo agency', volume: 1000, difficulty: 39 }],
-      metricsSource: 'exact',
+      metricsSource: 'url_level',
+      urlLevelKeywords: [{
+        keyword: 'seo services near me',
+        position: 3,
+        volume: 800,
+        difficulty: 35,
+        cpc: 6.5,
+        traffic: 42,
+        url: 'https://example.com/services/seo',
+      }],
+      urlLevelKeywordSource: 'semrush',
       validated: true,
       optimizationIssues: ['Missing H1'],
       recommendations: ['Add target keyword to title'],
       contentGaps: ['Pricing section'],
       optimizationScore: 74,
+      optimizationScoreHistory: [{ score: 70, recordedAt: '2026-05-07T00:00:00.000Z', source: 'strategy' }],
       analysisGeneratedAt: '2026-05-08T00:00:00.000Z',
       primaryKeywordPresence: { inTitle: true, inMeta: true, inContent: false, inSlug: true },
       longTailKeywords: ['seo services pricing'],
@@ -138,6 +184,10 @@ describe('keywordStrategySchema', () => {
     expect(parsed.pageMap?.[0]).toEqual(expect.objectContaining({
       searchIntent: 'commercial',
       gscKeywords: expect.any(Array),
+      metricsSource: 'url_level',
+      urlLevelKeywords: expect.any(Array),
+      urlLevelKeywordSource: 'semrush',
+      optimizationScoreHistory: expect.any(Array),
       primaryKeywordPresence: expect.any(Object),
       serpFeatures: ['featured_snippet', 'people_also_ask'],
     }));

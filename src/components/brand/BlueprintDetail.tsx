@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -25,7 +26,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar, Icon, Button, cn, ConfirmDialog } from '../ui/index';
+import { TabBar, Icon, Button, IconButton, cn, ConfirmDialog, FormInput, FormSelect } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -86,7 +87,7 @@ function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; ent
   };
 
   return (
-    <span className={cn('shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption rounded font-medium', colorClass[config.color] ?? colorClass.zinc)}>
+    <span className={cn('shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption rounded-[var(--radius-sm)] font-medium', colorClass[config.color] ?? colorClass.zinc)}>
       <Icon as={BadgeIcon} size="sm" />
       {config.label}
       {status.totalSections > 0 && (
@@ -123,13 +124,14 @@ function EntryCard({
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden">
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <button
+        <IconButton
           onClick={onToggle}
+          icon={ChevronIcon}
+          label={expanded ? 'Collapse entry' : 'Expand entry'}
+          variant="ghost"
+          size="sm"
           className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors shrink-0"
-          aria-label={expanded ? 'Collapse entry' : 'Expand entry'}
-        >
-          <Icon as={ChevronIcon} size="md" />
-        </button>
+        />
 
         <Icon as={Layout} size="md" className="text-[var(--brand-text)] shrink-0" />
 
@@ -138,20 +140,20 @@ function EntryCard({
         </span>
 
         {/* Page type badge */}
-        <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--surface-3)] text-[var(--brand-text)] rounded font-medium">
+        <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--surface-3)] text-[var(--brand-text)] rounded-[var(--radius-sm)] font-medium">
           {PAGE_TYPE_LABELS[entry.pageType] ?? entry.pageType}
         </span>
 
         {/* CMS badge */}
         {entry.isCollection && (
-          <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--brand-border-hover)] text-[var(--brand-text)] rounded font-medium">
+          <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--brand-border-hover)] text-[var(--brand-text)] rounded-[var(--radius-sm)] font-medium">
             CMS
           </span>
         )}
 
         {/* Primary keyword badge */}
         {entry.primaryKeyword && (
-          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded font-medium">
+          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded-[var(--radius-sm)] badge-span-ok font-medium">
             <Icon as={Tag} size="sm" />
             {entry.primaryKeyword}
           </span>
@@ -163,11 +165,13 @@ function EntryCard({
         )}
 
         {/* Scope toggle */}
-        <button
+        <Button
           onClick={onScopeToggle}
           disabled={isScopeToggling}
+          variant="ghost"
+          size="sm"
           className={cn(
-            'shrink-0 px-2 py-0.5 t-caption rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            'shrink-0 px-2 py-0.5 t-caption rounded-[var(--radius-sm)] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
             isIncluded
               ? 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'
               : 'bg-amber-900/40 text-amber-400 hover:bg-amber-900/60'
@@ -179,21 +183,23 @@ function EntryCard({
           ) : (
             isIncluded ? 'Included' : 'Upsell'
           )}
-        </button>
+        </Button>
 
         {/* Remove */}
-        <button
+        <IconButton
           onClick={onRemove}
           disabled={isRemoving}
-          className="shrink-0 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          aria-label={`Remove ${entry.name}`}
-        >
-          {isRemoving ? (
-            <Icon as={Loader2} size="md" className="animate-spin" />
-          ) : (
-            <Icon as={Trash2} size="md" />
+          icon={isRemoving ? Loader2 : Trash2}
+          label={`Remove ${entry.name}`}
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'shrink-0 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            isRemoving && '[&_svg]:animate-spin',
           )}
-        </button>
+          title={`Remove ${entry.name}`}
+          aria-busy={isRemoving || undefined}
+        />
       </div>
 
       {/* Expanded: section plan */}
@@ -207,7 +213,7 @@ function EntryCard({
               key={section.id}
               className="flex items-start gap-3 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] px-3 py-2.5"
             >
-              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption font-medium">
+              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-[var(--radius-pill)] bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption font-medium">
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0 space-y-1">
@@ -217,7 +223,7 @@ function EntryCard({
                   </span>
                   {/* narrative role — purple (admin-only) */}
                   {section.narrativeRole && (
-                    <span className="px-1.5 py-0.5 t-caption bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
+                    <span className="px-1.5 py-0.5 t-caption bg-purple-900/30 text-purple-400 rounded-[var(--radius-sm)] font-medium capitalize">
                       {section.narrativeRole.replace(/-/g, ' ')}
                     </span>
                   )}
@@ -305,11 +311,12 @@ function CopyActionButtons({
   return (
     <>
       {hasCopy ? (
-        // pr-check-disable-next-line -- toggle CTA conditionally applies the gradient only when !isReviewing; Button primitive's primary variant does not support a two-state conditional gradient
-        <button
+        <Button
           onClick={isReviewing ? onCloseReview : onReviewCopy}
+          variant="ghost"
+          size="sm"
           className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium transition-colors',
+            'px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium transition-colors',
             isReviewing
               ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]/80'
               : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90'
@@ -326,7 +333,7 @@ function CopyActionButtons({
               Review Copy
             </>
           )}
-        </button>
+        </Button>
       ) : (
         <Button
           variant="primary"
@@ -350,6 +357,7 @@ type BlueprintTab = 'pages' | 'copy';
 export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -363,7 +371,11 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   // ── Copy Pipeline state ──────────────────────────────────────────────────
   const copyEnabled = useFeatureFlag('copy-engine-pipeline');
-  const [activeTab, setActiveTab] = useState<BlueprintTab>('pages');
+  const [activeTab, setActiveTab] = useState<BlueprintTab>(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'copy' && copyEnabled) return 'copy';
+    return tabParam === 'pages' ? 'pages' : 'pages';
+  });
   const [reviewingEntryId, setReviewingEntryId] = useState<string | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -491,12 +503,13 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
     return (
       <div className="space-y-3 py-8">
         <p className="t-body text-[var(--brand-text)]">Blueprint not found or failed to load.</p>
-        <button
+        <Button
           onClick={onBack}
-          className="t-body text-teal-400 hover:text-teal-300 transition-colors"
+          variant="link"
+          className="t-body text-teal-400 hover:text-teal-300 transition-colors p-0"
         >
           &larr; Back to blueprints
-        </button>
+        </Button>
       </div>
     );
   }
@@ -506,13 +519,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
       {/* Top bar */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <button
+          <IconButton
             onClick={onBack}
-            className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded"
-            aria-label="Back to blueprints"
-          >
-            <Icon as={ArrowLeft} size="md" />
-          </button>
+            icon={ArrowLeft}
+            label="Back to blueprints"
+            title="Back to blueprints"
+            variant="ghost"
+            size="sm"
+            className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded-[var(--radius-sm)]"
+          />
           <div>
             <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{blueprint.name}</h2>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
@@ -552,13 +567,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                 In Scope ({inScope.length})
               </h3>
               {!showAddForm && (
-                <button
+                <Button
                   onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-1 t-caption text-teal-400 hover:text-teal-300 transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="t-caption text-teal-400 hover:text-teal-300 transition-colors px-0 py-0 h-auto"
                 >
                   <Icon as={Plus} size="md" />
                   Add page
-                </button>
+                </Button>
               )}
             </div>
 
@@ -571,12 +588,12 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                     <label htmlFor="new-entry-name" className="t-caption text-[var(--brand-text)]">
                       Page name
                     </label>
-                    <input
+                    <FormInput
                       id="new-entry-name"
                       value={newEntryName}
-                      onChange={e => setNewEntryName(e.target.value)}
+                      onChange={setNewEntryName}
                       placeholder="e.g. Home, Services, About Us"
-                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                      className="w-full t-body"
                       disabled={addEntryMutation.isPending}
                       onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
                     />
@@ -585,19 +602,14 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                     <label htmlFor="new-entry-type" className="t-caption text-[var(--brand-text)]">
                       Page type
                     </label>
-                    <select
+                    <FormSelect
                       id="new-entry-type"
                       value={newEntryType}
-                      onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
+                      onChange={value => setNewEntryType(value as BlueprintPageType)}
+                      options={Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
                       className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
-                    >
-                      {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -611,17 +623,19 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                   >
                     {addEntryMutation.isPending ? 'Adding...' : 'Add Page'}
                   </Button>
-                  <button
+                  <Button
                     onClick={() => {
                       setShowAddForm(false);
                       setNewEntryName('');
                       setNewEntryType('service');
                     }}
                     disabled={addEntryMutation.isPending}
+                    variant="ghost"
+                    size="sm"
                     className="px-3 py-1.5 text-[var(--brand-text-muted)] t-body hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

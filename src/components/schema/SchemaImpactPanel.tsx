@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart3, Clock } from 'lucide-react';
-import { schemaImpact as schemaImpactApi, type SchemaDeploymentImpact, type SchemaImpactData } from '../../api/seo';
-import { Icon, cn, TrendBadge } from '../ui';
+import { schemaImpact as schemaImpactApi, type SchemaDeploymentImpact, type SchemaImpactData } from '../../api/schema';
+import { Button, Icon, cn, TrendBadge } from '../ui';
 
 export function useSchemaImpactData(workspaceId?: string) {
   const [impactData, setImpactData] = useState<SchemaImpactData | null>(null);
@@ -37,9 +37,11 @@ export function SchemaImpactPanel({ impactData }: SchemaImpactPanelProps) {
 
   return (
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
-      <button
+      <Button
         onClick={() => setShowImpactDetail(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
+        variant="ghost"
+        size="sm"
+        className="w-full justify-between px-4 py-3 h-auto rounded-none hover:bg-[var(--surface-3)]/30 transition-colors"
       >
         <div className="flex items-center gap-2">
           <Icon as={BarChart3} size="md" className="text-accent-brand" />
@@ -63,7 +65,7 @@ export function SchemaImpactPanel({ impactData }: SchemaImpactPanelProps) {
             </span>
           )}
         </div>
-      </button>
+      </Button>
       {showImpactDetail && (
         <div className="border-t border-[var(--brand-border)]">
           <div className="grid grid-cols-4 gap-px bg-[var(--brand-border)]">

@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, ConfirmDialog } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, IconButton, cn, ConfirmDialog, FormInput, FormSelect, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
@@ -242,14 +242,16 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
     <div className="space-y-5">
       {/* Back navigation */}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
           onClick={onBack}
           aria-label="Back to sources"
-          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+          variant="ghost"
+          size="sm"
+          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors px-0 py-0 h-auto"
         >
           ← All sources
-        </button>
+        </Button>
         <span className="text-[var(--brand-border-hover)]">/</span>
         <span className="text-sm font-semibold text-[var(--brand-text)] truncate">{source.filename}</span>
         <SourceTypeBadge sourceType={source.sourceType} />
@@ -265,10 +267,12 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
         <Icon as={Filter} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
         <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1">
           {filters.map(f => (
-            <button
+            <Button
               key={f.value}
               type="button"
               onClick={() => setStatusFilter(f.value)}
+              variant="ghost"
+              size="sm"
               className={cn(
                 'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                 statusFilter === f.value
@@ -277,7 +281,7 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
               )}
             >
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -354,39 +358,36 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label htmlFor="paste-filename" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
-            <input
+            <FormInput
               id="paste-filename"
               value={filename}
-              onChange={e => setFilename(e.target.value)}
+              onChange={setFilename}
               placeholder="e.g. Sales call transcript"
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+              className="w-full placeholder:text-[var(--brand-text-muted)]"
             />
           </div>
 
           <div className="space-y-1">
             <label htmlFor="paste-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
-            <select
+            <FormSelect
               id="paste-source-type"
               value={sourceType}
-              onChange={e => setSourceType(e.target.value as SourceType)}
+              onChange={value => setSourceType(value as SourceType)}
+              options={SOURCE_TYPE_OPTIONS}
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
-            >
-              {SOURCE_TYPE_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
         <div className="space-y-1">
           <label htmlFor="paste-content" className="t-caption text-[var(--brand-text-muted)]">Content</label>
-          <textarea
+          <FormTextarea
             id="paste-content"
             value={rawContent}
-            onChange={e => setRawContent(e.target.value)}
+            onChange={setRawContent}
             placeholder="Paste transcript, brand document, competitor copy, or any text to analyze..."
             rows={8}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none"
+            className="w-full placeholder:text-[var(--brand-text-muted)]"
           />
         </div>
 
@@ -478,16 +479,13 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
         {/* Source type selector */}
         <div className="space-y-1">
           <label htmlFor="upload-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
-          <select
+          <FormSelect
             id="upload-source-type"
             value={sourceType}
-            onChange={e => setSourceType(e.target.value as SourceType)}
+            onChange={value => setSourceType(value as SourceType)}
+            options={SOURCE_TYPE_OPTIONS}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
-          >
-            {SOURCE_TYPE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Drop zone */}
@@ -617,19 +615,21 @@ function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing,
         )}
 
         {/* Delete button */}
-        <button
+        <IconButton
           type="button"
           onClick={() => onDelete(source)}
           disabled={isDeleting}
-          aria-label="Delete source"
-          className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50"
-        >
-          {isDeleting ? (
-            <Icon as={Loader2} size="md" className="animate-spin" />
-          ) : (
-            <Icon as={Trash2} size="md" />
+          icon={isDeleting ? Loader2 : Trash2}
+          label="Delete source"
+          title="Delete source"
+          variant="ghost"
+          size="sm"
+          aria-busy={isDeleting || undefined}
+          className={cn(
+            'text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50',
+            isDeleting && '[&_svg]:animate-spin',
           )}
-        </button>
+        />
       </div>
     </div>
   );
@@ -652,26 +652,30 @@ function UploadPanel({ workspaceId, onUploaded, onCancel }: UploadPanelProps) {
     <div className="space-y-4">
       {/* Mode toggle */}
       <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1 w-fit">
-        <button
+        <Button
           type="button"
           onClick={() => setMode('file')}
+          variant="ghost"
+          size="sm"
           className={cn(
             'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
             mode === 'file' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
           Upload file
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setMode('text')}
+          variant="ghost"
+          size="sm"
           className={cn(
             'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
             mode === 'text' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
           Paste text
-        </button>
+        </Button>
       </div>
 
       {mode === 'file' ? (

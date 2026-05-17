@@ -15,13 +15,15 @@ import {
 } from '../content-requests.js';
 import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
-import { sanitizeString, validateEnum } from '../helpers.js';
+import { normalizePageUrl, sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { listContentGaps } from '../content-gaps.js';
 import { listQuickWins } from '../quick-wins.js';
 import { listKeywordGaps } from '../keyword-gaps.js';
+import { listTopicClusters } from '../topic-clusters.js';
+import { listCannibalizationIssues } from '../cannibalization-issues.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -103,23 +105,40 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
-  if (!strategy) return res.json(null);
   // Reassemble pageMap from page_keywords table
   const fullPageMap = listPageKeywords(ws.id);
   // Reassemble contentGaps from content_gaps table (post-#365 normalization)
   const contentGapsList = listContentGaps(ws.id);
+  const contentGaps = contentGapsList.length > 0 ? contentGapsList : (strategy?.contentGaps || []);
   // Reassemble quickWins from quick_wins table (post-#367 normalization).
   // Fallback to blob data for legacy workspaces that have not been migrated yet.
   const quickWinsList = listQuickWins(ws.id);
-  const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy.quickWins || []);
+  const quickWins = quickWinsList.length > 0 ? quickWinsList : (strategy?.quickWins || []);
   // Reassemble keywordGaps from keyword_gaps table (post-#368 normalization).
   // Fallback to blob data for legacy workspaces that have not been migrated yet.
   const keywordGapsList = listKeywordGaps(ws.id);
-  const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy.keywordGaps || []);
+  const keywordGaps = keywordGapsList.length > 0 ? keywordGapsList : (strategy?.keywordGaps || []);
+  // Reassemble topicClusters and cannibalization from normalized tables.
+  // Fallback to blob data for legacy workspaces that have not been migrated yet.
+  const topicClustersList = listTopicClusters(ws.id);
+  const topicClusters = topicClustersList.length > 0 ? topicClustersList : (strategy?.topicClusters || []);
+  const cannibalizationList = listCannibalizationIssues(ws.id);
+  const cannibalization = cannibalizationList.length > 0 ? cannibalizationList : (strategy?.cannibalization || []);
+  if (
+    !strategy
+    && fullPageMap.length === 0
+    && contentGaps.length === 0
+    && quickWins.length === 0
+    && keywordGaps.length === 0
+    && topicClusters.length === 0
+    && cannibalization.length === 0
+  ) {
+    return res.json(null);
+  }
   // Return client-safe subset (no SEO data mode/provider internals)
   res.json({
-    siteKeywords: strategy.siteKeywords || [],
-    siteKeywordMetrics: strategy.siteKeywordMetrics || undefined,
+    siteKeywords: strategy?.siteKeywords || [],
+    siteKeywordMetrics: strategy?.siteKeywordMetrics || undefined,
     pageMap: fullPageMap.map(p => ({
       pagePath: p.pagePath,
       pageTitle: p.pageTitle,
@@ -136,8 +155,8 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       validated: p.validated,
       gscKeywords: p.gscKeywords || [],
     })),
-    opportunities: strategy.opportunities || [],
-    contentGaps: contentGapsList.map(g => ({
+    opportunities: strategy?.opportunities || [],
+    contentGaps: contentGaps.map(g => ({
       topic: g.topic,
       targetKeyword: g.targetKeyword,
       intent: g.intent,
@@ -164,8 +183,34 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
       volume: g.volume,
       difficulty: g.difficulty,
     })),
-    businessContext: strategy.businessContext || '',
-    generatedAt: strategy.generatedAt,
+    topicClusters: topicClusters.map(c => ({
+      topic: c.topic,
+      keywords: c.keywords,
+      ownedCount: c.ownedCount,
+      totalCount: c.totalCount,
+      coveragePercent: c.coveragePercent,
+      avgPosition: c.avgPosition,
+      topCompetitor: c.topCompetitor,
+      topCompetitorCoverage: c.topCompetitorCoverage,
+      gap: c.gap,
+    })),
+    cannibalization: cannibalization.map(c => ({
+      keyword: c.keyword,
+      pages: c.pages.map(page => ({
+        path: page.path,
+        position: page.position,
+        impressions: page.impressions,
+        clicks: page.clicks,
+        source: page.source,
+      })),
+      severity: c.severity,
+      recommendation: c.recommendation,
+      canonicalPath: c.canonicalPath,
+      canonicalUrl: c.canonicalUrl,
+      action: c.action,
+    })),
+    businessContext: strategy?.businessContext || '',
+    generatedAt: strategy?.generatedAt ?? null,
   });
 });
 
@@ -401,8 +446,8 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     if (siteBase.startsWith('sc-domain:')) {
       siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
     }
-    const slug = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
-    const pageUrl = `${siteBase}${slug}`;
+    const pagePath = normalizePageUrl(request.targetPageSlug);
+    const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
 
     const publishDate = request.updatedAt || request.requestedAt;
     const startDate = publishDate.split('T')[0];
@@ -433,11 +478,9 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
   if (ws.gscPropertyUrl && ws.webflowSiteId) {
     try {
       const qpData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-      const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
+      const normalizedPageSlug = normalizePageUrl(pageSlug);
       topKeywords = qpData
-        .filter(r => {
-          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch (err) { return false; }
-        })
+        .filter(r => normalizePageUrl(r.page) === normalizedPageSlug)
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)
         .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));

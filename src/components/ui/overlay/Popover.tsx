@@ -139,7 +139,7 @@ function PopoverItem({
 }: PopoverItemProps): React.ReactElement {
   const baseClass = danger
     ? 'text-red-400 hover:bg-red-500/10'
-    : 'text-zinc-200 hover:bg-zinc-800';
+    : 'text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]';
   const handleClick = () => {
     onClick?.();
     if (__closeOnSelect && __popoverClose) __popoverClose();
@@ -151,7 +151,7 @@ function PopoverItem({
       role="menuitem"
       tabIndex={-1}
       onClick={handleClick}
-      className={cn(baseClass, 'px-3 py-1.5 text-sm w-full text-left focus:outline-none focus:bg-zinc-800', className)}
+      className={cn(baseClass, 'px-3 py-1.5 text-sm w-full text-left focus:outline-none focus:bg-[var(--surface-3)]', className)}
       {...rest}
     >
       {children}
@@ -160,7 +160,7 @@ function PopoverItem({
 }
 
 function PopoverSeparator(): React.ReactElement {
-  return <div role="separator" className="border-t border-zinc-800 my-1" />;
+  return <div role="separator" className="border-t border-[var(--brand-border)] my-1" />;
 }
 
 /* ── Popover shell ───────────────────────────────────────────────────── */
@@ -358,7 +358,7 @@ function PopoverInner({
                 left: position.left,
                 zIndex: 'var(--z-dropdown)' as unknown as number,
               }}
-              className="min-w-[10rem] bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl py-1"
+              className="min-w-[10rem] bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl py-1"
             >
               {wiredChildren}
             </div>,

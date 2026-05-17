@@ -1,7 +1,7 @@
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import { post } from '../../api/client';
 import { STUDIO_NAME } from '../../constants';
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 
 interface Props {
@@ -30,20 +30,19 @@ export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
               </div>
             ))}
           </div>
-          <button onClick={async () => {
+          <Button onClick={async () => {
             try {
               const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: 'premium' });
               if (data.url) window.location.href = data.url;
             } catch (err) {
               onError(err instanceof Error ? err.message : 'Upgrade failed. Please try again.');
             }
-          }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-body font-medium transition-colors cursor-pointer">
+          }} className="gap-2 px-5 py-2.5 rounded-[var(--radius-lg)]">
             <Icon as={Sparkles} size="md" /> Upgrade to Premium
-          </button>
-          <button onClick={onClose} className="block mx-auto mt-3 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose} className="block mx-auto mt-3 px-0 py-0 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
             Maybe later
-          </button>
+          </Button>
         </div>
       </Modal.Body>
     </Modal>

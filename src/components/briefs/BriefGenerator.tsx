@@ -1,7 +1,7 @@
 import {
-  Loader2, Sparkles, ChevronDown, ChevronUp, ExternalLink,
+  Sparkles, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react';
-import { AIContextIndicator, Icon } from '../ui';
+import { AIContextIndicator, Icon, Button, FormInput, FormSelect, FormTextarea } from '../ui';
 import type { BriefTemplateCrossrefMatch } from '../../../shared/types/content';
 
 export interface BriefGeneratorProps {
@@ -49,31 +49,32 @@ export function BriefGenerator({
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Target Keyword *</label>
-            <input
+            <FormInput
               type="text"
               value={keyword}
-              onChange={e => onKeywordChange(e.target.value)}
+              onChange={onKeywordChange}
               placeholder="e.g. dental implants near me"
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+              className="w-full"
               onKeyDown={e => e.key === 'Enter' && !generating && onGenerate()}
             />
           </div>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Page Type</label>
-            <select
+            <FormSelect
               value={pageType}
-              onChange={e => onPageTypeChange(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none cursor-pointer"
-            >
-              <option value="">Auto-detect</option>
-              <option value="blog">Blog Post</option>
-              <option value="landing">Landing Page</option>
-              <option value="service">Service Page</option>
-              <option value="location">Location Page</option>
-              <option value="product">Product Page</option>
-              <option value="pillar">Pillar Page</option>
-              <option value="resource">Resource / Guide</option>
-            </select>
+              onChange={onPageTypeChange}
+              options={[
+                { value: '', label: 'Auto-detect' },
+                { value: 'blog', label: 'Blog Post' },
+                { value: 'landing', label: 'Landing Page' },
+                { value: 'service', label: 'Service Page' },
+                { value: 'location', label: 'Location Page' },
+                { value: 'product', label: 'Product Page' },
+                { value: 'pillar', label: 'Pillar Page' },
+                { value: 'resource', label: 'Resource / Guide' },
+              ]}
+              className="w-full cursor-pointer"
+            />
           </div>
         </div>
         {templateCrossref && (
@@ -88,24 +89,26 @@ export function BriefGenerator({
         )}
         <div>
           <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Business Context (optional)</label>
-          <input
+          <FormInput
             type="text"
             value={businessCtx}
-            onChange={e => onBusinessCtxChange(e.target.value)}
+            onChange={onBusinessCtxChange}
             placeholder="e.g. Local dental practice in Austin, TX specializing in cosmetic dentistry"
-            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+            className="w-full"
           />
         </div>
       </div>
 
       {/* Advanced Options */}
-      <button
+      <Button
         onClick={onToggleAdvanced}
-        className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+        icon={showAdvanced ? ChevronUp : ChevronDown}
+        size="sm"
+        variant="ghost"
+        className="h-auto px-0 py-0 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
       >
-        <Icon as={showAdvanced ? ChevronUp : ChevronDown} size="sm" />
         Advanced Options
-      </button>
+      </Button>
       {showAdvanced && (
         <div className="space-y-2 pl-1 border-l-2 border-[var(--brand-border)] ml-1">
           <div>
@@ -113,12 +116,12 @@ export function BriefGenerator({
               <Icon as={ExternalLink} size="sm" className="mr-1" />
               Reference URLs (competitor/inspiration pages — one per line)
             </label>
-            <textarea
+            <FormTextarea
               value={refUrls}
-              onChange={e => onRefUrlsChange(e.target.value)}
+              onChange={onRefUrlsChange}
               placeholder={"https://competitor.com/their-great-article\nhttps://example.com/inspiring-content"}
               rows={3}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none font-mono"
+              className="w-full"
             />
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">We&apos;ll scrape these pages and use their structure/tone as context (up to 5 URLs)</p>
           </div>
@@ -129,14 +132,17 @@ export function BriefGenerator({
 
       {error && <p className="text-xs text-red-400">{error}</p>}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           onClick={onGenerate}
           disabled={!keyword.trim() || generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
+          loading={generating}
+          icon={Sparkles}
+          size="md"
+          variant="secondary"
+          className="rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white border-0"
         >
-          <Icon as={generating ? Loader2 : Sparkles} size="md" className={generating ? 'animate-spin' : ''} />
           {generating ? 'Generating...' : 'Generate Brief'}
-        </button>
+        </Button>
         {generating && (
           <span className="t-caption-sm text-[var(--brand-text-muted)] animate-pulse">Enriching with SERP data, GA4 insights, and knowledge base...</span>
         )}

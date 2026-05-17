@@ -108,6 +108,7 @@ export interface SeoDataProvider {
 
   // Domain Analysis
   getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
+  getUrlKeywords?(url: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
   getDomainOverview(domain: string, workspaceId: string, database?: string): Promise<DomainOverview | null>;
   getCompetitors(domain: string, workspaceId: string, limit?: number, database?: string): Promise<OrganicCompetitor[]>;
 

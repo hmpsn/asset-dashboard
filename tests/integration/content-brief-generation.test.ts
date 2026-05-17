@@ -337,6 +337,18 @@ describe('generateBrief — happy path', () => {
     const briefCall = calls.find(c => c.feature === 'content-brief');
     expect(briefCall).toBeDefined();
   });
+
+  it('uses research-mode instructions for factual brief generation', async () => {
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+
+    await generateBrief(TEST_WS_ID, 'evidence based seo', {});
+
+    const calls = getCapturedOpenAICalls();
+    const briefCall = calls.find(c => c.feature === 'content-brief');
+    expect(briefCall).toBeDefined();
+    const systemMessage = briefCall!.messages.find(m => m.role === 'system');
+    expect(systemMessage?.content).toContain('RESEARCH MODE');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

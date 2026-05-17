@@ -9,7 +9,7 @@ import { ShippingVelocityChart } from './RoadmapVelocityChart';
 import { RoadmapFilterBar } from './RoadmapFilterBar';
 import { RoadmapSprintView } from './RoadmapSprintView';
 import { RoadmapBacklogView } from './RoadmapBacklogView';
-import { roadmap as roadmapApi, features as featuresApi } from '../api/misc';
+import { roadmap as roadmapApi, features as featuresApi } from '../api/platform';
 import { queryKeys } from '../lib/queryKeys';
 import { filtersFromParams, deriveAllTags } from '../lib/roadmapFilters';
 import { CHART_SERIES_COLORS } from './ui/constants';

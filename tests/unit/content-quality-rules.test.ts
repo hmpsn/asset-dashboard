@@ -412,6 +412,19 @@ describe('buildBriefContextBlock', () => {
     expect(result).toContain('3. Q3?');
   });
 
+  it('includes observed SERP evidence from stored real PAA and top results', () => {
+    const result = buildBriefContextBlock(
+      makeBrief({
+        realPeopleAlsoAsk: ['Which CRM is best for a small team?'],
+        realTopResults: [{ position: 1, title: 'Best CRM 2026', url: 'https://example.com/crm' }],
+      }),
+    );
+    expect(result).toContain('OBSERVED PEOPLE ALSO ASK QUESTIONS');
+    expect(result).toContain('Which CRM is best for a small team?');
+    expect(result).toContain('OBSERVED TOP SEARCH RESULTS');
+    expect(result).toContain('1. Best CRM 2026 — https://example.com/crm');
+  });
+
   it('includes topical entities when present', () => {
     const result = buildBriefContextBlock(
       makeBrief({ topicalEntities: ['Google Business Profile', 'local citations', 'NAP consistency'] }),

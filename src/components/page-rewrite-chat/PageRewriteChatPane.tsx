@@ -2,7 +2,7 @@ import { Check, Copy, Loader2, Send, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { extractRewriteOnly } from '../../lib/rewriteResponse';
 import { RenderMarkdown } from '../client/helpers';
-import { Icon, IconButton } from '../ui';
+import { Icon, Button, FormTextarea, IconButton } from '../ui';
 import { QUICK_PROMPTS, type ChatMessage, type PageData } from './pageRewriteChatModel';
 
 interface PageRewriteChatPaneProps {
@@ -58,13 +58,15 @@ export function PageRewriteChatPane({
             {pageData && (
               <div className="grid grid-cols-2 gap-2 max-w-md mt-2">
                 {QUICK_PROMPTS.map((prompt, i) => (
-                  <button
+                  <Button
                     key={i}
                     onClick={() => onSendMessage(prompt)}
+                    variant="ghost"
+                    size="sm"
                     className="text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 hover:border-teal-500/30 hover:bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
                   >
                     {prompt}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -94,21 +96,25 @@ export function PageRewriteChatPane({
                       }}
                     />
                     <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
-                      <button
+                      <Button
                         onClick={() => onApplyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
+                        variant="ghost"
+                        size="sm"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded t-micro bg-teal-500/10 text-accent-brand border border-teal-500/30 hover:bg-teal-500/20 transition-colors" // arbitrary-text-ok
                       >
                         <Icon as={Check} size="sm" />
                         Apply to {msg.sectionTarget}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => onCopyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
-                        className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                        variant="ghost"
+                        size="sm"
+                        className={"flex items-center gap-1 px-2 py-0.5 rounded t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                         }
                       >
                         {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
                         {copiedIdx === i ? 'Copied' : 'Copy'}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -117,14 +123,16 @@ export function PageRewriteChatPane({
                       <RenderMarkdown text={msg.content} />
                     </div>
                     <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
-                      <button
+                      <Button
                         onClick={() => onCopyToClipboard(msg.content, i)}
-                        className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                        variant="ghost"
+                        size="sm"
+                        className={"flex items-center gap-1 px-2 py-0.5 rounded t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
                         }
                       >
                         {copiedIdx === i ? <Icon as={Check} size="sm" className="text-accent-brand" /> : <Icon as={Copy} size="sm" />}
                         {copiedIdx === i ? 'Copied' : 'Copy'}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )
@@ -149,13 +157,13 @@ export function PageRewriteChatPane({
 
       <div className="flex-shrink-0 border-t border-[var(--brand-border)] px-4 py-3 bg-[var(--surface-2)]/50">
         <div className="flex items-end gap-2">
-          <textarea
+          <FormTextarea
             ref={inputRef}
             value={input}
-            onChange={e => onInputChange(e.target.value)}
+            onChange={onInputChange}
             onKeyDown={onInputKeyDown}
             placeholder={pageData ? 'Ask me to rewrite a section, optimize headings, add FAQs...' : 'Load a page first, or ask a general rewriting question...'}
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
+            className="flex-1 min-h-[40px] max-h-[120px]"
             rows={2}
           />
           <IconButton

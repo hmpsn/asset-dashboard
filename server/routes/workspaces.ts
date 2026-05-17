@@ -24,10 +24,8 @@ import {
 } from '../client-users.js';
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
-import { applySuppressionsToAudit } from '../helpers.js';
 import { callAI } from '../ai.js';
 import { parseAIJson } from '../openai-helpers.js';
-import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import { invalidatePageCache } from '../workspace-data.js';
 import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
@@ -58,6 +56,8 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { addActivity } from '../activity-log.js';
+import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
 const log = createLogger('workspaces');
 
@@ -101,9 +101,9 @@ router.get('/api/workspace-overview', (req, res) => {
     // Audit
     let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
     if (ws.webflowSiteId) {
-      const snap = getLatestSnapshot(ws.webflowSiteId);
+      const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
       if (snap) {
-        const filtered = applySuppressionsToAudit(snap.audit, ws.auditSuppressions || []);
+        const filtered = snap.audit;
         audit = {
           score: filtered.siteScore,
           totalPages: filtered.totalPages,
@@ -428,6 +428,37 @@ const auditSuppressionSchema = z.object({
   reason: z.string().max(500).optional(),
 }).refine(d => d.pageSlug || d.pagePattern, { message: 'pageSlug or pagePattern is required' });
 
+function publishAuditSuppressionChange(
+  workspace: Workspace,
+  action: 'added' | 'removed',
+  suppressions: Workspace['auditSuppressions'],
+) {
+  invalidateIntelligenceCache(workspace.id);
+  invalidateSubCachePrefix(workspace.id, 'slice:siteHealth');
+  invalidateSubCachePrefix(workspace.id, 'slice:pageProfile');
+  const latest = workspace.webflowSiteId
+    ? getLatestEffectiveSnapshot(workspace.webflowSiteId, suppressions || [])
+    : null;
+  addActivity(
+    workspace.id,
+    'audit_suppression_updated',
+    `Audit suppression ${action}`,
+    action === 'added'
+      ? 'An audit issue was hidden from health scoring and client reporting.'
+      : 'An audit issue was restored to health scoring and client reporting.',
+    { action, score: latest?.audit.siteScore ?? null, previousScore: latest?.previousScore ?? null },
+  );
+  broadcastToWorkspace(workspace.id, WS_EVENTS.AUDIT_COMPLETE, {
+    score: latest?.audit.siteScore ?? null,
+    previousScore: latest?.previousScore ?? null,
+    reason: 'audit_suppression_updated',
+  });
+  broadcastToWorkspace(workspace.id, WS_EVENTS.WORKSPACE_UPDATED, {
+    id: workspace.id,
+    auditSuppressions: suppressions || [],
+  });
+}
+
 router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), validate(auditSuppressionSchema), (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
@@ -446,6 +477,7 @@ router.post('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess(), 
     suppressions.push({ check, pageSlug, reason: reason || undefined, createdAt: new Date().toISOString() });
   }
   updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  publishAuditSuppressionChange(ws, 'added', suppressions);
   res.json({ ok: true, suppressions });
 });
 
@@ -453,11 +485,16 @@ router.delete('/api/workspaces/:id/audit-suppressions', requireWorkspaceAccess()
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   const { check, pageSlug, pagePattern } = req.body;
-  const suppressions = (ws.auditSuppressions || []).filter(s => {
+  const existingSuppressions = ws.auditSuppressions || [];
+  const suppressions = existingSuppressions.filter(s => {
     if (pagePattern) return !(s.check === check && s.pagePattern === pagePattern);
     return !(s.check === check && s.pageSlug === pageSlug && !s.pagePattern);
   });
+  if (suppressions.length === existingSuppressions.length) {
+    return res.json({ ok: true, suppressions });
+  }
   updateWorkspace(req.params.id, { auditSuppressions: suppressions });
+  publishAuditSuppressionChange(ws, 'removed', suppressions);
   res.json({ ok: true, suppressions });
 });
 

@@ -5,33 +5,72 @@
 > section below. For pr-check rule authoring, see
 > `docs/rules/pr-check-rule-authoring.md`.
 
-These rules are mechanized in `scripts/pr-check.ts` and enforced on every PR diff.
-All rules are scoped to files changed in the diff (not the full repo) during the Phase 1–3 migration window.
+The active rule list is generated in [automated-rules.md](./automated-rules.md)
+from `scripts/pr-check.ts`; treat that generated file as the live severity table.
+This document explains the design-system contract, ratchet strategy, and manual
+backlog that is not yet safe to fail in CI.
+
+For the active lock-in contract (authority order, invariants, scorecard schema,
+and ratchet gates), see [styleguide-lockdown-contract.md](./styleguide-lockdown-contract.md).
+For canonical rule inventory and tier/status tracking, see
+[styleguide-rule-registry.md](./styleguide-rule-registry.md) and
+`data/styleguide-rule-registry.json`.
 
 ---
 
 ## Active Rules (pr-check)
 
-| Rule | Severity | Pattern | Scope |
-|------|----------|---------|-------|
-| Legacy surface token | warn | `var(--brand-bg-*)` | `*.tsx`, `*.css` |
-| Hand-rolled card div | warn | `bg-zinc-9xx + rounded-xl` | `*.tsx` (excl. `ui/`) |
-| Page component missing PageHeader | warn | customCheck curated list | page components |
-| Hardcoded card radius | warn | `rounded-xl` outside `ui/` | `*.tsx` (excl. `ui/`) |
-| radius-signature-lg exclusivity | **error** | `--radius-signature-lg` | all, excl. SectionCard + styleguide |
-| Non-standard transition duration | warn | duration not 120/180/400ms | `*.tsx`, `*.css` |
-| Purple in client components | error | `purple-` Tailwind class | `src/components/client/` |
-| Forbidden hues (violet/indigo) | error | `violet-` or `indigo-` | `src/components/` |
-| Hardcoded dark hex in inline styles | error | `#0f1219` and related dark hex | `src/` |
-| SVG with hardcoded dark fill/stroke | warn | Dark hex in SVG `fill=` / `stroke=` | `src/` |
-| styleguide-token-parity | warn | Any `--*` token in `styleguide.css` | `public/styleguide.css` |
+Do not maintain a hand-copied rule table here. Run `npm run rules:generate`
+and read [automated-rules.md](./automated-rules.md) for current names,
+severities, hatches, and scopes. CI fails if the generated document drifts
+from the `CHECKS` array.
 
 ## Migration path
 
-- Phase 1: All rules ship as `warn` (except `radius-signature-lg exclusivity`, `Purple in client`, `Forbidden hues`, and `Hardcoded dark hex` which are `error` immediately).
-- Phase 3f: Rules A, B, D promoted to `error` once all 47 files are migrated.
-- Phase 4+: Rule F promoted to `error` once `--motion-*` tokens land.
-- Phase 3: `styleguide-token-parity` promoted to `error` after parity verified.
+- Error rules lock zero-hit invariants, such as forbidden hues, token parity,
+  raw action primitives, and signature-radius exclusivity.
+- Warning/report-only rules identify known backlog that still needs migration.
+- New drift categories should land as advisory metrics or warnings first unless
+  an audit proves they are already zero-hit and fixture-covered.
+- Promote warnings to errors only after the backlog reaches zero and the rule has
+  tests in `tests/pr-check.test.ts`.
+- Every style directive under migration must be represented in the styleguide
+  rule registry with owner, metric key, and promotion prerequisites.
+- Wave 8 ratchet (2026-05-18) promoted these zero-hit checks to error:
+  `styleguide-css-must-import-public-tokens`,
+  `styleguide-typography-extra-class-drift`,
+  `global-token-declaration-outside-canonical-token-files`,
+  `hardcoded card radius outside ui primitives`, and
+  `badge-like-span-outside-primitives`.
+- Wave 9 ratchet (2026-05-18) promoted these zero-hit checks to error:
+  `badge-color-prop-deprecation` and
+  `interactive-div-role-button`.
+- Wave 10 ratchet (2026-05-18) promoted this zero-hit check to error:
+  `primitive-override-drift-on-form-controls`.
+- Wave 12 ratchet prep (2026-05-17) added three new warn-tier advisory
+  detectors with fixture coverage and drift-report breakdowns:
+  `duplicate-heading-signal`, `nested-card-density-signal`, and
+  `blue-action-semantic-drift`.
+- Wave 14 ratchet (2026-05-17) promoted these zero-hit checks to error:
+  `duplicate-heading-signal`,
+  `nested-card-density-signal`, and
+  `blue-action-semantic-drift`.
+- Wave 15 ratchet (2026-05-17) promoted `src-index-css-no-token-declarations`
+  to error after sustained zero-hit verification and added
+  `status-semantic-mapping-drift` as a new warn-tier advisory detector with
+  file-level reporting.
+- Wave 16 ratchet (2026-05-17) migrated remaining local status tone maps to
+  `StatusBadge` domain mappings (`request` + `job`) and promoted
+  `status-semantic-mapping-drift` to error after advisory backlog reached zero.
+- Current advisory backlog is warn-tier and intentionally non-blocking:
+  none.
+- Wave 17 pre-plan audit (2026-05-17) expanded the canonical registry with
+  additional planned warn/manual directives (focus-visible ring contract,
+  reduced-motion contract, embedded-tab heading duplication, muted-tier usage,
+  raw inline z-index, report-metric parity, stat primitive bypass, and chart/
+  spacing/styleguide specimen manual checks). These are tracked in
+  `data/styleguide-rule-registry.json` as `planned`/`manual-review` and are not
+  blocking until detectors, fixtures, and ratchet evidence are added.
 
 ## Escape hatch
 
@@ -46,33 +85,32 @@ Per-rule hatch comments (preferred over the generic form):
 | Purple in client components | `// purple-ok` (not yet implemented) |
 | Forbidden hues (violet/indigo) | `// hue-ok` (not yet implemented) |
 
-Phase 3 will add hatch support to all new rules as they land.
+See [automated-rules.md](./automated-rules.md) for the current hatch per rule.
 
 ---
 
 ## Phase 5 Migration Window (2026-04-24)
 
-Phase 5 is a Total Unification Sweep. The following rules are **planned for Phase 3**
-(after Phase 2 codemod execution), at which point they will be added to `pr-check.ts`
-as `error`-severity customCheck rules. During Phase 0 and Phase 1, they are manual
-guidelines enforced by code review.
+Phase 5 is a Total Unification Sweep. Several items from the original plan are
+now hard errors in `pr-check`; the remaining items below are still backlog or
+advisory because the repo has known legitimate/native usage that needs a focused
+backfill before CI can fail on it.
 
 | Planned rule | Status | What it blocks |
 |---|---|---|
-| Arbitrary `text-[Npx]` values | planned (Phase 3) | Raw pixel font sizes — use `.t-*` utility class |
-| Raw `text-zinc-*` in components | planned (Phase 3) | Direct zinc text colors — use `var(--brand-text/bright/muted/dim)` |
-| Raw `bg-zinc-*` in components | planned (Phase 3) | Direct zinc backgrounds — use `var(--surface-1/2/3)` |
-| Raw `border-zinc-*` in components | planned (Phase 3) | Direct zinc borders — use `var(--brand-border)` |
-| `rounded-lg` without `var(--radius-*)` | planned (Phase 3) | Literal border-radius class — use `rounded-[var(--radius-lg)]` |
-| Hand-rolled buttons | planned (Phase 3) | Inline `px-* py-* rounded-* bg-* text-*` button patterns — use `<Button>` or `<IconButton>` |
-| Hand-rolled form controls | planned (Phase 3) | Inline `<input>`, `<select>`, `<textarea>` — use `<FormInput>`, `<FormSelect>`, `<FormTextarea>` |
-| `flex items-center gap-*` without layout primitive | planned (Phase 3) | Inline flex layouts — use `<Row>`, `<Stack>`, `<Column>` |
-| `fixed inset-0` modal pattern | planned (Phase 3) | Hand-rolled modals — use `<Modal>` |
-| `rose-` or `pink-` hues | planned (Phase 3) | Non-system hues eliminated in Phase 0; rule catches regressions |
-| `text-green-400` for success/score | planned (Phase 3) | Success color must be `text-emerald-400` (emerald, not green) |
+| Hand-rolled form controls | error | Inline visible `<input>`, `<select>`, `<textarea>` — use `<FormInput>`, `<FormSelect>`, `<FormTextarea>`, `<Checkbox>`, or `<Toggle>`. Native `hidden`, `file`, and `color` inputs are allowed. |
+| Static styleguide inline note chrome | error | Inline note typography/spacing in `public/styleguide.html` — use `.spec-note` / `.sg-note` |
+| Static styleguide radius prose drift | error | Raw or stale pixel radius prose — name `--radius-*` tokens and primitive ownership |
+| Hand-rolled badge-like spans | error | Inline rounded status/category/count pills — use `<Badge>` or `<StatusBadge>` |
+| Static styleguide raw controls/specimens | manual review | Static examples may intentionally show raw HTML; label bad examples clearly |
+| `flex items-center gap-*` without layout primitive | manual review | Inline flex layouts — use `<Row>`, `<Stack>`, `<Column>` when the abstraction adds value |
 
-All Phase 3 rules will report `warn` initially and be promoted to `error` after a
-2-sprint stabilization period.
+`scripts/report-style-drift.ts` includes advisory counts for raw form controls,
+client purple, static styleguide debt, and badge-like spans. Raw visible form
+controls and static styleguide note/radius debt are now also enforced by
+`pr-check` after the May 2026 ratchet sweep drove both counts to zero. Badge-like
+spans are now enforced as error after the Wave 8 client sweep removed the final
+violations and fixture coverage was added.
 
 ---
 
@@ -88,11 +126,14 @@ All Phase 3 rules will report `warn` initially and be promoted to `error` after 
 Verification: `npx tsx scripts/verify-styleguide-parity.ts`
 pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 
-**Phase 3 author note — `src/index.css` gap:** The `styleguide-token-parity` rule currently
-only checks `public/styleguide.css` for stray `--*` declarations. A matching rule for
-`src/index.css` (ensuring it stays token-free beyond the `@import`) is not yet mechanized.
-Phase 3 should add a `customCheck` that scans `src/index.css` for `--*` lines outside the
-import statement. Until then, `verify-styleguide-parity.ts` check #3 provides a manual gate.
+`src/index.css` token declaration gap is now mechanized via
+`src-index-css-no-token-declarations` (error tier). `verify-styleguide-parity.ts`
+remains as an additional parity gate.
+
+Route-level cleanliness heuristics for duplicate headings, nested `SectionCard`
+density, and blue-styled action controls are now enforced as `error` in
+`pr-check`, with `report-style-drift.ts` retaining file-level breakdowns for
+monitoring and cleanup targeting.
 
 ### Outstanding hatches to migrate
 

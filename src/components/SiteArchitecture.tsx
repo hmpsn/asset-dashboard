@@ -4,7 +4,7 @@ import {
   AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
   Zap, Link2,
 } from 'lucide-react';
-import { SectionCard, StatCard, Badge, EmptyState, PageHeader, Icon, Button } from './ui';
+import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
@@ -118,9 +118,9 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
 
   return (
     <div>
-      <button
+      <ClickableRow
         onClick={() => hasChildren && setExpanded(!expanded)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left rounded-[var(--radius-lg)] transition-colors group ${
+        className={`flex items-center gap-2 px-3 py-2 text-left rounded-[var(--radius-lg)] group ${
           hasChildren ? 'hover:bg-[var(--surface-3)]/50 cursor-pointer' : 'cursor-default'
         } ${!node.hasContent ? 'opacity-60' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 12}px` }}
@@ -134,36 +134,36 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
         <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate flex-1">{node.name}</span>
 
         {node.keyword && (
-          <span className="text-[10px] text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
             <Icon as={Target} size="sm" className="mr-0.5 -mt-px" />{node.keyword}
           </span>
         )}
 
-        <Badge label={badge.label} color={badge.color} />
+        <Badge label={badge.label} tone={badge.color} />
 
         {cov && (
           cov.hasSchema ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" /* arbitrary-text-ok */ title={`Schema: ${cov.schemaTypes.join(', ')}`}>
+            <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
               <Icon as={CheckCircle2} size="sm" />
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 text-[10px] text-[var(--brand-text-dim)]" title="No schema">
+            <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-dim)]" title="No schema">
               <Icon as={XCircle} size="sm" />
             </span>
           )
         )}
 
-        <span className="text-[10px] text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
+        <span className="t-caption-sm text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
           {node.path}
         </span>
 
         {hasChildren && (
-          <span className="text-[10px] text-[var(--brand-text-dim)] flex-shrink-0">
+          <span className="t-caption-sm text-[var(--brand-text-dim)] flex-shrink-0">
             {node.children.length}
           </span>
         )}
-      </button>
+      </ClickableRow>
 
       {expanded && hasChildren && (
         <div>
@@ -186,14 +186,14 @@ function DepthChart({ distribution }: { distribution: Record<number, number> }) 
     <div className="space-y-1.5">
       {entries.map(e => (
         <div key={e.depth} className="flex items-center gap-2">
-          <span className="text-[10px] text-[var(--brand-text-muted)] w-16 text-right flex-shrink-0">Depth {e.depth}</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] w-16 text-right flex-shrink-0">Depth {e.depth}</span>
           <div className="flex-1 h-4 bg-[var(--surface-3)] rounded overflow-hidden">
             <div
               className="h-full bg-teal-500/30 rounded"
               style={{ width: `${(e.count / maxCount) * 100}%` }}
             />
           </div>
-          <span className="text-[10px] text-[var(--brand-text)] w-8 text-right tabular-nums">{e.count}</span>
+          <span className="t-caption-sm text-[var(--brand-text)] w-8 text-right tabular-nums">{e.count}</span>
         </div>
       ))}
     </div>
@@ -352,13 +352,13 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         <SectionCard
           title="Architecture Gaps"
           titleIcon={<AlertTriangle className="w-4 h-4 text-amber-400" />}
-          titleExtra={<Badge label={`${data.gaps.length}`} color="amber" />}
+          titleExtra={<Badge label={`${data.gaps.length}`} tone="amber" />}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]/50">
             {data.gaps.map((gap, i) => (
               <div key={i} className="flex items-start gap-3 px-4 py-3">
-                <Badge label={gap.priority} color={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
+                <Badge label={gap.priority} tone={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-[var(--brand-text-bright)] font-mono">{gap.suggestedPath}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
@@ -375,7 +375,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         <SectionCard
           title="Orphan Pages"
           titleIcon={<AlertTriangle className="w-4 h-4 text-red-400" />}
-          titleExtra={<Badge label={`${data.orphanPaths.length}`} color="red" />}
+          titleExtra={<Badge label={`${data.orphanPaths.length}`} tone="red" />}
         >
           <div className="space-y-1">
             {data.orphanPaths.map(p => (
@@ -398,26 +398,29 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         >
           {/* Filters */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--brand-border)]">
-            <input
+            <FormInput
               type="text"
               placeholder="Search pages…"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
+              onChange={setSearchQuery}
+              className="flex-1"
             />
             <div className="flex items-center gap-1">
               {(['all', 'existing', 'planned', 'strategy', 'gap'] as const).map(f => (
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`t-caption-sm px-2 py-1 rounded-[var(--radius-md)] font-medium transition-colors ${
+                  className={`t-caption-sm px-2 py-1 rounded-[var(--radius-md)] font-medium ${
                     filter === f
                       ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
                       : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
                   }`}
                 >
                   {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -446,7 +449,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           <SectionCard
             title="Schema Priority Queue"
             titleIcon={<Zap className="w-4 h-4 text-amber-400" />}
-            titleExtra={<Badge label={`${coverage.priorityQueue.length}`} color="amber" />}
+            titleExtra={<Badge label={`${coverage.priorityQueue.length}`} tone="amber" />}
             noPadding
           >
             <div className="max-h-[280px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
@@ -460,12 +463,12 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                       <Icon as={XCircle} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     )}
                     <span className="text-xs text-[var(--brand-text-bright)] truncate flex-1" title={p.path}>{p.name}</span>
-                    <Badge label={pb.label} color={pb.color} />
+                    <Badge label={pb.label} tone={pb.color} />
                     {p.isOrphan && (
-                      <span className="text-[10px] text-red-400" /* arbitrary-text-ok */ title="Orphan page — no inbound links">orphan</span>
+                      <span className="t-caption-sm text-red-400" title="Orphan page — no inbound links">orphan</span>
                     )}
                     {p.inboundLinks !== null && !p.isOrphan && (
-                      <span className="text-[10px] text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
+                      <span className="t-caption-sm text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
                         {p.inboundLinks} in
                       </span>
                     )}

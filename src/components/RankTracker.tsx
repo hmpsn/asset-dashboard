@@ -4,7 +4,7 @@ import {
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState, SectionCard, Icon, Button } from './ui';
+import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
 
@@ -134,7 +134,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
           const latest = data[data.length - 1]?.positions[kw];
           return (
             <div key={kw} className="flex items-center gap-1.5 t-caption">
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TREND_COLORS[ki % TREND_COLORS.length] }} />
+              <span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: TREND_COLORS[ki % TREND_COLORS.length] }} />
               <span className="text-[var(--brand-text)]">{kw}</span>
               {latest !== undefined && <span className="text-[var(--brand-text-dim)]">#{latest.toFixed(1)}</span>}
             </div>
@@ -292,42 +292,43 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon as={Target} size="lg" className="text-teal-400" />
-          <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Rank Tracker</h2>
-          <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{keywords.length} keywords</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {latestRanks.some(r => r.pinned) && (
-            <button
-              onClick={() => showTrends ? setShowTrends(false) : loadTrends()}
-              disabled={trendsLoading}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] t-caption font-medium border transition-colors',
-                showTrends
-                  ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
-                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
-              )}
+      <PageHeader
+        title="Rank Tracker"
+        subtitle={`${keywords.length} keyword${keywords.length === 1 ? '' : 's'} tracked`}
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {latestRanks.some(r => r.pinned) && (
+              <Button
+                onClick={() => showTrends ? setShowTrends(false) : loadTrends()}
+                disabled={trendsLoading}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] t-caption font-medium border',
+                  showTrends
+                    ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                    : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
+                )}
+              >
+                {trendsLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={LineChart} size="sm" />}
+                Trends
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={snapshotting ? undefined : RefreshCw}
+              loading={snapshotting}
+              disabled={!hasGsc || snapshotting || keywords.length === 0}
+              title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
+              onClick={takeSnapshot}
             >
-              {trendsLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={LineChart} size="sm" />}
-              Trends
-            </button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={snapshotting ? undefined : RefreshCw}
-            loading={snapshotting}
-            disabled={!hasGsc || snapshotting || keywords.length === 0}
-            title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
-            onClick={takeSnapshot}
-          >
-            {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
-          </Button>
-        </div>
-      </div>
+              {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
+            </Button>
+          </div>
+        }
+      />
 
       {!hasGsc && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-sm)] px-4 py-3 text-xs text-amber-300">
@@ -339,12 +340,12 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Add keyword */}
       <div className="flex items-center gap-2">
-        <input
+        <FormInput
           type="text"
           value={newKeyword}
-          onChange={e => setNewKeyword(e.target.value)}
+          onChange={setNewKeyword}
           placeholder="Add keyword to track..."
-          className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]"
+          className="flex-1"
           onKeyDown={e => e.key === 'Enter' && !adding && addKeyword()}
         />
         <Button
@@ -390,9 +391,14 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   onClick={() => toggleExpand(rank.query)}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <button onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }} className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')} aria-label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}>
-                      <Icon as={Pin} size="sm" />
-                    </button>
+                    <IconButton
+                      onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }}
+                      icon={Pin}
+                      label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}
+                      size="sm"
+                      variant="ghost"
+                      className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')}
+                    />
                     <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                     <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
                   </div>
@@ -414,9 +420,14 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   <div className="text-right text-xs text-[var(--brand-text)]">{rank.clicks}</div>
                   <div className="text-right text-xs text-[var(--brand-text-muted)]">{rank.impressions.toLocaleString()}</div>
                   <div className="text-right">
-                    <button onClick={(e) => { e.stopPropagation(); removeKeyword(rank.query); }} className="text-[var(--brand-border-hover)] hover:text-red-400 transition-colors" aria-label="Remove keyword">
-                      <Icon as={Trash2} size="sm" />
-                    </button>
+                    <IconButton
+                      onClick={(e) => { e.stopPropagation(); removeKeyword(rank.query); }}
+                      icon={Trash2}
+                      label="Remove keyword"
+                      size="sm"
+                      variant="ghost"
+                      className="text-[var(--brand-border-hover)] hover:text-red-400"
+                    />
                   </div>
                 </div>
                 {isExpanded && (
@@ -467,9 +478,14 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
             {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).map(k => (
               <span key={k.query} className="flex items-center gap-1 t-caption px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)]">
                 {k.query}
-                <button onClick={() => removeKeyword(k.query)} className="text-[var(--brand-text-muted)] hover:text-red-400" aria-label={`Remove ${k.query}`}>
-                  <Icon as={Trash2} size="sm" />
-                </button>
+                <IconButton
+                  onClick={() => removeKeyword(k.query)}
+                  icon={Trash2}
+                  label={`Remove ${k.query}`}
+                  size="sm"
+                  variant="ghost"
+                  className="text-[var(--brand-text-muted)] hover:text-red-400"
+                />
               </span>
             ))}
           </div>

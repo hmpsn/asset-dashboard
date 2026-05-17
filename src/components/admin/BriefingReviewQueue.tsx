@@ -7,7 +7,7 @@ import {
   useSkipBriefing,
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
-import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, Modal } from '../ui';
+import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, ClickableRow, FormInput, Modal } from '../ui';
 import type { BriefingCategory, BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
 function statusColor(s: BriefingDraftStatus): 'teal' | 'emerald' | 'zinc' {
@@ -59,14 +59,16 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
   };
 
   const generateNowAction = (
-    <button
+    <Button
       onClick={() => genM.mutate()}
       disabled={genM.isPending}
-      className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/10 text-accent-brand hover:bg-teal-600/20 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+      icon={RefreshCw}
+      size="sm"
+      variant="secondary"
+      className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/10 text-accent-brand hover:bg-teal-600/20 border border-teal-600/30 disabled:opacity-50"
     >
-      <Icon as={RefreshCw} size="sm" />
       Generate now
-    </button>
+    </Button>
   );
 
   if (isLoading) {
@@ -104,7 +106,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
             const isTerminal = d.status === 'published' || d.status === 'skipped';
             return (
               <div key={d.id} className="border border-[var(--brand-border)] rounded-[var(--radius-md)] overflow-hidden">
-                <button
+                <ClickableRow
                   onClick={() => toggleExpanded(d.id)}
                   className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--surface-3)] transition-colors text-left"
                 >
@@ -115,7 +117,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                       className="text-[var(--brand-text-muted)] flex-shrink-0"
                     />
                     <span className="t-body text-[var(--brand-text-bright)]">{d.weekOf}</span>
-                    <Badge label={d.status} color={statusColor(d.status)} />
+                    <Badge label={d.status} tone={statusColor(d.status)} />
                     <span className="t-caption text-[var(--brand-text-muted)]">
                       {d.stories.length} {d.stories.length === 1 ? 'story' : 'stories'}
                     </span>
@@ -123,7 +125,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                   <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0 ml-3">
                     {new Date(d.updatedAt).toLocaleString()}
                   </span>
-                </button>
+                </ClickableRow>
 
                 {isExpanded && (
                   <div className="border-t border-[var(--brand-border)] p-3 space-y-3 bg-[var(--surface-3)]">
@@ -132,7 +134,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                       return (
                       <div key={s.id} className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge label={cat.label} color={cat.color} />
+                          <Badge label={cat.label} tone={cat.color} />
                           {s.isHeadline && (
                             <Icon as={Star} size="sm" className="text-accent-brand" aria-label="Headline story" />
                           )}
@@ -146,33 +148,39 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                     {!isTerminal && (
                       <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--brand-border)]">
                         {d.status === 'draft' && (
-                          <button
+                          <Button
                             onClick={() => approveM.mutate({ draftId: d.id })}
                             disabled={approveM.isPending}
-                            className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/10 text-accent-success hover:bg-emerald-500/20 border border-emerald-500/20 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                            icon={Check}
+                            size="sm"
+                            variant="secondary"
+                            className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/10 text-accent-success hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50"
                           >
-                            <Icon as={Check} size="sm" />
                             Approve
-                          </button>
+                          </Button>
                         )}
-                        <button
+                        <Button
                           onClick={() => publishM.mutate({ draftId: d.id })}
                           disabled={publishM.isPending}
-                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/15 text-accent-brand hover:bg-teal-600/25 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                          icon={Send}
+                          size="sm"
+                          variant="secondary"
+                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/15 text-accent-brand hover:bg-teal-600/25 border border-teal-600/30 disabled:opacity-50"
                         >
-                          <Icon as={Send} size="sm" />
                           Publish
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => {
                             setSkipping(d.id);
                             setSkipNote('');
                           }}
-                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-2)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] inline-flex items-center gap-1.5 transition-colors"
+                          icon={X}
+                          size="sm"
+                          variant="secondary"
+                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-2)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)]"
                         >
-                          <Icon as={X} size="sm" />
                           Skip
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -190,10 +198,10 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
           <p className="t-body text-[var(--brand-text)] mb-4">
             Skipped briefings are not published to the client. This is terminal — the briefing for this week cannot be un-skipped. Note your reason:
           </p>
-          <input
+          <FormInput
             value={skipNote}
-            onChange={e => setSkipNote(e.target.value)}
-            className="w-full px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-1)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50"
+            onChange={setSkipNote}
+            className="w-full t-body"
             placeholder="e.g. quiet week, low confidence in stories"
             autoFocus
           />

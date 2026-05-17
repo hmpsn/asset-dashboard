@@ -2,6 +2,7 @@
  * Persistent storage for schema generation results.
  * Saves per-site schema snapshots to SQLite.
  */
+import { randomUUID } from 'crypto';
 import type { SchemaPageSuggestion } from './schema-suggester.js';
 import {
   SCHEMA_ROLE_PRIMARY_TYPE,
@@ -559,7 +560,7 @@ export function recordSchemaPublish(
   schema: Record<string, unknown>,
 ): SchemaPublishEntry {
   const entry: SchemaPublishEntry = {
-    id: `sph-${siteId}-${pageId}-${Date.now()}`,
+    id: `sph-${siteId}-${pageId}-${Date.now()}-${randomUUID()}`,
     siteId,
     pageId,
     workspaceId,

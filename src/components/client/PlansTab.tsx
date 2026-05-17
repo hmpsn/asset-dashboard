@@ -1,5 +1,6 @@
 import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, ArrowUp, CreditCard, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
 import { SectionCard, type Tier, Icon, Button } from '../ui';
@@ -10,6 +11,7 @@ import { post } from '../../api/client';
 import { contentSubscriptions } from '../../api/misc';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../../shared/types/content';
 import type { PricingData } from '../../hooks/usePayments';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PlansTabProps {
   workspaceId: string;
@@ -31,14 +33,11 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
   const [billingLoading, setBillingLoading] = useState(false);
 
   // Content subscription state
-  const [subData, setSubData] = useState<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] } | null>(null);
   const [subLoading, setSubLoading] = useState(false);
-
-  useEffect(() => {
-    contentSubscriptions.clientStatus(workspaceId).then(data => {
-      if (data) setSubData(data);
-    });
-  }, [workspaceId]);
+  const { data: subData } = useQuery<{ subscription: ContentSubscription | null; plans: ContentSubscriptionPlanConfig[] } | null>({
+    queryKey: queryKeys.client.contentSubscription(workspaceId),
+    queryFn: () => contentSubscriptions.clientStatus(workspaceId),
+  });
 
   const handleSubscribe = async (plan: string) => {
     setSubLoading(true);
@@ -281,7 +280,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium ${
                       subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-accent-success' :
                       subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-accent-danger' :
                       'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
@@ -301,7 +300,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="mt-3">
                 <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
+                    className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all"
                     style={{ width: `${Math.min(100, (subData.subscription.postsDeliveredThisPeriod / subData.subscription.postsPerMonth) * 100)}%` }}
                   />
                 </div>

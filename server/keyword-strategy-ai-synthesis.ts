@@ -1,4 +1,4 @@
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from './helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePath, stripCodeFences } from './helpers.js';
 import { callAI } from './ai.js';
 import { getLatestSnapshot } from './reports.js';
 import { getTrackedKeywords } from './rank-tracking.js';
@@ -44,6 +44,8 @@ export interface StrategyPageMapEntry {
   difficulty?: number;
   cpc?: number;
   metricsSource?: string;
+  urlLevelKeywords?: { keyword: string; position: number; volume: number; difficulty: number; cpc: number; traffic?: number; url?: string }[];
+  urlLevelKeywordSource?: 'semrush' | 'dataforseo';
   gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[];
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   analysisGeneratedAt?: string;
@@ -147,13 +149,13 @@ export async function callKeywordStrategyAI(
   const aiMessages = (system ? wrappedMessages.slice(1) : wrappedMessages) as Array<{ role: 'user' | 'assistant'; content: string }>;
 
   const result = await callAI({
+    operation: 'keyword-strategy',
     model: 'gpt-5.4-mini',
     system,
     messages: aiMessages,
     maxTokens,
     temperature: 0.3,
     // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer
-    feature: 'keyword-strategy',
     workspaceId,
     maxRetries: 3,
     timeoutMs: 90_000,
@@ -722,7 +724,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           const pagesWithIssues = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
-              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+              const slug = normalizePath(p.slug);
               const traffic = trafficMap[slug] || trafficMap[p.slug];
               return { slug, issues: p.issues.length, score: p.score, traffic };
             })

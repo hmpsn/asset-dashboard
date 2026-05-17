@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Phone, Mail, MapPin, Link2, Clock, Save } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Link2, Clock, Save, X } from 'lucide-react';
 import { put } from '../../api/client';
-import { SectionCard, Icon, Button } from '../ui';
+import { SectionCard, Icon, Button, IconButton, FormInput } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 import { adminPath } from '../../routes';
 
@@ -79,13 +79,15 @@ function SchemaImpactRow({
         </Link>
       )}
       {handleScroll && (
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={handleScroll}
-          className="t-caption text-[var(--brand-text-bright)] hover:underline shrink-0"
+          className="t-caption text-[var(--brand-text-bright)] no-underline hover:underline shrink-0"
         >
           Jump to →
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -188,7 +190,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
     }
   };
 
-  const fieldClass = 'w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors';
+  const fieldClass = 'w-full bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption';
   const labelClass = 'block t-caption-sm font-medium text-[var(--brand-text)] mb-1';
 
   return (
@@ -277,12 +279,12 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1"><Icon as={Phone} size="sm" /> Phone</span>
                 </label>
-                <input
+                <FormInput
                   type="tel"
                   className={fieldClass}
                   placeholder="+1-555-123-4567"
                   value={form.phone || ''}
-                  onChange={e => update('phone', e.target.value)}
+                  onChange={value => update('phone', value)}
                   data-schema-deeplink="phone"
                 />
               </div>
@@ -290,12 +292,12 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1"><Icon as={Mail} size="sm" /> Email</span>
                 </label>
-                <input
+                <FormInput
                   type="email"
                   className={fieldClass}
                   placeholder="hello@example.com"
                   value={form.email || ''}
-                  onChange={e => update('email', e.target.value)}
+                  onChange={value => update('email', value)}
                 />
               </div>
             </div>
@@ -309,49 +311,49 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
             <div className="space-y-2">
               <div>
                 <label className={labelClass}>Street</label>
-                <input
+                <FormInput
                   className={fieldClass}
                   placeholder="123 Main St"
                   value={form.address?.street || ''}
-                  onChange={e => updateAddress('street', e.target.value)}
+                  onChange={value => updateAddress('street', value)}
                 />
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-1">
                   <label className={labelClass}>City</label>
-                  <input
+                  <FormInput
                     className={fieldClass}
                     placeholder="New York"
                     value={form.address?.city || ''}
-                    onChange={e => updateAddress('city', e.target.value)}
+                    onChange={value => updateAddress('city', value)}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>State / Region</label>
-                  <input
+                  <FormInput
                     className={fieldClass}
                     placeholder="NY"
                     value={form.address?.state || ''}
-                    onChange={e => updateAddress('state', e.target.value)}
+                    onChange={value => updateAddress('state', value)}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>ZIP / Postcode</label>
-                  <input
+                  <FormInput
                     className={fieldClass}
                     placeholder="10001"
                     value={form.address?.zip || ''}
-                    onChange={e => updateAddress('zip', e.target.value)}
+                    onChange={value => updateAddress('zip', value)}
                   />
                 </div>
               </div>
               <div>
                 <label className={labelClass}>Country</label>
-                <input
+                <FormInput
                   className={fieldClass}
                   placeholder="United States"
                   value={form.address?.country || ''}
-                  onChange={e => updateAddress('country', e.target.value)}
+                  onChange={value => updateAddress('country', value)}
                 />
               </div>
             </div>
@@ -364,32 +366,38 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
             </h4>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Used for Organization sameAs links in schema (Google Business, LinkedIn, Facebook, etc.)</p>
             <div className="flex gap-2 mb-2">
-              <input
+              <FormInput
                 className={`${fieldClass} flex-1`}
                 placeholder="https://www.linkedin.com/company/example"
                 value={socialInput}
-                onChange={e => setSocialInput(e.target.value)}
+                onChange={setSocialInput}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSocial(); } }}
               />
-              <button
+              <Button
+                type="button"
                 onClick={addSocial}
-                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors whitespace-nowrap"
+                variant="secondary"
+                size="sm"
+                className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30 whitespace-nowrap"
               >
                 Add
-              </button>
+              </Button>
             </div>
             {(form.socialProfiles || []).length > 0 && (
               <div className="space-y-1">
                 {(form.socialProfiles || []).map(url => (
                   <div key={url} className="flex items-center justify-between bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-1.5">
                     <span className="t-caption-sm text-[var(--brand-text)] truncate">{url}</span>
-                    <button
+                    <IconButton
+                      type="button"
                       onClick={() => removeSocial(url)}
+                      icon={X}
+                      label={`Remove social profile ${url}`}
+                      size="sm"
+                      variant="ghost"
                       className="ml-2 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors shrink-0"
                       title="Remove"
-                    >
-                      ×
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
@@ -404,31 +412,31 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
             <div className="space-y-3">
               <div>
                 <label className={labelClass}>Opening Hours</label>
-                <input
+                <FormInput
                   className={fieldClass}
                   placeholder="Mon–Fri 9am–5pm, Sat 10am–2pm"
                   value={form.openingHours || ''}
-                  onChange={e => update('openingHours', e.target.value)}
+                  onChange={value => update('openingHours', value)}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Founded</label>
-                  <input
+                  <FormInput
                     data-schema-deeplink="foundedDate"
                     className={fieldClass}
                     placeholder="2015"
                     value={form.foundedDate || ''}
-                    onChange={e => update('foundedDate', e.target.value)}
+                    onChange={value => update('foundedDate', value)}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>Number of Employees</label>
-                  <input
+                  <FormInput
                     className={fieldClass}
                     placeholder="10–50"
                     value={form.numberOfEmployees || ''}
-                    onChange={e => update('numberOfEmployees', e.target.value)}
+                    onChange={value => update('numberOfEmployees', value)}
                   />
                 </div>
               </div>

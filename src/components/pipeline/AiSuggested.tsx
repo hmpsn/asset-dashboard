@@ -28,7 +28,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
       >
         <div className="animate-pulse space-y-3">
           {[1, 2].map(i => (
-            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-lg" />
+            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]" />
           ))}
         </div>
       </SectionCard>
@@ -54,7 +54,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
     <SectionCard
       title="AI Suggested"
       titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
-      titleExtra={<Badge label={`${signals.length}`} color="teal" />}
+      titleExtra={<Badge label={`${signals.length}`} tone="teal" />}
     >
       <div className="space-y-2">
         {signals.slice(0, 8).map(signal => {
@@ -62,7 +62,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
           return (
             <div
               key={signal.insightId}
-              className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
+              className="flex items-start gap-3 p-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
               <Icon as={SignalIcon} size="md" className="mt-0.5 text-teal-400 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -72,7 +72,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
                   </span>
                   <Badge
                     label={signal.type === 'suggested_brief' ? 'New Brief' : 'Refresh'}
-                    color={signal.type === 'suggested_brief' ? 'blue' : 'amber'}
+                    tone={signal.type === 'suggested_brief' ? 'blue' : 'amber'}
                   />
                 </div>
                 <p className="text-xs text-[var(--brand-text)] mt-0.5">{signal.detail}</p>

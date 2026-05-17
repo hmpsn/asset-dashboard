@@ -29,9 +29,8 @@ vi.mock('../../../src/hooks/useBackgroundTasks', () => ({
 }));
 
 const mockJobsGet = vi.fn();
-vi.mock('../../../src/api/misc', () => ({
+vi.mock('../../../src/api/platform', () => ({
   jobs: { get: (...args: unknown[]) => mockJobsGet(...args) },
-  redirects: { save: vi.fn() },
 }));
 
 vi.mock('../../../src/api/seo', () => ({

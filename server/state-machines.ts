@@ -61,9 +61,9 @@ export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancell
 // ── Content Subscription ──
 export const CONTENT_SUB_TRANSITIONS: Record<string, readonly string[]> = {
   pending:   ['active', 'cancelled'],
-  active:    ['paused', 'cancelled', 'past_due'],
-  paused:    ['active', 'cancelled'],
-  past_due:  ['active', 'cancelled'],
+  active:    ['pending', 'paused', 'cancelled', 'past_due'],
+  paused:    ['pending', 'active', 'cancelled'],
+  past_due:  ['pending', 'active', 'cancelled'],
   cancelled: [],  // terminal
 };
 
@@ -96,6 +96,20 @@ export const BRIEFING_DRAFT_TRANSITIONS: Record<string, readonly string[]> = {
   published: [],   // terminal
   skipped:   [],   // terminal
 };
+
+// ── Background Job Status ──
+// Jobs move forward from pending → running and then to terminal states.
+// Some jobs can fail/cancel before running, so pending can move directly to
+// error/cancelled. Terminal states never reopen.
+export const BACKGROUND_JOB_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['running', 'done', 'error', 'cancelled'],
+  running: ['done', 'error', 'cancelled'],
+  done: [],
+  error: [],
+  cancelled: [],
+};
+
+export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled';
 
 // ── Generic validator ──
 

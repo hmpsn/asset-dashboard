@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, cn } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, Button, ClickableRow, cn } from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
@@ -279,21 +279,25 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                 {isStale ? 'Stale — ' : ''}{freshnessLabel}
               </span>
             )}
-            <button
+            <Button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors disabled:opacity-50"
+              variant="ghost"
+              size="sm"
+              className="!px-0 text-[var(--brand-text-muted)] hover:text-accent-brand disabled:opacity-50"
               title="Refresh all data"
             >
               <Icon as={RefreshCw} size="sm" className={refreshing ? 'animate-spin' : ''} />
               Refresh
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
-              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="!px-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
             >
               Settings →
-            </button>
+            </Button>
           </div>
         }
       />
@@ -502,10 +506,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               {visibleUrgent.map((item, i) => {
                 const ItemIcon = item.icon;
                 return (
-                  <button
+                  <ClickableRow
                     key={i}
                     onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]"
                   >
                     <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
                     <div className="flex-1 min-w-0">
@@ -513,34 +517,34 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                       <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
                     </div>
                     <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  </button>
+                  </ClickableRow>
                 );
               })}
               {hiddenCount > 0 && (
-                <button
+                <ClickableRow
                   onClick={() => setShowMoreActions(true)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors text-left"
+                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)]"
                 >
                   <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">{hiddenCount} more item{hiddenCount > 1 ? 's' : ''}</span>
-                </button>
+                </ClickableRow>
               )}
               {setupActions.length > 0 && !hasP1 && (
                 <>
-                  <button
+                  <ClickableRow
                     onClick={() => setShowSetupSuggestions(s => !s)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors text-left"
+                    className="flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)]"
                   >
                     <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-muted)] transition-transform', showSetupSuggestions ? 'rotate-180' : '')} />
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">{setupActions.length} setup suggestion{setupActions.length > 1 ? 's' : ''}</span>
-                  </button>
+                  </ClickableRow>
                   {showSetupSuggestions && setupActions.map((item, i) => {
                     const ItemIcon = item.icon;
                     return (
-                      <button
+                      <ClickableRow
                         key={`setup-${i}`}
                         onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left opacity-60"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] opacity-60"
                       >
                         <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
                         <div className="flex-1 min-w-0">
@@ -548,7 +552,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
                         </div>
                         <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                      </button>
+                      </ClickableRow>
                     );
                   })}
                 </>

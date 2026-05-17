@@ -1,7 +1,7 @@
 // src/components/client/DecisionDetailModal.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { X, Flag } from 'lucide-react';
-import { Button, Icon } from '../ui';
+import { Button, FormInput, Icon, IconButton } from '../ui';
 import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 import type { ApprovalBatch, ApprovalItem } from '../../../shared/types/approvals';
 import type { ClientAction, AeoChangePayload, InternalLinkPayload, RedirectProposalPayload } from '../../../shared/types/client-actions';
@@ -50,36 +50,37 @@ function ApprovalItemRow({
         </div>
         <div className="flex-shrink-0">
           {flagged ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onUnflag}
               className="t-caption-sm text-accent-warning hover:text-[var(--brand-text)] transition-colors px-2 py-1"
             >
               Unflag
-            </button>
+            </Button>
           ) : !flagging ? (
-            <button
-              type="button"
-              aria-label="Flag"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setFlagging(true)}
               className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-warning hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
             >
               <Icon as={Flag} size="sm" />
               Flag
-            </button>
+            </Button>
           ) : (
             <div className="flex items-center gap-2">
-              <input
+              <FormInput
                 type="text"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={setNote}
                 placeholder="What's your concern? (optional)"
-                className="px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-amber-500/50 w-48"
+                className="t-caption placeholder:text-[var(--brand-text-muted)] outline-none w-48"
                 autoFocus
               />
-              <button
-                type="button"
-                aria-label="Flag it"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   onFlag(note.trim());
                   setFlagging(false);
@@ -88,10 +89,10 @@ function ApprovalItemRow({
                 className="t-caption-sm font-medium text-accent-warning px-2 py-1 hover:bg-amber-500/10 rounded-[var(--radius-md)] transition-colors"
               >
                 Flag it
-              </button>
-              <button
-                type="button"
-                aria-label="Cancel flag"
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setFlagging(false);
                   setNote('');
@@ -99,7 +100,7 @@ function ApprovalItemRow({
                 className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors px-1"
               >
                 ✕
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -341,15 +342,15 @@ export function DecisionDetailModal({
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
-          <button
-            type="button"
+          <IconButton
             autoFocus
             onClick={onDismiss}
-            aria-label="Close"
+            icon={X}
+            label="Close"
+            size="sm"
+            variant="ghost"
             className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] transition-colors"
-          >
-            <Icon as={X} size="md" className="text-[var(--brand-text-muted)]" />
-          </button>
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
@@ -381,13 +382,14 @@ export function DecisionDetailModal({
           >
             {ctaLabel}
           </Button>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onDismiss}
             className="w-full t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors py-1"
           >
             Save for later
-          </button>
+          </Button>
         </div>
       </div>
     </div>

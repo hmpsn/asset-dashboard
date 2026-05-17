@@ -42,14 +42,14 @@ function relativeTime(isoDate: string): string {
 function ScoreBadge({ score }: { score: OutcomeScore }) {
   if (score === 'strong_win') {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-emerald-500/15 text-accent-success border border-emerald-500/30">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok t-caption-sm font-medium bg-emerald-500/15 text-accent-success border border-emerald-500/30">
         Strong win
       </span>
     );
   }
   // "Win" is a success-status badge — not a CTA — so emerald/neutral, not teal (Four Laws: teal = actions only)
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-emerald-500/8 text-[var(--brand-text-bright)] border border-emerald-500/20">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok t-caption-sm font-medium bg-emerald-500/8 text-[var(--brand-text-bright)] border border-emerald-500/20">
       Win
     </span>
   );

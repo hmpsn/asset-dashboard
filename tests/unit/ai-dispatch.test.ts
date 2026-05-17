@@ -92,6 +92,55 @@ describe('callAI', () => {
     }));
   });
 
+  it('adds research-mode instructions to OpenAI system prompts', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: 'ok',
+      promptTokens: 8,
+      completionTokens: 2,
+      totalTokens: 10,
+    });
+
+    await callAI({
+      model: 'gpt-5.4-mini',
+      system: 'Return JSON.',
+      messages: [{ role: 'user', content: 'Summarize this evidence.' }],
+      feature: 'unit-test-research-openai',
+      researchMode: true,
+    });
+
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      messages: [
+        expect.objectContaining({
+          role: 'system',
+          content: expect.stringContaining('RESEARCH MODE'),
+        }),
+        { role: 'user', content: 'Summarize this evidence.' },
+      ],
+    }));
+  });
+
+  it('adds research-mode instructions to Anthropic system prompts', async () => {
+    mocks.callAnthropic.mockResolvedValue({
+      text: 'ok',
+      promptTokens: 9,
+      completionTokens: 3,
+      totalTokens: 12,
+    });
+
+    await callAI({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      system: 'Write carefully.',
+      messages: [{ role: 'user', content: 'Draft this.' }],
+      feature: 'unit-test-research-anthropic',
+      researchMode: true,
+    });
+
+    expect(mocks.callAnthropic).toHaveBeenCalledWith(expect.objectContaining({
+      system: expect.stringContaining('RESEARCH MODE'),
+    }));
+  });
+
   it('passes Anthropic cancellation and retry options through the dispatcher', async () => {
     mocks.callAnthropic.mockResolvedValue({
       text: 'ok',
@@ -117,5 +166,60 @@ describe('callAI', () => {
       timeoutMs: 45_000,
       signal: controller.signal,
     }));
+  });
+
+  it('hydrates defaults from the AI operation registry', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: '{"ok":true}',
+      promptTokens: 8,
+      completionTokens: 2,
+      totalTokens: 10,
+    });
+
+    await callAI({
+      operation: 'schema-plan',
+      messages: [{ role: 'user', content: 'classify these pages' }],
+      workspaceId: 'ws_registry_test',
+    });
+
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-5.4-mini',
+      feature: 'schema-plan',
+      maxRetries: 3,
+      timeoutMs: 90_000,
+      responseFormat: { type: 'json_object' },
+    }));
+  });
+
+  it('lets explicit options override registry defaults', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: '{"ok":true}',
+      promptTokens: 8,
+      completionTokens: 2,
+      totalTokens: 10,
+    });
+
+    await callAI({
+      operation: 'schema-plan',
+      model: 'gpt-5.4',
+      maxRetries: 1,
+      timeoutMs: 12_000,
+      messages: [{ role: 'user', content: 'override defaults' }],
+      feature: 'schema-plan-override',
+      workspaceId: 'ws_registry_override',
+    });
+
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-5.4',
+      feature: 'schema-plan-override',
+      maxRetries: 1,
+      timeoutMs: 12_000,
+    }));
+  });
+
+  it('throws when both feature and operation are omitted', async () => {
+    await expect(callAI({
+      messages: [{ role: 'user', content: 'missing metadata' }],
+    })).rejects.toThrow('callAI requires either feature or operation');
   });
 });

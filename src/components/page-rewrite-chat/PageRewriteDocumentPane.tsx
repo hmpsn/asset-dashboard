@@ -1,6 +1,7 @@
 import { AlertTriangle, Copy, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import type { RefObject } from 'react';
-import { Icon } from '../ui';
+import { Button, ClickableRow, Icon } from '../ui';
+import { normalizePageUrl } from '../../lib/pathUtils';
 import type { PageData } from './pageRewriteChatModel';
 
 type ExportMode = 'copy' | 'download' | 'docx';
@@ -79,38 +80,40 @@ export function PageRewriteDocumentPane({
               rel="noopener noreferrer"
               className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-accent-brand transition-colors flex-1 min-w-0"
             >
-              <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+              <span className="truncate">{pageData.slug ? normalizePageUrl(pageData.slug) : pageUrl}</span>
               <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
             </a>
             <div className="relative flex-shrink-0" ref={exportPopoverRef}>
-              <button
+              <Button
                 ref={exportBtnRef}
                 onClick={onToggleExport}
-                className={"flex items-center gap-1 px-2 py-1 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors" // arbitrary-text-ok
+                variant="ghost"
+                size="sm"
+                className={"t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]" // arbitrary-text-ok
                 }
               >
                 Export brief
-              </button>
+              </Button>
               {exportOpen && (
                 <div className="absolute right-0 top-7 z-[var(--z-modal)] bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
-                  <button
+                  <ClickableRow
                     onClick={() => onExport('copy')}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]"
                   >
                     <Icon as={Copy} size="sm" /> Copy as Markdown
-                  </button>
-                  <button
+                  </ClickableRow>
+                  <ClickableRow
                     onClick={() => onExport('download')}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]"
                   >
                     <Icon as={FileText} size="sm" /> Download .md
-                  </button>
-                  <button
+                  </ClickableRow>
+                  <ClickableRow
                     onClick={() => onExport('docx')}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]"
                   >
                     <Icon as={FileText} size="sm" /> Download .docx
-                  </button>
+                  </ClickableRow>
                 </div>
               )}
             </div>
@@ -121,7 +124,7 @@ export function PageRewriteDocumentPane({
               {pageData.issues.slice(0, 20).map((issue, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ // arbitrary-text-ok
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded t-micro border ${ // arbitrary-text-ok
                     issue.severity === 'error'
                       ? 'bg-red-950/40 border-red-500/40 text-accent-danger'
                       : issue.severity === 'warning'
@@ -152,15 +155,21 @@ export function PageRewriteDocumentPane({
               style={{ top: toolbarPos.top, left: toolbarPos.left }}
               onMouseDown={e => e.preventDefault()}
             >
-              <button onClick={onBold} className="px-2 py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
-              <button onClick={onItalic} className="px-2 py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
+              <Button onClick={onBold} variant="ghost" size="sm" className="!px-2 !py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded">
+                B
+              </Button>
+              <Button onClick={onItalic} variant="ghost" size="sm" className="!px-2 !py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded">
+                I
+              </Button>
               <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-              <button onClick={onHeading2} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
-              }>H2</button>
-              <button onClick={onHeading3} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
-              }>H3</button>
+              <Button onClick={onHeading2} variant="ghost" size="sm" className={"!px-2 !py-1 t-micro text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
+              }>H2</Button>
+              <Button onClick={onHeading3} variant="ghost" size="sm" className={"!px-2 !py-1 t-micro text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded" // arbitrary-text-ok
+              }>H3</Button>
               <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-              <button onClick={onClearFormatting} className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
+              <Button onClick={onClearFormatting} variant="ghost" size="sm" className="!px-2 !py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded">
+                &times;
+              </Button>
             </div>
           )}
         </>

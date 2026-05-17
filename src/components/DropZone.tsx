@@ -99,12 +99,12 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
 
       {uploading ? (
         <>
-          <div className="w-8 h-8 border-2 rounded-full animate-spin border-[var(--brand-border-hover)] border-t-teal-400" />
+          <div className="w-8 h-8 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border-hover)] border-t-teal-400" />
           <p className="t-body text-[var(--brand-text)]">Processing...</p>
         </>
       ) : lastCount !== null ? (
         <>
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-[var(--radius-pill)] bg-emerald-500/20 flex items-center justify-center">
             <Icon as={Upload} size="lg" className="text-emerald-400" />
           </div>
           <p className="t-body text-emerald-400 font-medium">

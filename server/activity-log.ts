@@ -17,7 +17,10 @@ export function initActivityBroadcast(fn: WorkspaceBroadcastFn) {
 
 export type ActivityType =
   | 'audit_completed'
+  | 'audit_suppression_updated'
   | 'request_resolved'
+  | 'approval_sent'
+  | 'approval_deleted'
   | 'approval_applied'
   | 'approval_reverted'
   | 'seo_updated'
@@ -25,6 +28,7 @@ export type ActivityType =
   | 'links_fixed'
   | 'content_updated'
   | 'content_requested'
+  | 'content_request_deleted'
   | 'content_declined'
   | 'content_request_commented'
   | 'brief_generated'
@@ -165,7 +169,7 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
 
 /** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
-  'audit_completed', 'request_resolved', 'approval_applied', 'approval_reverted', 'seo_updated',
+  'audit_completed', 'request_resolved', 'approval_sent', 'approval_applied', 'approval_reverted', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'content_declined', 'content_request_commented', 'brief_generated', 'brief_approved',
   'changes_requested', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',

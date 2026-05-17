@@ -26,6 +26,27 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getPendingActions: vi.fn(() => []),
   getTopWinsFromActions: vi.fn(() => []),
 }));
+vi.mock('../../server/workspace-data.js', () => ({
+  getWorkspacePages: vi.fn(async () => []),
+  getContentPipelineSummary: vi.fn(() => ({
+    briefs: { total: 0, byStatus: {} },
+    posts: { total: 0, byStatus: {} },
+    matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
+    requests: { pending: 0, inProgress: 0, delivered: 0 },
+    workOrders: { active: 0 },
+    seoEdits: { pending: 0, applied: 0, inReview: 0 },
+  })),
+}));
+vi.mock('../../server/webflow-pages.js', () => ({
+  listPages: vi.fn(async () => []),
+  filterPublishedPages: vi.fn(() => []),
+  discoverCmsItemsBySlug: vi.fn(async () => ({ items: [], totalFound: 0 })),
+  toCmsPageId: vi.fn((collectionId: string, itemId: string) => `${collectionId}:${itemId}`),
+}));
+vi.mock('../../server/webflow-cms.js', () => ({
+  listCollections: vi.fn(async () => []),
+  getCollectionSchema: vi.fn(async () => ({ fields: [] })),
+}));
 vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn().mockReturnValue(true),
 }));

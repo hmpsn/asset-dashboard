@@ -21,7 +21,7 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { readFileSync, realpathSync } from 'fs';
+import { existsSync, readFileSync, realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -337,6 +337,45 @@ function workspaceScopedTables(): Set<string> {
 
 function readFileOrEmpty(file: string): string {
   try { return readFileSync(file, 'utf-8'); } catch { return ''; }
+}
+
+type StyleExceptionEntry = {
+  id: string;
+  rule: string;
+  file: string;
+  reason: string;
+  owner: string;
+  expiresOn: string;
+  createdAt: string;
+};
+
+const STYLE_EXCEPTIONS_PATH = path.join(ROOT, 'data/style-exceptions.json');
+
+let _styleExceptionsCache: StyleExceptionEntry[] | null = null;
+function loadStyleExceptions(): StyleExceptionEntry[] {
+  if (_styleExceptionsCache !== null) return _styleExceptionsCache;
+  if (!existsSync(STYLE_EXCEPTIONS_PATH)) {
+    _styleExceptionsCache = [];
+    return _styleExceptionsCache;
+  }
+  try {
+    const raw = readFileSync(STYLE_EXCEPTIONS_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as { exceptions?: unknown };
+    const entries = Array.isArray(parsed.exceptions) ? parsed.exceptions : [];
+    _styleExceptionsCache = entries
+      .filter((entry): entry is StyleExceptionEntry => {
+        if (!entry || typeof entry !== 'object') return false;
+        const typed = entry as Partial<StyleExceptionEntry>;
+        return Boolean(
+          typed.id && typed.rule && typed.file && typed.reason
+          && typed.owner && typed.expiresOn && typed.createdAt,
+        );
+      });
+    return _styleExceptionsCache;
+  } catch {
+    _styleExceptionsCache = [];
+    return _styleExceptionsCache;
+  }
 }
 
 /**
@@ -1428,6 +1467,7 @@ export const CHECKS: Check[] = [
       'server/seo-data-provider.ts',             // interface definition
       'server/providers/semrush-provider.ts',    // provider implementation
       'server/providers/dataforseo-provider.ts', // provider implementation
+      'server/providers/fake-seo-provider.ts',   // local fake provider implementation
       'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
       'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
     ],
@@ -3620,6 +3660,48 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── Raw pageSlug URL construction warning ──
+    //
+    // Approval/schema/outcome flows historically stored `pageSlug` as a leaf slug
+    // while newer callers may send a full path. Prefixing with `/${pageSlug}` can
+    // both collapse nested pages (`invisalign` → `/invisalign`) and double-prefix
+    // canonical paths (`/services/invisalign` → `//services/invisalign`). Use the
+    // Page Address helpers (`normalizePageUrl`, `resolvePagePath`, or
+    // `resolvePageAddress`) before crossing route/storage boundaries.
+    name: 'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['tests/**', 'server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['normalizePageUrl', 'resolvePagePath', 'resolvePageAddress', '// page-slug-url-ok'],
+    message:
+      'Avoid `/${pageSlug}` URL construction. pageSlug may already be a canonical path or may be only a leaf slug. ' +
+      'Use normalizePageUrl/resolvePagePath/resolvePageAddress, or add // page-slug-url-ok for display-only strings.',
+    severity: 'warn',
+    rationale:
+      'Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const rawPageSlugRe = /`\/\$\{[^}]*\b(?:pageSlug|slug)\b[^}]*\}`|['"]\/['"]\s*\+\s*[^;\n]*(?:\bpageSlug\b|\.pageSlug\b|\bslug\b|\.slug\b)/;
+      const rawPageSlugSinkRe =
+        /\b(?:recordSeoChange|captureBaselineFromGsc)\([^;\n]*(?:\bpageSlug\b|\.pageSlug\b|\bslug\b|\.slug\b)|\bpageUrl:\s*(?:pageSlug|slug|[^,\n]*(?:\.pageSlug|\.slug))/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.includes('/tests/') || file.startsWith('tests/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!rawPageSlugRe.test(lines[i]) && !rawPageSlugSinkRe.test(lines[i])) continue;
+          if (lines[i].includes('normalizePageUrl') || lines[i].includes('resolvePagePath') || lines[i].includes('resolvePageAddress')) continue;
+          if (hasHatch(lines, i, '// page-slug-url-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // ── Manual pageMap pairing outside shared helpers ──
     //
     // Three components (SeoEditor, PageIntelligence, ApprovalsTab) independently
@@ -4200,7 +4282,7 @@ export const CHECKS: Check[] = [
     name: 'Page component missing PageHeader',
     fileGlobs: [],
     message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Enforces consistent page-level header structure across all navigable views.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
     customCheck: (_files) => {
@@ -4253,9 +4335,54 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
     ],
     message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    name: 'badge-like-span-outside-primitives',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: [
+      'src/components/ui/',
+    ],
+    message: 'Use <Badge> or <StatusBadge> instead of hand-rolled badge-like <span> elements. Add // badge-span-ok with reason for intentional one-off specimens.',
+    severity: 'error',
+    rationale: 'Hand-rolled badge spans drift in shape, spacing, and tone semantics. Shared badge primitives keep status and category labels consistent across domains.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const normalized = file.replaceAll('\\', '/');
+        if (normalized.includes('/src/components/ui/')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          if (!/<span\b/.test(lines[index])) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 8); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/<span\b/.test(tagText)) continue;
+          if (!/rounded-\[var\(--radius-(?:sm|pill|md)\)\]/.test(tagText)) continue;
+          if (!/\bpx-/.test(tagText)) continue;
+          if (!/\b(?:bg|text|border)-(?:teal|blue|emerald|amber|red|orange|zinc)-/.test(tagText)) continue;
+          if (/badge-span-ok/.test(tagText)) continue;
+          hits.push({ file, line: index + 1, text: lines[index].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'radius-signature-lg used outside SectionCard',
@@ -4343,6 +4470,162 @@ export const CHECKS: Check[] = [
     },
   },
 
+  {
+    name: 'Style exception registry entry missing required metadata',
+    pattern: '',
+    fileGlobs: ['style-exceptions.json'],
+    pathFilter: 'data/',
+    message:
+      'Every style exception must include id, rule, file, reason, owner, expiresOn, and createdAt. ' +
+      'No expired exceptions are allowed.',
+    severity: 'error',
+    rationale:
+      'Ensures style exception hatches are explicit, time-bounded, and auditable instead of becoming permanent invisible debt.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: () => {
+      const hits: CustomCheckMatch[] = [];
+      if (!existsSync(STYLE_EXCEPTIONS_PATH)) {
+        hits.push({
+          file: STYLE_EXCEPTIONS_PATH,
+          line: 1,
+          text: 'Missing data/style-exceptions.json',
+        });
+        return hits;
+      }
+
+      const src = readFileOrEmpty(STYLE_EXCEPTIONS_PATH);
+      if (!src) {
+        hits.push({
+          file: STYLE_EXCEPTIONS_PATH,
+          line: 1,
+          text: 'Unable to read data/style-exceptions.json',
+        });
+        return hits;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(src);
+      } catch {
+        hits.push({
+          file: STYLE_EXCEPTIONS_PATH,
+          line: 1,
+          text: 'Invalid JSON in data/style-exceptions.json',
+        });
+        return hits;
+      }
+
+      const obj = parsed as { exceptions?: unknown };
+      if (!Array.isArray(obj.exceptions)) {
+        hits.push({
+          file: STYLE_EXCEPTIONS_PATH,
+          line: 1,
+          text: 'Expected top-level "exceptions" array in data/style-exceptions.json',
+        });
+        return hits;
+      }
+
+      const lines = src.split('\n');
+      const idLineNumbers = lines.flatMap((line, lineIndex) => (/\"id\"\s*:/.test(line) ? [lineIndex + 1] : []));
+      const lineForException = (index: number, candidate?: Partial<StyleExceptionEntry>): number => {
+        const fallbackLine = idLineNumbers[index] ?? idLineNumbers[0] ?? 1;
+        const id = candidate?.id;
+        if (!id || typeof id !== 'string') return fallbackLine;
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const idPattern = new RegExp(`"id"\\s*:\\s*"${escaped}"`);
+        const matchingLines = lines.flatMap((line, lineIndex) => (idPattern.test(line) ? [lineIndex + 1] : []));
+        return matchingLines[index] ?? matchingLines[0] ?? fallbackLine;
+      };
+
+      const parseIsoDateToUtcMs = (raw: string): number | null => {
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return null;
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+        const utcMs = Date.UTC(year, month - 1, day);
+        const date = new Date(utcMs);
+        if (
+          date.getUTCFullYear() !== year
+          || date.getUTCMonth() !== month - 1
+          || date.getUTCDate() !== day
+        ) {
+          return null;
+        }
+        return utcMs;
+      };
+
+      const seenIds = new Set<string>();
+      const now = new Date();
+      const todayUtcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+      obj.exceptions.forEach((entry, index) => {
+        const candidate = entry as Partial<StyleExceptionEntry> | undefined;
+        const line = lineForException(index, candidate);
+        if (!entry || typeof entry !== 'object') {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `exceptions[${index}] must be an object`,
+          });
+          return;
+        }
+
+        const missing: string[] = [];
+        for (const key of ['id', 'rule', 'file', 'reason', 'owner', 'expiresOn', 'createdAt'] as const) {
+          const value = candidate[key];
+          if (typeof value !== 'string' || value.trim().length === 0) missing.push(key);
+        }
+        if (missing.length > 0) {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `exceptions[${index}] missing required fields: ${missing.join(', ')}`,
+          });
+          return;
+        }
+        if (seenIds.has(candidate.id!)) {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `Duplicate style exception id: ${candidate.id}`,
+          });
+          return;
+        }
+        seenIds.add(candidate.id!);
+
+        const createdUtcMs = parseIsoDateToUtcMs(candidate.createdAt!);
+        const expiresUtcMs = parseIsoDateToUtcMs(candidate.expiresOn!);
+        if (createdUtcMs === null || expiresUtcMs === null) {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `exceptions[${index}] has invalid createdAt/expiresOn date format`,
+          });
+          return;
+        }
+        if (expiresUtcMs < todayUtcMs) {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `exceptions[${index}] is expired (${candidate.expiresOn})`,
+          });
+          return;
+        }
+        if (expiresUtcMs < createdUtcMs) {
+          hits.push({
+            file: STYLE_EXCEPTIONS_PATH,
+            line,
+            text: `exceptions[${index}] expiresOn is earlier than createdAt`,
+          });
+        }
+      });
+
+      return hits;
+    },
+  },
+
   // ─── Phase 5 Phase 3 — Design system enforcement hardening ───────────────────
   // Locks in the Phase 2 codemod gains. Error-severity rules below have a
   // verified zero-hit precondition (the one TemplateEditor gradient was migrated
@@ -4350,6 +4633,160 @@ export const CHECKS: Check[] = [
   // long-tail backlogs identified during Phase 3 audit (text-[Npx], raw zinc
   // utilities, hardcoded radii) — promote to error once each backlog reaches
   // zero. See docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md.
+  {
+    // Raw button control usage outside UI primitives remains the largest style
+    // drift surface. We allow file-level exceptions only through
+    // data/style-exceptions.json entries with
+    // rule="raw-button-outside-primitives".
+    name: 'Raw <button> outside primitive/infra allowlist',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// button-ok'],
+    message:
+      'Use Button/IconButton or an approved UI primitive instead of raw <button>. ' +
+      'For legitimate infra exceptions, add a time-bounded entry to data/style-exceptions.json (rule=raw-button-outside-primitives).',
+    severity: 'error',
+    rationale:
+      'Raw buttons are the highest-entropy source of style drift (variant, radius, typography, spacing, focus, and disabled-state divergence).',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const allowlistedFiles = new Set(
+        loadStyleExceptions()
+          .filter(entry => entry.rule === 'raw-button-outside-primitives')
+          .map(entry => entry.file),
+      );
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        if (file.includes('/src/components/ui/')) continue;
+        const repoRel = path.relative(ROOT, file).replaceAll('\\', '/');
+        if (allowlistedFiles.has(repoRel)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          if (!/<button\b/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// button-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Raw form control outside form primitives',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// form-control-ok'],
+    message:
+      'Use FormInput/FormSelect/FormTextarea/Checkbox/Toggle instead of visible raw input/select/textarea controls. ' +
+      'Native hidden/file/color inputs are allowed.',
+    severity: 'error',
+    rationale:
+      'Visible raw form controls bypass the shared focus ring, radius, typography, validation, and accessibility contract.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        if (file.includes('/src/components/ui/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          if (!/<(?:input|select|textarea)\b/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// form-control-ok')) continue;
+          const tagWindow = lines.slice(i, Math.min(lines.length, i + 8)).join(' ');
+          if (/<input\b[^>]*type\s*=\s*["'](?:hidden|file|color)["']/.test(tagWindow)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Static styleguide migrated note and radius debt',
+    pattern: '',
+    fileGlobs: ['styleguide.html'],
+    pathFilter: 'public/',
+    excludeLines: ['// styleguide-static-ok'],
+    message:
+      'Use static styleguide helper classes for note chrome and token names for radius prose/specimens. ' +
+      'Avoid inline note typography/spacing and stale rounded-* or multi-pixel radius literals.',
+    severity: 'error',
+    rationale:
+      'The static styleguide is the visual source of truth; stale note/radius specimens make the migration contract lie.',
+    claudeMdRef: '#token-authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('public/styleguide.html') && !file.endsWith('public' + path.sep + 'styleguide.html')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i];
+          if (hasHatch(lines, i, '// styleguide-static-ok')) continue;
+          const hasInlineNoteDebt =
+            /class="[^"]*(?:muted|dv-caption|dd-note|ar-note)[^"]*"/.test(line)
+            && /style="[^"]*(?:font-size|margin-top|line-height|padding)/.test(line);
+          const hasRadiusDebt =
+            /\b(?:[0-9]+px\s+){1,3}[0-9]+px\b|rounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/.test(line);
+          if (hasInlineNoteDebt || hasRadiusDebt) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Action CTAs that inline teal gradient/solid classes drift quickly from
+    // Button primitive semantics (focus, disabled, hover, icon sizing).
+    name: 'Raw CTA class literal outside Button/IconButton',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// cta-literal-ok'],
+    message:
+      'Use <Button> / <IconButton> for action CTAs instead of inline teal CTA class stacks. ' +
+      'Add // cta-literal-ok only for audited temporary exceptions.',
+    severity: 'error',
+    rationale:
+      'Prevents action-style drift by routing CTA styling through shared primitives instead of repeated class literals.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const ctaClassRe =
+        /(bg-gradient-to-[tlbr]{1,2}.*from-(teal|emerald)-\d{3}.*to-(teal|emerald)-\d{3}|bg-teal-\d{3}.*hover:bg-teal-\d{3})/;
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        if (file.includes('/src/components/ui/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          if (!ctaClassRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// cta-literal-ok')) continue;
+          let hasButton = false;
+          for (let j = Math.max(0, i - 8); j <= i; j += 1) {
+            if (/<button\b/.test(lines[j])) {
+              hasButton = true;
+              break;
+            }
+          }
+          if (!hasButton) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
   {
     // The rose- and pink- hue families are not in the Four Laws of Color
     // palette. Forbidden alongside violet/indigo. Ships at error because the
@@ -4382,14 +4819,9 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: ['src/components/ui/Button.tsx'],
     message: 'Use <Button variant="primary"> from src/components/ui/ instead of inlining bg-gradient-to-r from-teal-600 to-emerald-600. The primitive owns the canonical gradient, hover, disabled, and focus states.',
-    // Ships at warn — TemplateEditor + ClientDashboardTab + AiSuggested +
-    // BlueprintDetail migrations in this PR cleared the most-touched surfaces,
-    // but a full-repo --all scan still finds ~11 remaining hand-rolled gradient
-    // CTAs across older areas (ConfirmDialog, ClientChatWidget,
-    // PricingConfirmationModal, SchemaPageCard, ContentSubscriptions,
-    // FeatureFlagSettings, etc). Promote to error in a follow-up PR after a
-    // focused migration sweep.
-    severity: 'warn',
+    // Promoted warn -> error after full-repo zero-hit verification in the
+    // styleguide lock-in ratchet pass.
+    severity: 'error',
     rationale: 'Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
     customCheck: (files) => {
@@ -4480,7 +4912,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// arbitrary-text-ok'],
     message: 'Use a .t-* typography utility (.t-caption, .t-caption-sm, .t-stat-sm, etc.) instead of text-[Npx]. The .t-* classes pair font-size with the correct line-height and family. See src/index.css for the 14 utilities. Add // arbitrary-text-ok inline if the size is genuinely outside the type scale (rare).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Inline pixel text-sizes drift line-height and font-family because Tailwind only sets the size — the matching leading and font-family come from the .t-* utility wrapper.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4498,7 +4930,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use text-[var(--brand-text)], text-[var(--brand-text-bright)], or text-[var(--brand-text-muted)] instead of text-zinc-N. Raw zinc shades do not theme-switch in light mode. Add // raw-zinc-ok inline if dark-only is intentional (e.g. always-dark surfaces like Stripe Elements).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Light-theme parity requires every text color to flow through the --brand-text-* token system. Raw text-zinc-N is dark-only and produces invisible-on-light bugs.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4514,7 +4946,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use bg-[var(--surface-1)], bg-[var(--surface-2)], or bg-[var(--surface-3)] instead of bg-zinc-N. Raw zinc backgrounds do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4530,7 +4962,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// raw-zinc-ok'],
     message: 'Use border-[var(--brand-border)] or border-[var(--brand-border-hover)] instead of border-zinc-N. Raw zinc borders do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4554,7 +4986,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// asymmetric-radius-ok'],
     message: 'Use SectionCard (which applies --radius-signature-lg automatically) or var(--radius-signature) / var(--radius-signature-lg) tokens instead of inline asymmetric borderRadius values. The brand corner is centrally owned. Add // asymmetric-radius-ok inline if the surface genuinely needs a one-off corner.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4748,6 +5180,548 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'styleguide-css-must-import-public-tokens',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    message:
+      "public/styleguide.css must include @import url('/tokens.css'); without it, specimen styles can drift from canonical tokens.",
+    rationale:
+      "Token parity requires static styleguide CSS to import public/tokens.css. A missing import silently decouples styleguide rendering from canonical token values.",
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const styleguidePath = files.find(
+        f => f.endsWith(path.join('public', 'styleguide.css')) || f.endsWith('public/styleguide.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'public/styleguide.css') : null);
+      if (!styleguidePath) return hits;
+
+      let css: string;
+      try {
+        css = readFileSync(styleguidePath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      const hasTokensImport = /@import\s+url\(\s*['"]\/tokens\.css['"]\s*\)\s*;/.test(css);
+      if (!hasTokensImport) {
+        hits.push({
+          file: styleguidePath,
+          line: 1,
+          text: "missing @import url('/tokens.css') in public/styleguide.css",
+        });
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'styleguide-typography-extra-class-drift',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css contains .t-* classes not defined in src/index.css. Remove stale styleguide-only typography aliases.',
+    rationale:
+      'The styleguide must not invent extra typography utilities. Extra .t-* classes in static specimens reintroduce drift despite parity for shared class names.',
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css vs src/index.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const indexPath = files.find(
+        f => f.endsWith(path.join('src', 'index.css')) || f.endsWith('src/index.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'src/index.css') : null);
+      const styleguidePath = files.find(
+        f => f.endsWith(path.join('public', 'styleguide.css')) || f.endsWith('public/styleguide.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'public/styleguide.css') : null);
+
+      if (!indexPath || !styleguidePath) return hits;
+
+      let indexCss: string;
+      let styleguideCss: string;
+      try {
+        indexCss = readFileSync(indexPath, 'utf-8');
+        styleguideCss = readFileSync(styleguidePath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      type TypoClass = { className: string; line: number };
+      const parseTypoClasses = (css: string): TypoClass[] => {
+        const out: TypoClass[] = [];
+        const re = /\.(t-[\w-]+)\s*\{/g;
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(css)) !== null) {
+          const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          out.push({ className: match[1], line });
+        }
+        return out;
+      };
+
+      const canonical = new Set(parseTypoClasses(indexCss).map(item => item.className));
+      const styleguideClasses = parseTypoClasses(styleguideCss);
+
+      for (const item of styleguideClasses) {
+        if (!canonical.has(item.className)) {
+          hits.push({
+            file: styleguidePath,
+            line: item.line,
+            text: `.${item.className} exists in public/styleguide.css but not in src/index.css`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'global-token-declaration-outside-canonical-token-files',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    message:
+      'Token declarations (--*) are only allowed in src/tokens.css and public/tokens.css. Move declarations into src/tokens.css.',
+    rationale:
+      'Token authority requires one canonical declaration file plus the public build mirror. Declarations elsewhere create hidden drift and theme inconsistencies.',
+    claudeMdRef: 'Design System — Token authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const tokenDeclarationRe = /^\s*(--[\w-]+)\s*:/gm;
+
+      for (const file of files) {
+        if (!file.endsWith('.css')) continue;
+        const normalized = file.replaceAll('\\', '/');
+        if (normalized.endsWith('src/tokens.css') || normalized.endsWith('public/tokens.css')) continue;
+
+        let css: string;
+        try {
+          css = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        let match: RegExpExecArray | null;
+        while ((match = tokenDeclarationRe.exec(css)) !== null) {
+          const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          hits.push({
+            file,
+            line,
+            text: `token declaration ${match[1]} found outside src/tokens.css/public/tokens.css`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'src-index-css-no-token-declarations',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    displayScope: 'src/index.css',
+    message:
+      'Token declarations (--*) are not allowed in src/index.css. Move declarations to src/tokens.css and keep index.css as import + utility glue only.',
+    rationale:
+      'Token authority requires one canonical declaration source. Local declarations in src/index.css silently fork theme values from src/tokens.css.',
+    claudeMdRef: 'Design System — Token authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const indexPath = files.find(
+        f => f.endsWith(path.join('src', 'index.css')) || f.endsWith('src/index.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'src/index.css') : null);
+      if (!indexPath) return hits;
+
+      let css: string;
+      try {
+        css = readFileSync(indexPath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      const tokenDeclarationRe = /^\s*(--[\w-]+)\s*:/gm;
+      let match: RegExpExecArray | null;
+      while ((match = tokenDeclarationRe.exec(css)) !== null) {
+        const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+        hits.push({
+          file: indexPath,
+          line,
+          text: `token declaration ${match[1]} found in src/index.css`,
+        });
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'badge-color-prop-deprecation',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: [
+      'src/components/ui/Badge.tsx',
+      'src/components/ui/StatusBadge.tsx',
+    ],
+    message:
+      'Prefer Badge tone semantics over legacy color prop. Replace color={...} with tone={...} (and variant/shape when needed).',
+    rationale:
+      'The color alias is a compatibility bridge only. Continued callsite usage slows semantic badge convergence and keeps status mapping fragmented.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const badgeTagRe = /<Badge\b[\s\S]*?>/g;
+        let match: RegExpExecArray | null;
+        while ((match = badgeTagRe.exec(src)) !== null) {
+          const tagText = match[0];
+          if (!/\bcolor\s*=/.test(tagText)) continue;
+          if (/badge-color-ok/.test(tagText)) continue;
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          hits.push({
+            file,
+            line,
+            text: tagText.replace(/\s+/g, ' ').slice(0, 180),
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'interactive-div-role-button',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// button-ok'],
+    message:
+      'Button-like interactions should use Button/IconButton primitives, not <div role="button"> wrappers.',
+    rationale:
+      'Div-based interactive controls drift on keyboard/focus semantics and visual states. Primitive buttons centralize accessibility and style contracts.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (!/<div\b/.test(line)) continue;
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 10); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/\brole\s*=\s*["']button["']/.test(tagText)) continue;
+          if (hasHatch(lines, index, 'button-ok')) continue;
+          hits.push({ file, line: index + 1, text: tagText.trim().slice(0, 220) });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'primitive-override-drift-on-form-controls',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/forms/'],
+    message:
+      'Avoid heavy style overrides on form primitives. If the primitive contract is insufficient, extend the primitive instead of per-callsite restyling.',
+    rationale:
+      'Large className overrides on FormInput/FormTextarea/FormSelect/Checkbox/Toggle reintroduce raw-control drift and defeat typography/radius/tone standardization.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const primitiveStartRe = /<(FormInput|FormTextarea|FormSelect|Checkbox|Toggle)\b/;
+      const structuralOverrideRe = /\bclassName\s*=\s*["'`][^"'`]*(?:\b(?:rounded|border|bg-|focus:|px-|py-|p-[0-9]|resize-))/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const startMatch = lines[index].match(primitiveStartRe);
+          if (!startMatch) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 12); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (/form-override-ok/.test(tagText)) continue;
+          if (!structuralOverrideRe.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: `${startMatch[1]} with structural className override`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'duplicate-heading-signal',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential duplicate heading text detected in one file. Collapse repeated headings where possible; hatch intentional repeats with // duplicate-heading-ok.',
+    rationale:
+      'Styleguide parity favors concise section structure. Repeated heading text often indicates migration churn where two layout branches render the same section titles.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const headingRe = /<h([1-6])\b[^>]*>([^<]{4,})<\/h\1>/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const headingHits = new Map<string, Array<{ line: number; text: string }>>();
+        let match: RegExpExecArray | null;
+
+        while ((match = headingRe.exec(src)) !== null) {
+          const raw = match[2]
+            .replace(/&amp;/g, '&')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (raw.length < 6) continue;
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          if (hasHatch(lines, line - 1, 'duplicate-heading-ok')) continue;
+          const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          if (!normalized) continue;
+          if (!headingHits.has(normalized)) headingHits.set(normalized, []);
+          headingHits.get(normalized)!.push({ line, text: raw });
+        }
+
+        for (const matches of headingHits.values()) {
+          if (matches.length < 2) continue;
+          const exemplar = matches[0]?.text ?? 'heading';
+          for (let i = 1; i < matches.length; i += 1) {
+            hits.push({
+              file,
+              line: matches[i].line,
+              text: `duplicate heading "${exemplar}" appears ${matches.length}x in file`,
+            });
+          }
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'nested-card-density-signal',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential SectionCard nesting detected. Prefer section bands/layout wrappers over card-inside-card density; hatch intentional cases with // nested-card-ok.',
+    rationale:
+      'Nested cards tend to create crowded surfaces and spacing drift compared with styleguide specimens.',
+    claudeMdRef: '#frontend-guidance',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardTagRe = /<\/?SectionCard\b[^>]*>/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const stack: number[] = [];
+        let match: RegExpExecArray | null;
+
+        while ((match = cardTagRe.exec(src)) !== null) {
+          const token = match[0];
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          if (token.startsWith('</SectionCard')) {
+            if (stack.length > 0) stack.pop();
+            continue;
+          }
+
+          const selfClosing = /\/>$/.test(token);
+          if (stack.length > 0 && !hasHatch(lines, line - 1, 'nested-card-ok')) {
+            const outerLine = stack[stack.length - 1];
+            hits.push({
+              file,
+              line,
+              text: `SectionCard nested inside SectionCard opened at line ${outerLine}`,
+            });
+          }
+          if (!selfClosing) {
+            stack.push(line);
+          }
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'blue-action-semantic-drift',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential blue-styled action control detected. Actions should use teal semantics unless intentionally data/info-only. Hatch intentional cases with // blue-action-ok.',
+    rationale:
+      'Four Laws of Color reserve blue for read-only data semantics. Blue-styled actions often blur action-vs-data hierarchy.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const actionableStartRe = /<(Button|IconButton|button|a)\b/;
+      const blueStyleRe = /\b(?:bg|text|border)-blue-[0-9]+|\b(?:bg|text|border)-blue-[0-9]+\/[0-9]+|\btext-accent-info\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const startMatch = lines[index].match(actionableStartRe);
+          if (!startMatch) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 12); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (!blueStyleRe.test(tagText)) continue;
+          if (hasHatch(lines, index, 'blue-action-ok')) continue;
+
+          if (startMatch[1] === 'a' && !/\bhref\s*=|\bonClick\s*=/.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: `${startMatch[1]} uses blue action styling`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'status-semantic-mapping-drift',
+    severity: 'error',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential local status color/tone mapping detected. Prefer StatusBadge domain mappings (or shared status config) over per-component status maps. Hatch intentional cases with // status-semantic-ok.',
+    rationale:
+      'Local status maps drift quickly across inbox/content/schema/settings surfaces. Centralizing status semantics preserves consistent tone meanings and label behavior.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const statusMapDefRe = /\bconst\s+(statusColors?|statusMap)\s*[:=]/;
+      const statusTernaryRe = /\bconst\s+statusColor\s*=\s*.*\bstatus\b.*[?:]/;
+      const statusBadgeFnRe = /\bconst\s+statusBadge\s*=\s*\(/;
+      const statusToneTokenRe = /\b(?:bg|text|border)-(?:amber|red|orange|emerald|teal|blue|zinc)-[0-9]+|\btext-accent-(?:danger|warning|success|brand|info)\b/;
+      const statusToneLiteralRe = /['"`](?:red|amber|orange|emerald|teal|blue|zinc)['"`]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const flagged = new Set<number>();
+
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          const windowText = lines.slice(index, Math.min(lines.length, index + 24)).join(' ');
+
+          if (statusMapDefRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/<StatusBadge\b/.test(windowText)) continue;
+            if (!statusToneTokenRe.test(windowText) && !statusToneLiteralRe.test(windowText)) continue;
+            flagged.add(index + 1);
+            continue;
+          }
+
+          if (statusTernaryRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/statusCfg\?\.color/.test(line)) continue;
+            if (!statusToneLiteralRe.test(windowText)) continue;
+            flagged.add(index + 1);
+            continue;
+          }
+
+          if (statusBadgeFnRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/<StatusBadge\b/.test(windowText)) continue;
+            if (!/(<Badge\b|<span\b)/.test(windowText)) continue;
+            flagged.add(index + 1);
+          }
+        }
+
+        for (const lineNumber of [...flagged].sort((a, b) => a - b)) {
+          hits.push({
+            file,
+            line: lineNumber,
+            text: 'local status mapping detected',
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
 
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;
@@ -4768,7 +5742,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// rounded-literal-ok'],
     message: 'Use rounded-[var(--radius-sm)], rounded-[var(--radius-md)], rounded-[var(--radius-lg)], or rounded-[var(--radius-xl)] instead of raw rounded-sm/md/lg/xl. Raw radius classes do not theme-switch. Add // rounded-literal-ok inline if an exception is justified.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4799,7 +5773,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// trend-icon-ok'],
     message: 'Use <TrendBadge value={n} /> from src/components/ui/TrendBadge.tsx instead of importing TrendingUp/TrendingDown directly. The primitive consolidates color, sign handling, and zero-state.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4818,7 +5792,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// fixed-inset-ok'],
     message: 'Use <Modal> from src/components/ui/overlay/Modal.tsx instead of hand-rolling a fixed inset-0 backdrop. The primitive handles focus trap, escape key, scroll lock, and backdrop click.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
@@ -4888,7 +5862,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['chart-hex-ok', 'chartDotStroke', 'chartDotFill', 'chartGridColor', 'scoreColor(', 'url(#'],
     message:
       'Raw hex colors in chart props should use CHART_SERIES_COLORS from ui/constants.ts. Escape hatch: // chart-hex-ok',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },

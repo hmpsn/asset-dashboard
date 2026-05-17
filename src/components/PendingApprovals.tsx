@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
-import { Icon, cn } from './ui';
+import { Button, Icon, IconButton, StatusBadge, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { ApprovalBatch } from '../../shared/types/approvals';
@@ -73,11 +73,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   };
 
   const statusBadge = (status: string) => {
-    if (status === 'applied') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Applied</span>;
-    if (status === 'approved') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
-    if (status === 'partial') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
-    if (status === 'rejected') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-medium">Rejected</span>;
-    return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
+    return <StatusBadge status={status} domain="approval" fallback="neutral" />;
   };
 
   return (
@@ -103,9 +99,18 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
             <div key={batch.id}>
               <div className="flex items-center gap-2 px-3 py-2">
                 {!compact && (
-                  <button onClick={() => toggleExpand(batch.id)} className="p-0.5 hover:bg-[var(--surface-3)] rounded transition-colors">
-                    <ChevronDown className={cn('w-3 h-3 text-[var(--brand-text-muted)] transition-transform', !isExpanded && '-rotate-90')} />
-                  </button>
+                  <IconButton
+                    onClick={() => toggleExpand(batch.id)}
+                    icon={ChevronDown}
+                    label={isExpanded ? 'Collapse batch details' : 'Expand batch details'}
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'p-0.5 hover:bg-[var(--surface-3)] rounded transition-colors text-[var(--brand-text-muted)]',
+                      !isExpanded && '[&_svg]:-rotate-90',
+                    )}
+                  />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -123,19 +128,23 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                 {isConfirming ? (
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <span className="t-caption-sm text-red-400">Remove from client view?</span>
-                    <button
+                    <Button
                       onClick={() => retract(batch.id)}
                       disabled={retractMutation.isPending && retractMutation.variables === batch.id}
-                      className="px-2 py-1 rounded t-caption-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+                      variant="danger"
+                      size="sm"
+                      className="px-2 py-1 rounded t-caption-sm font-medium transition-colors disabled:opacity-50"
                     >
                       {retractMutation.isPending && retractMutation.variables === batch.id ? '...' : 'Yes'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setConfirmId(null)}
+                      variant="ghost"
+                      size="sm"
                       className="px-2 py-1 rounded t-caption-sm font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
                     >
                       No
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -145,23 +154,29 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                           <Icon as={Check} size="sm" /> Sent
                         </span>
                       ) : (
-                        <button
+                        <Button
                           onClick={() => sendReminder(batch.id)}
                           disabled={reminding === batch.id}
-                          className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                          variant="ghost"
+                          size="sm"
+                          className="px-2 py-1 rounded t-caption-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
                           title="Send reminder email to client"
+                          icon={Bell}
                         >
-                          <Icon as={Bell} size="sm" /> {reminding === batch.id ? 'Sending...' : 'Remind'}
-                        </button>
+                          {reminding === batch.id ? 'Sending...' : 'Remind'}
+                        </Button>
                       )
                     )}
-                    <button
+                    <Button
                       onClick={() => setConfirmId(batch.id)}
-                      className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                      variant="ghost"
+                      size="sm"
+                      className="px-2 py-1 rounded t-caption-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                       title="Retract — remove this from the client's view"
+                      icon={Trash2}
                     >
-                      <Icon as={Trash2} size="sm" /> Retract
-                    </button>
+                      Retract
+                    </Button>
                   </div>
                 )}
               </div>

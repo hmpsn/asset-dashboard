@@ -5,6 +5,7 @@ import {
   listPageKeywords,
   upsertPageKeyword,
 } from '../../server/page-keywords.js';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 
 let wsId = '';
 
@@ -40,7 +41,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
       pageTitle: 'SEO Services',
       primaryKeyword: 'seo services',
       secondaryKeywords: ['local seo', 'technical seo'],
-      metricsSource: 'bulk_lookup',
+      metricsSource: METRICS_SOURCE.BULK_LOOKUP,
       volume: 1200,
       difficulty: 45,
       currentPosition: 8,
@@ -54,23 +55,72 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result!.recommendations).toContain('Add FAQ section');
     expect(result!.analysisGeneratedAt).toBe('2026-04-01T10:00:00Z');
     // Strategy fields also present
-    expect(result!.metricsSource).toBe('bulk_lookup');
+    expect(result!.metricsSource).toBe(METRICS_SOURCE.BULK_LOOKUP);
     expect(result!.volume).toBe(1200);
   });
 
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {
     const result = getPageKeyword(wsId, '/services/seo');
-    expect(result!.metricsSource).toBe('bulk_lookup');
-    const validValues = ['exact', 'partial_match', 'ai_estimate', 'bulk_lookup'];
+    expect(result!.metricsSource).toBe(METRICS_SOURCE.BULK_LOOKUP);
+    const validValues = Object.values(METRICS_SOURCE);
     expect(validValues).toContain(result!.metricsSource);
   });
 
   it('multiple pages upserted via batch all appear in listPageKeywords', () => {
-    upsertPageKeyword(wsId, { workspaceId: wsId, pagePath: '/services/ppc', pageTitle: 'PPC Services', primaryKeyword: 'ppc', secondaryKeywords: [], metricsSource: 'bulk_lookup' } as any);
-    upsertPageKeyword(wsId, { workspaceId: wsId, pagePath: '/services/content', pageTitle: 'Content Services', primaryKeyword: 'content marketing', secondaryKeywords: [], metricsSource: 'bulk_lookup' } as any);
+    upsertPageKeyword(wsId, { workspaceId: wsId, pagePath: '/services/ppc', pageTitle: 'PPC Services', primaryKeyword: 'ppc', secondaryKeywords: [], metricsSource: METRICS_SOURCE.BULK_LOOKUP } as any);
+    upsertPageKeyword(wsId, { workspaceId: wsId, pagePath: '/services/content', pageTitle: 'Content Services', primaryKeyword: 'content marketing', secondaryKeywords: [], metricsSource: METRICS_SOURCE.BULK_LOOKUP } as any);
     const all = listPageKeywords(wsId);
     expect(all.length).toBeGreaterThan(0);
     expect(all.some(p => p.pagePath === '/services/ppc')).toBe(true);
     expect(all.some(p => p.pagePath === '/services/content')).toBe(true);
+  });
+
+  it('records score history only when optimization score changes', () => {
+    upsertPageKeyword(wsId, {
+      pagePath: '/history',
+      pageTitle: 'History',
+      primaryKeyword: 'history keyword',
+      secondaryKeywords: [],
+      optimizationScore: 50,
+      analysisGeneratedAt: '2026-05-01T00:00:00.000Z',
+    });
+    upsertPageKeyword(wsId, {
+      pagePath: '/history',
+      pageTitle: 'History',
+      primaryKeyword: 'history keyword',
+      secondaryKeywords: [],
+      optimizationScore: 50,
+      analysisGeneratedAt: '2026-05-02T00:00:00.000Z',
+    });
+    upsertPageKeyword(wsId, {
+      pagePath: '/history',
+      pageTitle: 'History',
+      primaryKeyword: 'history keyword',
+      secondaryKeywords: [],
+      optimizationScore: 74,
+      analysisGeneratedAt: '2026-05-03T00:00:00.000Z',
+    });
+
+    const result = getPageKeyword(wsId, '/history');
+    expect(result?.optimizationScoreHistory?.map(item => item.score)).toEqual([50, 74]);
+    expect(result?.optimizationScoreHistory?.[1]?.source).toBe('page-analysis');
+  });
+
+  it('keeps only the most recent score history snapshots per page', () => {
+    for (let i = 0; i < 30; i++) {
+      upsertPageKeyword(wsId, {
+        pagePath: '/history-retention',
+        pageTitle: 'History Retention',
+        primaryKeyword: 'history retention keyword',
+        secondaryKeywords: [],
+        optimizationScore: i + 1,
+        analysisGeneratedAt: `2026-06-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+      });
+    }
+
+    const result = getPageKeyword(wsId, '/history-retention');
+    expect(result?.optimizationScoreHistory).toHaveLength(25);
+    expect(result?.optimizationScoreHistory?.[0]?.score).toBe(6);
+    expect(result?.optimizationScoreHistory?.at(-1)?.score).toBe(30);
   });
 });

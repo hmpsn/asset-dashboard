@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, ClickableRow, IconButton, Checkbox } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -381,56 +381,71 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
         { id: 'history' as const, label: 'History', icon: Clock },
       ] as const).map(t => (
-        <button
+        <Button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
-        </button>
+        </Button>
       ))}
       <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
       {([
         { id: 'content-decay' as const, label: 'Content Health', icon: TrendingDown },
         { id: 'aeo-review' as const, label: 'AI Search Ready', icon: Sparkles },
       ] as const).map(t => (
-        <button
+        <Button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
-        </button>
+        </Button>
       ))}
       <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
-      <button
+      <Button
         onClick={() => setAuditSubTab('guide')}
-        className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+        variant="ghost"
+        size="sm"
+        className={cn('gap-1.5 px-3 py-2 t-caption font-medium border-b-2 -mb-px rounded-none', auditSubTab === 'guide' ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
       >
         <Icon as={BookOpen} size="md" />
         Guide
-      </button>
+      </Button>
     </div>
   );
 
-  if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
+  const pageHeader = (
+    <PageHeader
+      title="SEO Audit"
+      subtitle="Comprehensive SEO audit for your Webflow site."
+      icon={<Icon as={Globe} size="lg" className="text-accent-brand" />}
+    />
+  );
+
+  if (auditSubTab === 'guide') return <div>{auditTabBar}{pageHeader}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}{pageHeader}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
-    return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
+    return <div>{auditTabBar}{pageHeader}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
   }
 
   if (!hasRun) {
     return (
       <div>
         {auditTabBar}
+        {pageHeader}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
             <Icon as={Globe} size="2xl" className="text-[var(--brand-text-muted)]" />
@@ -439,21 +454,19 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)] max-w-md text-center">
             Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
           </p>
-          <button
+          <Button
             onClick={runAudit}
-            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
+            size="lg"
+            className="bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium"
           >
             Run SEO Audit
-          </button>
-          <label className="flex items-center gap-2 t-caption text-[var(--brand-text-muted)] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={!skipLinkCheck}
-              onChange={e => setSkipLinkCheck(!e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-accent-brand focus:ring-teal-500 focus:ring-offset-zinc-900" // raw-zinc-ok
-            />
-            Include dead link scan
-          </label>
+          </Button>
+          <Checkbox
+            checked={!skipLinkCheck}
+            onChange={checked => setSkipLinkCheck(!checked)}
+            label="Include dead link scan"
+            className="[&>span:last-child]:t-caption [&>span:last-child]:text-[var(--brand-text-muted)]"
+          />
         </div>
       </div>
     );
@@ -463,6 +476,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     return (
       <div>
         {auditTabBar}
+        {pageHeader}
         <LoadingState message="Analyzing site health..." />
       </div>
     );
@@ -471,6 +485,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   if (!data) return (
     <div>
       {auditTabBar}
+      {pageHeader}
       {auditError && (
         <ErrorState
           type="general"
@@ -518,6 +533,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <ErrorBoundary label="SEO Audit">
     <div className="space-y-8">
       {auditTabBar}
+      {pageHeader}
       {showNextSteps && data && (
         <NextStepsCard
           title={`Audit complete: ${(effectiveData?.errors ?? 0) + (effectiveData?.warnings ?? 0)} issues found`}
@@ -682,15 +698,19 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             <div className="t-caption font-medium text-accent-brand">Report saved! Share this link with clients:</div>
             <div className="t-caption text-[var(--brand-text-bright)] truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]">
-            <Icon as={Copy} size="sm" /> {copied ? 'Copied!' : 'Copy'}
-          </button>
+          <Button onClick={copyShareUrl} icon={Copy} size="sm" className="bg-teal-400 text-[#0f1219] hover:bg-teal-300">
+            {copied ? 'Copied!' : 'Copy'}
+          </Button>
           <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-[var(--radius-md)] hover:bg-white/10 text-accent-brand">
             <Icon as={ExternalLink} size="md" />
           </a>
-          <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss share URL">
-            <Icon as={X} size="md" className="text-[var(--brand-text)]" />
-          </button>
+          <IconButton
+            onClick={() => setShareUrl(null)}
+            icon={X}
+            label="Dismiss share URL"
+            size="sm"
+            className="hover:bg-white/10 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
+          />
         </div>
       )}
 
@@ -752,9 +772,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
           return (
             <div key={page.slug || page.page} className={cn('bg-[var(--surface-2)] border', trackBorder || 'border-[var(--brand-border)]')} style={{ borderRadius: 'var(--radius-signature)' }}>
-              <button
+              <ClickableRow
                 onClick={() => toggleExpand(page.page)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 text-left"
               >
                 {isExpanded ? (
                   <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -780,7 +800,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                   {page.issues.length === 0 && <Icon as={CheckCircle} size="md" className="text-accent-success" />}
                   <span className={cn('t-body font-bold tabular-nums', scoreColorClass(page.score))}>{page.score}</span>
                 </div>
-              </button>
+              </ClickableRow>
 
               {isExpanded && (
                 <div className="ml-8 mb-2 space-y-1">

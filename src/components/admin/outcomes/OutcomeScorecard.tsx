@@ -9,6 +9,7 @@ import {
   StatCardSkeleton,
   SectionCardSkeleton,
   Badge,
+  Button,
   scoreColor,
   scoreBgBarClass,
 } from '../../ui';
@@ -65,12 +66,14 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         title="Could not load scorecard"
         description="There was a problem loading outcome data. Try refreshing the page."
         action={
-          <button
+          <Button
             onClick={() => refetch()}
-            className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20"
           >
             Retry
-          </button>
+          </Button>
         }
       />
     );
@@ -159,7 +162,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
                     >
                       {pct}%
                     </span>
-                    <Badge label={`${cat.scored}/${cat.count}`} color="zinc" />
+                    <Badge label={`${cat.scored}/${cat.count}`} tone="zinc" />
                   </div>
                 </div>
               );

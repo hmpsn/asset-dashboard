@@ -472,7 +472,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd,
         });
-        _broadcastFn?.(workspaceId, 'content-subscription:created', { plan: contentSubPlan.plan });
+        _broadcastFn?.(workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED, { plan: contentSubPlan.plan });
         log.info(`Content subscription created: workspace=${workspaceId} plan=${contentSubPlan.plan}`);
       }
 
@@ -630,15 +630,48 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const subscription = event.data.object as Stripe.Subscription;
+
+      // Content package subscriptions are tracked in content_subscriptions and
+      // must not overwrite the platform plan subscription stored on workspace.
+      const contentSub = getContentSubscriptionByStripeId(subscription.id);
+      if (contentSub) {
+        const statusMap: Partial<Record<Stripe.Subscription.Status, ContentSubscription['status']>> = {
+          active: 'active',
+          trialing: 'active',
+          past_due: 'past_due',
+          unpaid: 'past_due',
+          incomplete: 'pending',
+          incomplete_expired: 'cancelled',
+          canceled: 'cancelled',
+          paused: 'paused',
+        };
+        const newStatus = statusMap[subscription.status];
+        if (!newStatus) {
+          log.warn({ workspaceId: contentSub.workspaceId, subscriptionId: subscription.id, status: subscription.status }, 'Unhandled content subscription Stripe status');
+          break;
+        }
+        if (newStatus !== contentSub.status) {
+          updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: newStatus });
+          _broadcastFn?.(contentSub.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED, { id: contentSub.id, status: newStatus });
+          addActivity(contentSub.workspaceId, 'content_subscription', `Content subscription status changed: ${contentSub.status} → ${newStatus}`, '', { subscriptionId: contentSub.id, stripeSubscriptionId: subscription.id });
+        }
+        break;
+      }
+
       const workspaceId = subscription.metadata?.workspaceId;
       if (!workspaceId) return;
 
       const productType = subscription.metadata?.productType;
       const newTier = productType === 'plan_premium' ? 'premium' : productType === 'plan_growth' ? 'growth' : null;
+      if (!newTier) {
+        log.info({ workspaceId, subscriptionId: subscription.id, status: subscription.status, productType }, 'Ignoring non-platform subscription event with no local content subscription');
+        break;
+      }
 
       if (subscription.status === 'active' || subscription.status === 'trialing') {
         const updates: Record<string, unknown> = { stripeSubscriptionId: subscription.id };
-        if (newTier) { updates.tier = newTier; updates.trialEndsAt = undefined; }
+        updates.tier = newTier;
+        updates.trialEndsAt = undefined;
         updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
         _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier, subscriptionStatus: subscription.status });
         log.info(`Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
@@ -646,35 +679,23 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
         addActivity(workspaceId, 'subscription_issue', `Subscription payment ${subscription.status} — please update billing`, '', { subscriptionId: subscription.id });
       }
-
-      // Sync content subscription status
-      const contentSub = getContentSubscriptionByStripeId(subscription.id);
-      if (contentSub) {
-        const statusMap: Record<string, ContentSubscription['status']> = {
-          active: 'active', trialing: 'active', past_due: 'past_due', unpaid: 'past_due', canceled: 'cancelled',
-        };
-        const newStatus = statusMap[subscription.status] || contentSub.status;
-        if (newStatus !== contentSub.status) {
-          updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: newStatus });
-          _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: newStatus });
-        }
-      }
       break;
     }
 
     case 'customer.subscription.deleted': {
       const subscription = event.data.object as Stripe.Subscription;
-      const workspaceId = subscription.metadata?.workspaceId;
-      if (!workspaceId) return;
 
       // Check if this is a content subscription
       const contentSub = getContentSubscriptionByStripeId(subscription.id);
       if (contentSub) {
         updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: 'cancelled' });
-        _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: 'cancelled' });
-        addActivity(workspaceId, 'content_subscription', 'Content subscription cancelled', '', { subscriptionId: contentSub.id });
-        log.info(`Content subscription cancelled: workspace=${workspaceId} sub=${subscription.id}`);
+        _broadcastFn?.(contentSub.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED, { id: contentSub.id, status: 'cancelled' });
+        addActivity(contentSub.workspaceId, 'content_subscription', 'Content subscription cancelled', '', { subscriptionId: contentSub.id });
+        log.info(`Content subscription cancelled: workspace=${contentSub.workspaceId} sub=${subscription.id}`);
       } else {
+        const workspaceId = subscription.metadata?.workspaceId;
+        if (!workspaceId) return;
+
         // Downgrade to free tier (platform plan)
         updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
         _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free' });
@@ -691,7 +712,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
       // Reset content subscription period on renewal using actual invoice billing period
       const contentSub = getContentSubscriptionByStripeId(subId);
-      const workspaceId = invoice.metadata?.workspaceId ?? contentSub?.workspaceId;
+      const workspaceId = contentSub?.workspaceId ?? invoice.metadata?.workspaceId;
       if (!workspaceId) return;
       if (contentSub) {
         const periodStart = invoice.period_start
@@ -702,8 +723,8 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         resetPeriod(contentSub.workspaceId, contentSub.id, periodStart, periodEnd);
         updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: 'active' });
-        _broadcastFn?.(workspaceId, 'content-subscription:renewed', { id: contentSub.id });
-        log.info(`Content subscription renewed: workspace=${workspaceId} sub=${subId}`);
+        _broadcastFn?.(contentSub.workspaceId, WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED, { id: contentSub.id });
+        log.info(`Content subscription renewed: workspace=${contentSub.workspaceId} sub=${subId}`);
       }
 
       addActivity(workspaceId, 'invoice_paid', `Invoice paid: $${((invoice.amount_paid || 0) / 100).toFixed(2)}`, '', { invoiceId: invoice.id, subscriptionId: subId });

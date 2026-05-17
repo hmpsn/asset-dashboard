@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronUp, ChevronRight, ArrowUpDown, FilterX } from 'lucide-react';
-import { Badge, EmptyState, SectionCard } from './ui/index';
+import { Badge, Button, EmptyState, IconButton, SectionCard } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters';
 import { matchesFilters, sortItems } from '../lib/roadmapFilters';
@@ -70,27 +70,27 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
             <th className={thStatic} style={{ width: '52px' }}>#</th>
             <th className={thStatic} style={{ minWidth: '220px' }}>Title</th>
             <th className="px-3 py-2" aria-sort={ariaSortFor('priority')}>
-              <button type="button" className={sortBtn} onClick={() => handleSort('priority')}>
+              <Button type="button" variant="ghost" size="sm" className={sortBtn} onClick={() => handleSort('priority')}>
                 Priority <SortIcon col="priority" sortKey={sortKey} sortDir={sortDir} />
-              </button>
+              </Button>
             </th>
             <th className="px-3 py-2" aria-sort={ariaSortFor('status')}>
-              <button type="button" className={sortBtn} onClick={() => handleSort('status')}>
+              <Button type="button" variant="ghost" size="sm" className={sortBtn} onClick={() => handleSort('status')}>
                 Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
-              </button>
+              </Button>
             </th>
             <th className={thStatic}>Sprint</th>
             <th className={thStatic}>Feature</th>
             <th className={thStatic}>Tags</th>
             <th className="px-3 py-2" aria-sort={ariaSortFor('est')}>
-              <button type="button" className={sortBtn} onClick={() => handleSort('est')}>
+              <Button type="button" variant="ghost" size="sm" className={sortBtn} onClick={() => handleSort('est')}>
                 Est <SortIcon col="est" sortKey={sortKey} sortDir={sortDir} />
-              </button>
+              </Button>
             </th>
             <th className="px-3 py-2" aria-sort={ariaSortFor('createdAt')}>
-              <button type="button" className={sortBtn} onClick={() => handleSort('createdAt')}>
+              <Button type="button" variant="ghost" size="sm" className={sortBtn} onClick={() => handleSort('createdAt')}>
                 Added <SortIcon col="createdAt" sortKey={sortKey} sortDir={sortDir} />
-              </button>
+              </Button>
             </th>
           </tr>
         </thead>
@@ -105,37 +105,37 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
               <Fragment key={key}>
                 <tr className="hover:bg-[var(--surface-3)] transition-colors">
                   <td className="px-2 py-2.5">
-                    <button
-                      type="button"
+                    <IconButton
                       onClick={() => setExpandedKey(isExpanded ? null : key)}
                       aria-expanded={isExpanded}
-                      aria-label={isExpanded ? `Collapse details for ${item.title}` : `Expand details for ${item.title}`}
-                      className="p-1 rounded hover:bg-[var(--surface-3)] focus:outline-none focus:ring-1 focus:ring-teal-400/50"
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text)]" />
-                        : <ChevronRight className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />}
-                    </button>
+                      label={isExpanded ? `Collapse details for ${item.title}` : `Expand details for ${item.title}`}
+                      icon={isExpanded ? ChevronDown : ChevronRight}
+                      size="sm"
+                      variant="ghost"
+                      className={isExpanded ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}
+                    />
                   </td>
                   <td className="px-3 py-2.5 font-mono t-caption-sm text-[var(--brand-text-muted)]">#{item.id}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => onToggleStatus(item.id, item.sprintId)}
-                        className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-teal-400/50 rounded"
+                        variant="ghost"
+                        size="sm"
+                        className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-teal-400/50 rounded p-0 min-h-0 h-auto"
                         aria-label={`Cycle status (currently ${item.status.replace('_', ' ')})`}
                         title={`Status: ${item.status} — click to cycle`}
                       >
                         {STATUS_ICON[item.status]}
-                      </button>
+                      </Button>
                       <span className={item.status === 'done' ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'}>
                         {item.title}
                       </span>
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <Badge label={pb.label} color={pb.color} />
+                    <Badge label={pb.label} tone={pb.color} />
                   </td>
                   <td className="px-3 py-2.5 text-[var(--brand-text)] capitalize">
                     {item.status.replace('_', ' ')}

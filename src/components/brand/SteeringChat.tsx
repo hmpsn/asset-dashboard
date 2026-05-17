@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { Icon, Button, cn } from '../ui';
+import { Icon, Button, cn, FormInput } from '../ui';
 
 export interface SteeringChatProps {
   content: string;
@@ -104,15 +104,15 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
             <label htmlFor="steering-direction" className="sr-only">
               Refinement direction
             </label>
-            <input
+            <FormInput
               ref={inputRef}
               id="steering-direction"
               type="text"
               value={direction}
-              onChange={e => setDirection(e.target.value)}
+              onChange={setDirection}
               disabled={refining}
               placeholder='e.g. "Make it more conversational"'
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <Button
               type="submit"
@@ -134,17 +134,19 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
       {/* Version history */}
       {versions.length > 0 && (
         <div>
-          <button
+          <Button
             type="button"
             onClick={() => setHistoryOpen(prev => !prev)}
-            className="flex items-center gap-2 t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide hover:text-[var(--brand-text-bright)] transition-colors w-full text-left"
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-2 t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide hover:text-[var(--brand-text-bright)] transition-colors w-full text-left px-0 py-0 h-auto justify-start"
             aria-expanded={historyOpen}
             aria-controls="version-history-list"
           >
             <Icon as={History} size="sm" />
             <span>Version History ({versions.length})</span>
             {historyOpen ? <Icon as={ChevronUp} size="sm" className="ml-auto" /> : <Icon as={ChevronDown} size="sm" className="ml-auto" />}
-          </button>
+          </Button>
 
           {historyOpen && (
             <ul
@@ -157,10 +159,12 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                 const isActive = idx === selectedVersionIndex;
                 return (
                   <li key={idx} role="option" aria-selected={isActive}>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => { onSelectVersion(idx); setSelectedVersionIndex(idx); }}
                       title={v.steeringNotes}
+                      variant="ghost"
+                      size="sm"
                       className={cn(
                         'w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-colors flex items-start gap-3',
                         isActive
@@ -182,7 +186,7 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                       {isActive && (
                         <span className="shrink-0 t-caption text-teal-400 font-medium self-center">active</span>
                       )}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

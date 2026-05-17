@@ -34,6 +34,38 @@ describe('SchemaGeneratorSetup', () => {
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
+  it('suppresses the business profile callout for explicit non-local SaaS intent', () => {
+    render(
+      <MemoryRouter>
+        <SchemaBusinessProfileCallout
+          businessProfile={{ address: { street: '', city: '' } }}
+          localBusinessIntent="non-local-saas"
+          dismissed={false}
+          workspaceId="workspace-1"
+          onDismiss={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('still shows the business profile callout for local intent', () => {
+    render(
+      <MemoryRouter>
+        <SchemaBusinessProfileCallout
+          businessProfile={{ address: { street: '', city: '' } }}
+          localBusinessIntent="local"
+          dismissed={false}
+          workspaceId="workspace-1"
+          onDismiss={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Your business profile is incomplete');
+  });
+
   it('wires generator hero action to scan', () => {
     const onRunScan = vi.fn();
 

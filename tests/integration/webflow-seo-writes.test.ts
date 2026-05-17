@@ -43,6 +43,8 @@ import {
 } from '../mocks/anthropic.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { listActivity } from '../../server/activity-log.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { listSuggestions, saveSuggestion } from '../../server/seo-suggestions.js';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,12 @@ import { listSuggestions, saveSuggestion } from '../../server/seo-suggestions.js
 setupWebflowMocks();
 setupOpenAIMocks();
 setupAnthropicMocks();
+
+vi.mock('../../server/broadcast.js', () => ({
+  setBroadcast: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastToWorkspace: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // HTTP helper — POST/GET against a live http.Server wrapping createApp()
@@ -108,6 +116,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   let stopServer: () => void;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     resetWebflowMocks();
     resetOpenAIMocks();
     resetAnthropicMocks();
@@ -387,6 +396,16 @@ describe('Webflow SEO extracted route coverage', () => {
 
     expect(titleSelect.status).toBe(200);
     expect(descSelect.status).toBe(200);
+    expect(vi.mocked(broadcastToWorkspace)).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'page-state:updated',
+      expect.objectContaining({ pageId: 'page-shared', source: 'seo-suggestion-selected' }),
+    );
+    expect(listActivity(ws.workspaceId).some(entry => (
+      entry.type === 'seo_updated'
+      && entry.title.includes('Selected SEO')
+      && entry.metadata?.pageId === 'page-shared'
+    ))).toBe(true);
 
     const { status, body } = await postJson(baseUrl, `/api/webflow/seo-suggestions/${ws.workspaceId}/apply`, {
       suggestionIds: [titleSuggestion.id, descSuggestion.id],
@@ -429,6 +448,43 @@ describe('Webflow SEO extracted route coverage', () => {
     expect(results[0]?.applied).toBe(false);
     expect(results[0]?.error).toMatch(/500|Webflow down/);
     expect(listSuggestions(ws.workspaceId).map(s => s.id)).toContain(suggestion.id);
+  });
+
+  it('dismisses suggestions with cache broadcast and activity context', async () => {
+    const suggestion = saveSuggestion({
+      workspaceId: ws.workspaceId,
+      siteId: ws.webflowSiteId,
+      pageId: 'page-dismiss',
+      pageTitle: 'Dismiss Page',
+      pageSlug: 'dismiss-page',
+      field: 'description',
+      currentValue: 'Old description',
+      variations: ['New description A', 'New description B', 'New description C'],
+    });
+
+    const res = await fetch(`${baseUrl}/api/webflow/seo-suggestions/${ws.workspaceId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suggestionIds: [suggestion.id] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(broadcastToWorkspace)).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'page-state:updated',
+      expect.objectContaining({
+        pageIds: ['page-dismiss'],
+        fields: ['description'],
+        source: 'seo-suggestions-dismissed',
+      }),
+    );
+    expect(listActivity(ws.workspaceId).some(entry => {
+      const suggestionIds = entry.metadata?.suggestionIds;
+      return entry.type === 'seo_updated'
+        && entry.title === 'Dismissed 1 SEO suggestion'
+        && Array.isArray(suggestionIds)
+        && suggestionIds.includes(suggestion.id);
+    })).toBe(true);
   });
 
   it('fetches page HTML from the live domain and returns extracted SEO metadata', async () => {

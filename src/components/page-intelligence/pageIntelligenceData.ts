@@ -1,4 +1,5 @@
 import type { UnifiedPage } from '../../../shared/types/page-join.js';
+import type { PageOptimizationScoreSnapshot } from '../../../shared/types/keywords.js';
 import { opportunityScore } from './pageIntelligenceDisplay';
 import type { KeywordData, SortBy, SortDir } from './pageIntelligenceTypes';
 
@@ -7,6 +8,32 @@ export interface FixQueueItem {
   score: number;
   impressions: number;
   impact: number;
+}
+
+export interface ScoreTrendSummary {
+  previous: number;
+  current: number;
+  delta: number;
+  direction: 'up' | 'down' | 'flat';
+}
+
+/**
+ * Compares the current score with the most recent distinct prior score.
+ * Repeated identical snapshots are ignored so the UI only shows meaningful movement.
+ */
+export function summarizeScoreTrend(history: PageOptimizationScoreSnapshot[] | undefined): ScoreTrendSummary | null {
+  if (!history || history.length < 2) return null;
+  const ordered = [...history].sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+  const current = ordered[ordered.length - 1]?.score;
+  const previous = [...ordered].reverse().find(item => item.score !== current)?.score;
+  if (current == null || previous == null) return null;
+  const delta = current - previous;
+  return {
+    previous,
+    current,
+    delta,
+    direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
+  };
 }
 
 export function buildEffectiveAnalyses(

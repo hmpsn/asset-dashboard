@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
-import { Icon, Button } from '../ui';
+import { Badge, Icon, Button, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { BusinessProfile } from './types';
 
@@ -79,14 +79,6 @@ export function BrandTab({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Page header */}
-      <div>
-        <h2 className="t-h2 text-[var(--brand-text-bright)]">Business Profile</h2>
-        <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
-          Keep your business information up to date. This helps us personalize your SEO strategy.
-        </p>
-      </div>
-
       {/* ── Business Profile Panel (editable) ── */}
       <ErrorBoundary label="Business Profile">
         <SectionCard
@@ -94,12 +86,14 @@ export function BrandTab({
           titleIcon={<Icon as={Building2} size="md" className="text-accent-brand" />}
           action={
             !editing ? (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setEditing(true)}
-                className="t-caption text-accent-brand hover:text-accent-brand transition-colors flex items-center gap-1"
+                className="gap-1 px-0 py-0 t-caption text-accent-brand hover:text-accent-brand"
               >
                 Edit <Icon as={ChevronRight} size="sm" />
-              </button>
+              </Button>
             ) : null
           }
         >
@@ -171,20 +165,20 @@ export function BrandTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Phone</label>
-                  <input
+                  <FormInput
                     type="tel"
                     value={form.phone ?? ''}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, phone: value }))}
                     placeholder={industry ? `e.g. +1 (555) 000-0000` : '+1 (555) 000-0000'}
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Business Email</label>
-                  <input
+                  <FormInput
                     type="email"
                     value={form.email ?? ''}
-                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, email: value }))}
                     placeholder="hello@yourbusiness.com"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
@@ -193,10 +187,10 @@ export function BrandTab({
 
               <div>
                 <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Street Address</label>
-                <input
+                <FormInput
                   type="text"
                   value={form.address?.street ?? ''}
-                  onChange={e => updateAddress('street', e.target.value)}
+                  onChange={value => updateAddress('street', value)}
                   placeholder="123 Main St"
                   className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                 />
@@ -205,30 +199,30 @@ export function BrandTab({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="col-span-2">
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">City</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.city ?? ''}
-                    onChange={e => updateAddress('city', e.target.value)}
+                    onChange={value => updateAddress('city', value)}
                     placeholder="City"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">State</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.state ?? ''}
-                    onChange={e => updateAddress('state', e.target.value)}
+                    onChange={value => updateAddress('state', value)}
                     placeholder="CA"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">ZIP</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.zip ?? ''}
-                    onChange={e => updateAddress('zip', e.target.value)}
+                    onChange={value => updateAddress('zip', value)}
                     placeholder="90210"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
@@ -238,20 +232,20 @@ export function BrandTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Country</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.country ?? ''}
-                    onChange={e => updateAddress('country', e.target.value)}
+                    onChange={value => updateAddress('country', value)}
                     placeholder="United States"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Hours</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.openingHours ?? ''}
-                    onChange={e => setForm(p => ({ ...p, openingHours: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, openingHours: value }))}
                     placeholder="Mon-Fri 9am–5pm"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
@@ -265,12 +259,13 @@ export function BrandTab({
                 <Button onClick={handleSave} disabled={saving} loading={saving}>
                   {saving ? 'Saving…' : 'Save Changes'}
                 </Button>
-                <button
+                <Button
+                  variant="ghost"
                   onClick={handleCancel}
-                  className="px-4 py-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] t-caption transition-colors"
+                  className="rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -282,7 +277,7 @@ export function BrandTab({
         <SectionCard
           title="Brand Positioning"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand border border-teal-500/20">AI-generated</span>}
+          titleExtra={<Badge label="AI-generated" tone="teal" variant="outline" shape="pill" size="sm" />}
         >
           {brandVoiceSummary ? (
             <div className="space-y-3">

@@ -9,6 +9,8 @@
 export const METRICS_SOURCE = {
   /** Exact keyword match from SEMRush bulk lookup. */
   EXACT: 'exact',
+  /** Page-specific provider data from a URL-level organic keyword report. */
+  URL_LEVEL: 'url_level',
   /** Partial/fuzzy match from SEMRush. */
   PARTIAL_MATCH: 'partial_match',
   /** SEMRush bulk domain organic data lookup. */
@@ -18,3 +20,19 @@ export const METRICS_SOURCE = {
 } as const;
 
 export type MetricsSource = typeof METRICS_SOURCE[keyof typeof METRICS_SOURCE];
+
+export interface UrlLevelKeyword {
+  keyword: string;
+  position: number;
+  volume: number;
+  difficulty: number;
+  cpc: number;
+  traffic?: number;
+  url?: string;
+}
+
+export interface PageOptimizationScoreSnapshot {
+  score: number;
+  recordedAt: string;
+  source: 'page-analysis' | 'bulk-analysis' | 'strategy' | 'unknown';
+}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Loader2, Mic, Plus, Trash2 } from 'lucide-react';
 import { voice } from '../../../api/brand-engine';
 import type { VoiceSample, VoiceSampleContext } from '../../../../shared/types/brand-engine';
-import { Button, ConfirmDialog, EmptyState, Icon, SectionCard } from '../../ui';
+import { Button, ConfirmDialog, EmptyState, Icon, SectionCard, FormSelect, FormTextarea } from '../../ui';
 import { useToast } from '../../Toast';
 import { CONTEXT_TAG_COLORS, CONTEXT_TAG_OPTIONS } from './voiceTabModel';
 
@@ -86,27 +86,24 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
             <form onSubmit={handleAdd} className="space-y-4">
               <div className="space-y-1">
                 <label htmlFor="sample-context-tag" className="t-caption text-[var(--brand-text-muted)]">Context tag</label>
-                <select
+                <FormSelect
                   id="sample-context-tag"
                   value={contextTag}
-                  onChange={e => setContextTag(e.target.value as VoiceSampleContext)}
+                  onChange={value => setContextTag(value as VoiceSampleContext)}
+                  options={CONTEXT_TAG_OPTIONS}
                   className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                >
-                  {CONTEXT_TAG_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="space-y-1">
                 <label htmlFor="sample-content" className="t-caption text-[var(--brand-text-muted)]">Content</label>
-                <textarea
+                <FormTextarea
                   id="sample-content"
                   value={content}
-                  onChange={e => setContent(e.target.value)}
+                  onChange={setContent}
                   placeholder="Paste an example of on-brand copy..."
                   rows={4}
-                  className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
+                  className="w-full"
                 />
               </div>
 
@@ -163,10 +160,12 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
                   {sample.contextTag && <ContextTagBadge tag={sample.contextTag} />}
                   <p className="text-sm text-[var(--brand-text)] leading-relaxed">{sample.content}</p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => setConfirmDeleteId(sample.id)}
                   disabled={deletingId === sample.id}
+                  variant="ghost"
+                  size="sm"
                   aria-label="Delete sample"
                   className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
                 >
@@ -175,7 +174,7 @@ export function SamplesSection({ workspaceId, samples, onChanged }: SamplesSecti
                   ) : (
                     <Icon as={Trash2} size="md" />
                   )}
-                </button>
+                </Button>
               </div>
             ))}
           </div>

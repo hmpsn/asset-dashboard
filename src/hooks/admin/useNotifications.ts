@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard, Layers,
 } from 'lucide-react';
-import { workspaceOverview, anomalies as anomaliesApi, churnSignals } from '../../api/misc';
+import { anomalies as anomaliesApi, churnSignals } from '../../api/misc';
+import { workspaceOverview } from '../../api/platform';
 import { queryKeys } from '../../lib/queryKeys';
 
 export interface NotificationItem {

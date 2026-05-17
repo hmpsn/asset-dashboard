@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Button, Icon } from '../../ui';
+import { Button, IconButton } from '../../ui';
 import { kdFraming } from '../../../lib/kdFraming.js';
 import {
   ROLE_DISPLAY_LABELS,
@@ -87,14 +87,14 @@ export function StrategyKeywordDrawer({
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Close keyword detail"
-            className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
+          <IconButton
+            icon={X}
+            label="Close keyword detail"
+            size="sm"
+            variant="ghost"
+            className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]"
             onClick={closeDrawer}
-          >
-            <Icon as={X} size="sm" />
-          </button>
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-5 px-4 py-4">
@@ -187,15 +187,16 @@ export function StrategyKeywordDrawer({
           </div>
 
           <div>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start px-0 py-0 flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors bg-transparent hover:bg-transparent"
               onClick={() => setDrawerEvidenceOpen(v => !v)}
               aria-expanded={drawerEvidenceOpen}
             >
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${drawerEvidenceOpen ? '' : '-rotate-90'}`} />
               See the numbers
-            </button>
+            </Button>
             {drawerEvidenceOpen && (
               <div className="mt-2 flex flex-col gap-2.5">
                 {!unenriched && (
@@ -236,9 +237,10 @@ export function StrategyKeywordDrawer({
 
         <div className="px-4 py-3 border-t border-[var(--brand-border)] flex-shrink-0">
           {isConfirmed ? (
-            <button
-              type="button"
-              className="t-caption text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-50"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-0 py-0 t-caption text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-50 bg-transparent hover:bg-transparent"
               disabled={isRemoving}
               onClick={async () => {
                 await removePriorityKeyword(drawerRow);
@@ -246,7 +248,7 @@ export function StrategyKeywordDrawer({
               }}
             >
               {isRemoving ? 'Removing…' : 'Remove from strategy'}
-            </button>
+            </Button>
           ) : (
             <div className="flex items-center gap-3">
               <Button
@@ -258,14 +260,15 @@ export function StrategyKeywordDrawer({
               >
                 Add to strategy
               </Button>
-              <button
-                type="button"
-                className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-40"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="px-0 py-0 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-40 bg-transparent hover:bg-transparent"
                 disabled={isLoadingFeedback(drawerRow.label)}
                 onClick={async () => { await submitFeedback(drawerRow.label, 'declined', 'suggestion'); closeDrawer(); }}
               >
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
         </div>

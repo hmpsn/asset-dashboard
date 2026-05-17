@@ -1,9 +1,11 @@
 import type { SeoEditState, SeoEditorPage } from './seoEditorTypes';
+import { resolvePagePath } from '../../lib/pathUtils';
 
 export interface SeoApprovalItem {
   pageId: string;
   pageTitle: string;
   pageSlug: string;
+  publishedPath?: string | null;
   field: 'seoTitle' | 'seoDescription';
   currentValue: string;
   proposedValue: string;
@@ -11,7 +13,6 @@ export interface SeoApprovalItem {
 
 interface SeoFilterAndSortOptions {
   search: string;
-  showCmsOnly: boolean;
   metadataRecommendationCountByPageId: Map<string, number>;
 }
 
@@ -26,6 +27,7 @@ export function buildSeoApprovalItemsForPage(
   const currentTitle = page.seo?.title ?? '';
   const currentDesc = page.seo?.description ?? '';
   const pageSlug = page.slug ?? '';
+  const publishedPath = resolvePagePath(page);
   const items: SeoApprovalItem[] = [];
 
   if (proposedTitle !== currentTitle) {
@@ -33,6 +35,7 @@ export function buildSeoApprovalItemsForPage(
       pageId: page.id,
       pageTitle: page.title,
       pageSlug,
+      publishedPath,
       field: 'seoTitle',
       currentValue: currentTitle,
       proposedValue: proposedTitle,
@@ -43,6 +46,7 @@ export function buildSeoApprovalItemsForPage(
       pageId: page.id,
       pageTitle: page.title,
       pageSlug,
+      publishedPath,
       field: 'seoDescription',
       currentValue: currentDesc,
       proposedValue: proposedDesc,
@@ -81,7 +85,6 @@ export function filterAndSortSeoPages(
 
   return pages
     .filter((page) => {
-      if (options.showCmsOnly && page.source !== 'cms') return false;
       if (!query) return true;
       return page.title.toLowerCase().includes(query) || (page.slug || '').toLowerCase().includes(query);
     })

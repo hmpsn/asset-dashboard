@@ -4,7 +4,7 @@ import { useActionQueue } from '../../hooks/admin/useActionQueue.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { Icon } from '../ui/index.js';
+import { Icon, Button, ClickableRow, FormInput, StatusBadge } from '../ui/index.js';
 import { put } from '../../api/client.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import { AlertTriangle, Clock, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -13,14 +13,6 @@ import type { AnalyticsInsight } from '../../../shared/types/analytics.js';
 interface Props {
   workspaceId: string;
 }
-
-// Severity badge colors following Four Laws of Color
-const severityBadge = {
-  critical: 'bg-red-500/8 text-accent-danger border-red-500/20',
-  warning: 'bg-amber-500/8 text-accent-warning border-amber-500/20',
-  opportunity: 'bg-blue-500/10 text-accent-info border-blue-500/20',
-  positive: 'bg-emerald-500/10 text-accent-success border-emerald-500/20',
-} as const;
 
 export function ActionQueue({ workspaceId }: Props) {
   const queryClient = useQueryClient();
@@ -65,20 +57,17 @@ export function ActionQueue({ workspaceId }: Props) {
       <div className="space-y-2">
         {items.map(item => {
           const isExpanded = expandedId === item.id;
-          const sev = item.severity as keyof typeof severityBadge;
-          const badgeClass = severityBadge[sev] ?? severityBadge.warning;
           const note = noteInputs[item.id] ?? '';
 
           return (
             <div key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
               {/* Header row */}
-              <button
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
+              <ClickableRow
+                active={isExpanded}
+                className="flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] bg-transparent"
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
-                  {item.severity}
-                </span>
+                <StatusBadge status={item.severity} domain="severity" variant="outline" shape="pill" size="sm" fallback="neutral" className="font-semibold uppercase shrink-0" />
                 <span className="t-caption-sm text-[var(--brand-text-bright)] flex-1 text-left truncate">
                   {item.pageTitle ?? item.pageId ?? 'Unknown page'}
                 </span>
@@ -91,7 +80,7 @@ export function ActionQueue({ workspaceId }: Props) {
                 ) : (
                   <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)] shrink-0" />
                 )}
-              </button>
+              </ClickableRow>
 
               {/* Expanded resolution panel */}
               {isExpanded && (
@@ -102,32 +91,36 @@ export function ActionQueue({ workspaceId }: Props) {
                   </p>
 
                   {/* Note input */}
-                  <input
+                  <FormInput
                     type="text"
                     placeholder="Add a resolution note (optional)..."
                     value={note}
-                    onChange={e => setNoteInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                    onChange={value => setNoteInputs(prev => ({ ...prev, [item.id]: value }))}
                     className="w-full t-caption-sm bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
                   />
 
                   {/* Resolution buttons — teal for actions */}
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'in_progress', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+                      variant="ghost"
+                      size="sm"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
                     >
                       <Clock className="w-3 h-3" />
                       In Progress
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'resolved', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 text-accent-brand hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
+                      variant="ghost"
+                      size="sm"
+                      className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 text-accent-brand hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
                     >
                       <CheckCircle className="w-3 h-3" />
                       Mark Resolved
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

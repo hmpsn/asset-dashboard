@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
-import { PageHeader, EmptyState, Icon, cn } from './ui';
-import { features as featuresApi } from '../api/misc';
+import { Button, PageHeader, EmptyState, FormInput, Icon, cn } from './ui';
+import { features as featuresApi } from '../api/platform';
 import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
 import { CATEGORY_LABELS as catLabels, PAIN_POINT_LABELS as ppLabels } from '../../shared/types/features';
@@ -124,33 +124,37 @@ export default function FeatureLibrary() {
       <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             placeholder="Search features..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
+            onChange={setSearch}
+            className="w-full pl-9 pr-3 placeholder:text-[var(--brand-text-dim)]"
           />
         </div>
         <div className="flex rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
-          <button
+          <Button
             onClick={() => setView('painPoint')}
+            variant="secondary"
+            size="sm"
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
               view === 'painPoint' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Pain Point
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setView('category')}
+            variant="secondary"
+            size="sm"
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
               view === 'category' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
             )}
           >
             By Platform Area
-          </button>
+          </Button>
         </div>
       </div>
 

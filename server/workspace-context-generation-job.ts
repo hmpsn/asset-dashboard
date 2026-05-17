@@ -89,6 +89,7 @@ async function generateWorkspaceContextResult(type: WorkspaceContextJobType, wor
 
   if (type === BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION) {
     const aiResult = await callAI({
+      operation: 'knowledge-base-gen',
       provider: 'openai',
       model: 'gpt-5.4',
       system: 'You are a business analyst. Given scraped website content, extract a structured knowledge base that an AI content writer and chatbot can use to understand this business. Be specific and factual — only include information that is clearly stated or strongly implied on the website.',
@@ -135,7 +136,6 @@ Be concise but specific. Use bullet points. Only include information actually fo
       }],
       maxTokens: 2000,
       temperature: 0.3,
-      feature: 'knowledge-base-gen',
       workspaceId,
       timeoutMs: 90_000,
     });
@@ -144,6 +144,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
 
   if (type === BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION) {
     const aiResult = await callAI({
+      operation: 'brand-voice-gen',
       provider: 'openai',
       model: 'gpt-5.4',
       system: 'You are a brand strategist and copywriting expert. Given scraped website content, analyze the writing style, tone, and voice patterns used across the site. Be specific and evidence-based — only describe patterns you actually observe in the content.',
@@ -185,7 +186,6 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
       }],
       maxTokens: 2000,
       temperature: 0.4,
-      feature: 'brand-voice-gen',
       workspaceId,
       timeoutMs: 90_000,
     });
@@ -193,6 +193,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
   }
 
   const aiResult = await callAI({
+    operation: 'personas-gen',
     provider: 'openai',
     model: 'gpt-5.4',
     system: 'You are a marketing strategist. Given scraped website content, identify the distinct audience segments this business targets. Be specific and evidence-based — only identify personas that are clearly implied by the website\'s messaging, services, case studies, or content.',
@@ -224,7 +225,6 @@ Rules:
     }],
     maxTokens: 2500,
     temperature: 0.4,
-    feature: 'personas-gen',
     workspaceId,
     timeoutMs: 90_000,
   });

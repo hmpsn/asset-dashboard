@@ -179,6 +179,27 @@ describe('extractPageData', () => {
     });
     expect(data.publisher).toEqual({ name: 'Acme Studio', logoUrl: undefined });
   });
+
+  it('uses only safe workspace logo URLs and records logo evidence', () => {
+    const safe = extractPageData({
+      pageMeta: { title: 'T', slug: 'x', publishedPath: '/' },
+      html: '<html></html>',
+      baseUrl,
+      workspace: { name: 'Test', publisherLogoUrl: 'https://cdn.example.com/logo.svg', businessProfile: null, defaultLocale: 'en' },
+    });
+    expect(safe.publisher.logoUrl).toBe('https://cdn.example.com/logo.svg');
+    expect(safe.fieldEvidence).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: 'logo', source: 'business-profile', status: 'resolved' }),
+    ]));
+
+    const unsafe = extractPageData({
+      pageMeta: { title: 'T', slug: 'x', publishedPath: '/' },
+      html: '<html></html>',
+      baseUrl,
+      workspace: { name: 'Test', publisherLogoUrl: 'javascript:alert(1)', businessProfile: null, defaultLocale: 'en' },
+    });
+    expect(unsafe.publisher.logoUrl).toBeUndefined();
+  });
 });
 
 describe('extractPageData — article quality hardening', () => {
@@ -274,5 +295,127 @@ describe('extractPageData — article quality hardening', () => {
       html: '<article><p>Body.</p></article>',
     });
     expect(fallback.author).toBeUndefined();
+  });
+});
+
+describe('extractPageData — serviceType hardening', () => {
+  it('keeps mapped serviceProfile serviceType and serviceName authoritative when present', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Swish Services Invisalign',
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+        serviceProfile: {
+          serviceType: 'Invisalign',
+          serviceName: 'Invisalign Treatment',
+        },
+      },
+    });
+    expect(out.serviceType).toBe('Invisalign');
+    expect(out.serviceName).toBe('Invisalign Treatment');
+  });
+
+  it('normalizes serviceType from visible title before slug fallback', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Placeholder',
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+      },
+      html: '<html><body><main><h1>Swish Services Invisalign</h1></main></body></html>',
+    });
+    expect(out.serviceType).toBe('Invisalign');
+  });
+
+  it('strips provider and SEO location context from service labels', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Invisalign at Swish Dental | Austin, Houston & San Antonio',
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+      },
+      workspace: { ...baseInput.workspace, name: 'Swish Dental' },
+    });
+    expect(out.serviceType).toBe('Invisalign');
+    expect(out.serviceName).toBe('Invisalign');
+  });
+
+  it('derives clean serviceName from service detail titles when no CMS mapping exists', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Preventative Dentistry at Swish Dental | Austin, Houston & San Antonio',
+        slug: 'preventative-dentistry',
+        publishedPath: '/services/preventative-dentistry',
+      },
+      workspace: { ...baseInput.workspace, name: 'Swish Dental' },
+    });
+    expect(out.serviceType).toBe('Preventative Dentistry');
+    expect(out.serviceName).toBe('Preventative Dentistry');
+  });
+
+  it('cleans service slug prefixes when title candidates are unavailable', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: '',
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+      },
+      html: '<html><body></body></html>',
+      workspace: { ...baseInput.workspace, name: 'Swish Dental' },
+    });
+    expect(out.serviceType).toBe('Invisalign');
+  });
+
+  it('keeps legitimate service suffixes in fallback slugs', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: '',
+        slug: 'managed-services',
+        publishedPath: '/managed-services',
+      },
+      html: '<html><body></body></html>',
+    });
+    expect(out.serviceType).toBe('Managed Services');
+  });
+
+  it('keeps non-brand managed-services prefixes in fallback slugs', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: '',
+        slug: 'managed-services-consulting',
+        publishedPath: '/managed-services-consulting',
+      },
+      html: '<html><body></body></html>',
+    });
+    expect(out.serviceType).toBe('Managed Services Consulting');
+  });
+
+  it('does not strip generic workspace category tokens from service slugs', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: '',
+        slug: 'dental-services-implants',
+        publishedPath: '/dental-services-implants',
+      },
+      html: '<html><body></body></html>',
+      workspace: { ...baseInput.workspace, name: 'Acme Dental' },
+    });
+    expect(out.serviceType).toBe('Dental Services Implants');
   });
 });

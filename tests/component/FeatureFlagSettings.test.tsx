@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { FeatureFlagSettings } from '../../src/components/FeatureFlagSettings';
-import type { UseQueryResult } from '@tanstack/react-query';
 
 // Mock the API client
 vi.mock('../../src/api/client', () => ({
@@ -19,10 +18,57 @@ vi.mock('@tanstack/react-query', async () => {
       if (queryKey[0] === 'admin-feature-flags') {
         return {
           data: [
-            { key: 'smart-placeholders', enabled: true, source: 'default', default: true },
-            { key: 'client-brand-section', enabled: false, source: 'default', default: false },
-            { key: 'seo-editor-unified', enabled: true, source: 'default', default: true },
-            { key: 'outcome-tracking', enabled: true, source: 'default', default: true },
+            {
+              key: 'smart-placeholders',
+              enabled: true,
+              source: 'default',
+              default: true,
+              label: 'Smart placeholders (admin chips + client ghost text)',
+              group: 'Platform Intelligence Enhancements',
+              lifecycle: {
+                owner: 'platform-foundation',
+                createdAt: '2026-05-06',
+                rolloutTarget: 'staging-validation',
+                removalCondition: 'Remove when placeholder behavior is default-on.',
+                linkedRoadmapItemId: 'platform-intelligence-enhancements-phase-1',
+                staleAuditCadence: 'monthly',
+                lastReviewedAt: '2026-05-15',
+              },
+            },
+            {
+              key: 'client-brand-section',
+              enabled: false,
+              source: 'default',
+              default: false,
+              label: 'Client portal — Brand tab (business profile)',
+              group: 'Platform Intelligence Enhancements',
+              lifecycle: {
+                owner: 'inbox',
+                createdAt: '2026-05-06',
+                rolloutTarget: 'tiered-client-rollout',
+                removalCondition: 'Remove when Brand tab is default for eligible workspaces.',
+                linkedRoadmapItemId: 'platform-intelligence-enhancements-phase-1',
+                staleAuditCadence: 'monthly',
+                lastReviewedAt: '2026-05-15',
+              },
+            },
+            {
+              key: 'outcome-tracking',
+              enabled: true,
+              source: 'default',
+              default: true,
+              label: 'Action tracking & measurement',
+              group: 'Outcome Intelligence Engine',
+              lifecycle: {
+                owner: 'outcomes-roi',
+                createdAt: '2026-03-10',
+                rolloutTarget: 'tiered-client-rollout',
+                removalCondition: 'Remove when outcome tracking is default.',
+                linkedRoadmapItemId: 'legacy-outcome-intelligence',
+                staleAuditCadence: 'monthly',
+                lastReviewedAt: '2026-05-15',
+              },
+            },
           ],
           isLoading: false,
           isError: false,
@@ -75,22 +121,16 @@ describe('FeatureFlagSettings', () => {
     expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
   });
 
-  it('renders seo-editor-unified flag with human-readable label', () => {
-    render(<FeatureFlagSettings />);
-    expect(screen.getByText(/SEO editor/i)).toBeInTheDocument();
-  });
-
-  it('displays all three new flags under the same group', () => {
+  it('displays all platform-enhancement flags under the same group', () => {
     render(<FeatureFlagSettings />);
 
     // Find the group header
     const groupHeader = screen.getByText('Platform Intelligence Enhancements');
     expect(groupHeader).toBeInTheDocument();
 
-    // Verify all three labels are present after the group header
+    // Verify both labels are present after the group header
     expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
     expect(screen.getByText(/Brand tab/i)).toBeInTheDocument();
-    expect(screen.getByText(/SEO editor/i)).toBeInTheDocument();
   });
 
   it('does not render flags in the Other bucket if all are properly grouped', () => {
@@ -104,7 +144,6 @@ describe('FeatureFlagSettings', () => {
       const otherSection = otherSections[0];
       expect(otherSection.parentElement).not.toHaveTextContent('smart-placeholders');
       expect(otherSection.parentElement).not.toHaveTextContent('client-brand-section');
-      expect(otherSection.parentElement).not.toHaveTextContent('seo-editor-unified');
     }
   });
 });

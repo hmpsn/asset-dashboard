@@ -4,6 +4,45 @@
 
 ---
 
+## Bounded Context Organization
+
+Before adding a new feature or substantially changing an existing one, identify the owning bounded context in [platform-organization.md](./platform-organization.md). Use that context to decide where server logic, API wrappers, hooks, components, tests, and docs belong. Then check [platform-integration-surfaces.md](./platform-integration-surfaces.md) for the context's DB/storage, external APIs, AI calls, background jobs, events, query keys, public endpoints, and activity types.
+
+Preferred shape for new or adjacent work:
+
+```txt
+shared/types/<domain>.ts
+src/api/<domain>.ts
+src/hooks/admin/use<Domain>.ts
+src/hooks/client/useClient<Domain>.ts
+src/components/<domain>/
+server/routes/<domain>.ts
+server/domains/<domain>/
+tests/integration/<domain>.test.ts
+tests/contract/<domain>.test.ts
+docs/rules/<domain>.md
+```
+
+This is a forward-looking convention. Do not move unrelated files just to make the tree look symmetrical.
+
+### Route-To-Service Extraction
+
+Route files should stay thin: auth, validation, request parsing, response shaping, activity logging, and broadcasts. Reusable business behavior belongs in `server/domains/<domain>/` or an existing domain module.
+
+When extracting logic from a route:
+
+- Preserve existing URLs and response shapes.
+- Preserve all `broadcastToWorkspace()` and `addActivity()` behavior.
+- Keep compatibility exports while migrating callers.
+- Run the relevant route integration tests and contract tests.
+- Avoid pairing structural extraction with visual redesign or new product behavior in the same PR.
+
+### API Wrapper Ownership
+
+Prefer domain-specific API modules over adding more unrelated methods to `src/api/misc.ts` or oversized wrappers. If a component still imports from the old barrel, keep a backward-compatible export until callers migrate.
+
+---
+
 ## React Query Data Fetching
 
 All frontend data fetching uses React Query. These are the patterns to follow:
@@ -225,6 +264,22 @@ export const FEATURE_FLAGS = {
   // ... existing flags ...
   'my-new-feature': false,  // Description of what it controls
 } as const;
+
+export const FEATURE_FLAG_CATALOG = {
+  'my-new-feature': {
+    label: 'My new feature',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'platform-foundation',
+      createdAt: '2026-05-15',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after this path is default and no fallback branch remains.',
+      linkedRoadmapItemId: 'my-roadmap-item-id',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-05-15',
+    },
+  },
+} as const;
 ```
 
 ### 2. Gate in frontend
@@ -255,6 +310,14 @@ if (!isFeatureEnabled('my-new-feature')) {
 Set in Render dashboard env vars:
 - Server: `FEATURE_MY_NEW_FEATURE=true`
 - Frontend: `VITE_FEATURE_MY_NEW_FEATURE=true`
+
+### 5. Run lifecycle audit
+
+```bash
+npm run verify:feature-flags
+```
+
+See `docs/rules/feature-flag-lifecycle.md` for the full lifecycle contract and audit expectations.
 
 ---
 

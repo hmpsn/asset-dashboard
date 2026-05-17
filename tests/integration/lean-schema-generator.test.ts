@@ -17,6 +17,7 @@ vi.mock('../../server/ai.js', () => ({
 import { generateLeanSchema } from '../../server/schema/generator.js';
 import { validateForGoogleRichResults } from '../../server/schema-validator.js';
 import { callAI } from '../../server/ai.js';
+import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 
 const baseInput = {
   pageId: 'p1',
@@ -25,6 +26,27 @@ const baseInput = {
   baseUrl: 'https://example.com',
   workspace: { name: 'Acme', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
 };
+
+function catalogWithSemantics(semantics: NonNullable<PageElementCatalog['semantics']>): PageElementCatalog {
+  return {
+    extractedAt: '2026-05-12T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    semantics,
+    diagnostics: {
+      aiClassificationCalls: 0,
+      hitAiBudgetCap: false,
+      rawCounts: {},
+    },
+  };
+}
 
 describe('generateLeanSchema', () => {
   beforeEach(() => {
@@ -82,6 +104,188 @@ describe('generateLeanSchema', () => {
     });
     const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
     expect(graph.map(n => n['@type'])).toEqual(['Service', 'WebPage', 'BreadcrumbList']);
+  });
+
+  it('hardens Service.serviceType and Offer extraction for swish-services pages', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      html: `<main>
+        <h1>Swish Services Invisalign</h1>
+        <p>Limited time promo: $1,250 off Invisalign treatment.</p>
+        <p>Standard Invisalign cost is $6,450.</p>
+      </main>`,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        slug: 'swish-services-invisalign',
+        publishedPath: '/services/swish-services-invisalign',
+      },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const service = graph.find(n => n['@type'] === 'Service')!;
+    expect(service.name).toBe('Invisalign');
+    expect(service.serviceType).toBe('Invisalign');
+    const offers = (service.offers as Array<Record<string, unknown>> | undefined) ?? [];
+    expect(offers.some(offer => offer.price === '1250')).toBe(false);
+    expect(offers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        '@type': 'Offer',
+        name: 'Standard Invisalign',
+        price: '6450',
+        priceCurrency: 'USD',
+      }),
+    ]));
+  });
+
+  it('emits Service Offer for valid packaged service pricing', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      html: '<main><h1>Invisalign Packages</h1><p>Smile Makeover Package $4,900 includes aligners and retainers.</p></main>',
+      pageMeta: {
+        ...baseInput.pageMeta,
+        slug: 'invisalign-packages',
+        publishedPath: '/services/invisalign-packages',
+      },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const service = graph.find(n => n['@type'] === 'Service')!;
+    expect(service.offers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        '@type': 'Offer',
+        name: 'Smile Makeover Package',
+        price: '4900',
+        priceCurrency: 'USD',
+      }),
+    ]));
+  });
+
+  it('assimilates trusted SaaS JSON-LD evidence into service pages', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageKindOverride: 'Service',
+      schemaRoleOverride: { role: 'service', source: 'ui' },
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Developer Experience',
+        slug: 'developer-experience',
+        publishedPath: '/developer-experience',
+        elements: catalogWithSemantics({
+          softwareApplication: {
+            name: 'Faros Developer Experience Module',
+            description: 'A developer experience platform for engineering leaders.',
+            url: 'https://example.com/developer-experience',
+            applicationCategory: 'BusinessApplication',
+            operatingSystem: 'Web',
+            featureList: ['Survey analytics', 'Workflow telemetry'],
+            audience: { audienceType: 'Engineering leaders' },
+            offer: {
+              url: 'https://example.com/pricing',
+              availability: 'https://schema.org/InStock',
+            },
+          },
+          existingFaq: [
+            { question: 'What does it measure?', answer: 'Developer experience and workflow friction.' },
+            { question: 'Who is it for?', answer: 'Engineering leaders and platform teams.' },
+          ],
+          reviews: [
+            {
+              author: 'Ari',
+              reviewBody: 'Helpful for prioritizing engineering investments.',
+              ratingValue: 4.8,
+            },
+            {
+              author: 'Morgan',
+              reviewBody: 'Solid onboarding and support.',
+              datePublished: '2026-05-01',
+            },
+          ],
+        }),
+      },
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.map(node => node['@type'])).toEqual(expect.arrayContaining([
+      'Service',
+      'WebPage',
+      'SoftwareApplication',
+      'FAQPage',
+      'Review',
+    ]));
+    const software = graph.find(node => node['@type'] === 'SoftwareApplication');
+    expect(software).toMatchObject({
+      '@id': 'https://example.com/developer-experience#software',
+      name: 'Faros Developer Experience Module',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      featureList: ['Survey analytics', 'Workflow telemetry'],
+      audience: { '@type': 'Audience', audienceType: 'Engineering leaders' },
+      offers: {
+        '@type': 'Offer',
+        url: 'https://example.com/pricing',
+        availability: 'https://schema.org/InStock',
+      },
+    });
+    const webPage = graph.find(node => node['@type'] === 'WebPage');
+    expect(webPage?.mentions).toEqual([{ '@id': 'https://example.com/developer-experience#software' }]);
+    const faq = graph.find(node => node['@type'] === 'FAQPage');
+    expect(faq?.mainEntity).toHaveLength(2);
+    const reviews = graph.filter(node => node['@type'] === 'Review');
+    expect(reviews).toHaveLength(2);
+    expect(reviews[0]?.itemReviewed).toEqual({ '@id': 'https://example.com/developer-experience#software' });
+    expect(reviews[0]?.reviewRating).toEqual({
+      '@type': 'Rating',
+      ratingValue: 4.8,
+      bestRating: 5,
+      worstRating: 1,
+    });
+    expect(reviews[1]).toMatchObject({
+      itemReviewed: { '@id': 'https://example.com/developer-experience#software' },
+      author: { '@type': 'Person', name: 'Morgan' },
+      reviewBody: 'Solid onboarding and support.',
+      datePublished: '2026-05-01',
+    });
+    expect(reviews[1]?.reviewRating).toBeUndefined();
+    expect(out.validationErrors).toBeUndefined();
+  });
+
+  it('enriches persona pages with audience and software about evidence', async () => {
+    const canonicalProductId = 'https://example.com/platform#software';
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageKindOverride: 'WebPage',
+      schemaRoleOverride: { role: 'audience', source: 'ui' },
+      siteContext: {
+        pages: [],
+        canonicalEntities: [{
+          type: 'SoftwareApplication',
+          name: 'Faros Platform',
+          canonicalUrl: 'https://example.com/platform',
+          id: canonicalProductId,
+          description: 'AI engineering productivity platform.',
+        }],
+      },
+      canonicalEntityRefs: [canonicalProductId],
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'AI Leaders',
+        slug: 'ai-leaders',
+        publishedPath: '/ai-leaders',
+        elements: catalogWithSemantics({
+          softwareApplication: {
+            name: 'Faros Platform',
+            description: 'AI engineering productivity platform.',
+            featureList: ['AI Tool Comparison', 'AI Impact Insights'],
+          },
+          pageAudience: { audienceType: 'AI Officers, CTOs, Engineering Leaders' },
+        }),
+      },
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const webPage = graph.find(node => node['@type'] === 'WebPage');
+    expect(webPage?.about).toEqual({ '@id': canonicalProductId });
+    expect(webPage?.audience).toEqual({ '@type': 'Audience', audienceType: 'AI Officers, CTOs, Engineering Leaders' });
+    expect(graph.filter(node => node['@type'] === 'SoftwareApplication')).toHaveLength(0);
+    expect(out.validationErrors).toBeUndefined();
   });
 
   it('never emits duplicate WebPage nodes (the bug we are fixing)', async () => {
@@ -311,6 +515,8 @@ const PE_WS_IDS = {
   articleGallery: 'ws_test_pe_article_gallery',
   thinMedia: 'ws_test_pe_thin_media',
   cacheHit: 'ws_test_pe_cache_hit',
+  jsonLdEvidenceRefresh: 'ws_test_pe_jsonld_refresh',
+  nestedAudienceRefresh: 'ws_test_pe_nested_audience_refresh',
   refresh: 'ws_test_pe_refresh',
   nullToSet: 'ws_test_pe_null_to_set',
 };
@@ -583,6 +789,129 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
     });
     const row2 = db.prepare('SELECT updated_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/cache-hit') as { updated_at: string };
     expect(row2.updated_at).toBe(firstExtractedAt); // same row, untouched
+
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('refreshes cached catalogs when current HTML adds trusted SaaS JSON-LD evidence', async () => {
+    const wsId = PE_WS_IDS.jsonLdEvidenceRefresh;
+    const pagePath = '/developer-experience';
+    const oldCatalog = catalogWithSemantics({
+      businessType: 'LocalBusiness',
+      address: {
+        street: '100 Main St',
+        city: 'Austin',
+        state: 'TX',
+        postalCode: '78701',
+      },
+    });
+    const oldTimestamp = '2026-04-01T00:00:00.000Z';
+    db.prepare(`
+      INSERT INTO page_elements (workspace_id, page_path, catalog_json, source_published_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(wsId, pagePath, JSON.stringify(oldCatalog), null, oldTimestamp, oldTimestamp);
+
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "Faros Developer Experience Module",
+              "description": "A developer experience platform for engineering leaders.",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "featureList": ["Survey analytics", "Workflow telemetry"]
+            }
+          </script>
+        </head>
+        <body><main><h1>Developer Experience</h1></main></body>
+      </html>`;
+
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-jsonld-refresh',
+      pageKindOverride: 'WebPage',
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Developer Experience',
+        slug: 'developer-experience',
+        publishedPath: pagePath,
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(node => node['@type'] === 'SoftwareApplication')).toMatchObject({
+      name: 'Faros Developer Experience Module',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      featureList: ['Survey analytics', 'Workflow telemetry'],
+    });
+    const refreshed = db.prepare('SELECT updated_at FROM page_elements WHERE workspace_id = ? AND page_path = ?')
+      .get(wsId, pagePath) as { updated_at: string };
+    expect(refreshed.updated_at).not.toBe(oldTimestamp);
+
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('refreshes cached catalogs when current SoftwareApplication JSON-LD adds nested audience evidence', async () => {
+    const wsId = PE_WS_IDS.nestedAudienceRefresh;
+    const pagePath = '/developer-experience';
+    const oldCatalog = catalogWithSemantics({
+      softwareApplication: {
+        name: 'Faros Developer Experience Module',
+        applicationCategory: 'BusinessApplication',
+      },
+    });
+    const oldTimestamp = '2026-04-01T00:00:00.000Z';
+    db.prepare(`
+      INSERT INTO page_elements (workspace_id, page_path, catalog_json, source_published_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(wsId, pagePath, JSON.stringify(oldCatalog), null, oldTimestamp, oldTimestamp);
+
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "Faros Developer Experience Module",
+              "applicationCategory": "BusinessApplication",
+              "audience": { "@type": "Audience", "audienceType": "Engineering leaders" }
+            }
+          </script>
+        </head>
+        <body><main><h1>Developer Experience</h1></main></body>
+      </html>`;
+
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-nested-audience-refresh',
+      pageKindOverride: 'WebPage',
+      pageMeta: {
+        ...baseInput.pageMeta,
+        title: 'Developer Experience',
+        slug: 'developer-experience',
+        publishedPath: pagePath,
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const software = graph.find(node => node['@type'] === 'SoftwareApplication')!;
+    expect(software.audience).toEqual({ '@type': 'Audience', audienceType: 'Engineering leaders' });
+    const refreshed = db.prepare('SELECT updated_at FROM page_elements WHERE workspace_id = ? AND page_path = ?')
+      .get(wsId, pagePath) as { updated_at: string };
+    expect(refreshed.updated_at).not.toBe(oldTimestamp);
 
     db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
   });

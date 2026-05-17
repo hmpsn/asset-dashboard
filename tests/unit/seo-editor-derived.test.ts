@@ -62,21 +62,9 @@ describe('seoEditorDerived page filtering and ranking', () => {
     { id: 'c', title: 'Blog Post', slug: 'blog/post', source: 'cms', seo: { title: '', description: '' } },
   ];
 
-  it('filters to CMS pages only when showCmsOnly is enabled', () => {
-    const result = filterAndSortSeoPages(pages, {
-      search: '',
-      showCmsOnly: true,
-      metadataRecommendationCountByPageId: new Map(),
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('c');
-  });
-
   it('applies search filter across title and slug', () => {
     const result = filterAndSortSeoPages(pages, {
       search: 'contact',
-      showCmsOnly: false,
       metadataRecommendationCountByPageId: new Map(),
     });
 
@@ -87,7 +75,6 @@ describe('seoEditorDerived page filtering and ranking', () => {
   it('ranks by missing SEO fields plus metadata recommendation count', () => {
     const result = filterAndSortSeoPages(pages, {
       search: '',
-      showCmsOnly: false,
       metadataRecommendationCountByPageId: new Map([
         ['a', 3],
         ['b', 0],

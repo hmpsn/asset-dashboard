@@ -31,7 +31,7 @@ Run the `pre-plan-audit` skill **before writing-plans** for:
 1. Exhaustive findings table — every affected file, line, value, category
 2. Coverage verification — which existing mechanisms already handle which findings
 3. Infrastructure recommendations — shared utilities, pr-check rules, test coverage gaps
-4. Parallelization strategy — dependency graph + model assignments
+4. Parallelization strategy — dependency graph + platform-appropriate model assignments
 
 Plans written without a pre-plan audit miss 50–70% of affected files. Don't skip it for applicable tasks.
 
@@ -66,19 +66,35 @@ Rules for the graph:
 - Backend services owning different files can be parallel
 - Frontend components modifying different files can be parallel
 
-### 2. Model assignments per task
+### 2. Bounded context ownership
 
-Use the least capable model that can handle the task:
+Name the owning bounded context from [platform-organization.md](./rules/platform-organization.md). For cross-context work, name the primary owner, secondary integrations, shared contracts, and coordination files.
+Then check [platform-integration-surfaces.md](./rules/platform-integration-surfaces.md) for the context's external APIs, DB/storage, AI calls, background jobs, WebSocket events, React Query keys, public endpoints, and activity types.
+Before writing implementation tasks, fill [feature-spec-template.md](./workflows/feature-spec-template.md) so ownership, contracts, events, cache keys, and test owners are explicit.
 
-| Task type | Model | Signal |
-|-----------|-------|--------|
-| Migration SQL, shared types from spec, route boilerplate, API client wrappers | `haiku` | Pure transcription — no judgment calls |
-| Service/CRUD layers, React components, tasks with edge-case awareness | `sonnet` | Pattern-following with local judgment |
-| Prompt engineering, brand context logic, complex shared components, auto-summarization | `opus` | Creative judgment or high reuse surface |
-| Spec compliance reviewer | `opus` | Review quality scales with model capability |
-| Code quality reviewer | `opus` | Never downgrade reviewers |
+Every plan should state:
 
-### 3. File ownership declarations
+- owning bounded context,
+- route/API surface,
+- shared type contracts,
+- React Query keys and invalidation events,
+- WebSocket events,
+- test ownership,
+- and whether the work is new behavior, behavior-preserving extraction, or both.
+
+### 3. Model assignments per task
+
+Name the active agent platform in the plan, then use the least capable model on that platform that can handle the task. Codex/OpenAI plans should use the OpenAI ladder; Claude/Anthropic plans should use the Anthropic ladder.
+
+| Task type | Codex / OpenAI model | Claude / Anthropic model | Signal |
+|-----------|----------------------|--------------------------|--------|
+| Mechanical doc cleanup, route boilerplate, small fixture updates | `GPT-5.4-Mini` | `Haiku` | Pure transcription or low-judgment edits |
+| Service/CRUD layers, React components, bounded docs, read-only reports, tests with local patterns | `GPT-5.4` | `Sonnet` | Pattern-following with local judgment |
+| Prompt engineering, brand context logic, complex shared components, cross-context plans, final integration | `GPT-5.5` | `Opus` | Creative judgment, high reuse surface, or broad blast radius |
+| Spec compliance reviewer | `GPT-5.5` | `Opus` | Review quality scales with model capability |
+| Code quality reviewer | `GPT-5.5` | `Opus` | Never downgrade reviewers |
+
+### 4. File ownership declarations
 
 Every parallel task must list what it owns and must not touch:
 
@@ -98,7 +114,7 @@ If you need to change a file not on your ownership list, STOP and report
 back with status NEEDS_CONTEXT. Do not modify files outside your ownership.
 ```
 
-### 4. Cross-phase contracts (multi-phase features only)
+### 5. Cross-phase contracts (multi-phase features only)
 
 A companion guardrails doc listing what each phase exports for downstream:
 
@@ -117,20 +133,25 @@ A companion guardrails doc listing what each phase exports for downstream:
 
 This document lives alongside the plans and gets updated as phases complete.
 
-### 5. Systemic improvements section
+### 6. Systemic improvements section
 
 Every plan must include:
 - **Shared utilities to extract** — if 3+ files do the same fix, extract a helper
 - **pr-check rules to add** — to prevent the same class of bug recurring
 - **Test coverage additions** — what new tests this plan requires
+- **Feature-class gates** — which sections of [feature-class-definition-of-done.md](./workflows/feature-class-definition-of-done.md) apply
 
-### 6. Verification strategy
+### 7. Verification strategy
 
 Specify *how* to verify each phase, not just "manual verification":
 - Preview screenshots for UI changes
 - Specific `npx vitest run --reporter=verbose` test commands
 - `curl` commands for API endpoints
 - Contrast or color checks for design work
+
+### 8. Golden path and PR readiness references
+
+For common feature shapes, start from [platform-golden-paths.md](./workflows/platform-golden-paths.md) and select the closest template before assigning files. Before final review, run through [pr-readiness-checklist.md](./workflows/pr-readiness-checklist.md) so the plan's ownership, data flow, tests, docs, and verification are visible in the PR.
 
 ---
 
@@ -225,7 +246,7 @@ One paragraph: what this implements and why.
 
 ## Task List
 
-### Task 1 — [Name] (Model: haiku | sonnet | opus)
+### Task 1 — [Name] (Platform: Codex/OpenAI | Claude/Anthropic; Model: [platform model])
 **Owns:** [files]
 **Must not touch:** [files]
 Steps...

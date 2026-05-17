@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { renderDrillInUrl } from './drillIn';
+import { ClickableRow } from '../../ui/ClickableRow';
 import type { BriefingStory, BriefingCategory } from '../../../../shared/types/briefing';
 
 interface SecondaryStoryRowProps {
@@ -37,7 +38,7 @@ const CATEGORY_VISUALS: Record<BriefingCategory, CategoryVisual> = {
  * Renders below the `<HeroStoryCard>` in the magazine briefing layout, one row
  * per non-headline story (typically 2–4). No card chrome — plain rows separated
  * by thin bottom borders, with a hover state for affordance. The whole row is
- * a `<button>` so it's keyboard-accessible and clickable end-to-end.
+ * an interactive control so it's keyboard-accessible and clickable end-to-end.
  */
 export function SecondaryStoryRow({ story, workspaceId, betaMode }: SecondaryStoryRowProps) {
   const navigate = useNavigate();
@@ -46,8 +47,7 @@ export function SecondaryStoryRow({ story, workspaceId, betaMode }: SecondarySto
   const url = renderDrillInUrl(story, workspaceId, betaMode);
 
   return (
-    <button
-      type="button"
+    <ClickableRow
       onClick={() => navigate(url)}
       className="text-left w-full flex items-center gap-4 px-4 py-3 border-b border-[var(--brand-border)] last:border-b-0 hover:bg-[var(--surface-3)]/50 transition-colors cursor-pointer"
     >
@@ -69,6 +69,6 @@ export function SecondaryStoryRow({ story, workspaceId, betaMode }: SecondarySto
         className="w-5 h-5 shrink-0 text-[var(--brand-text-muted)]"
         aria-hidden="true"
       />
-    </button>
+    </ClickableRow>
   );
 }

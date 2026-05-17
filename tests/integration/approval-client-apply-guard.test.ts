@@ -9,7 +9,8 @@ const { postJson } = ctx;
 
 let wsId = '';
 let schemaBatchId = '';
-let cmsBatchId = '';
+let syntheticCmsBatchId = '';
+let nonSeoCmsBatchId = '';
 let pendingBatchId = '';
 let savedWebflowToken: string | undefined;
 
@@ -34,7 +35,7 @@ beforeAll(async () => {
   schemaBatchId = schemaBatch.id;
   updateItem(wsId, schemaBatchId, schemaBatch.items[0].id, { status: 'approved' });
 
-  const cmsBatch = createBatch(wsId, 'site-apply-guard', 'CMS Batch', [{
+  const syntheticCmsBatch = createBatch(wsId, 'site-apply-guard', 'Synthetic CMS Batch', [{
     pageId: 'cms-item-1',
     pageTitle: 'CMS Item',
     pageSlug: 'cms-item',
@@ -43,8 +44,20 @@ beforeAll(async () => {
     currentValue: 'Current',
     proposedValue: 'Proposed',
   }]);
-  cmsBatchId = cmsBatch.id;
-  updateItem(wsId, cmsBatchId, cmsBatch.items[0].id, { status: 'approved' });
+  syntheticCmsBatchId = syntheticCmsBatch.id;
+  updateItem(wsId, syntheticCmsBatchId, syntheticCmsBatch.items[0].id, { status: 'approved' });
+
+  const nonSeoCmsBatch = createBatch(wsId, 'site-apply-guard', 'CMS Non-SEO Batch', [{
+    pageId: 'real-cms-item-1',
+    pageTitle: 'CMS Item',
+    pageSlug: 'cms-item',
+    field: 'slug',
+    collectionId: 'collection-1',
+    currentValue: 'current-slug',
+    proposedValue: 'proposed-slug',
+  }]);
+  nonSeoCmsBatchId = nonSeoCmsBatch.id;
+  updateItem(wsId, nonSeoCmsBatchId, nonSeoCmsBatch.items[0].id, { status: 'approved' });
 
   const pendingBatch = createBatch(wsId, 'site-apply-guard', 'Pending Batch', [{
     pageId: 'page-static-pending',
@@ -68,20 +81,31 @@ describe('public approval apply guard', () => {
     const res = await postJson(`/api/public/approvals/${wsId}/${schemaBatchId}/apply`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('Only static page SEO title and meta description');
+    expect(body.error).toContain('real CMS item approvals');
 
     const batch = getBatch(wsId, schemaBatchId);
     expect(batch?.status).toBe('approved');
     expect(batch?.items[0].status).toBe('approved');
   });
 
-  it('blocks CMS approval items from client apply even when the field is SEO title', async () => {
-    const res = await postJson(`/api/public/approvals/${wsId}/${cmsBatchId}/apply`, {});
+  it('blocks synthetic CMS approval items even when collection metadata is present', async () => {
+    const res = await postJson(`/api/public/approvals/${wsId}/${syntheticCmsBatchId}/apply`, {});
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('Only static page SEO title and meta description');
+    expect(body.error).toContain('real CMS item approvals');
 
-    const batch = getBatch(wsId, cmsBatchId);
+    const batch = getBatch(wsId, syntheticCmsBatchId);
+    expect(batch?.status).toBe('approved');
+    expect(batch?.items[0].status).toBe('approved');
+  });
+
+  it('blocks real CMS approval items for non-SEO collection fields', async () => {
+    const res = await postJson(`/api/public/approvals/${wsId}/${nonSeoCmsBatchId}/apply`, {});
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('real CMS item approvals');
+
+    const batch = getBatch(wsId, nonSeoCmsBatchId);
     expect(batch?.status).toBe('approved');
     expect(batch?.items[0].status).toBe('approved');
   });

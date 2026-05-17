@@ -28,8 +28,8 @@ const STEPS = [
     number: 2,
     title: 'Check Coverage',
     icon: Eye,
-    color: 'text-sky-400',
-    bg: 'bg-sky-500/10 border-sky-500/20',
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10 border-blue-500/20',
     description: 'See which pages have schema markup and which don\'t — coverage percentage by page role.',
     actions: [
       'Review the coverage dashboard to understand your starting point',

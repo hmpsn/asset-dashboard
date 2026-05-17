@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, ArrowUp, ArrowDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
-import { SectionCard } from '../ui';
+import { Button, SectionCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
 import type { ProductType } from '../../../server/payments';
 import { getOptional, getSafe } from '../../api/client';
+import { normalizePageUrl } from '../../lib/pathUtils';
 
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
@@ -88,7 +89,7 @@ function buildFixCategories(audit: AuditDetail, traffic: TrafficMap): FixCategor
   let manualIssues = 0;
 
   for (const page of audit.audit.pages) {
-    const slug = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
+    const slug = normalizePageUrl(page.slug);
     const t = traffic[slug] || { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
 
     for (const issue of page.issues) {
@@ -286,7 +287,7 @@ function buildCategoriesFromServer(recs: ServerRecommendation[]): FixCategory[] 
 
     const pages: AffectedPage[] = [...pageSet].map(slug => ({
       name: slug.replace(/^\//, '') || 'Home',
-      slug: slug.startsWith('/') ? slug : `/${slug}`,
+      slug: normalizePageUrl(slug),
       clicks: 0, impressions: 0, pageviews: 0, issueCount: 1, topIssue: '',
     }));
 
@@ -454,18 +455,18 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                     <span className="t-ui text-[var(--brand-text-bright)]">{cat.label}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
                     {cat.highTrafficPages > 0 && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand flex items-center gap-1">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-accent-brand flex items-center gap-1">
                         <Icon as={ArrowUp} size="sm" />
                         {cat.highTrafficPages} with traffic
                       </span>
                     )}
                     {allDone && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-1">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-1">
                         <Icon as={CheckCircle2} size="sm" /> Addressed
                       </span>
                     )}
                     {completedCount > 0 && pendingCount > 0 && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-blue-500/10 border border-blue-500/20 text-accent-info">
                         {completedCount} done · {pendingCount} remaining
                       </span>
                     )}
@@ -480,10 +481,15 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   {/* Top affected pages (traffic-sorted) */}
                   {hasPages && !cat.isManual && (
                     <div className="mt-3">
-                      <button onClick={() => toggleCategory(cat.id)} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors mb-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCategory(cat.id)}
+                        className="!p-0 !rounded-none hover:!bg-transparent flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors mb-1.5"
+                      >
                         <Icon as={ChevronDown} size="sm" className={`transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         Top pages that would benefit most
-                      </button>
+                      </Button>
                       {isExpanded && (
                         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] overflow-hidden">
                           <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-1.5 t-micro text-[var(--brand-text-muted)] border-b border-[var(--brand-border)]">
@@ -525,10 +531,14 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                         <span className="t-caption-sm text-accent-warning">Included in your Premium plan</span>
                       </div>
                     ) : cat.isManual ? (
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-1.5 !px-3 !py-1.5 !rounded-[var(--radius-md)] t-caption-sm font-medium"
+                      >
                         <Icon as={MessageSquare} size="sm" />
                         Request a Quote
-                      </button>
+                      </Button>
                     ) : inCart ? (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                         <Icon as={ShoppingCart} size="sm" />
@@ -537,8 +547,10 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {cat.options.map((opt, idx) => (
-                          <button
+                          <Button
                             key={idx}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => cart?.addItem({
                               productType: opt.productType as ProductType,
                               displayName: opt.displayName,
@@ -548,13 +560,13 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                             })}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                               opt.isSuggested
-                                ? 'bg-teal-600 hover:bg-teal-500 text-white'
-                                : 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                                ? '!bg-teal-600 hover:!bg-teal-500 !text-white'
+                                : '!bg-[var(--surface-3)] hover:!bg-[var(--brand-border-hover)] !text-[var(--brand-text-bright)]'
                             }`}
                           >
                             <Icon as={ShoppingCart} size="sm" />
                             {opt.buttonLabel}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     )}
@@ -580,7 +592,9 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                 </div>
               )}
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 autoCategories.forEach(cat => {
                   const suggested = cat.options.find(o => o.isSuggested);
@@ -595,11 +609,11 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   }
                 });
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              className="flex items-center gap-1.5 !px-3 !py-1.5 !rounded-[var(--radius-md)] t-caption-sm font-medium !bg-teal-600 hover:!bg-teal-500 !text-white transition-colors"
             >
               <Icon as={ShoppingCart} size="sm" />
               Add All to Cart
-            </button>
+            </Button>
           </div>
         </div>
       )}

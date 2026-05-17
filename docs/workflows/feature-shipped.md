@@ -31,9 +31,10 @@ If the shipped work added, removed, or changed any UI colors, badges, buttons, o
 
 ## 4. Update data/roadmap.json
 
-- **Existing items**: Change `"status": "pending"` → `"status": "done"` for any completed roadmap items. Update `"notes"` to include "Shipped —" prefix with a brief description.
+- **Existing items**: Change `"status": "pending"` → `"status": "done"` only for roadmap items whose acceptance criteria are actually complete. Update `"notes"` to include "Shipped —" prefix with a brief description.
 - **New unplanned work**: If the shipped feature wasn't on the roadmap, add it as a new item in the appropriate sprint with `"status": "done"`. Use the next available ID number.
-- **Cross-check all items**: Scan ALL sprints and backlog for items that may have been completed in previous sessions but never marked done. Compare item descriptions against the git log and actual codebase.
+- **Cross-check all items carefully**: Scan ALL sprints and backlog for items that may have been completed in previous sessions but never marked done. Compare item descriptions against the git log and actual codebase, and leave incomplete or only partially complete items pending.
+- **Archive maintenance**: Run `npx tsx scripts/sort-roadmap.ts` after roadmap edits. The script keeps active planning in `data/roadmap.json` and moves older shipped history into `data/roadmap.archive.json`.
 
 ## 5. Update ACTION_PLAN.md
 
@@ -55,7 +56,7 @@ If the shipped feature adds new cross-links between tools, update the table in `
 ## 8. Build and verify
 
 // turbo
-Run `npx vite build` to ensure no build errors from documentation-adjacent code changes.
+Run `npx vite build` to ensure no build errors from documentation-adjacent code changes. For substantial feature work, complete `docs/workflows/pr-readiness-checklist.md` before requesting review.
 
 ## 9. Commit and push
 
@@ -70,6 +71,7 @@ git push origin main
 Before committing, verify:
 - [ ] FEATURE_AUDIT.md feature count matches actual numbered entries
 - [ ] data/roadmap.json has no items marked "pending" that are actually shipped
+- [ ] `npx tsx scripts/sort-roadmap.ts` was run so old shipped history is archived
 - [ ] ACTION_PLAN.md decision log has entries for all significant decisions this session
 - [ ] No roadmap items in ANY sprint were overlooked (scan all sprints, not just Sprint 1)
 - [ ] BRAND_DESIGN_LANGUAGE.md Per-Component Color Map is current (if UI changed)

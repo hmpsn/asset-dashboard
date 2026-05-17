@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import {
   Loader2, Check, Search, Sparkles, Send,
 } from 'lucide-react';
 import { PendingApprovals } from '../PendingApprovals';
-import { ErrorState, Icon } from '../ui';
+import { Badge, Button, ErrorState, FormInput, Icon } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import type { PageEditSummary } from '../../hooks/usePageEditStates';
 import type { CmsCollection } from './cmsEditorModel';
@@ -22,7 +23,7 @@ interface CmsEditorShellPanelsProps {
   approvalSelectedCount: number;
   sendingApproval: boolean;
   approvalSent: boolean;
-  sendForApproval: () => void;
+  sendForApproval: (note?: string) => Promise<void>;
   bulkMode: 'idle' | 'rewriting';
   bulkProgress: { done: number; total: number };
   bulkResults: string | null;
@@ -32,9 +33,11 @@ interface CmsEditorShellPanelsProps {
   workspaceId?: string;
   approvalRefreshKey: number;
   onApprovalRetracted: () => void;
+  showPendingApprovals?: boolean;
   summary: PageEditSummary;
   search: string;
   onSearchChange: (value: string) => void;
+  showSearch?: boolean;
 }
 
 export function CmsEditorShellPanels({
@@ -55,10 +58,14 @@ export function CmsEditorShellPanels({
   workspaceId,
   approvalRefreshKey,
   onApprovalRetracted,
+  showPendingApprovals = true,
   summary,
   search,
   onSearchChange,
+  showSearch = true,
 }: CmsEditorShellPanelsProps) {
+  const [approvalNote, setApprovalNote] = useState('');
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -70,22 +77,18 @@ export function CmsEditorShellPanels({
         </div>
         <div className="flex items-center gap-2">
           {dirtyCount > 0 && (
-            <span className="t-caption-sm text-amber-400/80 bg-amber-500/8 px-2 py-0.5 rounded">
-              {dirtyCount} unsaved
-            </span>
+            <Badge label={`${dirtyCount} unsaved`} tone="amber" variant="soft" shape="sm" size="sm" />
           )}
           {savedCount > 0 && (
-            <span className="t-caption-sm text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-              {savedCount} saved (draft)
-            </span>
+            <Badge label={`${savedCount} saved (draft)`} tone="emerald" variant="soft" shape="sm" size="sm" />
           )}
           {approvalSelectedCount > 0 && bulkMode === 'idle' && (
             <div className="flex items-center gap-1.5">
               <span className="t-caption-sm text-[var(--brand-text-muted)] mr-1">AI Rewrite:</span>
-              <button onClick={() => onBulkAiRewrite('name')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Names</button>
-              <button onClick={() => onBulkAiRewrite('title')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Titles</button>
-              <button onClick={() => onBulkAiRewrite('description')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Descriptions</button>
-              <button onClick={() => onBulkAiRewrite('all')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 transition-colors">All SEO</button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('name')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Names</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('title')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Titles</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('description')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30">Descriptions</Button>
+              <Button variant="secondary" size="sm" onClick={() => onBulkAiRewrite('all')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30">All SEO</Button>
             </div>
           )}
           {bulkMode === 'rewriting' && (
@@ -95,16 +98,28 @@ export function CmsEditorShellPanels({
             </div>
           )}
           {workspaceId && (
-            <button
-              onClick={sendForApproval}
-              disabled={sendingApproval || approvalSelectedCount === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-                approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
-              }`}
-            >
-              <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
-              {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelectedCount})`}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {approvalSelectedCount > 0 && (
+                <FormInput
+                  value={approvalNote}
+                  onChange={setApprovalNote}
+                  placeholder="Add a note for your client (optional)"
+                  className="w-56"
+                />
+              )}
+              <Button
+                onClick={() => sendForApproval(approvalNote)}
+                disabled={sendingApproval || approvalSelectedCount === 0}
+                loading={sendingApproval}
+                icon={approvalSent ? Check : Send}
+                size="sm"
+                className={`px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
+                  approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
+                }`}
+              >
+                {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send to client (${approvalSelectedCount})`}
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -131,9 +146,10 @@ export function CmsEditorShellPanels({
         />
       )}
 
-      {workspaceId && (
+      {workspaceId && showPendingApprovals && (
         <PendingApprovals
           workspaceId={workspaceId}
+          nameFilter="SEO"
           refreshKey={approvalRefreshKey}
           onRetracted={onApprovalRetracted}
         />
@@ -151,16 +167,18 @@ export function CmsEditorShellPanels({
         </div>
       )}
 
-      <div className="relative">
-        <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-        <input
-          type="text"
-          value={search}
-          onChange={event => onSearchChange(event.target.value)}
-          placeholder="Search items..."
-          className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
-        />
-      </div>
+      {showSearch && (
+        <div className="relative">
+          <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
+          <FormInput
+            type="text"
+            value={search}
+            onChange={onSearchChange}
+            placeholder="Search items..."
+            className="w-full pl-9 pr-3"
+          />
+        </div>
+      )}
     </>
   );
 }

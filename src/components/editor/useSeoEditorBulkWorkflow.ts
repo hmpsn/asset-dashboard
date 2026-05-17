@@ -6,6 +6,7 @@ import { seoBulkJobs } from '../../api/seo';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import { WS_EVENTS } from '../../lib/wsEvents';
+import { resolvePagePath } from '../../lib/pathUtils';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type { BackgroundJobType } from '../../../shared/types/background-jobs';
 import {
@@ -37,6 +38,7 @@ interface UseSeoEditorBulkWorkflowArgs {
   analyzedPages: Set<string>;
   setLocalAnalyzedPages: React.Dispatch<React.SetStateAction<Set<string>>>;
   queryClient: QueryClient;
+  startJob: (type: BackgroundJobType, params: Record<string, unknown>) => Promise<string | null>;
   trackJob: (type: BackgroundJobType, jobId: string, meta: Record<string, unknown>) => void;
   cancelJob: (jobId: string) => Promise<void> | void;
   refetchSuggestions: () => Promise<unknown> | void;
@@ -52,6 +54,7 @@ export function useSeoEditorBulkWorkflow({
   analyzedPages,
   setLocalAnalyzedPages,
   queryClient,
+  startJob,
   trackJob,
   cancelJob,
   refetchSuggestions,
@@ -123,7 +126,7 @@ export function useSeoEditorBulkWorkflow({
       }
     },
     [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
-      const detail = data as { jobId: string; operation: string; generated?: number; failed?: number; total: number; field?: string };
+      const detail = data as { jobId: string; operation: string; generated?: number; generatedPages?: number; suggestions?: number; failed?: number; total: number; field?: string };
       if (detail.operation === 'bulk-analyze' && detail.jobId === bulkAnalyzeJobId) {
         setBulkAnalyzeProgress(prev => (prev ? { ...prev, done: prev.total } : null));
         setBulkAnalyzeJobId(null);
@@ -135,12 +138,15 @@ export function useSeoEditorBulkWorkflow({
 
       if (detail.operation === 'bulk-rewrite' && detail.jobId === bulkRewriteJobId) {
         const failed = detail.failed || 0;
-        const generated = detail.generated ?? (detail.total - failed);
+        const generated = detail.generatedPages ?? (detail.total - failed);
         const fieldLabel = detail.field === 'both' ? 'title + description' : (detail.field || 'title');
+        const suggestionSuffix = detail.suggestions != null && detail.suggestions !== generated
+          ? ` (${detail.suggestions} suggestion rows)`
+          : '';
         setBulkResults(
           failed > 0
-            ? `Generated ${generated}/${detail.total} ${fieldLabel} variations (${failed} failed) — review in the suggestions panel.`
-            : `Generated ${generated}/${detail.total} ${fieldLabel} variations — review in the suggestions panel.`,
+            ? `Generated ${generated}/${detail.total} ${fieldLabel} variations${suggestionSuffix} (${failed} failed) — review in the suggestions panel.`
+            : `Generated ${generated}/${detail.total} ${fieldLabel} variations${suggestionSuffix} — review in the suggestions panel.`,
         );
         setBulkMode('idle');
         setBulkRewriteJobId(null);
@@ -202,23 +208,28 @@ export function useSeoEditorBulkWorkflow({
     setBulkFixing(true);
     setBulkResults(null);
     try {
-      const data = await post<{ results?: Array<{ applied: boolean }> }>(`/api/webflow/seo-bulk-fix/${siteId}`, {
+      const jobId = await startJob(BACKGROUND_JOB_TYPES.BULK_SEO_FIX, {
+        siteId,
         workspaceId,
         field,
         pages: pagesNeedingFix.map(page => ({
           pageId: page.id,
           title: page.title,
+          slug: page.slug,
+          publishedPath: page.publishedPath,
           currentSeoTitle: page.seo?.title,
           currentDescription: page.seo?.description,
         })),
       });
-      const applied = data.results?.filter((result: { applied: boolean }) => result.applied).length || 0;
-      setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
-      setTimeout(() => setBulkResults(null), 5000);
+      if (jobId) {
+        setBulkResults(`Started background ${field === 'title' ? 'title' : 'description'} fixes for ${pagesNeedingFix.length} pages.`);
+        setTimeout(() => setBulkResults(null), 5000);
+      } else {
+        setBulkResults('Bulk fix could not be started.');
+      }
     } catch (err) {
       console.error('SeoEditor operation failed:', err);
-      setBulkResults('Bulk fix failed.');
+      setBulkResults('Bulk fix could not be started.');
     } finally {
       setBulkFixing(false);
     }
@@ -295,7 +306,13 @@ export function useSeoEditorBulkWorkflow({
         const page = pageById.get(item.pageId);
         if (!page) continue;
         const seoFields = buildBulkSeoUpdate(bulkField, item.newValue, page, edits[page.id]);
-        await put(`/api/webflow/pages/${page.id}/seo`, { siteId, workspaceId, ...seoFields });
+        await put(`/api/webflow/pages/${page.id}/seo`, {
+          siteId,
+          workspaceId,
+          slug: resolvePagePath(page),
+          pageTitle: page.title,
+          ...seoFields,
+        });
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
       setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, PageHeader, Icon } from './ui';
+import { SectionCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow } from './ui';
 import { TemplateEditor, MatrixBuilder, MatrixGrid } from './matrix';
 import { contentTemplates, contentMatrices } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
@@ -150,15 +150,29 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           icon={AlertTriangle}
           title="Matrix not found"
           description="This content matrix may have been deleted."
-          action={<button onClick={() => setView({ mode: 'list' })} className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Back to List</button>}
+          action={(
+            <Button
+              onClick={() => setView({ mode: 'list' })}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
+            >
+              Back to List
+            </Button>
+          )}
         />
       );
     }
     return (
       <div className="space-y-2">
-        <button onClick={() => setView({ mode: 'list' })} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button
+          onClick={() => setView({ mode: 'list' })}
+          size="sm"
+          variant="ghost"
+          className="h-auto px-0 py-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
+        >
           ← Back to Planner
-        </button>
+        </Button>
         <MatrixGrid
           workspaceId={workspaceId}
           matrix={matrix}
@@ -187,7 +201,16 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         icon={AlertTriangle}
         title="Failed to load planner"
         description={error || (queryError instanceof Error ? queryError.message : 'Failed to load content planner data')}
-        action={<button onClick={loadData} className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Retry</button>}
+        action={(
+          <Button
+            onClick={loadData}
+            size="sm"
+            variant="secondary"
+            className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
+          >
+            Retry
+          </Button>
+        )}
       />
     );
   }
@@ -207,13 +230,15 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           title="No templates or matrices yet"
           description="Start by creating a content template that defines the structure for a type of page (blog, service, location, etc.). Then build matrices to generate dozens of planned pages from one template."
           action={
-            <button
+            <Button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 t-caption-sm px-4 py-2 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors font-medium"
+              icon={Plus}
+              size="md"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0 font-medium"
             >
-              <Icon as={Plus} size="md" />
               Create First Template
-            </button>
+            </Button>
           }
         />
       </div>
@@ -231,21 +256,25 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors"
+              icon={FileText}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)]"
             >
-              <Icon as={FileText} size="sm" />
               New Template
-            </button>
+            </Button>
             {templates.length > 0 && (
-              <button
+              <Button
                 onClick={() => setView({ mode: 'matrix-builder' })}
-                className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
+                icon={Grid3X3}
+                size="sm"
+                variant="secondary"
+                className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
               >
-                <Icon as={Grid3X3} size="sm" />
                 Build Matrix
-              </button>
+              </Button>
             )}
           </div>
         }
@@ -265,19 +294,24 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           title="Templates"
           titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
           action={
-            <button onClick={() => setView({ mode: 'template-editor' })} className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors">
+            <Button
+              onClick={() => setView({ mode: 'template-editor' })}
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 py-0 text-accent-brand hover:text-accent-brand hover:bg-transparent"
+            >
               + New
-            </button>
+            </Button>
           }
         >
           <div className="space-y-2">
             {templates.map(t => {
               const matrixCount = matrices.filter(m => m.templateId === t.id).length;
               return (
-                <button
+                <ClickableRow
                   key={t.id}
                   onClick={() => setView({ mode: 'template-editor', templateId: t.id })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
+                  className="group flex items-center justify-between px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)]"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -292,11 +326,11 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {matrixCount > 0 && (
-                      <Badge color="teal" label={`${matrixCount} matri${matrixCount !== 1 ? 'ces' : 'x'}`} />
+                      <Badge tone="teal" label={`${matrixCount} matri${matrixCount !== 1 ? 'ces' : 'x'}`} />
                     )}
-                    <Badge color="zinc" label={t.pageType} />
+                    <Badge tone="zinc" label={t.pageType} />
                   </div>
-                </button>
+                </ClickableRow>
               );
             })}
           </div>
@@ -321,10 +355,10 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                 ? Math.round((m.cells.filter(c => c.status === 'published').length / m.cells.length) * 100)
                 : 0;
               return (
-                <button
+                <ClickableRow
                   key={m.id}
                   onClick={() => setView({ mode: 'matrix-grid', matrixId: m.id })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
+                  className="group flex items-center justify-between px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)]"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -341,9 +375,9 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                     <div className="w-16 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                       <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />
                     </div>
-                    <Badge color={progress === 100 ? 'emerald' : progress > 0 ? 'amber' : 'zinc'} label={`${m.cells.length} pages`} />
+                    <Badge tone={progress === 100 ? 'emerald' : progress > 0 ? 'amber' : 'zinc'} label={`${m.cells.length} pages`} />
                   </div>
-                </button>
+                </ClickableRow>
               );
             })}
           </div>

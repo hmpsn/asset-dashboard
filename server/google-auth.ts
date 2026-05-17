@@ -213,6 +213,37 @@ export function isConnected(siteId: string): boolean {
   return !!loadTokenForSite(siteId);
 }
 
+export function getTokenStatus(siteId: string): {
+  connected: boolean;
+  usable: boolean;
+  expired: boolean;
+  refreshable: boolean;
+  expiresAt: string | null;
+} {
+  const tokens = loadTokenForSite(siteId);
+  if (!tokens) {
+    return {
+      connected: false,
+      usable: false,
+      expired: false,
+      refreshable: false,
+      expiresAt: null,
+    };
+  }
+
+  const expiresAt = new Date(tokens.expires_at).toISOString();
+  const hasBuffer = tokens.expires_at > Date.now() + 300_000;
+  const refreshable = !!tokens.refresh_token;
+
+  return {
+    connected: true,
+    usable: hasBuffer || refreshable,
+    expired: !hasBuffer,
+    refreshable,
+    expiresAt,
+  };
+}
+
 export function disconnect(siteId: string): void {
   deleteStmt().run(siteId);
 }

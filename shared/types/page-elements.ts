@@ -153,6 +153,7 @@ export interface SemanticPageData {
     author: string;
     reviewBody: string;
     ratingValue?: number;
+    datePublished?: string;
   }>;
 
   // Business identity
@@ -184,6 +185,27 @@ export interface SemanticPageData {
     description?: string;
   }>;
   priceRange?: string;
+
+  // SaaS / product evidence from trusted existing JSON-LD
+  softwareApplication?: {
+    name: string;
+    description?: string;
+    url?: string;
+    applicationCategory?: string;
+    operatingSystem?: string;
+    featureList?: string[];
+    audience?: {
+      audienceType: string;
+    };
+    offer?: {
+      url?: string;
+      availability?: string;
+    };
+  };
+  pageAudience?: {
+    audienceType: string;
+  };
+  existingFaq?: Array<{ question: string; answer: string }>;
   events?: Array<{
     name: string;
     startDate?: string;

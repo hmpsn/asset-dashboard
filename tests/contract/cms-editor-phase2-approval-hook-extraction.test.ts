@@ -32,6 +32,6 @@ describe('CmsEditor phase-2 approval hook extraction contract', () => {
     expect(hookSource).toContain('const [approvalSelected, setApprovalSelected]');
     expect(hookSource).toContain('const [sendingApproval, setSendingApproval]');
     expect(hookSource).toContain('buildApprovalPayloadItems(approvalSelected, edits, collections)');
-    expect(hookSource).toContain('const sendForApproval = useCallback(async () => {');
+    expect(hookSource).toContain('const sendForApproval = useCallback(async (note?: string) => {');
   });
 });

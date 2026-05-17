@@ -5,7 +5,7 @@
 import {
   Loader2, Sparkles, Check, X, Type, ArrowRight, Eye, CheckSquare, Square,
 } from 'lucide-react';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect } from '../ui';
 import type { SeoBulkMode, SeoEditorPage } from './seoEditorTypes';
 
 export interface BulkOperationsProps {
@@ -43,26 +43,55 @@ export function BulkOperations({
     <>
       {/* Select all + bulk actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={onSelectAll} className="flex items-center gap-1.5 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-          {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <Icon as={CheckSquare} size="md" className="text-teal-400" /> : <Icon as={Square} size="md" />}
+        <Button
+          onClick={onSelectAll}
+          icon={approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? CheckSquare : Square}
+          size="sm"
+          variant="ghost"
+          className="h-auto px-0 py-0 rounded-none text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
+        >
           {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? 'Deselect all' : 'Select all'}
-        </button>
+        </Button>
         {approvalSelected.size > 0 && <span className="text-xs text-teal-400">{approvalSelected.size} selected</span>}
         {approvalSelected.size > 0 && bulkMode === 'idle' && (
           <>
             <span className="text-[var(--brand-border)]">|</span>
-            <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-xs text-[var(--brand-text-bright)] transition-colors">
-              <Icon as={Type} size="sm" /> Pattern Apply
-            </button>
-            <button onClick={() => onBulkAiRewrite('both')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
-              <Icon as={Sparkles} size="sm" /> AI Rewrite Both
-            </button>
-            <button onClick={() => onBulkAiRewrite('title')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/60 hover:bg-teal-500/80 text-xs text-white transition-colors">
-              <Icon as={Sparkles} size="sm" /> Titles Only
-            </button>
-            <button onClick={() => onBulkAiRewrite('description')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/60 hover:bg-teal-500/80 text-xs text-white transition-colors">
-              <Icon as={Sparkles} size="sm" /> Descriptions Only
-            </button>
+            <Button
+              onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }}
+              icon={Type}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)]"
+            >
+              Pattern Apply
+            </Button>
+            <Button
+              onClick={() => onBulkAiRewrite('both')}
+              icon={Sparkles}
+              size="sm"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium"
+            >
+              AI Rewrite Both
+            </Button>
+            <Button
+              onClick={() => onBulkAiRewrite('title')}
+              icon={Sparkles}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)]"
+            >
+              Titles Only
+            </Button>
+            <Button
+              onClick={() => onBulkAiRewrite('description')}
+              icon={Sparkles}
+              size="sm"
+              variant="secondary"
+              className="rounded-[var(--radius-lg)]"
+            >
+              Descriptions Only
+            </Button>
           </>
         )}
       </div>
@@ -72,43 +101,55 @@ export function BulkOperations({
         <SectionCard
           title={`Pattern Apply — ${approvalSelected.size} pages`}
           titleIcon={<Icon as={Type} size="md" className="text-teal-400" />}
-          action={<button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>}
+          action={(
+            <IconButton
+              onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }}
+              icon={X}
+              label="Close pattern apply panel"
+              size="sm"
+            />
+          )}
           className="!border-teal-500/30"
           noPadding
         >
           <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <select
+            <FormSelect
               value={bulkField}
-              onChange={e => onSetBulkField(e.target.value as 'title' | 'description')}
-              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
-            >
-              <option value="title">SEO Title</option>
-              <option value="description">Meta Description</option>
-            </select>
-            <select
+              onChange={value => onSetBulkField(value as 'title' | 'description')}
+              options={[
+                { value: 'title', label: 'SEO Title' },
+                { value: 'description', label: 'Meta Description' },
+              ]}
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
+            />
+            <FormSelect
               value={patternAction}
-              onChange={e => onSetPatternAction(e.target.value as 'append' | 'prepend')}
-              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
-            >
-              <option value="append">Append</option>
-              <option value="prepend">Prepend</option>
-            </select>
-            <input
+              onChange={value => onSetPatternAction(value as 'append' | 'prepend')}
+              options={[
+                { value: 'append', label: 'Append' },
+                { value: 'prepend', label: 'Prepend' },
+              ]}
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
+            />
+            <FormInput
               type="text"
               value={patternText}
-              onChange={e => onSetPatternText(e.target.value)}
+              onChange={onSetPatternText}
               placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
-              className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+              className="flex-1"
               autoFocus
             />
-            <button
+            <Button
               onClick={onPreviewPattern}
               disabled={!patternText.trim()}
-              className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded text-xs font-medium text-white transition-colors"
+              icon={Eye}
+              size="sm"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium"
             >
-              <Icon as={Eye} size="sm" /> Preview
-            </button>
+              Preview
+            </Button>
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
             {patternAction === 'append' ? 'Text will be added after' : 'Text will be added before'} each page's {bulkField === 'title' ? 'SEO title' : 'meta description'}.
@@ -125,12 +166,24 @@ export function BulkOperations({
           titleIcon={<Icon as={Eye} size="md" className="text-teal-400" />}
           action={
             <div className="flex items-center gap-2">
-              <button onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern} className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded text-xs font-medium text-white transition-colors">
-                <Icon as={Check} size="sm" /> Apply All
-              </button>
-              <button onClick={onClearPreview} className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded text-xs text-[var(--brand-text-bright)] transition-colors">
-                <Icon as={X} size="sm" /> Cancel
-              </button>
+              <Button
+                onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern}
+                icon={Check}
+                size="sm"
+                variant="primary"
+                className="rounded-[var(--radius-lg)] font-medium"
+              >
+                Apply All
+              </Button>
+              <Button
+                onClick={onClearPreview}
+                icon={X}
+                size="sm"
+                variant="secondary"
+                className="bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]"
+              >
+                Cancel
+              </Button>
             </div>
           }
           className="!border-teal-500/30"
@@ -157,20 +210,27 @@ export function BulkOperations({
 
       {/* Bulk operation progress */}
       {bulkMode === 'rewriting' && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-[var(--radius-lg)]">
+          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
           <div className="flex-1">
-            <div className="text-sm text-teal-300">
+            <div className="t-caption text-blue-300">
               {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
             </div>
             {bulkProgress.total > 0 && (
               <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-                <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
+                <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
               </div>
             )}
           </div>
           {onCancelRewrite && (
-            <button onClick={onCancelRewrite} className="t-caption-sm text-red-400 hover:text-red-300">Cancel</button>
+            <Button
+              onClick={onCancelRewrite}
+              variant="link"
+              size="sm"
+              className="!text-red-400 no-underline"
+            >
+              Cancel
+            </Button>
           )}
         </div>
       )}

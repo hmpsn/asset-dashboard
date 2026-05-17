@@ -8,7 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { X, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, FormInput } from '../ui';
 import type {
   ClientAction,
   InternalLinkPayload,
@@ -225,15 +225,16 @@ export function ClientActionDetailModal({
             <p className="t-body text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{action.summary}</p>
           )}
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onClose}
           aria-label="Close action review"
           autoFocus
-          className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+          className="flex-shrink-0 w-9 h-9 p-0 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]"
         >
           <X className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Scrollable body */}
@@ -257,13 +258,13 @@ export function ClientActionDetailModal({
           </>
         ) : (
           <>
-            <input
+            <FormInput
               type="text"
               value={changeNote}
-              onChange={e => setChangeNote(e.target.value)}
+              onChange={setChangeNote}
               placeholder="Describe what needs to change…"
               aria-label="Describe what needs to change"
-              className="flex-1 min-w-[200px] px-3 py-2 rounded-[var(--radius-md)] t-body bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
+              className="flex-1 min-w-[200px] t-body placeholder:text-[var(--brand-text-muted)] outline-none"
             />
             <Button variant="primary" disabled={submitting || !changeNote.trim()} onClick={() => onRequestChanges(changeNote.trim())}>
               {submitting ? 'Sending…' : 'Send feedback'}

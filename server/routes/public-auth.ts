@@ -62,7 +62,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       secure: IS_PROD,
     });
-    addActivity(ws.id, 'portal_session', 'Client portal session started', 'Via shared password');
+    addActivity(ws.id, 'portal_session', 'Client portal session started', 'Via shared password'); // client-visibility-ok: authentication session telemetry is admin-only by design
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: 'Incorrect password' });
@@ -108,7 +108,7 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
     res.cookie(`client_user_token_${ws.id}`, token, {
       httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
     });
-    addActivity(ws.id, 'portal_session', 'Client portal session started', `Via client login: ${safe.email}`, undefined, { id: safe.id, name: safe.name });
+    addActivity(ws.id, 'portal_session', 'Client portal session started', `Via client login: ${safe.email}`, undefined, { id: safe.id, name: safe.name }); // client-visibility-ok: authentication session telemetry is admin-only by design
     res.json({ ok: true, user: safe });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

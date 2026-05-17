@@ -49,7 +49,8 @@ When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring g
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
 4. **Before writing any implementation plan** — read `docs/PLAN_WRITING_GUIDE.md`.
 5. **Cross-reference before building** — search the codebase to verify a component/endpoint/feature doesn't already exist.
-6. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `docs/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
+6. **For new feature or substantial refactor work** — identify the owning bounded context from `docs/rules/platform-organization.md` before choosing files. Prefer adjacent, context-owned modules over new catch-all files.
+7. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `docs/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
 
 ### After completing a task
 
@@ -172,7 +173,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 8. **Progressive disclosure** — show summary first, details on demand.
 9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
 10. **AI prompt ↔ frontend rendering must be co-designed** — when a system prompt instructs the AI to format output a certain way (Markdown, JSON, prefixed labels), verify the frontend rendering matches. If a rewrite/insertion path uses `textContent` or `innerText`, the AI must be told to return plain prose, not Markdown. If a parsing path uses `match(/regex/)`, the AI's output format must be stable enough for the regex. Document the contract in the system prompt itself (e.g., "content is inserted into a live editor — no Markdown syntax").
-11. **`?tab=` deep-link two-halves contract** — when navigating to a component with `?tab=X` (via `navigate()`, `<Navigate>`, or any URL construction), the receiving component MUST read `useSearchParams` and initialize its tab state from the `'tab'` param. This is a two-halves contract: the sender appends `?tab=X`, the receiver reads it. Neither half alone is sufficient — a `?tab=` URL whose target ignores the param is a silent navigation bug (user sees the default tab instead of the requested one). Pattern: `const [searchParams] = useSearchParams(); const [tab, setTab] = useState(() => { const param = searchParams.get('tab'); return TABS.some(t => t.id === param) ? param : defaultTab; });`. Enforced by contract test (`tests/contract/tab-deep-link-wiring.test.ts`) and pr-check.
+11. **Content quality grounding** — factual content generation and review paths must use the research-mode/evidence contracts in `docs/rules/content-quality-grounding.md`. Preserve output-format contracts (`responseFormat`, `json: true`, clean HTML) and never let AI auto-check provenance-sensitive review items.
+12. **`?tab=` deep-link two-halves contract** — when navigating to a component with `?tab=X` (via `navigate()`, `<Navigate>`, or any URL construction), the receiving component MUST read `useSearchParams` and initialize its tab state from the `'tab'` param. This is a two-halves contract: the sender appends `?tab=X`, the receiver reads it. Neither half alone is sufficient — a `?tab=` URL whose target ignores the param is a silent navigation bug (user sees the default tab instead of the requested one). Pattern: `const [searchParams] = useSearchParams(); const [tab, setTab] = useState(() => { const param = searchParams.get('tab'); return TABS.some(t => t.id === param) ? param : defaultTab; });`. Enforced by contract test (`tests/contract/tab-deep-link-wiring.test.ts`) and pr-check.
 
 ---
 
@@ -224,6 +226,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Inbox abstraction** — `NormalizedDecision` in `shared/types/decision.ts` is the canonical interface for inbox items that unifies `ClientAction` and `ApprovalBatch`. Use it for any component or hook that renders or processes both types. `isSingleAction: true` → inline approve/decline UI; `false` → bulk modal (opens `DecisionDetailModal`).
 - **Outcome tracking types** — `shared/types/outcome-tracking.ts` defines `ActionType`, `Attribution`, `OutcomeScore`, `LearningsTrend`, and `EarlySignal` unions. Always use these typed values when creating tracked actions or outcomes — never inline string literals.
 - **Large edits**: break into multiple smaller edits if > 300 lines
+- **Platform organization** — new and substantially touched features must name an owning bounded context and follow the forward-looking structure in `docs/rules/platform-organization.md`. Prefer route-to-service extraction (`server/routes/*` as HTTP adapters; domain behavior in `server/domains/<domain>/` or established domain modules) over adding more logic to route files. Avoid whole-repo feature-folder migrations unless there is a pre-plan audit, phased migration plan, compatibility strategy, and verification gate for each phase.
 - **Delete-then-reinsert batch updates must preserve metadata** — batch-save UX is often implemented as delete-all + reinsert (simpler than per-row upserts). This permanently clobbers `created_at`, user-defined `sort_order`, and any approval/status column not present in the new payload. Always build a `Map<id, { createdAt, sortOrder, ... }>` from the pre-delete read and re-apply those fields on insert. See `updateBrandscriptSections` in `server/brandscript.ts` for the pattern.
 - **Prompt assembly layers must not duplicate content** — `buildSystemPrompt` in `server/prompt-assembly.ts` injects voice DNA + guardrails into the system message when `profile.status === 'calibrated'` (Layer 2). Any user-prompt code that manually inlines the same DNA must guard on `profile.status !== 'calibrated'` to avoid redundant injection that wastes tokens and confuses the model. Use `buildVoiceCalibrationContext(profile)` from `server/voice-calibration.ts` rather than hand-rolling the guard inline.
 - **Authority-layered fields — expose one resolved representation, never raw + format helper** — when a shared-type field has multiple authority sources (legacy column + override, global + workspace-specific, raw + computed), the single blessed representation is the pre-resolved form (e.g. `SeoContextSlice.effectiveBrandVoiceBlock`, which is pre-formatted by `buildSeoContext` with voice-profile authority applied). Callers inject that form DIRECTLY. Never ship a generic `format<Field>ForPrompt(raw)` helper alongside it — any caller who grabs the helper bypasses the authority chain, and the compiler cannot see the mistake because the raw field's type is still `string`. **Corollary:** when *adding* a new authority layer to an existing field, grep the repo for every format helper touching that field and delete them in the same commit. A helper that predates an authority layer cannot know about it. The reintroduction hazard is mechanized by the pr-check rule of the same name.
@@ -271,11 +274,13 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `MONETIZATION.md` | Tiers, pricing, Stripe spec, UX soft-gating |
 | `ACTION_PLAN.md` | Execution roadmap, decision log |
 | `data/roadmap.json` | Sprint tracking — what's done/pending |
-| `docs/PLAN_WRITING_GUIDE.md` | **Writing plans** — parallel agents, model assignments, PR gates, testing, verification |
+| `docs/PLAN_WRITING_GUIDE.md` | **Writing plans** — parallel agents, platform-appropriate model assignments, PR gates, testing, verification |
 | `docs/workflows/use-primitives.md` | When and how to use UI primitives |
 | `docs/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text |
 | `docs/workflows/feature-integration.md` | Connecting features together |
 | `docs/workflows/feature-shipped.md` | 9-step post-ship checklist |
+| `docs/workflows/platform-golden-paths.md` | Golden-path templates for admin CRUD, client-visible, background job, AI generation, analytics, and inbox work |
+| `docs/workflows/pr-readiness-checklist.md` | Pre-PR platform health checklist for context ownership, read paths, broadcasts, logging, tests, and verification |
 | `docs/workflows/wiring-patterns.md` | Adding data sources to chat/strategy/briefs |
 | `docs/workflows/stripe-integration.md` | Payment architecture |
 | `docs/workflows/auth-system.md` | Auth architecture and flows |
@@ -293,13 +298,19 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/ai-dispatch-patterns.md` | AI-call-before-DB-write race, transaction guards, retry-on-unique patterns |
 | `docs/rules/development-patterns.md` | Operational patterns — React Query hooks, WebSocket wiring checklist, route templates, DB query patterns, auth decision tree, feature flag lifecycle, testing quick reference |
 | `docs/rules/rich-text-content.md` | TipTap content invariants — HTML word-count helpers, sanitize-on-public-boundary trust model, `useAutoSave` shared-timer contract, RichTextEditor focus-guard pattern, side-effect coalescing |
+| `docs/rules/content-quality-grounding.md` | Research-mode and provenance contracts for factual content generation and post review |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 | `AI_CHATBOT_ROADMAP.md` | Client AI advisor roadmap — chat feature phases, upgrade hooks, proactive insights spec |
 | `GLOSSARY.md` | Domain terminology — Activity Log, Approval Batch, Blueprint, Insight, Playbook, etc. |
 | `docs/rules/background-generation.md` | Full background job platform contract — when to use it, worker patterns, pr-check escape hatch |
 | `docs/rules/inbox-section-routing.md` | Inbox section routing rules — Decisions vs Conversations vs Reviews routing logic |
+| `docs/rules/seo-editor-write-targets.md` | SEO Editor static/CMS/manual write-target contract |
 | `docs/rules/brand-engine.md` | Copy & Brand Engine contracts — voice profile, brandscript, prompt assembly patterns |
 | `docs/rules/workspace-intelligence.md` | Intelligence slice architecture — `assemble*()` functions, slice interfaces, token budget |
+| `docs/rules/platform-organization.md` | Bounded-context ownership, route-to-service extraction, and safe organization/refactor rules |
+| `docs/rules/platform-integration-surfaces.md` | Integration surfaces by bounded context — external APIs, DB/storage, AI calls, jobs, events, query keys, endpoints, activity types |
+| `docs/testing/platform-domain-smoke-matrix.md` | Fast smoke-test matrix by bounded context |
+| `docs/workflows/feature-class-definition-of-done.md` | Completion gates by feature class before PR closeout |
 | `docs/workflows/client-debug.md` | Debugging client-reported bugs — gather context, investigate data/UI/API/CMS issues |
 
 ---
@@ -310,7 +321,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 **Before dispatching subagents:** pre-commit shared contracts (types, function signatures, barrel exports, migrations), assign exclusive file ownership per task, and schedule a diff review checkpoint after every batch (git diff, grep duplicates, tsc, full test suite). Dispatch prompts must include app-level context: rate limiters, React Query caches, WS events, current conditional rendering state.
 
-**Every implementation plan must include:** task dependency graph, model assignments (Haiku/Sonnet/Opus), file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), and a verification strategy with specific commands. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
+**Every implementation plan must include:** task dependency graph, platform-appropriate model assignments, file ownership per parallel task, systemic improvements (shared utilities, pr-check rules, new tests), feature-class definition-of-done gates, and a verification strategy with specific commands. Name the active agent platform in the plan: Codex/OpenAI plans use `GPT-5.4-Mini` for mechanical cleanup, `GPT-5.4` for implementation with local judgment, and `GPT-5.5` for complex cross-context work and review; Claude/Anthropic plans use the corresponding `Haiku`/`Sonnet`/`Opus` ladder. For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
 
 ---
 

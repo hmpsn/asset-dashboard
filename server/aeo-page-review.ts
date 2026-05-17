@@ -234,6 +234,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     maxTokens: 5000,
     temperature: 0.4,
     responseFormat: { type: 'json_object' },
+    researchMode: true,
     feature: 'aeo-review',
     workspaceId,
   });

@@ -86,19 +86,29 @@ import briefingRoutes from './routes/briefing.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
+import { FakeSeoProvider } from './providers/fake-seo-provider.js';
+import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 import { registerWebflowRoutes } from './route-groups/webflow.js';
 import { registerPublicRoutes } from './route-groups/public.js';
 import { registerContentRoutes } from './route-groups/content.js';
+import mcpRouter from './mcp/index.js';
 
 // ─── Register SEO data providers ───
-registerProvider('semrush', new SemrushProvider());
-const dfsProv = new DataForSeoProvider();
-registerProvider('dataforseo', dfsProv);
-// Skip the billable probe in test mode — integration tests that import app.ts must not
-// trigger real API calls against DataForSEO even if CI env has DATAFORSEO_LOGIN set.
-// Unit tests call provider.init() directly to exercise the probe logic with mocked fetch.
-if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-  dfsProv.init().catch((err: unknown) => log.warn({ err }, 'DataForSEO capability probe failed'));
+if (isLocalFakeProviderModeEnabled()) {
+  const fakeProvider = new FakeSeoProvider();
+  registerProvider('semrush', fakeProvider);
+  registerProvider('dataforseo', fakeProvider);
+  log.warn('LOCAL_FAKE_PROVIDERS enabled: registering fake SEO providers for local onboarding');
+} else {
+  registerProvider('semrush', new SemrushProvider());
+  const dfsProv = new DataForSeoProvider();
+  registerProvider('dataforseo', dfsProv);
+  // Skip the billable probe in test mode — integration tests that import app.ts must not
+  // trigger real API calls against DataForSEO even if CI env has DATAFORSEO_LOGIN set.
+  // Unit tests call provider.init() directly to exercise the probe logic with mocked fetch.
+  if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+    dfsProv.init().catch((err: unknown) => log.warn({ err }, 'DataForSEO capability probe failed'));
+  }
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -195,6 +205,9 @@ export function createApp(): express.Express {
     }
     next();
   });
+
+  // ─── MCP server (own Bearer-token auth, not behind APP_PASSWORD gate) ───
+  app.use('/mcp', mcpRouter);
 
   // --- Populate req.user from JWT when present (non-blocking) ---
   app.use(optionalAuth);

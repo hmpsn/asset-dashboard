@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Activity, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, Skeleton } from '../../ui';
+import { Button, ClickableRow, SectionCard, Badge, EmptyState, FormSelect, Skeleton } from '../../ui';
 import { useOutcomeActions } from '../../../hooks/admin/useOutcomes';
 import type { ActionType, TrackedAction } from '../../../../shared/types/outcome-tracking';
 import { ACTION_TYPE_LABELS, formatOutcomeDate } from './outcomeConstants';
@@ -70,7 +70,7 @@ function ActionRow({ action }: ActionRowProps) {
 
   return (
     <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden">
-      <button
+      <ClickableRow
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-3)] transition-colors"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
@@ -78,7 +78,7 @@ function ActionRow({ action }: ActionRowProps) {
         {/* Type badge */}
         <Badge
           label={ACTION_TYPE_LABELS[action.actionType] ?? action.actionType}
-          color="blue"
+          tone="blue"
         />
 
         {/* Page + keyword */}
@@ -111,7 +111,7 @@ function ActionRow({ action }: ActionRowProps) {
             <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
           )}
         </div>
-      </button>
+      </ClickableRow>
 
       {expanded && (
         <div className="border-t border-[var(--brand-border)] px-4 py-3 space-y-3 bg-[var(--surface-2)]">
@@ -185,33 +185,29 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter className="w-3.5 h-3.5 text-[var(--brand-text-muted)] shrink-0" />
-        <select
+        <FormSelect
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          onChange={setTypeFilter}
+          options={ACTION_TYPE_OPTIONS}
+          className="t-caption-sm transition-colors"
           aria-label="Filter by action type"
-        >
-          {ACTION_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-        <select
+        />
+        <FormSelect
           value={scoreFilter}
-          onChange={(e) => setScoreFilter(e.target.value)}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          onChange={setScoreFilter}
+          options={SCORE_OPTIONS}
+          className="t-caption-sm transition-colors"
           aria-label="Filter by score"
-        >
-          {SCORE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        />
         {(typeFilter || scoreFilter) && (
-          <button
+          <Button
             onClick={() => { setTypeFilter(''); setScoreFilter(''); }}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+            variant="ghost"
+            size="sm"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             Clear filters
-          </button>
+          </Button>
         )}
       </div>
 
@@ -244,4 +240,3 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
     </div>
   );
 }
-

@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, PageHeader} from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -78,7 +78,7 @@ export function SearchTab({
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
-    <PageHeader title="Search Performance" subtitle={`${overview.dateRange.start} — ${overview.dateRange.end}`} className="mb-2" />
+    <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
 
     {/* AI-style takeaway */}
     <SectionCard variant="subtle" noPadding>
@@ -91,7 +91,7 @@ export function SearchTab({
     {/* Compact metrics bar */}
     <CompactStatBar items={[
       { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-accent-info', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
-      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-accent-brand', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
+      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-accent-info', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
       { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-accent-success', sub: searchComparison ? `${searchComparison.change.ctr > 0 ? '+' : ''}${searchComparison.change.ctr}pp` : undefined, subColor: searchComparison ? (searchComparison.change.ctr >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
       { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-accent-warning', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
     ]} />
@@ -178,9 +178,15 @@ export function SearchTab({
         <>
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
-              <button key={st} type="button" onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-[var(--radius-md)] t-ui font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
-              >{st === 'queries' ? 'Queries' : 'Pages'}</button>
+              <Button
+                key={st}
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchSubTab(st)}
+                className={`rounded-[var(--radius-md)] t-ui font-medium ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+              >
+                {st === 'queries' ? 'Queries' : 'Pages'}
+              </Button>
             ))}
           </div>
           <table className="w-full t-caption">
@@ -188,11 +194,16 @@ export function SearchTab({
               <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
               {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                 <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                  <button type="button" onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text)]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort(key)}
+                    className="ml-auto px-0 py-0 hover:bg-transparent hover:text-[var(--brand-text)]"
+                  >
                     {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
                     {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
-                  </button>
+                  </Button>
                 </th>
               ))}
             </tr></thead>

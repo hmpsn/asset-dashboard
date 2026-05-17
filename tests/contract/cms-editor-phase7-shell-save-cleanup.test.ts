@@ -23,7 +23,7 @@ describe('CmsEditor phase-7 shell + save cleanup contract', () => {
     expect(cmsEditorSource).not.toContain('/api/webflow/collections/${collectionId}/items/${itemId}');
     expect(cmsEditorSource).not.toContain('setSaving(prev => new Set(prev).add(itemId))');
     expect(cmsEditorSource).not.toContain('Edit SEO-relevant fields on collection items');
-    expect(cmsEditorSource).not.toContain('Send for Approval (');
+    expect(cmsEditorSource).not.toContain('Send to client (');
     expect(cmsEditorSource).not.toContain('placeholder="Search items..."');
   });
 
@@ -33,7 +33,8 @@ describe('CmsEditor phase-7 shell + save cleanup contract', () => {
 
     expect(shellPanelsSource).toContain('export function CmsEditorShellPanels');
     expect(shellPanelsSource).toContain('Edit SEO-relevant fields on collection items');
-    expect(shellPanelsSource).toContain('Send for Approval (');
+    expect(shellPanelsSource).toContain('Send to client (');
+    expect(shellPanelsSource).toContain('Add a note for your client (optional)');
     expect(shellPanelsSource).toContain('placeholder="Search items..."');
 
     expect(saveHookSource).toContain('export function useCmsEditorSaveWorkflow');

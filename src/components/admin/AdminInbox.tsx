@@ -12,7 +12,7 @@ import { ChevronDown, ChevronUp, Inbox, MessageSquare, CheckCircle } from 'lucid
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
-import { Icon, cn } from '../ui/index';
+import { Button, ClickableRow, Icon, cn } from '../ui/index';
 import { useClientSignals, useUpdateSignalStatus } from '../../hooks/admin/useClientSignals';
 import type { ClientSignal, ClientSignalStatus } from '../../../shared/types/client-signals';
 
@@ -48,8 +48,8 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
   return (
     <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden">
       {/* Header row */}
-      <button
-        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
+      <ClickableRow
+        className="flex items-start gap-3 px-4 py-3 hover:bg-[var(--surface-3)] text-left"
         onClick={() => setExpanded(p => !p)}
       >
         <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -75,7 +75,7 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
           ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0 mt-1" />
           : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0 mt-1" />
         }
-      </button>
+      </ClickableRow>
 
       {/* Expanded: chat context + actions */}
       {expanded && (
@@ -111,19 +111,22 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
           <div className="flex items-center gap-2 pt-1">
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Mark as:</span>
             {(['reviewed', 'actioned'] as ClientSignalStatus[]).map(s => (
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 key={s}
                 onClick={() => handleStatus(s)}
                 disabled={signal.status === s || updateStatus.isPending}
                 className={cn(
-                  't-caption-sm px-2 py-1 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40',
+                  't-caption-sm px-2 py-1 rounded-[var(--radius-md)] border disabled:opacity-40',
                   signal.status === s
                     ? STATUS_COLORS[s]
                     : 'border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:border-teal-500/40 hover:text-accent-brand'
                 )}
               >
                 {STATUS_LABELS[s]}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -143,7 +146,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   const titleIcon = <Icon as={Inbox} size="md" className="text-[var(--brand-text-muted)]" />;
 
   const newBadge = newSignals.length > 0 ? (
-    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 text-accent-warning border border-amber-500/20">
+    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/10 text-accent-warning border border-amber-500/20">
       {newSignals.length} new
     </span>
   ) : undefined;
@@ -167,18 +170,21 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
       {/* Tab bar */}
       <div className="flex gap-1 mb-3">
         {(['new', 'all'] as const).map(tab => (
-          <button
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'px-3 py-1 rounded-[var(--radius-lg)] t-caption font-medium transition-colors',
+              'px-3 py-1 rounded-[var(--radius-lg)] t-caption font-medium',
               activeTab === tab
                 ? 'bg-teal-500/10 text-accent-brand border border-teal-500/20'
                 : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
             )}
           >
             {tab === 'new' ? `New (${newSignals.length})` : `All (${allSignals.length})`}
-          </button>
+          </Button>
         ))}
       </div>
 

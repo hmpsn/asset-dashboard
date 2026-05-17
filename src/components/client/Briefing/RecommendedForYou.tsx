@@ -10,7 +10,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
-import { SectionCard, Icon, TierGate } from '../../ui';
+import { Badge, SectionCard, Icon, TierGate, Button, type BadgeTone } from '../../ui';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { fmtNum } from '../../../utils/formatNumbers';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming';
@@ -39,18 +39,18 @@ const kdColor = (kd?: number) =>
     ? 'text-accent-warning'
     : 'text-accent-danger';
 
-const intentColor = (intent?: string): string => {
+const intentTone = (intent?: string): BadgeTone => {
   switch (intent) {
     case 'informational':
-      return 'text-accent-info bg-blue-500/10 border-blue-500/20';
+      return 'blue';
     case 'commercial':
-      return 'text-accent-brand bg-teal-500/10 border-teal-500/20';
+      return 'teal';
     case 'transactional':
-      return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
+      return 'emerald';
     case 'navigational':
-      return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+      return 'amber';
     default:
-      return 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
+      return 'zinc';
   }
 };
 
@@ -82,13 +82,6 @@ export function RecommendedForYou({
       <SectionCard title="RECOMMENDED FOR YOU" variant="default">
       <div className="space-y-2">
         {visible.map((rec) => {
-          const prioColor =
-            rec.priority === 'high'
-              ? 'text-accent-danger bg-red-500/10 border-red-500/20'
-              : rec.priority === 'medium'
-              ? 'text-accent-warning bg-amber-500/10 border-amber-500/20'
-              : 'text-[var(--brand-text)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
-
           return (
             <div
               key={rec.targetKeyword}
@@ -99,26 +92,14 @@ export function RecommendedForYou({
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                   {rec.topic}
                   {rec.opportunityScore != null && (
-                    <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
-                      {rec.opportunityScore}/100
-                    </span>
+                    <Badge label={`${rec.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
                   )}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(rec.intent)}`}
-                  >
-                    {rec.intent}
-                  </span>
-                  <span
-                    className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${prioColor}`}
-                  >
-                    {rec.priority}
-                  </span>
+                  <Badge label={rec.intent ?? ''} tone={intentTone(rec.intent)} variant="outline" shape="pill" className="uppercase" />
+                  <Badge label={rec.priority ?? ''} tone={rec.priority === 'high' ? 'red' : rec.priority === 'medium' ? 'amber' : 'zinc'} variant="outline" />
                   {rec.suggestedPageType && rec.suggestedPageType !== 'blog' && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">
-                      {rec.suggestedPageType}
-                    </span>
+                    <Badge label={rec.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
                   )}
                 </div>
               </div>
@@ -169,21 +150,27 @@ export function RecommendedForYou({
                 {/* Tier-aware CTA buttons */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {tier === 'premium' ? (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Check}
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
                     >
-                      <Icon as={Check} size="sm" className="text-accent-brand" />
                       Generate Brief (included) &rarr;
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Sparkles}
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+                      className="rounded-[var(--radius-lg)] bg-teal-600/20 border-teal-500/30 text-accent-brand hover:bg-teal-600/40"
                     >
-                      <Icon as={Sparkles} size="sm" className="text-accent-brand" />
                       Generate Brief &rarr;
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -208,24 +195,16 @@ export function RecommendedForYou({
                 {Array.isArray(rec.serpFeatures) && rec.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {rec.serpFeatures.includes('featured_snippet') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-                        ⬜ Snippet
-                      </span>
+                      <Badge label="⬜ Snippet" tone="blue" variant="outline" />
                     )}
                     {rec.serpFeatures.includes('people_also_ask') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-                        ❓ PAA
-                      </span>
+                      <Badge label="❓ PAA" tone="blue" variant="outline" />
                     )}
                     {rec.serpFeatures.includes('video') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-                        ▶ Video
-                      </span>
+                      <Badge label="▶ Video" tone="blue" variant="outline" />
                     )}
                     {rec.serpFeatures.includes('local_pack') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-                        📍 Local
-                      </span>
+                      <Badge label="📍 Local" tone="blue" variant="outline" />
                     )}
                   </div>
                 )}
@@ -275,19 +254,25 @@ export function RecommendedForYou({
       {hiddenCount > 0 && (
         <div className="mt-3 text-center">
           {expanded ? (
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => setExpanded(false)}
-              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors no-underline"
             >
               Show less
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => setExpanded(true)}
-              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors"
+              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors no-underline"
             >
               Show {hiddenCount} more
-            </button>
+            </Button>
           )}
         </div>
       )}

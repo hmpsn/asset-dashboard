@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3, Loader2 } from 'lucide-react';
-import { Button, ClickableRow, Icon } from '../ui';
+import { Button, ClickableRow, FormInput, FormTextarea, Icon } from '../ui';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost, ContentTopicRequest, PostSection } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
@@ -227,22 +227,22 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <div className="mt-3 space-y-3">
             <label className="block">
               <span className="t-label text-[var(--brand-text-muted)]">Title</span>
-              <input
+              <FormInput
                 value={post.title}
-                onChange={e => {
-                  updateLocalPost({ title: e.target.value });
-                  scheduleTitleSave(e.target.value);
+                onChange={value => {
+                  updateLocalPost({ title: value });
+                  scheduleTitleSave(value);
                 }}
                 className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
               />
             </label>
             <label className="block">
               <span className="t-label text-[var(--brand-text-muted)]">Meta description</span>
-              <textarea
+              <FormTextarea
                 value={post.metaDescription}
-                onChange={e => {
-                  updateLocalPost({ metaDescription: e.target.value });
-                  scheduleMetaSave(e.target.value);
+                onChange={value => {
+                  updateLocalPost({ metaDescription: value });
+                  scheduleMetaSave(value);
                 }}
                 rows={3}
                 className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
@@ -341,11 +341,11 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <div className="space-y-2">
               <label className="block">
                 <span className="t-label text-[var(--brand-text-muted)]">Heading</span>
-                <input
+                <FormInput
                   value={section.heading}
-                  onChange={e => {
-                    updateLocalSection(section.index, { heading: e.target.value });
-                    scheduleSectionHeadingSave(e.target.value);
+                  onChange={value => {
+                    updateLocalSection(section.index, { heading: value });
+                    scheduleSectionHeadingSave(value);
                   }}
                   className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
                 />
@@ -448,11 +448,11 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           {showFeedback ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
         </ClickableRow>
         {showFeedback && (
-          <textarea
+          <FormTextarea
             value={feedback}
-            onChange={e => setFeedback(e.target.value)}
+            onChange={setFeedback}
             placeholder="e.g. 'Please make the tone less formal' or 'Add more specifics about our pricing model in section 2'"
-            className="mt-2 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:border-teal-500/50 focus:outline-none resize-y"
+            className="mt-2 w-full t-caption"
             rows={3}
           />
         )}

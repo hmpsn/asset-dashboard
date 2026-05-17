@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react';
+import { Button } from '../../ui';
 
 interface Props {
   generatedAt: string;
@@ -26,15 +27,17 @@ export function BriefHeader({ generatedAt, onRegenerate, isGenerating }: Props) 
           Generated {formatRelativeTime(generatedAt)}
         </p>
       </div>
-      <button
+      <Button
         onClick={onRegenerate}
         disabled={isGenerating}
-        className="flex items-center gap-1.5 t-caption-sm font-medium px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        size="sm"
+        variant="secondary"
+        className="font-medium rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
         title="Regenerate brief"
       >
-        <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+        <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} aria-hidden="true" />
         {isGenerating ? 'Generating\u2026' : 'Regenerate'}
-      </button>
+      </Button>
     </div>
   );
 }

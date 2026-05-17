@@ -106,7 +106,7 @@ function ContentSection({ data }: ContentSectionProps) {
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Best Performing Topics</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestPerformingTopics.slice(0, 6).map((topic) => (
-                <Badge key={topic} label={topic} color="blue" />
+                <Badge key={topic} label={topic} tone="blue" />
               ))}
             </div>
           </div>
@@ -183,7 +183,7 @@ function StrategySection({ data }: StrategySectionProps) {
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Best Intent Types</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestIntentTypes.slice(0, 5).map((intent) => (
-                <Badge key={intent} label={intent} color="blue" />
+                <Badge key={intent} label={intent} tone="blue" />
               ))}
             </div>
           </div>
@@ -242,7 +242,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Schema Types Driving Rich Results</p>
             <div className="flex flex-wrap gap-1.5">
               {data.schemaTypesWithRichResults.map((type) => (
-                <Badge key={type} label={type} color="blue" />
+                <Badge key={type} label={type} tone="blue" />
               ))}
             </div>
           </div>
@@ -308,7 +308,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         titleExtra={
           <Badge
             label={confidenceLabel(learnings.confidence)}
-            color={confidenceColor(learnings.confidence)}
+            tone={confidenceColor(learnings.confidence)}
           />
         }
         action={

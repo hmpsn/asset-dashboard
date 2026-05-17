@@ -13,9 +13,9 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
-import { applySuppressionsToAudit } from '../helpers.js';
 import { verifyClientSession } from '../middleware.js';
-import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../reports.js';
+import { getLatestSnapshotBefore } from '../reports.js';
+import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
@@ -50,6 +50,7 @@ import {
 } from '../schemas/keyword-feedback.js';
 import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
+import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 
 const log = createLogger('public-portal');
 
@@ -72,49 +73,11 @@ router.get('/api/public/workspace/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
-  // Only expose safe fields for client view
-  res.json({
-    id: ws.id,
-    name: ws.name,
-    webflowSiteId: ws.webflowSiteId,
-    webflowSiteName: ws.webflowSiteName,
-    gscPropertyUrl: ws.gscPropertyUrl,
-    ga4PropertyId: ws.ga4PropertyId,
-    liveDomain: ws.liveDomain,
-    eventConfig: ws.eventConfig || [],
-    eventGroups: ws.eventGroups || [],
-    requiresPassword: !!ws.clientPassword,
-    // Feature toggles
-    clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
-    seoClientView: !!ws.seoClientView,
-    analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
-    siteIntelligenceClientView: ws.siteIntelligenceClientView != null ? !!ws.siteIntelligenceClientView : true,
-    // Business profile — safe to expose to client portal
-    businessProfile: ws.businessProfile || null,
-    autoReports: !!ws.autoReports,
-    // Branding
-    brandLogoUrl: ws.brandLogoUrl || '',
-    brandAccentColor: ws.brandAccentColor || '',
-    // Content pricing
-    contentPricing: ws.contentPricing || null,
-    // Monetization — trial-resolved tier
-    tier: computeEffectiveTier(ws),
-    baseTier: ws.tier || 'free',
-    isTrial: computeEffectiveTier(ws) === 'growth' && (ws.tier || 'free') === 'free',
-    trialDaysRemaining: ws.trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      : 0,
-    trialEndsAt: ws.trialEndsAt || null,
+  res.json(toPublicWorkspaceView(ws, {
     stripeEnabled: isStripeConfigured(),
-    billingMode: ws.billingMode || 'platform',
-    // Onboarding
-    onboardingEnabled: ws.onboardingEnabled ?? false,
-    onboardingCompleted: ws.onboardingCompleted ?? false,
-    // Auth mode
     hasClientUsers: hasClientUsers(req.params.id),
-    // Studio-level settings exposed to client portal
     bookingUrl: getBookingUrl() ?? null,
-  });
+  }));
 });
 
 // Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
@@ -277,10 +240,9 @@ router.get('/api/public/pricing/:id', (req, res) => {
 router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
-  const latest = getLatestSnapshot(ws.webflowSiteId);
+  const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
-  // Apply suppressions so scores exclude suppressed issues
-  const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions || []);
+  const filtered = latest.audit;
   res.json({
     id: latest.id,
     createdAt: latest.createdAt,
@@ -288,6 +250,7 @@ router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
     totalPages: filtered.totalPages,
     errors: filtered.errors,
     warnings: filtered.warnings,
+    infos: filtered.infos,
     previousScore: latest.previousScore,
   });
 });
@@ -295,18 +258,18 @@ router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
 router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
-  const latest = getLatestSnapshot(ws.webflowSiteId);
+  const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
-  // Apply suppressions so client sees filtered issues and recalculated scores
-  const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions || []);
-  const history = listSnapshots(ws.webflowSiteId);
+  const filtered = latest.audit;
+  const history = listEffectiveSnapshotSummaries(ws.webflowSiteId, ws.auditSuppressions || []);
+  const previousScore = latest.previousScore;
 
   // Compute audit diff against the previous snapshot (what changed since last audit)
   let auditDiff: { resolved: number; newIssues: number } | undefined;
-  if (latest.previousScore != null) {
+  if (previousScore != null) {
     const prev = getLatestSnapshotBefore(ws.webflowSiteId, latest.id);
     if (prev) {
-      const prevFiltered = applySuppressionsToAudit(prev.audit, ws.auditSuppressions || []);
+      const prevFiltered = getEffectiveAudit(prev.audit, ws.auditSuppressions || []);
       // Build issue key sets: "check::slug" for each page issue
       const prevKeys = new Set<string>();
       for (const page of prevFiltered.pages) {
@@ -327,9 +290,9 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
     createdAt: latest.createdAt,
     siteName: latest.siteName,
     logoUrl: latest.logoUrl,
-    previousScore: latest.previousScore,
+    previousScore,
     audit: filtered,
-    scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore })),
+    scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore, errors: h.errors, warnings: h.warnings })),
     auditDiff,
   });
 });
@@ -449,7 +412,6 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
-// broadcast-ok: keyword feedback is internal strategy input, not live workspace content; local UI updates optimistically.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -488,6 +450,12 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   }
 
   log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    keyword,
+    status: 'cleared',
+    previousStatus: existing.status,
+    source: existing.source,
+  });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${existing.status})`, 'Via client portal');
   res.json({ deleted: keyword, existed: true });

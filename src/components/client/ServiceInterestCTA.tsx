@@ -13,6 +13,7 @@
 import { ArrowRight, CheckCircle, Loader2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
 import { useCreateClientSignal } from '../../hooks/admin/useClientSignals';
 import { ApiError } from '../../api/client';
+import { Button } from '../ui';
 
 interface ServiceInterestCTAProps {
   type: 'content_interest' | 'service_interest';
@@ -82,14 +83,16 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
           <Clock className="w-4 h-4 text-accent-warning flex-shrink-0" />
           <span className="t-caption text-accent-warning">Please try again in a moment.</span>
         </div>
-        <button
+        <Button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 t-micro text-accent-warning hover:text-accent-warning transition-colors"
+          variant="link"
+          size="sm"
+          className="no-underline hover:no-underline flex items-center gap-1 t-micro text-accent-warning hover:text-accent-warning"
           aria-label="Retry"
         >
           <RefreshCw className="w-3 h-3" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -99,22 +102,27 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
     return (
       <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50">
         <span className="t-caption text-[var(--brand-text)]">Something went wrong.</span>
-        <button
+        <Button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 t-micro text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          variant="link"
+          size="sm"
+          className="no-underline hover:no-underline flex items-center gap-1 t-micro text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
           aria-label="Try again"
         >
           <RefreshCw className="w-3 h-3" />
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="mt-3">
-      <button
+      <Button
         onClick={handleClick}
+        type="button"
+        variant="ghost"
+        size="sm"
         disabled={mutation.isPending}
         className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 hover:border-teal-500/40 transition-all disabled:opacity-60 group"
         aria-label={label}
@@ -130,7 +138,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
         ) : (
           <ArrowRight className="w-3.5 h-3.5 text-accent-brand flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         )}
-      </button>
+      </Button>
     </div>
   );
 }

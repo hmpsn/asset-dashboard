@@ -6,7 +6,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
+import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -272,41 +272,45 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       />
       {strategyTab === 'guide' && <KeywordStrategyGuide />}
       {strategyTab === 'analysis' && <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Keyword Strategy</h3>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-            {isRealStrategy
-              ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
-              : 'AI-powered keyword mapping for your entire site'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isRealStrategy && (
-            <button
-              onClick={() => generateStrategy('incremental')}
-              disabled={generating}
-              title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
-            >
-              Update changed pages
-            </button>
-          )}
-          <button
-            onClick={() => generateStrategy('full')}
-            disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption font-medium transition-colors"
-          >
-            {generating ? (
-              <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
-            ) : isRealStrategy ? (
-              <><Icon as={RefreshCw} size="sm" /> Regenerate</>
-            ) : (
-              <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
+      <PageHeader
+        title="Keyword Strategy"
+        subtitle={
+          isRealStrategy
+            ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
+            : 'AI-powered keyword mapping for your entire site'
+        }
+        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {isRealStrategy && (
+              <Button
+                onClick={() => generateStrategy('incremental')}
+                disabled={generating}
+                title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
+                variant="ghost"
+                size="sm"
+                className="rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
+              >
+                Update changed pages
+              </Button>
             )}
-          </button>
-        </div>
-      </div>
+            <Button
+              onClick={() => generateStrategy('full')}
+              disabled={generating}
+              size="sm"
+              className="rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium"
+            >
+              {generating ? (
+                <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
+              ) : isRealStrategy ? (
+                <><Icon as={RefreshCw} size="sm" /> Regenerate</>
+              ) : (
+                <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
+              )}
+            </Button>
+          </div>
+        }
+      />
 
       {!isRealStrategy && !generating && (
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
@@ -315,9 +319,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {/* Settings Panel */}
       {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-        <button
+        <ClickableRow
           onClick={() => setSettingsOpen(!settingsOpen)}
-          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
+          className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 text-left"
         >
           <div className="flex items-center gap-2">
             <Icon as={Briefcase} size="md" className="text-accent-brand" />
@@ -332,7 +336,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             )}
           </div>
           <Icon as={settingsOpen ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />
-        </button>
+        </ClickableRow>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-6">
             {/* SEO Data Provider */}
@@ -344,7 +348,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {providerList.filter(p => p.configured).map(p => (
-                    <button
+                    <ClickableRow
                       key={p.name}
                       onClick={() => {
                         setActiveProvider(p.name);
@@ -360,7 +364,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       <div className="t-caption-sm mt-0.5 opacity-70">
                         {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
                       </div>
-                    </button>
+                    </ClickableRow>
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
@@ -380,7 +384,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {(['none', 'quick', 'full'] as const).map(mode => (
-                    <button
+                    <ClickableRow
                       key={mode}
                       onClick={() => setSeoDataMode(mode)}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
@@ -395,7 +399,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                         {mode === 'quick' && '~500 credits'}
                         {mode === 'full' && '~7,500 credits'}
                       </div>
-                    </button>
+                    </ClickableRow>
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
@@ -414,7 +418,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <Icon as={Users} size="md" className="text-accent-orange" />
                     <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
-                  <button
+                  <Button
                     onClick={async () => {
                       setDiscoveringCompetitors(true);
                       setDiscoverError(null);
@@ -434,18 +438,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       }
                     }}
                     disabled={discoveringCompetitors}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-accent-orange font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
+                    variant="ghost"
+                    size="sm"
+                    className="px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-accent-orange font-medium hover:bg-orange-500/20"
                   >
                     {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-accent-orange" />}
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
-                  </button>
+                  </Button>
                 </div>
-                <input
+                <FormInput
                   type="text"
                   value={competitors}
-                  onChange={e => setCompetitors(e.target.value)}
+                  onChange={setCompetitors}
                   placeholder="e.g. competitor1.com, competitor2.com"
-                  className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
+                  className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                 />
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses your configured SEO data provider to find organic competitors. These persist between strategy runs.</p>
                 {discoverError && <p className="t-caption-sm text-accent-danger mt-1">{discoverError}</p>}
@@ -460,7 +466,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </div>
               <div className="grid grid-cols-4 gap-3">
                 {([200, 500, 1000, 0] as const).map(cap => (
-                  <button
+                  <ClickableRow
                     key={cap}
                     onClick={() => setMaxPages(cap)}
                     className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
@@ -476,7 +482,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       {cap === 1000 && '~10-15 min'}
                       {cap === 0 && 'No limit'}
                     </div>
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
@@ -488,22 +494,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
             {/* Business Context */}
             <div>
-              <button
+              <Button
                 onClick={() => setContextOpen(!contextOpen)}
-                className="flex items-center gap-1.5 mb-1"
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1.5 mb-1 px-0 py-0 h-auto min-h-0"
               >
                 <Icon as={Briefcase} size="md" className="text-accent-brand" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
                 <Icon as={contextOpen ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
-              </button>
+              </Button>
               {contextOpen && (
                 <div className="space-y-1.5">
-                  <textarea
+                  <FormTextarea
                     value={businessContext}
-                    onChange={e => setBusinessContext(e.target.value)}
+                    onChange={setBusinessContext}
                     placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
                     rows={3}
-                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
+                    className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                   />
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
                 </div>
@@ -595,20 +603,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 {notRankingCount > 0 && <div className="bg-[var(--surface-3)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500 inline-block" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500 inline-block" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500 inline-block" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60 inline-block" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></div>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
                   <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Search Intent Mix</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <span key={intent} className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(intent)}`}>
-                        {intent} ({count})
-                      </span>
+                      <Badge
+                        key={intent}
+                        label={`${intent} (${count})`}
+                        tone={intent === 'commercial' ? 'blue' : intent === 'informational' ? 'emerald' : intent === 'transactional' ? 'amber' : intent === 'navigational' ? 'teal' : 'zinc'}
+                        variant="outline"
+                        shape="pill"
+                      />
                     ))}
                   </div>
                 </div>
@@ -670,22 +682,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
                 const tracked = trackedKeywords.has(kw);
                 return (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded t-caption-sm text-accent-brand">
-                    {kw}
+                  <div key={i} className="inline-flex items-center gap-1.5 t-caption-sm text-accent-brand">
+                    <Badge label={kw} tone="teal" />
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
                         {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
                         {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
-                    <button
+                    <IconButton
                       onClick={() => trackKeyword(kw)}
                       title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
-                      className={`ml-0.5 transition-colors ${tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
-                    >
-                      {tracked ? <Icon as={Check} size="sm" className="text-accent-success" /> : <Icon as={Plus} size="sm" />}
-                    </button>
-                  </span>
+                      label={tracked ? 'Tracking' : 'Track in Rank Tracker'}
+                      icon={tracked ? Check : Plus}
+                      size="sm"
+                      variant="ghost"
+                      className={`ml-0.5 ${tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -703,7 +717,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
-                    <span className="w-4 h-4 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 t-caption-sm text-accent-brand font-bold">{i + 1}</span>
+                    <Badge label={`${i + 1}`} tone="teal" variant="outline" shape="pill" className="flex-shrink-0 mt-0.5 font-bold" />
                     {opp}
                   </div>
                 ))}

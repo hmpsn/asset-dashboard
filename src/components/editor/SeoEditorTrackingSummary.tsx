@@ -1,4 +1,4 @@
-import { StatusBadge } from '../ui';
+import { Button, StatusBadge } from '../ui';
 
 interface TrackingSummary {
   total: number;
@@ -24,12 +24,14 @@ export function SeoEditorTrackingSummary({
   if (summary.total === 0) {
     if (!workspaceId) return null;
     return (
-      <button
+      <Button
         onClick={onResetAll}
-        className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
+        variant="link"
+        size="sm"
+        className="px-0 py-0 h-auto min-h-0 t-caption-sm !text-[var(--brand-text-muted)] hover:!text-accent-danger"
       >
         Reset page tracking
-      </button>
+      </Button>
     );
   }
 
@@ -49,12 +51,14 @@ export function SeoEditorTrackingSummary({
       {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
       {summary.fixProposed > 0 && <span className="text-accent-info">{summary.fixProposed}</span>}
       {workspaceId && (
-        <button
+        <Button
           onClick={onResetAll}
-          className="ml-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
+          variant="link"
+          size="sm"
+          className="ml-auto px-0 py-0 h-auto min-h-0 t-caption-sm !text-[var(--brand-text-muted)] hover:!text-accent-danger"
         >
           reset all
-        </button>
+        </Button>
       )}
     </div>
   );

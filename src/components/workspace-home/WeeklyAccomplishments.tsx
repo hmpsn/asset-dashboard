@@ -26,7 +26,7 @@ export function WeeklyAccomplishments({ summary }: WeeklyAccomplishmentsProps) {
       <span className="text-[var(--brand-text)] font-medium">This week:</span>
       {items.map((item, i) => (
         <span key={item.label} className="flex items-center gap-1">
-          {i > 0 && <span className="text-zinc-700">·</span>}
+          {i > 0 && <span className="text-[var(--brand-text-dim)]">·</span>}
           <span className="inline-flex items-center gap-1">
             <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 font-medium tabular-nums">{item.value}</span>
             {item.label}{item.value !== 1 && item.label !== 'published' ? 's' : ''}

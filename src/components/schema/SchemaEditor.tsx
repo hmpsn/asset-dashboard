@@ -3,7 +3,7 @@
  * Extracted from SchemaSuggester.tsx schema editing logic.
  */
 import { AlertCircle, CheckCircle } from 'lucide-react';
-import { Icon } from '../ui';
+import { FormTextarea, Icon } from '../ui';
 
 export interface SchemaEditorProps {
   pageId: string;
@@ -16,10 +16,10 @@ export interface SchemaEditorProps {
 export function SchemaEditor({ pageId, schemaJson, parseError, hasEdits, onChange }: SchemaEditorProps) {
   return (
     <div className="relative">
-      <textarea
+      <FormTextarea
         value={schemaJson}
-        onChange={e => onChange(pageId, e.target.value)}
-        className={`w-full t-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 text-[var(--brand-text)] border ${parseError ? 'border-red-500/50' : 'border-teal-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus:border-teal-500/60`}
+        onChange={value => onChange(pageId, value)}
+        className={`w-full t-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 text-[var(--brand-text)] border ${parseError ? 'border-red-500/50' : 'border-emerald-500/30'} max-h-96 min-h-[200px] overflow-y-auto resize-y focus:outline-none focus:border-teal-500/60`}
         spellCheck={false}
       />
       {parseError && (
@@ -29,7 +29,7 @@ export function SchemaEditor({ pageId, schemaJson, parseError, hasEdits, onChang
         </div>
       )}
       {hasEdits && !parseError && (
-        <div className="flex items-center gap-1.5 mt-1.5 t-caption-sm text-teal-400">
+        <div className="flex items-center gap-1.5 mt-1.5 t-caption-sm text-emerald-400">
           <Icon as={CheckCircle} size="sm" />
           Valid JSON — edits will be used for copy &amp; publish
         </div>

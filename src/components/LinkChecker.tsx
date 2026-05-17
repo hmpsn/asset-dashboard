@@ -4,7 +4,7 @@ import {
   RefreshCw, Link2Off, Check, Download,
 } from 'lucide-react';
 import { get, getOptional } from '../api/client';
-import { Icon, cn } from './ui';
+import { FormSelect, Icon, cn, Button } from './ui';
 
 interface DeadLink {
   url: string;
@@ -101,7 +101,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
   if (!hasRun) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
           <Icon as={Link2Off} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] t-body">Find broken links and redirect chains across your site</p>
@@ -111,25 +111,26 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
         {domains && (
           <div className="flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">Crawl domain:</span>
-            <select
+            <FormSelect
               value={selectedDomain}
-              onChange={e => setSelectedDomain(e.target.value)}
-              className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg px-3 py-1.5 t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
-            >
-              <option value={domains.staging}>{domains.staging.replace('https://', '')} (staging)</option>
-              {domains.customDomains.map(d => (
-                <option key={d} value={d}>{d.replace('https://', '')} (live)</option>
-              ))}
-            </select>
+              onChange={setSelectedDomain}
+              options={[
+                { value: domains.staging, label: `${domains.staging.replace('https://', '')} (staging)` },
+                ...domains.customDomains.map(d => ({ value: d, label: `${d.replace('https://', '')} (live)` })),
+              ]}
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+            />
           </div>
         )}
-        <button
+        <Button
           onClick={runCheck}
           disabled={!selectedDomain}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg t-body font-medium transition-colors"
+          size="md"
+          variant="secondary"
+          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-body font-medium text-white border-0"
         >
           Run Link Check
-        </button>
+        </Button>
       </div>
     );
   }
@@ -172,7 +173,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
       </div>
 
       {data.deadLinks.length === 0 && data.redirects.length === 0 && (
-        <div className="flex items-center gap-3 px-4 py-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+        <div className="flex items-center gap-3 px-4 py-4 bg-emerald-500/10 border border-emerald-500/30 rounded-[var(--radius-lg)]">
           <Icon as={Check} size="lg" className="text-emerald-400" />
           <div>
             <div className="t-body font-medium text-emerald-300">All links are healthy!</div>
@@ -183,44 +184,56 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
 
       {/* Toolbar */}
       <div className="flex items-center gap-3">
-        <div className="flex bg-[var(--surface-2)] rounded-lg border border-[var(--brand-border)] p-0.5">
-          <button
+        <div className="flex bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
+          <Button
             onClick={() => setTab('dead')}
-            className={cn('px-3 py-1.5 t-caption font-medium rounded-md transition-colors', tab === 'dead' ? 'bg-red-500/20 text-red-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
+            size="sm"
+            variant="ghost"
+            className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors', tab === 'dead' ? 'bg-red-500/20 text-red-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
           >
             Dead Links ({data.deadLinks.length})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setTab('redirects')}
-            className={cn('px-3 py-1.5 t-caption font-medium rounded-md transition-colors', tab === 'redirects' ? 'bg-amber-500/20 text-amber-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
+            size="sm"
+            variant="ghost"
+            className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors', tab === 'redirects' ? 'bg-amber-500/20 text-amber-400' : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]')}
           >
             Redirects ({data.redirects.length})
-          </button>
+          </Button>
         </div>
-        <div className="flex bg-[var(--surface-2)] rounded-lg border border-[var(--brand-border)] p-0.5">
+        <div className="flex bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
           {(['all', 'internal', 'external'] as const).map(t => (
-            <button
+            <Button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={cn('px-3 py-1.5 t-caption font-medium rounded-md transition-colors capitalize', typeFilter === t ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
+              size="sm"
+              variant="ghost"
+              className={cn('px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] transition-colors capitalize', typeFilter === t ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
             >
               {t}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex-1" />
-        <button
+        <Button
           onClick={exportCsv}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors"
+          icon={Download}
+          size="sm"
+          variant="secondary"
+          className="bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium"
         >
-          <Icon as={Download} size="sm" /> Export CSV
-        </button>
-        <button
+          Export CSV
+        </Button>
+        <Button
           onClick={runCheck}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors"
+          icon={RefreshCw}
+          size="sm"
+          variant="secondary"
+          className="bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium"
         >
-          <Icon as={RefreshCw} size="sm" /> Re-check
-        </button>
+          Re-check
+        </Button>
       </div>
 
       {/* Link list */}
@@ -231,7 +244,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
           </div>
         ) : (
           filtered.map((link, idx) => (
-            <div key={idx} className="flex items-start gap-3 px-4 py-3 bg-[var(--surface-2)] hover:bg-[var(--surface-3)]/50 border border-[var(--brand-border)] transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={idx} className="flex items-start gap-3 px-4 py-3 bg-[var(--surface-2)] hover:bg-[var(--surface-3)]/50 border border-[var(--brand-border)] transition-colors" style={{ borderRadius: 'var(--radius-signature)' }}>
               {tab === 'dead' ? (
                 <Icon as={AlertCircle} size="md" className="mt-0.5 text-red-400 shrink-0" />
               ) : (
@@ -257,7 +270,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{link.statusText}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded border', link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text)]')}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok border', link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text)]')}>
                   {link.type}
                 </span>
                 <span className={cn('t-caption font-mono font-bold', tab === 'dead' ? 'text-red-400' : 'text-amber-400')}>

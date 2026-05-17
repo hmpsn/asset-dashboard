@@ -130,6 +130,55 @@ function buildClientRouteMap(): Map<string, string> {
     }
   }
 
+  // New composition-first shell path: ClientDashboardTabContent panels map
+  // (e.g. panels={{ overview: (<OverviewTab ... />), inbox: (<InboxTab ... />) }})
+  // Preserve a deterministic slug -> component mapping for deep-link contracts.
+  const panelToComponent: Record<string, string> = {
+    overview: 'OverviewTab',
+    performance: 'PerformanceTab',
+    health: 'HealthTab',
+    strategy: 'StrategyTab',
+    inbox: 'InboxTab',
+    'content-plan': 'ContentPlanTab',
+    plans: 'PlansTab',
+    roi: 'ROIDashboard',
+    brand: 'BrandTab',
+  };
+
+  const resolveAndSet = (pageSlug: string, componentName: string) => {
+    const importPath = componentPaths.get(componentName);
+    if (!importPath) return;
+    const base = importPath.replace(/^\.\//, 'components/');
+    for (const ext of ['.tsx', '.ts', '/index.tsx', '/index.ts']) {
+      const resolved = join(SRC_DIR, base + ext);
+      if (existsSync(resolved)) {
+        routeMap.set(pageSlug, resolved);
+        break;
+      }
+    }
+  };
+
+  const panelsStart = dashboard.indexOf('panels={{');
+  let panelsBlock = '';
+  if (panelsStart >= 0) {
+    let i = panelsStart + 'panels={{'.length;
+    let depth = 2; // "panels={{" opens two braces
+    while (i < dashboard.length && depth > 0) {
+      const ch = dashboard[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      i += 1;
+    }
+    panelsBlock = dashboard.slice(panelsStart, i);
+  }
+
+  for (const [pageSlug, componentName] of Object.entries(panelToComponent)) {
+    const panelKeyRe = new RegExp(`['"]?${pageSlug}['"]?\\s*:`);
+    if (panelKeyRe.test(panelsBlock)) {
+      resolveAndSet(pageSlug, componentName);
+    }
+  }
+
   return routeMap;
 }
 

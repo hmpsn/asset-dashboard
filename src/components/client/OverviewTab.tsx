@@ -9,7 +9,7 @@ import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import { useClientIntelligence } from '../../hooks/client';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow, PageHeader, SectionCard } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -94,9 +94,6 @@ export function OverviewTab({
   // flag can be flipped per-workspace without touching anything below this
   // block. When OFF (default), the original overview body renders unchanged.
   const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
-  // client-wins-surface: when WinsSurface is active on InsightsTab, PredictionShowcaseCard
-  // must not render simultaneously (PR 1.3 mutual exclusivity invariant).
-  const winsEnabled = useFeatureFlag('client-wins-surface');
   if (briefingV2Enabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
@@ -142,12 +139,9 @@ export function OverviewTab({
     return 'Here are your latest insights';
   })();
   return (<>
-    {/* Welcome header */}
-    <PageHeader
-      title={`Welcome back${clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}`}
-      subtitle={dynamicSubtitle}
-      className="mb-2"
-    />
+    <p className="t-body text-[var(--brand-text-muted)]">
+      Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}. {dynamicSubtitle}
+    </p>
 
     {/* Headline health score */}
     <HealthScoreCard score={clientIntel?.compositeHealthScore} />
@@ -156,7 +150,7 @@ export function OverviewTab({
     {(() => {
       const cards: { label: React.ReactNode; value: string; icon?: typeof Users; color: string; sub?: string; delta?: number }[] = [];
       if (ga4Overview) {
-        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#2dd4bf', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, delta: ga4Comparison?.changePercent.users });
+        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#60a5fa', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, delta: ga4Comparison?.changePercent.users });
       }
       if (overview) {
         cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, delta: searchComparison?.changePercent.clicks });
@@ -341,7 +335,8 @@ export function OverviewTab({
     )}
 
     {/* Predictions that came true — only render when wins surface is off AND server has populated the field (growth+) */}
-    {!winsEnabled && clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
+          {/* prediction-showcase-ungated-ok: wins surface flag is sunset and promoted by Wave 5. */}
+          {clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

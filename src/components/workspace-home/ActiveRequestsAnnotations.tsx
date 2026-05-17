@@ -1,6 +1,6 @@
 import { Clipboard, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, Badge, Icon } from '../ui';
+import { SectionCard, StatusBadge, Icon, Button } from '../ui';
 import { adminPath } from '../../routes';
 import { timeAgo } from '../../lib/timeAgo';
 
@@ -35,19 +35,27 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         <SectionCard
           title="Active Requests"
           titleIcon={<Icon as={Clipboard} size="md" className="text-amber-400/80" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={(
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => navigate(adminPath(workspaceId, 'requests'))}
+              className="no-underline text-teal-400 hover:text-teal-300"
+            >
+              View All →
+            </Button>
+          )}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]">
             {requests.slice(0, 5).map(req => {
-              const statusColor = req.status === 'new' || req.status === 'open' ? 'red' : req.status === 'in_progress' ? 'teal' : 'zinc';
               return (
                 <div key={req.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="t-caption text-[var(--brand-text-bright)] truncate">{req.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
                   </div>
-                  <Badge label={req.status} color={statusColor} />
+                  <StatusBadge domain="request" status={req.status} fallback="neutral" />
                 </div>
               );
             })}
@@ -59,13 +67,22 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         <SectionCard
           title="Recent Annotations"
           titleIcon={<Icon as={Flag} size="md" className="text-[var(--brand-text-muted)]" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={(
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+              className="no-underline text-teal-400 hover:text-teal-300"
+            >
+              View All →
+            </Button>
+          )}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]">
             {annotations.map(ann => (
               <div key={ann.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
+                <div className="w-2 h-2 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
                 <div className="flex-1 min-w-0">
                   <div className="t-caption text-[var(--brand-text-bright)] truncate">{ann.label}</div>
                 </div>

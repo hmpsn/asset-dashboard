@@ -33,6 +33,8 @@ vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammi
 vi.mock('../../server/helpers.js', () => ({
   findPageMapEntryForPage: vi.fn(() => ({ pagePath: '/services', primaryKeyword: 'seo services' })),
   matchGscUrlToPath: vi.fn(() => false),
+  sanitizeForPromptInjection: vi.fn((value: string) => `<untrusted_user_content>\n${value}\n</untrusted_user_content>`),
+  sanitizeQueryForPrompt: vi.fn((value: string) => value),
   stripCodeFences: vi.fn((value: string) => value),
   stripHtmlToText: vi.fn(() => 'Clean page copy'),
   tryResolvePagePath: vi.fn((page: { publishedPath?: string | null; slug?: string }) => page.publishedPath ?? (page.slug ? `/${page.slug}` : null)),
@@ -99,7 +101,7 @@ describe('webflow SEO bulk rewrite job', () => {
       jobId: 'job_1',
       workspaceId: 'ws_1',
       siteId: 'site_1',
-      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', currentSeoTitle: 'Old title' }],
+      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', publishedPath: '/services/seo', currentSeoTitle: 'Old title' }],
       field: 'title',
       workspace,
       signal: ac.signal,
@@ -107,13 +109,15 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledWith(expect.objectContaining({
       workspaceId: 'ws_1',
       siteId: 'site_1',
       pageId: 'page_1',
+      pageSlug: '/services/seo',
       field: 'title',
       variations: ['One improved title', 'Two improved title', 'Three improved title'],
     }));
@@ -132,7 +136,7 @@ describe('webflow SEO bulk rewrite job', () => {
       'seo_updated',
       'Bulk SEO rewrite: 1 title variations for 1/1 pages',
       'Background job completed',
-      { generated: 1, failed: 0, total: 1, field: 'title' },
+      { generated: 1, suggestions: 1, failed: 0, total: 1, field: 'title' },
     );
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job_1');
   });
@@ -153,6 +157,7 @@ describe('webflow SEO bulk rewrite job', () => {
         pageId: 'page_1',
         title: 'Services',
         slug: 'services',
+        publishedPath: '/services/seo',
         currentSeoTitle: 'Old title',
         currentDescription: 'Old description',
       }],
@@ -163,23 +168,33 @@ describe('webflow SEO bulk rewrite job', () => {
 
     expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
       feature: 'seo-bulk-rewrite-both',
-      json: false,
+      json: true,
+      researchMode: true,
       workspaceId: 'ws_1',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(1, expect.objectContaining({
       field: 'title',
+      pageSlug: '/services/seo',
       currentValue: 'Old title',
       variations: ['First services title', 'Second services title', 'Third services title'],
     }));
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(2, expect.objectContaining({
       field: 'description',
+      pageSlug: '/services/seo',
       currentValue: 'Old description',
       variations: ['First services description', 'Second services description', 'Third services description'],
     }));
     expect(mocks.updateJob).toHaveBeenCalledWith('job_both', expect.objectContaining({
       status: 'done',
-      result: expect.objectContaining({ suggestions: 2, failed: 0, total: 1, field: 'both' }),
+      result: expect.objectContaining({ suggestions: 2, generatedPages: 1, failed: 0, total: 1, field: 'both' }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:complete', expect.objectContaining({
+      generated: 2,
+      generatedPages: 1,
+      suggestions: 2,
+      total: 1,
+      field: 'both',
     }));
   });
 

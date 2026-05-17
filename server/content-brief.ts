@@ -667,13 +667,14 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   );
 
   const aiResult = await callAI({
+    operation: 'content-brief-regenerate',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
-    feature: 'content-brief-regenerate',
+    researchMode: true,
     workspaceId,
   });
 
@@ -822,6 +823,7 @@ Rules:
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.6,
+    researchMode: true,
     feature: 'content-brief-outline-regen',
     workspaceId,
   });
@@ -1264,6 +1266,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
+    researchMode: true,
     feature: 'content-brief',
     workspaceId,
   });

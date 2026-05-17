@@ -44,6 +44,7 @@ export interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
   slug: string;
+  publishedPath?: string | null;
   url: string;
   existingSchemas: string[];
   existingSchemaJson?: Record<string, unknown>[];
@@ -463,6 +464,7 @@ function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput)
     pageId: lean.pageId,
     pageTitle: lean.pageTitle,
     slug: lean.slug,
+    publishedPath: lean.publishedPath,
     url: lean.url,
     existingSchemas: lean.existingSchemas,
     suggestedSchemas: lean.suggestedSchemas,
@@ -667,7 +669,20 @@ export async function generateSchemaForPage(
     };
   }
 
-  const meta = await fetchPageMeta(pageId, tokenOverride);
+  const matchedPage = allPages.find(p => p.id === pageId);
+  const meta = matchedPage ? {
+    id: matchedPage.id,
+    title: matchedPage.title || '',
+    slug: matchedPage.slug || resolvePagePath(matchedPage).replace(/^\//, ''),
+    seo: matchedPage.seo,
+    openGraph: matchedPage.openGraph,
+    lastPublished: typeof (matchedPage as Record<string, unknown>).lastPublished === 'string'
+      ? ((matchedPage as Record<string, unknown>).lastPublished as string)
+      : undefined,
+    createdOn: typeof (matchedPage as Record<string, unknown>).createdOn === 'string'
+      ? ((matchedPage as Record<string, unknown>).createdOn as string)
+      : undefined,
+  } : await fetchPageMeta(pageId, tokenOverride);
   if (!meta) return null;
 
   const slug = meta.slug || '';
@@ -677,13 +692,12 @@ export async function generateSchemaForPage(
   // returns the leaf slug, which loses parent folder for nested pages (e.g. the page
   // published at /services/web-design would produce /web-design from slug alone).
   // Fall back to derived path if page list fails or page is not found.
-  let publishedPath = isHomepage ? '/' : `/${slug}`;
+  let publishedPath = isHomepage ? '/' : resolvePagePath({ slug });
   let siteContextForPage: SiteContext | undefined;
   try {
     if (wsId) {
-      const matched = allPages.find(p => p.id === pageId);
-      if (matched?.publishedPath) {
-        publishedPath = matched.publishedPath;
+      if (matchedPage?.publishedPath) {
+        publishedPath = matchedPage.publishedPath;
       }
       const latestPlan = getSchemaPlan(siteId);
       const activePlan = latestPlan?.status === 'active' ? latestPlan : null;

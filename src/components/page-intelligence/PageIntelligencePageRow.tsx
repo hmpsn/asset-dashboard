@@ -3,15 +3,19 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Minus,
   Plus,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { scoreColorClass, Icon } from '../ui';
+import { scoreColorClass, Icon, IconButton, ClickableRow } from '../ui';
 import {
   intentColor,
   kdColor,
   positionColor,
 } from './pageIntelligenceDisplay';
+import { summarizeScoreTrend } from './pageIntelligenceData';
 import type { ContentScore, KeywordData, KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
 import { PageIntelligencePageDetails } from './PageIntelligencePageDetails';
 
@@ -72,12 +76,23 @@ export function PageIntelligencePageRow({
 }: Props) {
   const strategy = page.strategy;
   const displayScore = analysis?.optimizationScore ?? strategy?.optimizationScore;
+  const scoreTrend = summarizeScoreTrend(strategy?.optimizationScoreHistory);
+  const trendIcon = scoreTrend?.direction === 'up'
+    ? TrendingUp
+    : scoreTrend?.direction === 'down'
+      ? TrendingDown
+      : Minus;
+  const trendClass = scoreTrend?.direction === 'up'
+    ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20'
+    : scoreTrend?.direction === 'down'
+      ? 'text-red-400/80 bg-red-500/8 border-red-500/20'
+      : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border-hover)]';
 
   return (
     <div className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-      <button
+      <ClickableRow
         onClick={() => onToggleExpanded(page.id)}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
+        className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isAnalyzing ? (
@@ -91,7 +106,7 @@ export function PageIntelligencePageRow({
             <div className="flex items-center gap-1.5">
               <span className="t-caption text-[var(--brand-text-bright)] truncate">{page.title}</span>
               {page.source === 'cms' && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 shrink-0" // arbitrary-text-ok
+                <span className="t-micro px-1 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 shrink-0" // arbitrary-text-ok
                 >CMS</span>
               )}
             </div>
@@ -107,20 +122,22 @@ export function PageIntelligencePageRow({
           {strategy?.primaryKeyword && (
             <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
               <span className="truncate">{strategy.primaryKeyword}</span>
-              <button
+              <IconButton
+                icon={trackedKeywords.has(strategy.primaryKeyword) ? Check : Plus}
+                label={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                size="sm"
+                variant="ghost"
                 onClick={event => {
                   event.stopPropagation();
                   onTrackKeyword(strategy.primaryKeyword);
                 }}
-                title={trackedKeywords.has(strategy.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                className={`flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
-              >
-                {trackedKeywords.has(strategy.primaryKeyword) ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-              </button>
+                className={`!h-auto !w-auto !p-0 flex-shrink-0 transition-colors ${trackedKeywords.has(strategy.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
+              />
             </span>
           )}
           {strategy?.validated === false && (
-            <span className="text-[10px] text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
+            <span className="t-micro text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
               Unvalidated
             </span>
           )}
@@ -138,8 +155,17 @@ export function PageIntelligencePageRow({
           {displayScore !== undefined && (
             <span className={`t-caption font-bold tabular-nums ${scoreColorClass(displayScore)}`}>{displayScore}</span>
           )}
+          {scoreTrend && (
+            <span
+              className={`inline-flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border tabular-nums ${trendClass}`}
+              title={`Optimization score changed from ${scoreTrend.previous} to ${scoreTrend.current}`}
+            >
+              <Icon as={trendIcon} size="xs" />
+              {scoreTrend.delta > 0 ? '+' : ''}{scoreTrend.delta}
+            </span>
+          )}
         </div>
-      </button>
+      </ClickableRow>
 
       {isExpanded && (
         <PageIntelligencePageDetails

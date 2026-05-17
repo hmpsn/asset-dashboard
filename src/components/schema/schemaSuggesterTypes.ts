@@ -20,6 +20,7 @@ export interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
   slug: string;
+  publishedPath?: string | null;
   url: string;
   existingSchemas: string[];
   existingSchemaJson?: Record<string, unknown>[];

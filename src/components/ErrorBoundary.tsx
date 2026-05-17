@@ -1,5 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react';
-import { Icon } from './ui';
+import { Button, Icon } from './ui';
 import { AlertTriangle } from 'lucide-react';
 
 interface Props {
@@ -41,12 +41,14 @@ export class ErrorBoundary extends Component<Props, State> {
               {this.state.error?.message || 'An unexpected error occurred'}
             </div>
           </div>
-          <button
+          <Button
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 rounded-[var(--radius-lg)] border border-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] transition-colors flex-shrink-0"
+            size="sm"
+            variant="secondary"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 rounded-[var(--radius-lg)] border border-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] flex-shrink-0"
           >
             Retry
-          </button>
+          </Button>
         </div>
       );
     }

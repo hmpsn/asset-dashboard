@@ -98,7 +98,7 @@ export function EmailCaptureGate({
                     value={field.value ?? ''}
                     placeholder="Your name"
                     autoComplete="name"
-                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                    className="t-body"
                   />
                 </FormField>
               )}
@@ -120,7 +120,7 @@ export function EmailCaptureGate({
                     value={field.value}
                     placeholder="Your email address"
                     autoComplete="email"
-                    className="bg-[var(--surface-3)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
+                    className="t-body"
                     autoFocus
                   />
                 </FormField>
@@ -135,13 +135,15 @@ export function EmailCaptureGate({
             >
               {isSubmitting ? '' : 'Continue to Dashboard'}
             </Button>
-            <button
+            <Button
               type="button"
               onClick={handleSkip}
-              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              variant="ghost"
+              size="sm"
+              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-transparent"
             >
               Skip for now
-            </button>
+            </Button>
           </form>
         </div>
       </div>

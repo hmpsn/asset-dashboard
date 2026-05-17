@@ -1,0 +1,16 @@
+{
+  "exceptions": [
+    {
+      "pr": 420,
+      "reason": "Historical stacked typography PR merged into an intermediate codex branch and superseded by later styleguide parity waves.",
+      "addedAt": "2026-05-17",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "pr": 796,
+      "reason": "Wave 11 stacked commit hash is not patch-equivalent in staging history; later wave promotions landed the enforcement contract directly on staging.",
+      "addedAt": "2026-05-17",
+      "expiresAt": "2026-09-30"
+    }
+  ]
+}

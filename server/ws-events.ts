@@ -14,6 +14,12 @@
 export const WS_EVENTS = {
   // Workspace settings / tier changes
   WORKSPACE_UPDATED: 'workspace:updated',
+  PAGE_STATE_UPDATED: 'page-state:updated',
+
+  // Billing / content subscriptions
+  CONTENT_SUBSCRIPTION_CREATED: 'content-subscription:created',
+  CONTENT_SUBSCRIPTION_UPDATED: 'content-subscription:updated',
+  CONTENT_SUBSCRIPTION_RENEWED: 'content-subscription:renewed',
 
   // Approvals
   APPROVAL_UPDATE: 'approval:update',

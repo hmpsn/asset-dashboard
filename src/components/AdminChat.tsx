@@ -4,7 +4,7 @@ import { ChatPanel } from './ChatPanel';
 import type { ChatMessage } from './ChatPanel';
 import { chat } from '../api/misc';
 import { useSmartPlaceholder } from '../hooks/useSmartPlaceholder';
-import { Icon, cn } from './ui';
+import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
 
 const ADMIN_QUICK_QUESTIONS = [
   'Give me a full status report on this site',
@@ -49,6 +49,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Reset state when workspace changes
+  // effect-layout-ok — workspace-change reset is intentional post-prop sync, not derived layout state.
   useEffect(() => {
     setMessages([]);
     setInput('');
@@ -143,10 +144,10 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
     <>
       {/* ── Floating trigger button ── */}
       {!open && (
-        <button onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-[var(--radius-pill)] bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] hover:brightness-105 text-white t-body font-medium shadow-lg shadow-black/30 transition-all z-[var(--z-modal)]">
-          <Icon as={Bot} size="md" /> Admin Insights
-        </button>
+        <Button onClick={() => setOpen(true)} variant="ghost" icon={Bot}
+          className="fixed bottom-6 right-6 px-4 py-3 rounded-[var(--radius-pill)] bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] hover:brightness-105 text-white t-body font-medium shadow-lg shadow-black/30 transition-all z-[var(--z-modal)]">
+          Admin Insights
+        </Button>
       )}
 
       {/* ── Chat panel ── */}
@@ -192,21 +193,42 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
             </div>
             <div className="flex items-center gap-0.5 flex-shrink-0">
               {messages.length > 0 && (
-                <button onClick={newSession} title="New conversation" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1">
-                  <Icon as={Plus} size="md" />
-                </button>
+                <IconButton
+                  onClick={newSession}
+                  title="New conversation"
+                  icon={Plus}
+                  label="New conversation"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1"
+                />
               )}
-              <button onClick={toggleHistory} title="Chat history"
-                className={cn('p-1', showHistory ? 'text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}>
-                <Icon as={MessageSquare} size="md" />
-              </button>
-              <button onClick={() => setDocked(d => !d)} title={docked ? 'Float panel' : 'Dock to side'}
-                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1">
-                {docked ? <Icon as={PanelRightClose} size="md" /> : <Icon as={PanelRightOpen} size="md" />}
-              </button>
-              <button onClick={() => setOpen(false)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1">
-                <Icon as={X} size="md" />
-              </button>
+              <IconButton
+                onClick={toggleHistory}
+                title="Chat history"
+                icon={MessageSquare}
+                label="Chat history"
+                variant="ghost"
+                size="sm"
+                className={cn('p-1', showHistory ? 'text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+              />
+              <IconButton
+                onClick={() => setDocked(d => !d)}
+                title={docked ? 'Float panel' : 'Dock to side'}
+                icon={docked ? PanelRightClose : PanelRightOpen}
+                label={docked ? 'Float panel' : 'Dock to side'}
+                variant="ghost"
+                size="sm"
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1"
+              />
+              <IconButton
+                onClick={() => setOpen(false)}
+                icon={X}
+                label="Close chat"
+                variant="ghost"
+                size="sm"
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-1"
+              />
             </div>
           </div>
 
@@ -216,16 +238,16 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               <p className="t-caption text-[var(--brand-text-muted)] mb-2">Previous conversations</p>
               {sessions.length === 0 && <p className="t-caption text-[var(--brand-text-muted)] italic">No past conversations yet.</p>}
               {sessions.map(s => (
-                <button key={s.id} onClick={() => loadSession(s.id)}
+                <ClickableRow key={s.id} onClick={() => loadSession(s.id)}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-[var(--radius-lg)] border transition-colors',
+                    'px-3 py-2 rounded-[var(--radius-lg)] border transition-colors',
                     s.id === sessionId
                       ? 'bg-accent-brand-soft border-accent-brand-soft text-accent-brand'
                       : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
                   )}>
                   <div className="t-caption font-medium truncate">{s.title}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
-                </button>
+                </ClickableRow>
               ))}
             </div>
           ) : (

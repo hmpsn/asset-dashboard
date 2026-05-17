@@ -147,7 +147,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {inReview > 0 && (
-                    <Badge label={`${inReview} needs review`} color="blue" />
+                    <Badge label={`${inReview} needs review`} tone="blue" />
                   )}
                   <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                     <div className="h-full bg-teal-500/50 rounded-[var(--radius-pill)] transition-all" style={{ width: `${progress}%` }} />

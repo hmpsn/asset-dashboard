@@ -8,7 +8,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useExportCopy } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, EmptyState, Icon, Button, cn } from '../ui';
+import { SectionCard, Badge, EmptyState, Icon, Button, cn, FormSelect } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { ExportFormat, ExportScope } from '../../../shared/types/copy-pipeline';
 import type { BlueprintEntry } from '../../../shared/types/page-strategy';
@@ -194,15 +194,17 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
             const isDisabled = option.disabled;
 
             return (
-              <button
+              <Button
                 key={option.value}
                 role="radio"
                 aria-checked={isSelected}
                 aria-disabled={isDisabled}
                 disabled={isDisabled}
                 onClick={() => !isDisabled && setSelectedFormat(option.value)}
+                variant="ghost"
+                size="md"
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors',
+                  'w-full justify-start gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors',
                   isDisabled
                     ? 'border-[var(--brand-border)] bg-[var(--surface-2)] opacity-40 cursor-not-allowed'
                     : isSelected
@@ -228,7 +230,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                       {option.label}
                     </span>
                     {isDisabled && option.disabledReason && (
-                      <Badge label={option.disabledReason} color="zinc" />
+                      <Badge label={option.disabledReason} tone="zinc" />
                     )}
                   </div>
                   <p
@@ -242,7 +244,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                 {isSelected && !isDisabled && (
                   <Icon as={CheckCircle2} size="md" className="text-teal-400 shrink-0" />
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -258,13 +260,15 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
             const isSelected = selectedScope === option.value;
 
             return (
-              <button
+              <Button
                 key={option.value}
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => setSelectedScope(option.value)}
+                variant="ghost"
+                size="md"
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors cursor-pointer',
+                  'w-full justify-start gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors cursor-pointer',
                   isSelected
                     ? 'border-teal-500 bg-teal-500/10'
                     : 'border-[var(--brand-border)] bg-[var(--surface-3)]/70 hover:border-[var(--brand-border-hover)]'
@@ -281,7 +285,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                   <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{option.description}</p>
                 </div>
                 {isSelected && <Icon as={CheckCircle2} size="md" className="text-teal-400 shrink-0" />}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -300,13 +304,15 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
               {exportableEntries.map(entry => {
                 const checked = selectedEntryIds.has(entry.id);
                 return (
-                  <button
+                  <Button
                     key={entry.id}
                     role="checkbox"
                     aria-checked={checked}
                     onClick={() => toggleEntryId(entry.id)}
+                    variant="ghost"
+                    size="md"
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border text-left transition-colors cursor-pointer',
+                      'w-full justify-start gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border text-left transition-colors cursor-pointer',
                       checked
                         ? 'border-teal-500/50 bg-teal-500/8'
                         : 'border-[var(--brand-border)] bg-[var(--surface-3)]/50 hover:border-[var(--brand-border-hover)]'
@@ -332,7 +338,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                       </p>
                       <p className="t-caption text-[var(--brand-text-muted)] truncate">{entry.primaryKeyword}</p>
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -353,22 +359,20 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
             >
               Choose entry
             </label>
-            <select
+            <FormSelect
               id="single-entry-select"
               value={singleEntryId}
-              onChange={e => setSingleEntryId(e.target.value)}
+              onChange={setSingleEntryId}
+              options={[
+                { value: '', label: 'Select an entry…' },
+                ...exportableEntries.map(entry => ({
+                  value: entry.id,
+                  label: `${entry.name} — ${entry.primaryKeyword}`,
+                })),
+              ]}
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 appearance-none cursor-pointer"
               aria-label="Select entry to export"
-            >
-              <option value="" disabled>
-                Select an entry…
-              </option>
-              {exportableEntries.map(entry => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name} — {entry.primaryKeyword}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         )}
       </SectionCard>

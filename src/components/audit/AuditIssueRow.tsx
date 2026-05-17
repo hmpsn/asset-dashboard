@@ -5,10 +5,10 @@
 import { useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../../routes';
 import {
-  Loader2, CheckCircle, Send, Wrench, X, Pencil,
+  CheckCircle, Send, Wrench, X, Pencil,
   MoreVertical, EyeOff, ClipboardList, Layers, FileSearch,
 } from 'lucide-react';
-import { Icon, cn } from '../ui';
+import { Button, FormInput, FormTextarea, Icon, IconButton, cn } from '../ui';
 import type { SeoIssue, PageSeoResult } from './types';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, FIX_TAB_LABELS, getFixTab } from './types';
 
@@ -94,13 +94,14 @@ export function AuditIssueRow({
               <div className="flex items-center gap-1.5">
                 <span className="t-micro text-emerald-500 font-semibold uppercase tracking-wider">AI Suggestion</span>
                 {!isApplied && !isEditing && (
-                  <button
+                  <Button
                     onClick={() => { onSetEditingKey(fixKey); if (!editedText) onSetEditedSuggestion(fixKey, issue.suggestedFix!); }}
-                    className="t-micro text-emerald-500/60 hover:text-emerald-400 flex items-center gap-0.5 transition-colors"
+                    variant="ghost"
+                    className="t-micro text-emerald-500/60 hover:text-emerald-400 px-0 py-0 h-auto"
                     title="Edit before sending"
                   >
                     <Pencil className="w-2.5 h-2.5" /> Edit
-                  </button>
+                  </Button>
                 )}
               </div>
               {isApplied ? (
@@ -109,21 +110,23 @@ export function AuditIssueRow({
                 </span>
               ) : (
                 <div className="flex items-center gap-1">
-                  <button
+                  <Button
                     onClick={() => onAcceptSuggestion(page.pageId, issue)}
                     disabled={isApplying}
-                    className="t-micro px-1.5 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                    loading={isApplying}
+                    icon={CheckCircle}
+                    variant="ghost"
+                    className="t-micro px-1.5 py-0.5 h-auto rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-medium transition-colors disabled:opacity-50"
                   >
-                    {isApplying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCircle className="w-2.5 h-2.5" />}
                     {isApplying ? 'Pushing...' : 'Apply Now'}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
             {isEditing ? (
-              <textarea
+              <FormTextarea
                 value={editedText || issue.suggestedFix}
-                onChange={e => onSetEditedSuggestion(fixKey, e.target.value)}
+                onChange={value => onSetEditedSuggestion(fixKey, value)}
                 onBlur={() => onSetEditingKey(null)}
                 onKeyDown={e => { if (e.key === 'Escape') onSetEditingKey(null); }}
                 className="w-full t-caption-sm text-emerald-300 bg-emerald-950/60 border border-emerald-700/40 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500/50 resize-none"
@@ -147,26 +150,33 @@ export function AuditIssueRow({
         {/* Inline flag-for-client form */}
         {workspaceId && flaggingKey === taskKey && (
           <div className="mt-2 flex items-center gap-2">
-            <input
+            <FormInput
               type="text"
               value={flagNote}
-              onChange={e => onSetFlagNote(e.target.value)}
+              onChange={onSetFlagNote}
               placeholder="Note for client (optional)..."
-              className="flex-1 px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-purple-500/50"
+              className="flex-1 t-caption"
               onKeyDown={e => e.key === 'Enter' && onFlagForClient(page, issue, flagNote)}
               autoFocus
             />
-            <button
+            <Button
               onClick={() => onFlagForClient(page, issue, flagNote)}
               disabled={flagSending}
-              className="flex items-center gap-1 px-2 py-1.5 rounded bg-purple-600/80 hover:bg-purple-600 t-caption font-medium text-white transition-colors disabled:opacity-50"
+              loading={flagSending}
+              icon={Send}
+              size="sm"
+              className="px-2 py-1.5 rounded bg-purple-600/80 hover:bg-purple-600 t-caption font-medium text-white transition-colors disabled:opacity-50"
             >
-              {flagSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               Send
-            </button>
-            <button onClick={() => { onSetFlaggingKey(null); onSetFlagNote(''); }} className="p-1 rounded hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)]">
-              <Icon as={X} size="sm" />
-            </button>
+            </Button>
+            <IconButton
+              onClick={() => { onSetFlaggingKey(null); onSetFlagNote(''); }}
+              icon={X}
+              label="Cancel flag note"
+              variant="ghost"
+              size="sm"
+              className="rounded hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)]"
+            />
           </div>
         )}
       </div>
@@ -177,24 +187,26 @@ export function AuditIssueRow({
           const fixTab = getFixTab(issue);
           if (!fixTab) return null;
           return (
-            <button
+            <Button
               onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { targetRoute: fixTab, pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
-              className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
+              variant="ghost"
+              className="t-caption-sm px-1.5 py-0.5 h-auto rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
               title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
             >
               <Wrench className="w-2.5 h-2.5" /> Fix
-            </button>
+            </Button>
           );
         })()}
         {/* View Page → Page Intelligence (deep-dive into all page signals) */}
         {workspaceId && page.pageId && (
-          <button
+          <Button
             onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'), { state: { fixContext: { targetRoute: 'page-intelligence', pageId: page.pageId, pageSlug: page.slug, pageName: page.page } } })}
-            className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-2)]/60 hover:bg-[var(--surface-3)]/60 text-[var(--brand-text)] border border-[var(--brand-border)]/40 flex items-center gap-0.5 transition-colors"
+            variant="ghost"
+            className="t-caption-sm px-1.5 py-0.5 h-auto rounded bg-[var(--surface-2)]/60 hover:bg-[var(--surface-3)]/60 text-[var(--brand-text)] border border-[var(--brand-border)]/40 transition-colors"
             title="View in Page Intelligence"
           >
             <FileSearch className="w-2.5 h-2.5" /> Page
-          </button>
+          </Button>
         )}
         {/* Status badges (show instead of actions when done) */}
         {isFlagged && (
@@ -269,45 +281,58 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
   const slugPrefix = pageSlug?.includes('/') ? pageSlug.split('/')[0] : null;
   return (
     <div className="relative">
-      <button
+      <IconButton
         onClick={onToggle}
-        className={cn('p-1 rounded transition-colors', menuOpen ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] opacity-0 group-hover/issue:opacity-100')}
+        icon={MoreVertical}
+        label="More actions"
         title="More actions"
-      >
-        <MoreVertical className="w-3 h-3" />
-      </button>
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'rounded transition-colors',
+          menuOpen
+            ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+            : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] opacity-0 group-hover/issue:opacity-100',
+        )}
+      />
       {menuOpen && (
         <div className="absolute right-0 top-full mt-1 w-44 rounded-[var(--radius-lg)] shadow-xl z-[var(--z-modal)] py-1 bg-[var(--surface-2)] border border-[var(--brand-border)]">
           {onFlagForClient && (
-            <button
+            <Button
               onMouseDown={e => { e.stopPropagation(); onFlagForClient(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-purple-400 hover:bg-purple-500/10 transition-colors"
+              variant="ghost"
+              className="w-full justify-start px-3 py-1.5 h-auto t-caption text-purple-400 hover:bg-purple-500/10 transition-colors"
             >
               <Send className="w-3 h-3" /> Send to Client
-            </button>
+            </Button>
           )}
           {onCreateTask && (
-            <button
+            <Button
               onMouseDown={e => { e.stopPropagation(); onCreateTask(); }}
               disabled={isCreating}
-              className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
+              loading={isCreating}
+              icon={ClipboardList}
+              variant="ghost"
+              className="w-full justify-start px-3 py-1.5 h-auto t-caption text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
             >
-              {isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ClipboardList className="w-3 h-3" />} Add to Tasks
-            </button>
+              Add to Tasks
+            </Button>
           )}
-          <button
+          <Button
             onMouseDown={e => { e.stopPropagation(); onSuppress(); }}
-            className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] transition-colors"
+            variant="ghost"
+            className="w-full justify-start px-3 py-1.5 h-auto t-caption text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] transition-colors"
           >
             <EyeOff className="w-3 h-3" /> Suppress Issue
-          </button>
+          </Button>
           {onSuppressPattern && slugPrefix && (
-            <button
+            <Button
               onMouseDown={e => { e.stopPropagation(); onSuppressPattern(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] transition-colors"
+              variant="ghost"
+              className="w-full justify-start px-3 py-1.5 h-auto t-caption text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] transition-colors"
             >
               <Layers className="w-3 h-3" /> Suppress for {slugPrefix}/*
-            </button>
+            </Button>
           )}
         </div>
       )}

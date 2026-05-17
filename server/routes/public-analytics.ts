@@ -33,7 +33,7 @@ import {
   getGA4PeriodComparison,
   getGA4NewVsReturning,
 } from '../google-analytics.js';
-import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from '../helpers.js';
+import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, normalizePageUrl, stripCodeFences } from '../helpers.js';
 import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -304,9 +304,9 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
           const pagesWithTraffic = filteredAudit.pages
             .filter(p => p.issues.length > 0)
             .map(p => {
-              const slug = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
-              const traffic = trafficMap[slug] || trafficMap[p.slug];
-              return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+              const pagePath = normalizePageUrl(p.slug);
+              const traffic = trafficMap[pagePath] || trafficMap[p.slug];
+              return { page: p.page, slug: pagePath, issues: p.issues.length, score: p.score, traffic };
             })
             .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
             .sort((a, b) => ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
@@ -461,6 +461,7 @@ ${JSON.stringify(context, null, 2)}`;
     // Fire main chat + intent classification in parallel — classification adds zero latency.
     const [mainResult, intentResult] = await Promise.allSettled([
       callAI({
+        operation: 'client-search-chat',
         model: 'gpt-5.4',
         system: systemPrompt,
         messages: [
@@ -469,7 +470,6 @@ ${JSON.stringify(context, null, 2)}`;
         ],
         temperature: 0.7,
         maxTokens: 1500,
-        feature: 'client-search-chat',
         workspaceId: ws.id,
       }),
       betaMode ? Promise.resolve(null) : classifyMessageIntent(question, historyMessages.slice(-4), ws.id),
@@ -485,7 +485,7 @@ ${JSON.stringify(context, null, 2)}`;
       const session = getChatSession(ws.id, sessionId);
       // Log first exchange to activity log so agency sees what clients ask
       if (session && session.messages.length === 2) {
-        addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`);
+        addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`); // client-visibility-ok: admin activity signal; intentionally not shown in client-visible activity feed
         incrementUsage(ws.id, 'ai_chats');
       }
       // Auto-summarize after 6+ messages
@@ -519,7 +519,7 @@ ${JSON.stringify(context, null, 2)}`;
             triggerMessage: question.trim().slice(0, 500),
           });
           broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
-          addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
+          addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80)); // client-visibility-ok: internal ops signal for agency follow-up, not client feed content
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
       }

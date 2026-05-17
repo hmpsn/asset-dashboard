@@ -3,7 +3,7 @@ import {
   CreditCard, Eye, EyeOff, Save, Trash2, Loader2,
   CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
-import { SectionCard, Badge, Icon } from './ui';
+import { SectionCard, Badge, Button, FormInput, Icon, IconButton } from './ui';
 import { useToast } from '../hooks/useToast';
 import { stripe } from '../api';
 
@@ -164,9 +164,9 @@ export function StripeSettings() {
       titleIcon={<Icon as={CreditCard} size="md" className="text-teal-400" />}
       action={
         config?.configured ? (
-          <Badge label="Connected" color="emerald" />
+          <Badge label="Connected" tone="emerald" />
         ) : (
-          <Badge label="Not configured" color="zinc" />
+          <Badge label="Not configured" tone="zinc" />
         )
       }
     >
@@ -217,19 +217,22 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Secret Key {config?.hasSecretKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type={showSecretKey ? 'text' : 'password'}
                     value={secretKey}
-                    onChange={e => setSecretKey(e.target.value)}
+                    onChange={setSecretKey}
                     placeholder={config?.hasSecretKey ? '••••••••••••••••' : 'sk_test_... or sk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full t-caption pr-8"
                   />
-                  <button
+                  <IconButton
                     onClick={() => setShowSecretKey(!showSecretKey)}
+                    icon={showSecretKey ? EyeOff : Eye}
+                    label={showSecretKey ? 'Hide secret key' : 'Show secret key'}
+                    title={showSecretKey ? 'Hide secret key' : 'Show secret key'}
+                    variant="ghost"
+                    size="sm"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                  >
-                    {showSecretKey ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
-                  </button>
+                  />
                 </div>
               </div>
             </div>
@@ -237,19 +240,22 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type={showWebhookSecret ? 'text' : 'password'}
                     value={webhookSecret}
-                    onChange={e => setWebhookSecret(e.target.value)}
+                    onChange={setWebhookSecret}
                     placeholder={config?.hasWebhookSecret ? '••••••••••••••••' : 'whsec_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full t-caption pr-8"
                   />
-                  <button
+                  <IconButton
                     onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                    icon={showWebhookSecret ? EyeOff : Eye}
+                    label={showWebhookSecret ? 'Hide webhook secret' : 'Show webhook secret'}
+                    title={showWebhookSecret ? 'Hide webhook secret' : 'Show webhook secret'}
+                    variant="ghost"
+                    size="sm"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                  >
-                    {showWebhookSecret ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
-                  </button>
+                  />
                 </div>
               </div>
             </div>
@@ -257,33 +263,39 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type="text"
                     value={publishableKey}
-                    onChange={e => setPublishableKey(e.target.value)}
+                    onChange={setPublishableKey}
                     placeholder={config?.hasPublishableKey ? config.publishableKey.slice(0, 12) + '...' : 'pk_test_... or pk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono"
+                    className="w-full t-caption"
                   />
                 </div>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Optional public key reference. Checkout redirects use the Secret Key and Price IDs.</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={saveKeys}
                 disabled={saving || (!secretKey && !webhookSecret && !publishableKey)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                loading={saving}
+                icon={Save}
+                variant="ghost"
+                size="sm"
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Save} size="sm" />}
                 Save Keys
-              </button>
+              </Button>
               {config?.configured && (
-                <button
+                <Button
                   onClick={clearConfig}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium text-red-400 hover:bg-red-500/10 border border-[var(--brand-border)] hover:border-red-500/20 transition-all"
+                  icon={Trash2}
+                  variant="ghost"
+                  size="sm"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium text-red-400 hover:bg-red-500/10 border border-[var(--brand-border)] hover:border-red-500/20 transition-all"
                 >
-                  <Icon as={Trash2} size="sm" /> Disconnect
-                </button>
+                  Disconnect
+                </Button>
               )}
             </div>
           </div>
@@ -291,16 +303,18 @@ export function StripeSettings() {
 
         {/* Product Price IDs */}
         <div>
-          <button
+          <Button
             onClick={() => setProductsExpanded(!productsExpanded)}
-            className="flex items-center gap-2 w-full text-left group"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 px-0 py-0 h-auto text-left group hover:bg-transparent"
           >
             <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Product Price IDs</div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">({configuredCount} configured)</span>
             {productsExpanded
               ? <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />
               : <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />}
-          </button>
+          </Button>
 
           {productsExpanded && (
             <div className="mt-2 space-y-1.5">
@@ -323,32 +337,36 @@ export function StripeSettings() {
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={() => updateProduct(idx, { enabled: !product.enabled })}
+                          variant="ghost"
+                          size="sm"
                           className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
                             product.enabled ? 'bg-teal-500/20 border-teal-500/40' : 'bg-[var(--surface-3)] border-[var(--brand-border)]'
-                          }`}
+                          } p-0`}
+                          title={product.enabled ? `Disable ${product.displayName}` : `Enable ${product.displayName}`}
+                          aria-label={product.enabled ? `Disable ${product.displayName}` : `Enable ${product.displayName}`}
                         >
                           {product.enabled && <Icon as={CheckCircle2} size="xs" className="text-teal-400" />}
-                        </button>
+                        </Button>
                         <span className={`t-caption-sm w-44 truncate flex-shrink-0 ${product.enabled ? 'text-[var(--brand-text)]' : 'text-[var(--brand-border-hover)]'}`}>
                           {product.displayName}
                         </span>
                         <div className="flex items-center w-16 flex-shrink-0">
                           <span className="t-caption-sm text-[var(--brand-text-muted)]">$</span>
-                          <input
+                          <FormInput
                             type="number"
                             value={product.priceUsd}
-                            onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
+                            onChange={value => updateProduct(idx, { priceUsd: Math.max(0, Number(value)) })}
                             disabled={!product.enabled}
                             className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           {product.recurring && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-0.5">/mo</span>}
                         </div>
-                        <input
+                        <FormInput
                           type="text"
                           value={product.stripePriceId}
-                          onChange={e => updateProduct(idx, { stripePriceId: e.target.value.trim() })}
+                          onChange={value => updateProduct(idx, { stripePriceId: value.trim() })}
                           placeholder="price_..."
                           disabled={!product.enabled}
                           className="flex-1 px-2 py-1 rounded t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
@@ -358,14 +376,17 @@ export function StripeSettings() {
                   );
                 });
               })()}
-              <button
+              <Button
                 onClick={saveProductConfig}
                 disabled={savingProducts}
-                className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40"
+                loading={savingProducts}
+                icon={Save}
+                variant="ghost"
+                size="sm"
+                className="mt-2 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40"
               >
-                {savingProducts ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Save} size="sm" />}
                 Save Products
-              </button>
+              </Button>
             </div>
           )}
         </div>

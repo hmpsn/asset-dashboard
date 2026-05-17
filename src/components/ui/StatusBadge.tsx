@@ -1,22 +1,45 @@
-import { statusConfig, type PageEditStatus } from './statusConfig';
+import { Badge, type BadgeShape, type BadgeSize, type BadgeVariant } from './Badge';
+import {
+  resolveStatusBadgeConfig,
+  type PageEditStatus,
+  type StatusBadgeDomain,
+} from './statusConfig';
 
 interface StatusBadgeProps {
-  status: PageEditStatus | undefined | null;
-  size?: 'sm' | 'md';
+  status: PageEditStatus | string | undefined | null;
+  domain?: StatusBadgeDomain;
+  size?: BadgeSize;
+  shape?: BadgeShape;
+  variant?: BadgeVariant;
   showLabel?: boolean;
+  fallback?: 'neutral';
+  className?: string;
 }
 
-export function StatusBadge({ status, size = 'sm', showLabel = true }: StatusBadgeProps) {
+export function StatusBadge({
+  status,
+  domain = 'page-edit',
+  size = 'sm',
+  shape = 'sm',
+  variant = 'outline',
+  showLabel = true,
+  fallback,
+  className,
+}: StatusBadgeProps) {
   if (!status || status === 'clean') return null;
-  const c = statusConfig[status];
+  const c = resolveStatusBadgeConfig(domain, status, fallback);
   if (!c) return null;
 
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'; // arbitrary-text-ok — StatusBadge owns this size scale
-  const padding = size === 'sm' ? 'px-1.5 py-0.5' : 'px-2 py-1';
-
   return (
-    <span className={`${textSize} ${padding} rounded border ${c.border} ${c.bg} ${c.text} whitespace-nowrap`}>
-      {showLabel ? c.label : <span className={`inline-block w-1.5 h-1.5 rounded-full ${c.dot}`} />}
-    </span>
+    <Badge
+      label={showLabel ? c.label : ''}
+      tone={c.tone}
+      variant={variant}
+      size={size}
+      shape={shape}
+      dot={!showLabel}
+      ariaLabel={!showLabel ? c.label : undefined}
+      className={className}
+    />
   );
 }

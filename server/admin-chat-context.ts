@@ -906,8 +906,8 @@ export async function assembleAdminContext(
   if (categories.has('performance') || categories.has('general')) {
     try {
       const health = intel.siteHealth;
+      const perfParts: string[] = [];
       if (health) {
-        const perfParts: string[] = [];
         if (health.performanceSummary?.score != null)
           perfParts.push(`Performance score: ${health.performanceSummary.score}/100`);
         if (health.performanceSummary?.avgLcp != null)
@@ -916,31 +916,36 @@ export async function assembleAdminContext(
           perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
         if (health.cwvPassRate.mobile != null)
           perfParts.push(`CWV pass rate: ${(health.cwvPassRate.mobile * 100).toFixed(0)}% mobile`);
+        if (health.cwvPassRate.desktop != null)
+          perfParts.push(`CWV pass rate: ${(health.cwvPassRate.desktop * 100).toFixed(0)}% desktop`);
         if (health.deadLinks > 0) perfParts.push(`Dead links: ${health.deadLinks}`);
         if (health.redirectChains > 0) perfParts.push(`Redirect chains: ${health.redirectChains}`);
+      }
 
-        // Supplement with per-URL dead link detail and worst-performing pages.
-        // siteHealth slice stores counts only; raw snapshots hold the full arrays.
-        // Direct calls preserved for this granularity (same pattern as listBatches() for approvals).
-        if (ws?.webflowSiteId) {
-          try {
-            const linkSnap = getLinkCheck(ws.webflowSiteId);
-            if (linkSnap?.result) {
-              const linkResult = linkSnap.result as { deadLinks?: DeadLink[] };
-              const dead = linkResult.deadLinks ?? [];
-              if (dead.length > 0) {
-                const deadDetail = dead.slice(0, 10).map(d =>
-                  `    ${d.url} [${d.status}] — found on "${d.foundOn}" (anchor: "${d.anchorText}")`
-                );
-                perfParts.push(`Dead link URLs (top ${Math.min(dead.length, 10)} of ${dead.length}):\n${deadDetail.join('\n')}`);
-              }
+      // Supplement with per-URL dead link detail and worst-performing pages.
+      // siteHealth slice stores counts only; raw snapshots hold the full arrays.
+      // Direct calls preserved for this granularity (same pattern as listBatches() for approvals).
+      if (ws?.webflowSiteId) {
+        try {
+          const linkSnap = getLinkCheck(ws.webflowSiteId);
+          if (linkSnap?.result) {
+            const linkResult = linkSnap.result as { deadLinks?: DeadLink[] };
+            const dead = linkResult.deadLinks ?? [];
+            if (dead.length > 0) {
+              const deadDetail = dead.slice(0, 10).map(d =>
+                `    ${d.url} [${d.status}] — found on "${d.foundOn}" (anchor: "${d.anchorText}")`
+              );
+              perfParts.push(`Dead link URLs (top ${Math.min(dead.length, 10)} of ${dead.length}):\n${deadDetail.join('\n')}`);
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
+          }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
-          try {
-            const speedSnap = getPageSpeed(ws.webflowSiteId);
+        try {
+          for (const strategy of ['mobile', 'desktop'] as const) {
+            const speedSnap = getPageSpeed(ws.webflowSiteId, strategy);
             if (speedSnap?.result) {
-              const siteSpeed = speedSnap.result as { pages?: Array<{ url?: string; score?: number }> };
+              const siteSpeed = speedSnap.result as { averageScore?: number; pages?: Array<{ url?: string; score?: number }> };
+              if (siteSpeed.averageScore != null) perfParts.push(`Saved ${strategy} PageSpeed average: ${siteSpeed.averageScore}/100`);
               const pages = siteSpeed.pages ?? [];
               const worst = pages
                 .filter(p => p.url && p.score != null)
@@ -948,41 +953,41 @@ export async function assembleAdminContext(
                 .slice(0, 5);
               if (worst.length > 0) {
                 const worstDetail = worst.map(p => `    ${p.url} — score ${p.score}/100`);
-                perfParts.push(`Worst-performing pages (PageSpeed):\n${worstDetail.join('\n')}`);
+                perfParts.push(`Worst-performing ${strategy} pages (PageSpeed):\n${worstDetail.join('\n')}`);
               }
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
+          }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
-          try {
-            const weightSnap = getPageWeight(ws.webflowSiteId);
-            if (weightSnap?.result) {
-              const pw = weightSnap.result as {
-                totalAssetSize?: number;
-                pages?: Array<{ page: string; totalSize: number; assetCount: number; assets: Array<{ name: string; size: number; contentType: string }> }>;
-              };
-              const pwPages = pw.pages ?? [];
-              if (pwPages.length > 0) {
-                const totalMb = pw.totalAssetSize != null ? (pw.totalAssetSize / 1024 / 1024).toFixed(1) : null;
-                const heaviestPages = pwPages.slice(0, 5).map(p => {
-                  const pageMb = (p.totalSize / 1024 / 1024).toFixed(1);
-                  const heaviestAsset = p.assets[0];
-                  const assetNote = heaviestAsset
-                    ? ` (heaviest asset: ${heaviestAsset.name}, ${(heaviestAsset.size / 1024).toFixed(0)}KB ${heaviestAsset.contentType})`
-                    : '';
-                  return `    ${p.page} — ${pageMb}MB${assetNote}`;
-                });
-                perfParts.push(
-                  `Page weight (total: ${totalMb != null ? `${totalMb}MB` : 'unknown'}, heaviest pages):\n${heaviestPages.join('\n')}`,
-                );
-              }
+        try {
+          const weightSnap = getPageWeight(ws.webflowSiteId);
+          if (weightSnap?.result) {
+            const pw = weightSnap.result as {
+              totalAssetSize?: number;
+              pages?: Array<{ page: string; totalSize: number; assetCount: number; assets: Array<{ name: string; size: number; contentType: string }> }>;
+            };
+            const pwPages = pw.pages ?? [];
+            if (pwPages.length > 0) {
+              const totalMb = pw.totalAssetSize != null ? (pw.totalAssetSize / 1024 / 1024).toFixed(1) : null;
+              const heaviestPages = pwPages.slice(0, 5).map(p => {
+                const pageMb = (p.totalSize / 1024 / 1024).toFixed(1);
+                const heaviestAsset = p.assets[0];
+                const assetNote = heaviestAsset
+                  ? ` (heaviest asset: ${heaviestAsset.name}, ${(heaviestAsset.size / 1024).toFixed(0)}KB ${heaviestAsset.contentType})`
+                  : '';
+                return `    ${p.page} — ${pageMb}MB${assetNote}`;
+              });
+              perfParts.push(
+                `Page weight (total: ${totalMb != null ? `${totalMb}MB` : 'unknown'}, heaviest pages):\n${heaviestPages.join('\n')}`,
+              );
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
-        }
+          }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
+      }
 
-        if (perfParts.length > 0) {
-          sections.push(`SITE PERFORMANCE:\n${perfParts.join('\n')}`);
-          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, per-URL dead links, page weight analysis)');
-        }
+      if (perfParts.length > 0) {
+        sections.push(`SITE PERFORMANCE:\n${perfParts.join('\n')}`);
+        dataSources.push('Site Performance (Core Web Vitals, PageSpeed, per-URL dead links, page weight analysis)');
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }

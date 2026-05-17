@@ -4108,6 +4108,74 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
   });
 });
 
+describe('Rule: Raw pageSlug prefixed as URL — normalize via Page Address helpers', () => {
+  const RULE = 'Raw pageSlug prefixed as URL — normalize via Page Address helpers';
+
+  it('warns on raw pageSlug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/approvals.ts'),
+      lines(
+        'const pageUrl = item.pageSlug ? `/${item.pageSlug}` : null;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('warns on raw slug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/webflow-schema.ts'),
+      lines(
+        "const pageUrl = '/' + slug;",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('allows normalized pageSlug URL construction', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/approvals.ts'),
+      lines(
+        'const pageUrl = normalizePageUrl(item.publishedPath || item.pageSlug || "");',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('warns on raw page slug values passed to outcome sinks', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/jobs.ts'),
+      lines(
+        "recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('warns on raw pageUrl slug assignment', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'server/routes/content-posts.ts'),
+      lines(
+        'const action = recordAction({ pageUrl: slug });',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('suppresses display-only uses with hatch', () => {
+    const file = write(
+      uniqPath('rule-page-slug-url', 'src/components/workspace-home/SeoChangeImpact.tsx'),
+      lines(
+        'const label = `/${change.pageSlug}`; // page-slug-url-ok — display-only label',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Rule: Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin', () => {
   const RULE = 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin';
 
@@ -4587,6 +4655,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Slug-path hardening sprint (2026-04-21)
     'Bare slug used in pagePath construction — use resolvePagePath(page)',
     'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
     // Unified page-join hooks sprint (2026-04-21)
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)
@@ -4600,14 +4669,27 @@ describe('Meta: customCheck rule name registry', () => {
     // Design-system enforcement rules (Phase 1, PR #277)
     'Non-standard transition duration',
     'Page component missing PageHeader',
+    'Style exception registry entry missing required metadata',
     // SVG shell-quoting fix (Phase 3 follow-up)
     'SVG with hardcoded dark fill/stroke',
     // Phase 3 migration bug pattern — recurring 5× in PR #277
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    'styleguide-css-must-import-public-tokens',
+    'src-index-css-no-token-declarations',
     // Phase 6A — .t-* typography parity between styleguide.css and index.css
     'styleguide-typography-parity',
+    'styleguide-typography-extra-class-drift',
+    'global-token-declaration-outside-canonical-token-files',
+    'badge-like-span-outside-primitives',
+    'badge-color-prop-deprecation',
+    'interactive-div-role-button',
+    'primitive-override-drift-on-form-controls',
+    'duplicate-heading-signal',
+    'nested-card-density-signal',
+    'blue-action-semantic-drift',
+    'status-semantic-mapping-drift',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -4625,6 +4707,10 @@ describe('Meta: customCheck rule name registry', () => {
     // must use <Button variant="primary">. Locked in after migrating the two
     // TemplateEditor sites that were the last hand-rolled gradient CTAs.
     'Hand-rolled gradient CTA button',
+    'Raw <button> outside primitive/infra allowlist',
+    'Raw form control outside form primitives',
+    'Static styleguide migrated note and radius debt',
+    'Raw CTA class literal outside Button/IconButton',
     // Schema Yoast parity PR1 (2026-04-29) — Trajectory 3 → 1 migration guard.
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
@@ -4754,7 +4840,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 240_000,
+        timeout: 360_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -4790,6 +4876,8 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       const [, symbol, name] = match;
       // Skip the summary line — it contains digits immediately after ✗.
       if (/^\d+\s+error/.test(name)) continue;
+      // Skip the success footer line from scripts/pr-check.ts output.
+      if (/^All automated checks passed\.$/.test(name)) continue;
       if (symbol === '✓') cleanRules.push(name);
     }
 
@@ -4874,7 +4962,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 260_000);
+  }, 390_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -5573,6 +5661,34 @@ describe('Rule: styleguide-token-parity', () => {
   });
 });
 
+describe('Rule: styleguide-css-must-import-public-tokens', () => {
+  const RULE = 'styleguide-css-must-import-public-tokens';
+
+  it('flags public/styleguide.css when @import url(/tokens.css) is missing', () => {
+    const file = write(
+      uniqPath('rule-styleguide-import', 'public/styleguide.css'),
+      lines(
+        '.sg-header { color: var(--brand-text-bright); }',
+        '.sg-card { border: 1px solid var(--brand-border); }',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain("missing @import url('/tokens.css')");
+  });
+
+  it('passes when public/styleguide.css imports /tokens.css', () => {
+    const file = write(
+      uniqPath('rule-styleguide-import', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.sg-header { color: var(--brand-text-bright); }',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Runner: pattern-based rules with `-`-prefix patterns
 // ════════════════════════════════════════════════════════════════════════════
@@ -5957,6 +6073,367 @@ describe('Rule: Hand-rolled gradient CTA button', () => {
     );
     const hits = runRule(RULE, [probe]);
     expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Style exception registry entry missing required metadata', () => {
+  const RULE = 'Style exception registry entry missing required metadata';
+  const STYLE_EXCEPTIONS_FILE = path.resolve(process.cwd(), 'data/style-exceptions.json');
+
+  function withStyleExceptionsFixture(content: string, fn: () => void): void {
+    const original = existsSync(STYLE_EXCEPTIONS_FILE)
+      ? readFileSync(STYLE_EXCEPTIONS_FILE, 'utf-8')
+      : null;
+    try {
+      writeFileSync(STYLE_EXCEPTIONS_FILE, content, 'utf-8');
+      fn();
+    } finally {
+      if (original === null) {
+        rmSync(STYLE_EXCEPTIONS_FILE, { force: true });
+      } else {
+        writeFileSync(STYLE_EXCEPTIONS_FILE, original, 'utf-8');
+      }
+    }
+  }
+
+  it('flags entries missing required metadata fields', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{ id: 'raw-button-admin-shell' }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags expired exceptions', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'legacy-expired',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/legacy/Expired.tsx',
+            reason: 'Legacy migration still pending',
+            owner: 'platform',
+            createdAt: '2026-05-01',
+            expiresOn: '2026-05-10',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags duplicate exception ids', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [
+            {
+              id: 'dup-id',
+              rule: 'raw-button-outside-primitives',
+              file: 'src/components/admin/a.tsx',
+              reason: 'Legacy migration still pending',
+              owner: 'platform',
+              createdAt: '2026-05-01',
+              expiresOn: '2026-06-30',
+            },
+            {
+              id: 'dup-id',
+              rule: 'raw-button-outside-primitives',
+              file: 'src/components/admin/b.tsx',
+              reason: 'Legacy migration still pending',
+              owner: 'platform',
+              createdAt: '2026-05-01',
+              expiresOn: '2026-06-30',
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+      }
+    );
+  });
+
+  it('flags non-ISO (non-zero-padded) date values', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'bad-date-format',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/legacy/DateFormat.tsx',
+            reason: 'Legacy migration still pending',
+            owner: 'platform',
+            createdAt: '2026-5-01',
+            expiresOn: '2026-06-30',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        const hits = runRule(RULE, []);
+        expect(hits.length).toBeGreaterThanOrEqual(1);
+        expect(hits[0].text).toContain('invalid createdAt/expiresOn date format');
+      }
+    );
+  });
+
+  it('pins errors to the failing exception entry line', () => {
+    const fixtureContent = JSON.stringify(
+      {
+        version: 1,
+        updatedAt: '2026-05-15',
+        exceptions: [
+          {
+            id: 'first-valid',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/a.tsx',
+            reason: 'valid baseline entry',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          },
+          {
+            id: 'second-invalid',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/b.tsx',
+            reason: '',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          },
+        ],
+      },
+      null,
+      2
+    );
+
+    const secondIdLine = fixtureContent.split('\n').findIndex(line => line.includes('"id": "second-invalid"')) + 1;
+
+    withStyleExceptionsFixture(fixtureContent, () => {
+      const hits = runRule(RULE, []);
+      expect(hits.length).toBeGreaterThanOrEqual(1);
+      expect(hits[0].line).toBe(secondIdLine);
+    });
+  });
+
+  it('does not flag a valid registry entry', () => {
+    withStyleExceptionsFixture(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: '2026-05-15',
+          exceptions: [{
+            id: 'admin-seo-editor-transitional',
+            rule: 'raw-button-outside-primitives',
+            file: 'src/components/admin/seo/SeoEditorActionRow.tsx',
+            reason: 'Migrating this route in next wave',
+            owner: 'platform',
+            createdAt: '2026-05-15',
+            expiresOn: '2026-06-30',
+          }],
+        },
+        null,
+        2
+      ),
+      () => {
+        expect(runRule(RULE, [])).toHaveLength(0);
+      }
+    );
+  });
+});
+
+describe('Rule: Raw <button> outside primitive/infra allowlist', () => {
+  const RULE = 'Raw <button> outside primitive/infra allowlist';
+
+  it('flags a raw <button> in src/components outside ui/', () => {
+    const probe = write(
+      uniqPath('raw-button-rule', 'src/components/admin/seo/Trigger.tsx'),
+      '<button className="px-3 py-1.5">Refresh</button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // button-ok hatch', () => {
+    const probe = write(
+      uniqPath('raw-button-hatch-inline', 'src/components/admin/seo/InlineHatch.tsx'),
+      '<button className="px-3 py-1.5">Refresh</button> // button-ok\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('respects // button-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('raw-button-hatch-above', 'src/components/admin/seo/AboveHatch.tsx'),
+      lines(
+        '// button-ok',
+        '<button className="px-3 py-1.5">Refresh</button>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag primitive usage (<Button />)', () => {
+    const probe = write(
+      uniqPath('raw-button-negative', 'src/components/admin/seo/Primitive.tsx'),
+      '<Button variant="secondary">Refresh</Button>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Raw form control outside form primitives', () => {
+  const RULE = 'Raw form control outside form primitives';
+
+  it('flags visible raw input controls in src/components outside ui/', () => {
+    const probe = write(
+      uniqPath('raw-form-rule', 'src/components/admin/seo/Trigger.tsx'),
+      '<input value={query} onChange={e => setQuery(e.target.value)} />\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects // form-control-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('raw-form-hatch', 'src/components/admin/seo/Hatch.tsx'),
+      lines(
+        '// form-control-ok',
+        '<textarea value={note} onChange={e => setNote(e.target.value)} />',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag native hidden, file, or color inputs', () => {
+    const probe = write(
+      uniqPath('raw-form-native', 'src/components/admin/seo/Native.tsx'),
+      lines(
+        '<input',
+        '  type="file"',
+        '  className="hidden"',
+        '/>',
+        '<input type="hidden" value={id} />',
+        '<input type="color" value={accent} />',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag shared form primitives', () => {
+    const probe = write(
+      uniqPath('raw-form-negative', 'src/components/admin/seo/Primitive.tsx'),
+      '<FormInput value={query} onChange={setQuery} />\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Static styleguide migrated note and radius debt', () => {
+  const RULE = 'Static styleguide migrated note and radius debt';
+
+  it('flags inline note chrome in public/styleguide.html', () => {
+    const probe = write(
+      uniqPath('styleguide-static-note', 'public/styleguide.html'),
+      '<div class="muted" style="font-size:11px; margin-top:10px;">Note</div>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags stale radius prose and rounded-* literals in public/styleguide.html', () => {
+    const probe = write(
+      uniqPath('styleguide-static-radius', 'public/styleguide.html'),
+      '<div>Uses rounded-xl and 10px 24px 10px 24px.</div>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects // styleguide-static-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('styleguide-static-hatch', 'public/styleguide.html'),
+      lines(
+        '// styleguide-static-ok',
+        '<div class="muted" style="font-size:11px; margin-top:10px;">Intentional</div>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag migrated note classes and token radius references', () => {
+    const probe = write(
+      uniqPath('styleguide-static-negative', 'public/styleguide.html'),
+      '<div class="spec-note">Use <span class="t-mono">--radius-signature-lg</span>.</div>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Raw CTA class literal outside Button/IconButton', () => {
+  const RULE = 'Raw CTA class literal outside Button/IconButton';
+
+  it('flags a raw <button> with inline teal CTA classes', () => {
+    const probe = write(
+      uniqPath('cta-literal-trigger', 'src/components/admin/seo/CtaTrigger.tsx'),
+      '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // cta-literal-ok hatch', () => {
+    const probe = write(
+      uniqPath('cta-literal-inline', 'src/components/admin/seo/CtaInlineHatch.tsx'),
+      '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button> // cta-literal-ok\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('respects // cta-literal-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('cta-literal-above', 'src/components/admin/seo/CtaAboveHatch.tsx'),
+      lines(
+        '// cta-literal-ok',
+        '<button className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white">Fix</button>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag non-button teal classes', () => {
+    const probe = write(
+      uniqPath('cta-literal-negative', 'src/components/admin/seo/CtaNegative.tsx'),
+      '<div className="bg-teal-600 hover:bg-teal-500">Legend</div>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
   });
 });
 
@@ -6525,6 +7002,445 @@ describe('Rule: styleguide-typography-parity', () => {
       write(uniqPath('typo-parity', 'src/components/Foo.tsx'), 'export const Foo = () => null;'),
     ]);
     expect(hits).toHaveLength(0);
+  });
+});
+
+describe('Rule: styleguide-typography-extra-class-drift', () => {
+  const RULE = 'styleguide-typography-extra-class-drift';
+
+  it('flags extra .t-* classes present only in public/styleguide.css', () => {
+    const indexFile = write(
+      uniqPath('rule-typo-extra', 'src/index.css'),
+      lines(
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    const styleguideFile = write(
+      uniqPath('rule-typo-extra', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+        '.t-legacy { font-size: 11px; line-height: 1.2; }',
+      ),
+    );
+    const hits = runRule(RULE, [indexFile, styleguideFile]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('.t-legacy');
+  });
+
+  it('passes when styleguide uses only canonical .t-* classes', () => {
+    const indexFile = write(
+      uniqPath('rule-typo-extra', 'src/index.css'),
+      lines(
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    const styleguideFile = write(
+      uniqPath('rule-typo-extra', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    expect(runRule(RULE, [indexFile, styleguideFile])).toHaveLength(0);
+  });
+});
+
+describe('Rule: global-token-declaration-outside-canonical-token-files', () => {
+  const RULE = 'global-token-declaration-outside-canonical-token-files';
+
+  it('flags --* declarations in non-canonical CSS files', () => {
+    const file = write(
+      uniqPath('rule-global-token-decl', 'src/components/probe.css'),
+      lines(
+        '.probe { color: red; }',
+        ':root {',
+        '  --rogue-token: #fff;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('--rogue-token');
+  });
+
+  it('does not flag declarations inside src/tokens.css and public/tokens.css', () => {
+    const srcTokens = write(
+      uniqPath('rule-global-token-decl', 'src/tokens.css'),
+      lines(':root {', '  --allowed: #000;', '}'),
+    );
+    const publicTokens = write(
+      uniqPath('rule-global-token-decl', 'public/tokens.css'),
+      lines(':root {', '  --allowed-mirror: #111;', '}'),
+    );
+    expect(runRule(RULE, [srcTokens, publicTokens])).toHaveLength(0);
+  });
+});
+
+describe('Rule: src-index-css-no-token-declarations', () => {
+  const RULE = 'src-index-css-no-token-declarations';
+
+  it('flags --* declarations in src/index.css', () => {
+    const file = write(
+      uniqPath('rule-src-index-token-decl', 'src/index.css'),
+      lines(
+        "@import './tokens.css';",
+        ':root {',
+        '  --rogue: #fff;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('--rogue');
+  });
+
+  it('passes when src/index.css has no token declarations', () => {
+    const file = write(
+      uniqPath('rule-src-index-token-decl', 'src/index.css'),
+      lines(
+        "@import './tokens.css';",
+        '.app-root { color: var(--brand-text); }',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: badge-like-span-outside-primitives', () => {
+  const RULE = 'badge-like-span-outside-primitives';
+
+  it('flags a hand-rolled badge-like span', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="rounded-[var(--radius-pill)] px-2 py-1 bg-teal-500/10 text-teal-300 border border-teal-400/30">Active</span>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('passes with inline badge-span-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="rounded-[var(--radius-pill)] px-2 py-1 bg-teal-500/10 text-teal-300 border border-teal-400/30">Active</span>; // badge-span-ok: static demo',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-badge spans', () => {
+    const file = write(
+      uniqPath('rule-badge-span', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="text-sm text-[var(--brand-text)]">Body copy</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: badge-color-prop-deprecation', () => {
+  const RULE = 'badge-color-prop-deprecation';
+
+  it('flags Badge color prop usage', () => {
+    const file = write(
+      uniqPath('rule-badge-color-prop', 'src/components/Foo.tsx'),
+      lines(
+        "import { Badge } from '../ui/Badge';",
+        'export function Foo() {',
+        '  return <Badge label="Live" color="emerald" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('passes when Badge uses tone prop', () => {
+    const file = write(
+      uniqPath('rule-badge-color-prop', 'src/components/Foo.tsx'),
+      lines(
+        "import { Badge } from '../ui/Badge';",
+        'export function Foo() {',
+        '  return <Badge label="Live" tone="emerald" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: interactive-div-role-button', () => {
+  const RULE = 'interactive-div-role-button';
+
+  it('flags div role=\"button\" usage in components', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Bad.tsx'),
+      lines(
+        'export function Bad() {',
+        '  return <div role="button" tabIndex={0}>Open</div>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('respects the button-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Hatched.tsx'),
+      lines(
+        'export function Hatched() {',
+        '  return <div role="button">Open</div>; // button-ok: legacy keyboard handler',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-button divs', () => {
+    const file = write(
+      uniqPath('rule-interactive-div', 'src/components/Good.tsx'),
+      lines(
+        'export function Good() {',
+        '  return <div aria-hidden="true">Overlay</div>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: primitive-override-drift-on-form-controls', () => {
+  const RULE = 'primitive-override-drift-on-form-controls';
+
+  it('flags structural className overrides on form primitives', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="w-full px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('FormInput');
+  });
+
+  it('passes for lightweight layout-only className', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="w-full" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('passes with form-override-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-form-override', 'src/components/Foo.tsx'),
+      lines(
+        "import { FormInput } from '../ui/forms';",
+        'export function Foo() {',
+        '  return <FormInput value="" onChange={() => {}} className="px-3 py-2 border border-[var(--brand-border)] rounded-[var(--radius-lg)]" />; // form-override-ok: compact legacy row',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: duplicate-heading-signal', () => {
+  const RULE = 'duplicate-heading-signal';
+
+  it('flags repeated heading text in one file', () => {
+    const file = write(
+      uniqPath('rule-duplicate-heading', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return (',
+        '    <>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '      <section>...</section>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '    </>',
+        '  );',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('duplicate heading');
+  });
+
+  it('respects duplicate-heading-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-duplicate-heading', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return (',
+        '    <>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '      <section>...</section>',
+        '      <h2 className="t-h2">Overview Summary</h2> // duplicate-heading-ok: mirrored mobile branch',
+        '    </>',
+        '  );',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: nested-card-density-signal', () => {
+  const RULE = 'nested-card-density-signal';
+
+  it('flags nested SectionCard usage', () => {
+    const file = write(
+      uniqPath('rule-nested-card', 'src/components/Foo.tsx'),
+      lines(
+        "import { SectionCard } from '../ui';",
+        'export function Foo() {',
+        '  return (',
+        '    <SectionCard>',
+        '      <SectionCard>Inner</SectionCard>',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('nested inside');
+  });
+
+  it('respects nested-card-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-nested-card', 'src/components/Foo.tsx'),
+      lines(
+        "import { SectionCard } from '../ui';",
+        'export function Foo() {',
+        '  return (',
+        '    <SectionCard>',
+        '      <SectionCard>Inner</SectionCard> // nested-card-ok: intentional contained specimen',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: blue-action-semantic-drift', () => {
+  const RULE = 'blue-action-semantic-drift';
+
+  it('flags blue-styled action buttons', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        "import { Button } from '../ui';",
+        'export function Foo() {',
+        '  return <Button className="bg-blue-500/10 text-blue-400">Save</Button>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('Button uses blue action styling');
+  });
+
+  it('respects blue-action-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        "import { Button } from '../ui';",
+        'export function Foo() {',
+        '  return <Button className="bg-blue-500/10 text-blue-400">Save</Button>; // blue-action-ok: analytics toggle demo',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-action blue text', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="text-blue-400">Read-only metric</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: status-semantic-mapping-drift', () => {
+  const RULE = 'status-semantic-mapping-drift';
+
+  it('flags local status tone maps', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo({ status }: { status: string }) {',
+        '  const statusColors: Record<string, string> = {',
+        "    open: 'bg-blue-500/10 text-accent-info border-blue-500/30',",
+        "    done: 'bg-emerald-500/10 text-accent-success border-emerald-500/30',",
+        '  };',
+        '  return <span className={statusColors[status] ?? statusColors.open}>{status}</span>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('local status mapping');
+  });
+
+  it('passes when using StatusBadge domain mapping', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        "import { StatusBadge } from '../ui';",
+        'export function Foo({ status }: { status: string }) {',
+        '  return <StatusBadge status={status} domain="approval" fallback="neutral" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects status-semantic-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo({ status }: { status: string }) {',
+        '  const statusColor = status === "ok" ? "emerald" : "red"; // status-semantic-ok: HTTP status code badge map',
+        '  return <span className={statusColor}>{status}</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 

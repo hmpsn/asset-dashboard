@@ -32,7 +32,7 @@ export function TrendBadge({
 }: TrendBadgeProps) {
   if (value === 0 && hideOnZero) return null;
 
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'; // arbitrary-text-ok — TrendBadge owns this size scale
+  const textSize = size === 'sm' ? 'text-xs' : 'text-xs'; // arbitrary-text-ok — TrendBadge owns this size scale
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
 
   if (value === 0) {

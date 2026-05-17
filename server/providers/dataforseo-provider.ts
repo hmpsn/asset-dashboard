@@ -9,6 +9,7 @@ import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
+import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -22,6 +23,7 @@ import type {
   ReferringDomain,
 } from '../seo-data-provider.js';
 import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
+import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -196,6 +198,16 @@ function cleanDomain(domain: string): string {
   return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
 }
 
+function cleanUrlTarget(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch { // catch-ok: malformed provider target degrades to domain-style target normalization.
+    return cleanDomain(url);
+  }
+}
+
 interface DataForSeoResponse {
   version?: string;
   status_code?: number;
@@ -210,33 +222,93 @@ interface DataForSeoResponse {
   }>;
 }
 
-async function apiCall(endpoint: string, body: unknown[]): Promise<DataForSeoResponse> {
-  const res = await fetch(`https://api.dataforseo.com/v3/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': authHeader(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 402 || text.includes('balance')) markCreditsExhausted();
-    throw new Error(`DataForSEO ${endpoint} HTTP ${res.status}: ${text.slice(0, 300)}`);
+async function apiCall(endpoint: string, body: unknown[], workspaceId?: string): Promise<DataForSeoResponse> {
+  const startedAt = Date.now();
+  const operation = `dataforseo:${endpoint}`;
+  let json: DataForSeoResponse;
+  try {
+    json = await fetchProviderJson<DataForSeoResponse>({
+      url: `https://api.dataforseo.com/v3/${endpoint}`,
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      timeoutMs: 20_000,
+      redirect: 'follow',
+      logContext: { module: 'dataforseo', endpoint },
+    });
+  } catch (err) {
+    if (isExternalFetchError(err)) {
+      const durationMs = Date.now() - startedAt;
+      recordExternalApiTelemetry({
+        provider: 'dataforseo',
+        endpoint,
+        workspaceId,
+        durationMs,
+        status: 'error',
+        errorKind: err.kind,
+      });
+      recordOperationTrace({
+        source: 'integration',
+        operation,
+        status: 'error',
+        workspaceId,
+        durationMs,
+        message: `DataForSEO fetch ${err.kind}${err.status ? ` ${err.status}` : ''}`,
+      });
+      if (err.kind === 'http' && err.status === 402) markCreditsExhausted();
+      const snippet = err.responseBodySnippet || '';
+      if (snippet.includes('balance')) markCreditsExhausted();
+      throw new Error(`DataForSEO ${endpoint} ${err.kind}${err.status ? ` ${err.status}` : ''}: ${snippet || err.message}`);
+    }
+    throw err;
   }
-
-  const json = await res.json() as DataForSeoResponse;
 
   // Check task-level errors
   const task = json.tasks?.[0];
   if (task && task.status_code !== 20000) {
     const msg = task.status_message || 'Unknown error';
+    const durationMs = Date.now() - startedAt;
+    recordExternalApiTelemetry({
+      provider: 'dataforseo',
+      endpoint,
+      workspaceId,
+      durationMs,
+      status: 'error',
+      errorKind: 'task_error',
+    });
+    recordOperationTrace({
+      source: 'integration',
+      operation,
+      status: 'error',
+      workspaceId,
+      durationMs,
+      message: `task ${task.status_code}: ${msg}`,
+    });
     if (msg.toLowerCase().includes('balance') || msg.toLowerCase().includes('insufficient')) {
       markCreditsExhausted();
     }
     throw new Error(`DataForSEO ${endpoint} task error ${task.status_code}: ${msg}`);
   }
+
+  const durationMs = Date.now() - startedAt;
+  recordExternalApiTelemetry({
+    provider: 'dataforseo',
+    endpoint,
+    workspaceId,
+    durationMs,
+    status: 'success',
+  });
+  recordOperationTrace({
+    source: 'integration',
+    operation,
+    status: 'success',
+    workspaceId,
+    durationMs,
+    message: `DataForSEO ${endpoint} success`,
+  });
 
   return json;
 }
@@ -343,12 +415,12 @@ export class DataForSeoProvider implements SeoDataProvider {
             keywords: batch,
             location_code: locationCode(database),
             language_code: 'en',
-          }]),
+          }], workspaceId),
           apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
             keywords: batch,
             location_code: locationCode(database),
             language_code: 'en',
-          }]).catch(() => null),   // graceful fallback if KD endpoint unavailable
+          }], workspaceId).catch(() => null),   // graceful fallback if KD endpoint unavailable
         ]);
 
         // Build KD lookup map
@@ -424,7 +496,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         limit,
         depth: 1,
         include_seed_keyword: false,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -468,7 +540,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         filters: ['keyword', 'regex', '^(how|what|why|when|where|who|which|can|does|is|are|do|will|should) '],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -517,7 +589,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -580,6 +652,63 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
+  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
+    const target = cleanUrlTarget(url);
+    const cacheKey = `url_ranked_${database}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
+    const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'ranked_keywords_url', query: target, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
+        target,
+        location_code: locationCode(database),
+        language_code: 'en',
+        limit,
+        order_by: ['keyword_data.keyword_info.search_volume,desc'],
+      }], workspaceId);
+
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results: DomainKeyword[] = [];
+      const seen = new Set<string>();
+      for (const item of items) {
+        const kwData = item.keyword_data as Record<string, unknown> | undefined;
+        const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
+        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+        const itemType = (serpItem?.type as string) ?? 'organic';
+        const keyword = (kwData?.keyword as string) ?? '';
+        if (itemType !== 'organic' || !keyword || seen.has(keyword)) continue;
+        seen.add(keyword);
+        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+        results.push({
+          keyword,
+          position: (serpItem?.rank_group as number) ?? 0,
+          volume: (kwInfo?.search_volume as number) ?? 0,
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          cpc: (kwInfo?.cpc as number) ?? 0,
+          url: (serpItem?.url as string) ?? target,
+          traffic: (serpItem?.etv as number) ?? 0,
+          trafficPercent: 0,
+          trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+        });
+      }
+
+      logCreditUsage({ credits: cost, endpoint: 'ranked_keywords_url', query: target, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO URL ranked_keywords error for "${target}"`);
+      return [];
+    }
+  }
+
   // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
@@ -601,7 +730,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit: 1,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -652,7 +781,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         language_code: 'en',
         limit,
         item_types: ['organic'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -755,7 +884,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       const json = await apiCall('backlinks/summary/live', [{
         target,
         include_subdomains: true,
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -812,7 +941,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         limit,
         include_subdomains: true,
         order_by: ['rank,desc'],
-      }]);
+      }], workspaceId);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);

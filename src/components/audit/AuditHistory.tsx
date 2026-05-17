@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   CheckCircle, Globe, RefreshCw, Copy, ExternalLink, Clock, Minus,
 } from 'lucide-react';
-import { scoreColorClass, EmptyState, TrendBadge, Icon, SectionCard, cn } from '../ui';
+import { scoreColorClass, EmptyState, TrendBadge, Icon, SectionCard, Button, IconButton, cn } from '../ui';
 import { ScoreTrendChart } from './ScoreTrendChart';
 import { ActionItemsPanel } from './ActionItemsPanel';
 import type { SnapshotSummary } from './types';
@@ -86,14 +86,17 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             <div className="t-caption font-medium text-[var(--brand-text-bright)]">Audit Report</div>
             <div className="t-caption text-[var(--brand-text-muted)] truncate font-mono">{window.location.origin}/report/audit/{siteId}</div>
           </div>
-          <button
+          <Button
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/report/audit/${siteId}`);
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
+            icon={Copy}
+            size="sm"
+            variant="secondary"
+            className="px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
           >
-            <Icon as={Copy} size="sm" /> Copy
-          </button>
+            Copy
+          </Button>
           <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-teal-400">
             <Icon as={ExternalLink} size="md" />
           </a>
@@ -104,9 +107,9 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="t-body font-medium text-[var(--brand-text-bright)]">Audit History</div>
-          <button onClick={onRefresh} className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex items-center gap-1">
-            <Icon as={RefreshCw} size="sm" /> Refresh
-          </button>
+          <Button onClick={onRefresh} icon={RefreshCw} variant="ghost" size="sm" className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">
+            Refresh
+          </Button>
         </div>
         <div className="space-y-1">
           {history.map((snap, i) => {
@@ -129,22 +132,27 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
+                  <IconButton
                     onClick={() => copyLink(snap.id)}
-                    className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+                    icon={loadingId === snap.id ? CheckCircle : Copy}
+                    label="Copy share link"
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'rounded-[var(--radius-md)] hover:bg-[var(--surface-2)]',
+                      loadingId === snap.id ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]',
+                    )}
                     title="Copy share link"
-                  >
-                    {loadingId === snap.id
-                      ? <Icon as={CheckCircle} size="md" className="text-emerald-400" />
-                      : <Icon as={Copy} size="md" />}
-                  </button>
-                  <button
+                  />
+                  <IconButton
                     onClick={() => openReport(snap.id)}
-                    className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+                    icon={ExternalLink}
+                    label="View report"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                     title="View report"
-                  >
-                    <Icon as={ExternalLink} size="md" />
-                  </button>
+                  />
                 </div>
               </div>
             );

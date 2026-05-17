@@ -1,7 +1,7 @@
 import {
-  Loader2, Upload, Check, Wand2, RefreshCw,
+  Upload, Check, Wand2, RefreshCw,
 } from 'lucide-react';
-import { LoadingState, Icon } from '../ui';
+import { LoadingState, Icon, Button, IconButton } from '../ui';
 import { ApprovalPanel } from './ApprovalPanel';
 
 interface SeoEditorHeaderActionsProps {
@@ -48,37 +48,42 @@ export function SeoEditorHeaderActions({
           <span className="font-medium text-[var(--brand-text-bright)]">{pagesCount}</span> pages
         </div>
         {missingTitles > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-accent-warning">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/8 border border-amber-500/30 text-accent-warning">
             {missingTitles} missing SEO titles
           </span>
         )}
         {missingDescs > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-accent-danger">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-red-500/8 border border-red-500/30 text-accent-danger">
             {missingDescs} missing meta descriptions
           </span>
         )}
         <div className="flex-1" />
-        <button
+        <IconButton
           onClick={onRefreshPages}
-          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-accent-brand hover:bg-[var(--surface-3)] transition-colors"
+          icon={RefreshCw}
+          label="Refresh pages from Webflow"
+          size="sm"
+          className="hover:text-accent-brand"
           title="Refresh pages from Webflow"
-        >
-          <Icon as={RefreshCw} size="md" />
-        </button>
-        <button
+        />
+        <Button
           onClick={onFixTitles}
           disabled={bulkFixing || missingTitles === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
+          icon={Wand2}
+          size="sm"
+          variant="primary"
         >
-          <Icon as={Wand2} size="sm" /> AI Fix Titles ({missingTitles})
-        </button>
-        <button
+          AI Fix Titles ({missingTitles})
+        </Button>
+        <Button
           onClick={onFixDescriptions}
           disabled={bulkFixing || missingDescs === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
+          icon={Wand2}
+          size="sm"
+          variant="primary"
         >
-          <Icon as={Wand2} size="sm" /> AI Fix Descriptions ({missingDescs})
-        </button>
+          AI Fix Descriptions ({missingDescs})
+        </Button>
         {workspaceId && (
           <ApprovalPanel
             approvalSelected={approvalSelected}
@@ -87,18 +92,21 @@ export function SeoEditorHeaderActions({
             onSendApproval={onSendApproval}
           />
         )}
-        <button
+        <Button
           onClick={onPublish}
           disabled={publishing}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+          loading={publishing}
+          icon={published ? Check : Upload}
+          size="sm"
+          variant={published ? 'secondary' : 'primary'}
+          className={`rounded-[var(--radius-lg)] font-medium ${
             published
-              ? 'bg-[var(--emerald)] text-white'
-              : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-active)]'
+              ? 'bg-[var(--emerald)] text-white border-0 hover:bg-[var(--emerald)]/90'
+              : ''
           }`}
         >
-          <Icon as={publishing ? Loader2 : published ? Check : Upload} size="sm" className={publishing ? 'animate-spin' : ''} />
           {published ? 'Published!' : publishing ? 'Publishing...' : 'Publish Site'}
-        </button>
+        </Button>
       </div>
 
       {bulkFixing && (

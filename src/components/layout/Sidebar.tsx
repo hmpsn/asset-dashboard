@@ -5,7 +5,7 @@ import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
-import { Icon, cn } from '../ui';
+import { Icon, cn, IconButton, ClickableRow } from '../ui';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
@@ -171,13 +171,13 @@ export function Sidebar({
   return (
     <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-[var(--brand-border)]">
       {/* Logo → Command Center */}
-      <button
+      <ClickableRow
         onClick={() => navigate('/')}
-        className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
+        className="px-4 pt-4 pb-3 block hover:opacity-80 hover:bg-transparent"
         title="Command Center"
       >
         <img src="/logo.svg" alt="Studio logo" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
-      </button>
+      </ClickableRow>
 
       {/* Workspace selector */}
       <div className="px-3 pb-2 border-b border-[var(--brand-border)]">
@@ -202,9 +202,9 @@ export function Sidebar({
           return (
             <div key={group.label || `group-${gi}`} className={group.label ? 'mt-3' : ''}>
               {group.label ? (
-                <button
+                <ClickableRow
                   onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] transition-colors group/hdr"
+                  className="flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] group/hdr"
                 >
                   {group.groupIcon && (() => {
                     const GIcon = group.groupIcon;
@@ -213,11 +213,11 @@ export function Sidebar({
                   <span className="t-caption-sm text-[var(--brand-text-muted)] font-semibold tracking-widest uppercase flex-1 text-left">{group.label}</span>
                   <ChevronRight className={`w-3 h-3 text-[var(--brand-text-dim)] transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
                   {isCollapsed && groupBadgeCount > 0 && (
-                    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
+                    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
                       {groupBadgeCount}
                     </span>
                   )}
-                </button>
+                </ClickableRow>
               ) : null}
               {!isCollapsed && group.items.filter(item => !item.hidden).map(item => {
                 const NavIcon = item.icon;
@@ -225,12 +225,12 @@ export function Sidebar({
                 const isGlobal = GLOBAL_TABS.has(item.id);
                 const disabled = isGlobal ? false : (!selected || (item.needsSite && !selected.webflowSiteId));
                 return (
-                  <button
+                  <ClickableRow
                     key={item.id}
                     onClick={() => !disabled && (isGlobal ? navigate('/' + item.id) : selected && navigate(adminPath(selected.id, item.id)))}
                     title={item.desc}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-[var(--radius-lg)] t-caption font-medium transition-all',
+                      'flex items-center gap-2.5 px-2.5 py-[5px] rounded-[var(--radius-lg)] t-caption font-medium transition-all',
                       active
                         ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
                         : disabled
@@ -243,13 +243,13 @@ export function Sidebar({
                       size="sm"
                       className={cn('flex-shrink-0', active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || 'text-[var(--brand-text-muted)]'))}
                     />
-                    <span className="truncate">{item.label}</span>
-                    {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
-                      <span className="ml-auto t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
-                        {pendingContentRequests}
-                      </span>
-                    )}
-                  </button>
+                      <span className="truncate">{item.label}</span>
+                      {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
+                        <span className="ml-auto t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
+                          {pendingContentRequests}
+                        </span>
+                      )}
+                  </ClickableRow>
                 );
               })}
             </div>
@@ -260,48 +260,49 @@ export function Sidebar({
       {/* Bottom: icon-only utility bar */}
       <div className="px-3 py-2.5 border-t border-[var(--brand-border)] flex items-center justify-center gap-1">
         <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} />
-        <button
+        <IconButton
           onClick={() => navigate('/revenue')}
+          icon={DollarSign}
+          label="Revenue"
+          size="md"
           title="Revenue"
           className={cn(
-            'p-2 rounded-[var(--radius-lg)] transition-all',
+            'rounded-[var(--radius-lg)] transition-all',
             tab === 'revenue'
               ? 'text-teal-400 bg-teal-500/10'
               : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
           )}
-        >
-          <Icon as={DollarSign} size="md" />
-        </button>
-        <button
+        />
+        <IconButton
           onClick={() => navigate('/settings')}
+          icon={Settings}
+          label="Settings"
+          size="md"
           title="Settings"
           className={cn(
-            'p-2 rounded-[var(--radius-lg)] transition-all',
+            'rounded-[var(--radius-lg)] transition-all',
             tab === 'settings'
               ? 'text-teal-400 bg-teal-500/10'
               : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
           )}
-        >
-          <Icon as={Settings} size="md" />
-        </button>
-        <button
+        />
+        <IconButton
           onClick={toggleTheme}
+          icon={theme === 'dark' ? Sun : Moon}
+          label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          size="md"
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="p-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-all"
-        >
-          {theme === 'dark'
-            ? <Icon as={Sun} size="md" />
-            : <Icon as={Moon} size="md" />
-          }
-        </button>
+          className="rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-all"
+        />
         {onLogout && (
-          <button
+          <IconButton
             onClick={() => { auth.logout(); onLogout(); }}
+            icon={LogOut}
+            label="Log out"
+            size="md"
             title="Log out"
-            className="p-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/5 transition-all"
-          >
-            <Icon as={LogOut} size="md" />
-          </button>
+            className="rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/5 transition-all"
+          />
         )}
       </div>
     </aside>

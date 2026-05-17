@@ -9,7 +9,7 @@ import {
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation } from '../hooks/admin/useSchemaValidation';
-import { Icon, cn } from './ui';
+import { Icon, cn, Button } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -40,9 +40,34 @@ interface Props {
   workspaceId?: string;
   fixContext?: FixContext | null;
   businessProfile?: BusinessProfileContact | null;
+  intelligenceProfile?: {
+    industry?: string;
+    targetAudience?: string;
+  } | null;
 }
 
-export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
+type LocalBusinessIntent = 'unknown' | 'local' | 'non-local-saas';
+
+function inferLocalBusinessIntent(
+  businessProfile: BusinessProfileContact | null | undefined,
+  intelligenceProfile: Props['intelligenceProfile'],
+): LocalBusinessIntent {
+  if (businessProfile?.address?.street || businessProfile?.address?.city) return 'local';
+  const profileText = [
+    intelligenceProfile?.industry,
+    intelligenceProfile?.targetAudience,
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (!profileText) return 'unknown';
+  if (/\b(?:dental|dentist|clinic|medical|healthcare|restaurant|retail|salon|spa|law firm|real estate|local)\b/.test(profileText)) {
+    return 'local';
+  }
+  if (/\b(?:saas|software|platform|developer|engineering|b2b|cloud|ai|artificial intelligence)\b/.test(profileText)) {
+    return 'non-local-saas';
+  }
+  return 'unknown';
+}
+
+export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile, intelligenceProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -95,6 +120,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     if (dismissedKey) localStorage.setItem(dismissedKey, '1');
     setCalloutDismissed(true);
   };
+  const localBusinessIntent = inferLocalBusinessIntent(businessProfile, intelligenceProfile);
 
   const {
     cmsMappingError,
@@ -161,9 +187,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         { id: 'generator' as SchemaSubTab, label: 'Generator', icon: Sparkles },
         { id: 'guide' as SchemaSubTab, label: 'Workflow Guide', icon: BookOpen },
       ]).map(t => (
-        <button
+        <Button
           key={t.id}
           onClick={() => setSchemaSubTab(t.id)}
+          variant="ghost"
+          size="sm"
           className={cn(
             'flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px',
             schemaSubTab === t.id
@@ -173,7 +201,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         >
           <Icon as={t.icon} size="md" />
           {t.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -204,6 +232,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
         <SchemaBusinessProfileCallout
           businessProfile={businessProfile}
+          localBusinessIntent={localBusinessIntent}
           dismissed={calloutDismissed}
           workspaceId={workspaceId}
           onDismiss={dismissBpCallout}
@@ -274,9 +303,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         {schemaTabBar}
         <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
         <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
-        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors mt-2">
-          <Icon as={RefreshCw} size="sm" /> Re-scan
-        </button>
+        <Button onClick={runScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
+          Re-scan
+        </Button>
       </div>
     );
   }
@@ -303,6 +332,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       <SchemaBusinessProfileCallout
         businessProfile={businessProfile}
+        localBusinessIntent={localBusinessIntent}
         dismissed={calloutDismissed}
         workspaceId={workspaceId}
         onDismiss={dismissBpCallout}
@@ -360,13 +390,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             />
           )}
           <div className="relative">
-            <button
+            <Button
               onClick={fetchPages}
               disabled={loading || loadingPages}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="secondary"
+              size="sm"
+              icon={loadingPages ? Loader2 : Plus}
+              className={loadingPages ? '[&>svg]:animate-spin' : undefined}
             >
-              {loadingPages ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Plus} size="sm" />} Add Page
-            </button>
+              Add Page
+            </Button>
             {showPagePicker && (
               <PagePicker
                 availablePages={availablePages}
@@ -379,9 +412,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               />
             )}
           </div>
-          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            <Icon as={RefreshCw} size="sm" /> Re-generate All
-          </button>
+          <Button onClick={runScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
+            Re-generate All
+          </Button>
         </div>
       </div>
       {generatingSingle && (

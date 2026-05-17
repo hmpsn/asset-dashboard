@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
-import { Icon } from '../ui';
+import { IconButton } from '../ui';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { jobs as jobsApi } from '../../api/misc';
+import { jobs as jobsApi } from '../../api/platform';
 import { seoBulkJobs } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
@@ -125,13 +125,13 @@ export function BulkAcceptPanel({
 
   const acceptAllSuggestions = async () => {
     if (!data) return;
-    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; pageName?: string }[] = [];
+    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; publishedPath?: string | null; pageName?: string }[] = [];
     for (const page of data.pages) {
       for (const issue of page.issues) {
         const fixKey = `${page.pageId}-${issue.check}`;
         if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
           const text = editedSuggestions[fixKey] || issue.suggestedFix;
-          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, pageName: page.page });
+          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, publishedPath: page.publishedPath, pageName: page.page });
         }
       }
     }
@@ -171,9 +171,15 @@ export function BulkAcceptPanel({
     <div className="flex items-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-red-500/10 border border-red-500/20 t-body text-red-400">
       <AlertTriangle className="w-4 h-4 flex-shrink-0" />
       <span>{bulkError}</span>
-      <button onClick={() => setBulkError(null)} className="ml-auto p-0.5 rounded hover:bg-white/10">
-        <Icon as={X} size="md" />
-      </button>
+      <IconButton
+        type="button"
+        icon={X}
+        label="Dismiss bulk error"
+        size="sm"
+        variant="ghost"
+        onClick={() => setBulkError(null)}
+        className="ml-auto p-0.5 rounded hover:bg-white/10"
+      />
     </div>
   );
 }

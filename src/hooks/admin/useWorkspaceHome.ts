@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { workspaceHome, type WorkspaceHomeData } from '../../api/misc';
+import { workspaceHome, type WorkspaceHomeData } from '../../api/platform';
 import { queryKeys } from '../../lib/queryKeys';
 
 /**

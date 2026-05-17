@@ -44,7 +44,7 @@ import {
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
-import { getEntry } from '../page-strategy.js';
+import { getBlueprint, getEntry } from '../page-strategy.js';
 import type { BatchJob } from '../../shared/types/copy-pipeline.js';
 
 const router = Router();
@@ -309,6 +309,11 @@ router.post(
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
     const { entryIds, mode, batchSize } = req.body as { entryIds: string[]; mode?: string; batchSize?: number };
+
+    const blueprint = getBlueprint(workspaceId, blueprintId);
+    if (!blueprint) {
+      return res.status(404).json({ error: 'Blueprint not found' });
+    }
 
     const batchId = `bj_${randomUUID()}`;
     const now = new Date().toISOString();

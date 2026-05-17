@@ -1,5 +1,5 @@
 import { Loader2, Sparkles } from 'lucide-react';
-import { Icon } from '../ui';
+import { FormInput, Icon, Button } from '../ui';
 
 interface SeoEditorTableControlsProps {
   workspaceId?: string;
@@ -9,11 +9,10 @@ interface SeoEditorTableControlsProps {
   analyzeDisabled: boolean;
   analyzedPagesCount: number;
   totalPages: number;
-  showCmsOnly: boolean;
-  onToggleCmsOnly: () => void;
-  filteredCmsCount: number;
+  cmsPageCount: number;
   search: string;
   onSearchChange: (value: string) => void;
+  showSearch?: boolean;
 }
 
 export function SeoEditorTableControls({
@@ -24,42 +23,48 @@ export function SeoEditorTableControls({
   analyzeDisabled,
   analyzedPagesCount,
   totalPages,
-  showCmsOnly,
-  onToggleCmsOnly,
-  filteredCmsCount,
+  cmsPageCount,
   search,
   onSearchChange,
+  showSearch = true,
 }: SeoEditorTableControlsProps) {
   return (
     <>
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-              <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-[var(--radius-lg)]">
+              <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
               <span className="t-caption-sm text-[var(--brand-text-bright)]">
                 Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...
               </span>
-              <button onClick={onCancelAnalyze} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">
+              <Button
+                onClick={onCancelAnalyze}
+                variant="link"
+                size="sm"
+                className="ml-2 !text-accent-danger no-underline"
+              >
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               onClick={onAnalyzeAllPages}
               disabled={analyzeDisabled}
-              className="flex items-center gap-1.5 px-3 py-1.5 t-caption-sm font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-40"
+              icon={Sparkles}
+              size="sm"
+              variant="primary"
+              className="rounded-[var(--radius-lg)] font-medium disabled:opacity-40"
             >
-              <Icon as={Sparkles} size="md" />
               {analyzedPagesCount === totalPages && totalPages > 0
                 ? 'All Pages Analyzed'
                 : analyzedPagesCount > 0
                   ? `Analyze Remaining (${totalPages - analyzedPagesCount})`
                   : 'Analyze All Pages'}
-            </button>
+            </Button>
           )}
           {analyzedPagesCount > 0 && !bulkAnalyzeProgress && (
-            <span className="t-caption-sm text-accent-success">
+            <span className="t-caption-sm text-blue-400">
               {analyzedPagesCount}/{totalPages} pages have analysis on file
             </span>
           )}
@@ -67,30 +72,22 @@ export function SeoEditorTableControls({
       )}
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={onToggleCmsOnly}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors border ${
-            showCmsOnly
-              ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand'
-              : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-          }`}
-        >
-          CMS pages only
-        </button>
-        {showCmsOnly && (
+        {cmsPageCount > 0 && (
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            {filteredCmsCount} CMS pages
+            {cmsPageCount} CMS items are managed in CMS Collections.
           </span>
         )}
       </div>
 
-      <input
-        type="text"
-        value={search}
-        onChange={e => onSearchChange(e.target.value)}
-        placeholder="Search pages..."
-        className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
-      />
+      {showSearch && (
+        <FormInput
+          type="text"
+          value={search}
+          onChange={onSearchChange}
+          placeholder="Search pages..."
+          className="w-full t-caption-sm"
+        />
+      )}
     </>
   );
 }

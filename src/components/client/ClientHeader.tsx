@@ -2,7 +2,7 @@ import React from 'react';
 import { Lock, Sun, Moon, Calendar, LogOut } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
-import { Button, Icon, IconButton } from '../ui';
+import { Badge, Button, FormInput, Icon, IconButton } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 
@@ -67,17 +67,26 @@ export function ClientHeader({
   hasAnyData,
   effectiveTier,
 }: ClientHeaderProps) {
+  const [customStartDraft, setCustomStartDraft] = React.useState(customDateRange?.startDate || MODULE_DEFAULT_START);
+  const [customEndDraft, setCustomEndDraft] = React.useState(customDateRange?.endDate || MODULE_TODAY);
+
+  React.useEffect(() => {
+    if (!showDatePicker) return;
+    setCustomStartDraft(customDateRange?.startDate || MODULE_DEFAULT_START);
+    setCustomEndDraft(customDateRange?.endDate || MODULE_TODAY);
+  }, [customDateRange, showDatePicker]);
+
   return (
     <header className="border-b border-[var(--brand-border)]">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
           <div className="w-px h-8 bg-[var(--brand-border)]" />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="t-h2 text-[var(--brand-text-bright)]">{ws.name}</h1>
+              <h1 className="t-h2 text-[var(--brand-text-bright)] truncate">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
-                <span className="px-2 py-0.5 t-label rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
+                <span className="px-2 py-0.5 t-label rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/15 text-accent-warning border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                 </span>
               )}
@@ -85,7 +94,7 @@ export function ClientHeader({
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Insights Engine{hasAnyData && <span className="ml-2 text-[var(--brand-text-muted)]">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap sm:justify-end">
           {/* Client user menu */}
           {clientUser && (
             <div className="flex items-center gap-2 pr-2 border-r border-[var(--brand-border)]">
@@ -105,17 +114,22 @@ export function ClientHeader({
           />
           {hasAnalytics && (
             // pr-check-disable-next-line -- Date-range segmented control toolbar; interactive control, not a content card
-            <div className="relative flex items-center gap-1 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
+            <div className="relative flex items-center gap-1 max-w-full overflow-x-auto bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
               {[7, 28, 90, 180, 365].map(d => (
-                <button key={d} onClick={() => changeDays(d, ws)}
-                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-ui font-medium transition-colors ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+                <Button
+                  key={d}
+                  variant="ghost"
+                  onClick={() => changeDays(d, ws)}
+                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-ui font-medium ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
                 >
                   {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
                   {!customDateRange && days === d && <span className="block t-micro text-[var(--brand-text-muted)] font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
-                </button>
+                </Button>
               ))}
-              <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
-                className={`px-2.5 py-1.5 rounded-[var(--radius-md)] t-ui font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+              <Button
+                variant="ghost"
+                onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
+                className={`px-2.5 py-1.5 rounded-[var(--radius-md)] t-ui font-medium ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
                 title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
               >
                 <Icon as={Calendar} size="md" />
@@ -128,25 +142,27 @@ export function ClientHeader({
                 ) : (
                   <span className="hidden sm:inline">Custom</span>
                 )}
-              </button>
+              </Button>
               <Modal open={showDatePicker} onClose={() => setShowDatePicker(false)} size="sm">
                 <Modal.Header title="Custom date range" onClose={() => setShowDatePicker(false)} />
                 <Modal.Body>
                   <div className="space-y-2">
                     <label className="block">
                       <span className="t-label text-[var(--brand-text-muted)]">Start date</span>
-                      <input type="date" ref={customStartRef}
-                        defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
+                      <FormInput type="date" ref={customStartRef}
+                        value={customStartDraft}
+                        onChange={setCustomStartDraft}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full t-caption"
                       />
                     </label>
                     <label className="block">
                       <span className="t-label text-[var(--brand-text-muted)]">End date</span>
-                      <input type="date" ref={customEndRef}
-                        defaultValue={customDateRange?.endDate || MODULE_TODAY}
+                      <FormInput type="date" ref={customEndRef}
+                        value={customEndDraft}
+                        onChange={setCustomEndDraft}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full t-caption"
                       />
                     </label>
                   </div>
@@ -157,8 +173,8 @@ export function ClientHeader({
                       Cancel
                     </Button>
                     <Button onClick={() => {
-                      const s = customStartRef.current?.value;
-                      const e = customEndRef.current?.value;
+                      const s = customStartDraft;
+                      const e = customEndDraft;
                       if (s && e && s <= e) applyCustomRange(s, e, ws);
                     }} size="sm" className="flex-1">
                       Apply
@@ -170,7 +186,7 @@ export function ClientHeader({
           )}
         </div>
       </div>
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <nav role="tablist" className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none"
           onKeyDown={(e) => {
             const unlocked = NAV.filter(n => !n.locked);
@@ -186,7 +202,7 @@ export function ClientHeader({
               r => r.status === 'client_review' || r.status === 'post_review',
             ).length;
             return (
-              <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+              <Button key={t.id} variant="ghost" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-3 t-ui font-medium border-b-2 transition-colors whitespace-nowrap ${
                   t.locked ? 'border-transparent text-[var(--brand-text-muted)] cursor-default' :
@@ -195,10 +211,28 @@ export function ClientHeader({
                 }`}>
                 <Icon as={TabIcon} size="md" /> {t.label}
                 {t.locked && <Icon as={Lock} size="sm" className="ml-0.5 text-[var(--brand-text-muted)]" />}
-                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-[var(--teal)] text-[var(--button-primary-text)] flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
+                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && (
+                  <Badge
+                    label={`${pendingApprovals + pendingReviews + unreadTeamNotes}`}
+                    tone="teal"
+                    variant="solid"
+                    shape="pill"
+                    size="sm"
+                    className="ml-1 min-w-[20px] justify-center leading-tight"
+                  />
+                )}
+                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && (
+                  <Badge
+                    label={`${contentPlanSummary.reviewCells}`}
+                    tone="blue"
+                    variant="solid"
+                    shape="pill"
+                    size="sm"
+                    className="ml-1 min-w-[20px] justify-center leading-tight"
+                  />
+                )}
                 {!t.locked && tabHasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-400/60" title="Data available" />}
-              </button>
+              </Button>
             );
           })}
         </nav>

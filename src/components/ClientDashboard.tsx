@@ -1,24 +1,16 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { get, post, patch, getOptional } from '../api/client';
-import { ApiError } from '../api/client';
+import { post, patch, getOptional } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
 import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
 import {
-  parseAuthInitParams,
-  stripResetTokenFromUrl,
-  stripStripeParamsFromUrl,
-  hasSessionAuth,
-  welcomeSeenKey,
-} from '../lib/client-dashboard-auth';
-import {
   AlertTriangle,
-  Target, Zap, Shield, X,
-  CheckCircle2, LineChart, Trophy, Layers,
-  Clock, CreditCard, Building2, Sparkles,
+  X,
+  CheckCircle2,
+  Clock, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -71,6 +63,9 @@ import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatW
 import { ClientHeader } from './client/ClientHeader';
 import { UpgradeModal } from './client/UpgradeModal';
 import { PricingConfirmationModal } from './client/PricingConfirmationModal';
+import { ClientDashboardTabContent } from './client/client-dashboard/ClientDashboardTabContent';
+import { buildClientDashboardNav, hasClientTabData } from './client/client-dashboard/clientDashboardNav';
+import { useClientWorkspaceBootstrap } from './client/client-dashboard/useClientWorkspaceBootstrap';
 import {
   type BusinessProfile,
   type WorkspaceInfo,
@@ -205,6 +200,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       activity: queryKeys.client.activity(workspaceId),
       approvals: queryKeys.client.approvals(workspaceId),
       clientActions: queryKeys.client.clientActions(workspaceId),
+      workOrders: queryKeys.client.workOrders(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
       'content-plan': queryKeys.client.contentPlan(workspaceId),
@@ -215,6 +211,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       strategy: queryKeys.client.strategy(workspaceId),
       'page-keywords': queryKeys.client.pageKeywords(workspaceId),
       pricing: queryKeys.client.pricing(workspaceId),
+      'content-subscription': queryKeys.client.contentSubscription(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),
       'client-insights': queryKeys.client.clientInsights(workspaceId),
       intelligence: queryKeys.client.intelligence(workspaceId),
@@ -366,6 +363,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.WORK_ORDER_UPDATE]: () => refetchClient('workOrders', `/api/public/work-orders/${workspaceId}`),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
@@ -380,6 +379,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       refetchClient('intelligence', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_CREATED]: () => refetchClient('content-subscription', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => refetchClient('content-subscription', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => refetchClient('content-subscription', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'post:updated': () => refetchClient('post-preview', ''),
@@ -392,6 +397,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'workspace:updated': () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
       refetchClient('pricing', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.PAGE_STATE_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, false) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shared.pageEditStates(workspaceId, true) });
+      refetchClient('activity', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     'recommendations:updated': () => refetchClient('recommendations', ''),
@@ -435,110 +446,22 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
-  useEffect(() => {
-    setLoading(true);
-    get<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`)
-      .then(async (data: WorkspaceInfo) => {
-        if (!data.id) { setError('Workspace not found'); setLoading(false); return; }
-        setWs(data);
-        // Update document head: title, OG meta, Twitter cards, favicon
-        const portalTitle = `${data.name} — Insights Engine`;
-        const portalDesc = `Performance insights, SEO opportunities, and growth recommendations for ${data.name}.`;
-        document.title = portalTitle;
-        const setMeta = (attr: string, key: string, content: string) => {
-          let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
-          if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
-          el.setAttribute('content', content);
-        };
-        setMeta('property', 'og:title', portalTitle);
-        setMeta('property', 'og:description', portalDesc);
-        setMeta('property', 'og:type', 'website');
-        setMeta('property', 'og:url', window.location.href);
-        setMeta('name', 'twitter:title', portalTitle);
-        setMeta('name', 'twitter:description', portalDesc);
-        setMeta('name', 'twitter:card', 'summary');
-        setMeta('name', 'description', portalDesc);
-        if (data.brandLogoUrl) {
-          setMeta('property', 'og:image', data.brandLogoUrl);
-          setMeta('name', 'twitter:image', data.brandLogoUrl);
-        }
-        // Dynamic favicon — use workspace logo if available, else keep default
-        if (data.brandLogoUrl) {
-          let faviconEl = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
-          if (!faviconEl) { faviconEl = document.createElement('link'); faviconEl.rel = 'icon'; document.head.appendChild(faviconEl); }
-          faviconEl.href = data.brandLogoUrl;
-          faviconEl.type = data.brandLogoUrl.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
-        }
-
-        // Fetch auth mode (shared password vs individual accounts)
-        try {
-          const am = await getOptional<{ hasSharedPassword?: boolean; hasClientUsers?: boolean }>(`/api/public/auth-mode/${workspaceId}`);
-          if (am) {
-            setAuthMode({ hasSharedPassword: am.hasSharedPassword ?? !!data.requiresPassword, hasClientUsers: am.hasClientUsers ?? false });
-            setLoginTab(am.hasClientUsers ? 'user' : 'password');
-          }
-        } catch (err) { console.error('ClientDashboard operation failed:', err); }
-
-        // Check if already authenticated via client user JWT cookie
-        let autoAuthed = false;
-        let resolvedUserId: string | undefined;
-        try {
-          const meData = await getOptional<{ user?: { id: string; email: string; name: string; role?: string } }>(`/api/public/client-me/${workspaceId}`);
-          if (meData?.user) {
-            setClientUser({ ...meData.user, role: meData.user.role || 'client' });
-            resolvedUserId = meData.user.id;
-            setAuthenticated(true);
-            autoAuthed = true;
-            loadDashboardData(data);
-          }
-        } catch (err) { console.error('ClientDashboard operation failed:', err); }
-
-        // Fall back to legacy session check
-        if (!autoAuthed) {
-          if (data.requiresPassword) {
-            if (hasSessionAuth(sessionStorage, workspaceId)) {
-              setAuthenticated(true);
-              loadDashboardData(data);
-            }
-          } else {
-            setAuthenticated(true);
-            loadDashboardData(data);
-          }
-        }
-        setLoading(false);
-
-        // Show onboarding questionnaire if enabled and not yet completed
-        if (data.onboardingEnabled && !data.onboardingCompleted) {
-          setShowOnboarding(true);
-        }
-
-        // Show welcome modal on first visit (user-aware key when logged in)
-        const welcomeKey = welcomeSeenKey(workspaceId, resolvedUserId);
-        if (!localStorage.getItem(welcomeKey) && !data.onboardingEnabled) {
-          setShowWelcome(true);
-        }
-
-        const { resetToken: urlResetToken, paymentStatus } = parseAuthInitParams(window.location.search);
-
-        // Detect password reset token in URL
-        if (urlResetToken) {
-          setResetToken(urlResetToken);
-          setLoginView('reset');
-          window.history.replaceState({}, '', stripResetTokenFromUrl(window.location.href));
-        }
-
-        // Detect Stripe payment redirect
-        if (paymentStatus === 'success') {
-          setToast({ message: 'Payment successful! Your content request is being processed.', type: 'success' });
-          window.history.replaceState({}, '', stripStripeParamsFromUrl(window.location.href));
-        } else if (paymentStatus === 'cancelled') {
-          setToast({ message: 'Payment was cancelled. You can try again anytime.', type: 'error' });
-          window.history.replaceState({}, '', stripStripeParamsFromUrl(window.location.href));
-        }
-      })
-      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? `This dashboard is currently unavailable. Please contact ${STUDIO_NAME} for access.` : 'Failed to load dashboard'); setLoading(false); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]); // large init effect — only re-runs on workspace change; missing deps are stable useState setters
+  useClientWorkspaceBootstrap({
+    workspaceId,
+    loadDashboardData,
+    setWs,
+    setLoading,
+    setError,
+    setShowOnboarding,
+    setShowWelcome,
+    setResetToken,
+    setLoginView,
+    setToast,
+    setAuthMode,
+    setLoginTab,
+    setClientUser,
+    setAuthenticated,
+  });
 
 
   const eventDisplayName = (eventName: string): string => {
@@ -648,39 +571,33 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const fmtPrice = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: pCurrency, minimumFractionDigits: 0 }).format(n);
   const briefPrice = pricingData?.products?.brief_blog?.price ?? ws?.contentPricing?.briefPrice ?? null;
   const fullPostPrice = pricingData?.products?.post_polished?.price ?? ws?.contentPricing?.fullPostPrice ?? null;
-  const strategyLocked = effectiveTier === 'free' || !ws?.seoClientView;
-  const isPaid = effectiveTier !== 'free';
   // External-billing workspaces don't see Stripe-managed UI (Plans, Trial banners,
   // Upgrade modal, SEO services cart). Per-request actions still work via the
   // bypass path in usePayments + PricingConfirmationModal.
   const isExternalBilling = ws?.billingMode === 'external';
-  const NAV = [
-    { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
-    ...(ws?.analyticsClientView !== false ? [
-      { id: 'performance' as ClientTab, label: 'Performance', icon: LineChart, locked: false },
-    ] : []),
-    { id: 'health' as ClientTab, label: 'Site Health', icon: Shield, locked: false },
-    ...(isPaid ? [{ id: 'strategy' as ClientTab, label: 'SEO Strategy', icon: Target, locked: strategyLocked }] : []),
-    ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0 ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
-    ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
-    ...(!betaMode && !isExternalBilling ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
-    ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
-    ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
-  ];
+  const NAV = buildClientDashboardNav({
+    ws,
+    effectiveTier,
+    betaMode,
+    brandTabEnabled,
+    contentPlanSummary,
+    strategyData,
+  });
 
-  // hasData function passed to ClientHeader for tab indicator dots
-  const hasData = (tabId: ClientTab): boolean =>
-    tabId === 'overview' ||
-    (tabId === 'performance' && !!(overview || ga4Overview)) ||
-    (tabId === 'health' && !!audit) ||
-    tabId === 'inbox' ||
-    (tabId === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
+  const hasData = (tabId: ClientTab): boolean => hasClientTabData({
+    tabId,
+    overview,
+    ga4Overview,
+    audit,
+    contentPlanSummary,
+  });
+  const activeTabLabel = NAV.find(item => item.id === tab)?.label ?? 'Dashboard';
 
   return (
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
-    <div className={`min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
+    <div className={`min-h-screen overflow-x-hidden bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
       <ClientHeader
@@ -715,6 +632,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <main className="max-w-6xl mx-auto px-6 py-6">
         <ScannerReveal>
         <div className="space-y-8">
+        <PageHeader
+          title={activeTabLabel}
+          subtitle={ws.name}
+          icon={<Sparkles className="w-5 h-5 text-accent-brand" />}
+        />
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
@@ -749,83 +671,68 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* SEO Education Tips — per-tab first-visit contextual tips */}
         <SeoEducationTip tab={tab} workspaceId={workspaceId} />
 
-        {/* ════════════ OVERVIEW TAB ════════════ */}
-        {tab === 'overview' && (
-          <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
-        )}
-
-        {/* ════════════ PERFORMANCE TAB (Search + Analytics) ════════════ */}
-        {tab === 'performance' && (
-          <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
-        )}
-
-        {/* ════════════ SITE HEALTH TAB ════════════ */}
-        {tab === 'health' && (
-          <ErrorBoundary label="Site Health">
-            <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
-              <ErrorBoundary label="Action Plan">
-                <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
-              </ErrorBoundary>
-            ) : undefined} />
-          </ErrorBoundary>
-        )}
-
-        {/* ════════════ SEO STRATEGY TAB ════════════ */}
-        {tab === 'strategy' && (
-          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(t) => setTab(t as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
-        )}
-
-
-        {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
-        {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
-        )}
-
-
-      {/* Floating AI Chat */}
-      <ClientChatWidget
-        chatDeps={chatDeps}
-        betaMode={betaMode}
-        workspaceId={workspaceId}
-        ws={ws}
-        onApiChange={api => setChatApi(api)}
-      />
-
-
-
-        {/* ════════════ CONTENT PLAN TAB ════════════ */}
-        {tab === 'content-plan' && (
-          <ErrorBoundary label="Content Plan">
-            <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
-          </ErrorBoundary>
-        )}
-
-        {/* ════════════ PLANS TAB ════════════ */}
-        {tab === 'plans' && (
-          <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
-        )}
-
-        {/* ════════════ ROI TAB ════════════ */}
-        {tab === 'roi' && (
-          <ErrorBoundary label="ROI Dashboard">
-            <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
-          </ErrorBoundary>
-        )}
-
-        {/* ════════════ BRAND TAB ════════════ */}
-        {tab === 'brand' && brandTabEnabled && (
-          <ErrorBoundary label="Brand">
-            <BrandTab
-              businessProfile={ws?.businessProfile ?? undefined}
-              onSaveBusinessProfile={async (profile) => {
-                const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
-                if (res?.businessProfile) {
-                  setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
-                }
-              }}
+        <ClientDashboardTabContent
+          tab={tab}
+          chatWidget={(
+            <ClientChatWidget
+              chatDeps={chatDeps}
+              betaMode={betaMode}
+              workspaceId={workspaceId}
+              ws={ws}
+              onApiChange={api => setChatApi(api)}
             />
-          </ErrorBoundary>
-        )}
+          )}
+          panels={{
+            overview: (
+              <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
+            ),
+            performance: (
+              <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+            ),
+            health: (
+              <ErrorBoundary label="Site Health">
+                <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
+                  <ErrorBoundary label="Action Plan">
+                    <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+                  </ErrorBoundary>
+                ) : undefined}
+                />
+              </ErrorBoundary>
+            ),
+            strategy: (
+              <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+            ),
+            inbox: (
+              <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+            ),
+            'content-plan': (
+              <ErrorBoundary label="Content Plan">
+                <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
+              </ErrorBoundary>
+            ),
+            plans: (
+              <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
+            ),
+            roi: (
+              <ErrorBoundary label="ROI Dashboard">
+                <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+              </ErrorBoundary>
+            ),
+            brand: brandTabEnabled ? (
+              <ErrorBoundary label="Brand">
+                <BrandTab
+                  businessProfile={ws?.businessProfile ?? undefined}
+                  onSaveBusinessProfile={async (profile) => {
+                    const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                    if (res?.businessProfile) {
+                      setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+                    }
+                  }}
+                />
+              </ErrorBoundary>
+            ) : null,
+          }}
+        />
 
         </div>
         </ScannerReveal>

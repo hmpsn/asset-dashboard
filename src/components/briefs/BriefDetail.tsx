@@ -4,7 +4,7 @@ import {
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
-import { Icon } from '../ui';
+import { Badge, Icon, Button, ClickableRow, FormInput, FormSelect, FormTextarea } from '../ui';
 import type { ContentBrief } from '../../../shared/types/content';
 
 interface BriefDetailProps {
@@ -45,56 +45,58 @@ export function BriefDetail({
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
         {!hideActions?.includes('generatePost') && (
-        <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+        <Button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
           <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
           {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
-        </button>
+        </Button>
         )}
-        <button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
+        <Button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
           {editingBrief === brief.id ? <><Icon as={Check} size="sm" /> Done Editing</> : <><Icon as={Pencil} size="sm" /> Edit Brief</>}
-        </button>
-        <button onClick={() => onCopyAsMarkdown(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+        </Button>
+        <Button onClick={() => onCopyAsMarkdown(brief)} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Icon as={Copy} size="sm" /> Copy for AI Tool
-        </button>
-        <button onClick={() => onExportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+        </Button>
+        <Button onClick={() => onExportClientHTML(brief)} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Icon as={Download} size="sm" /> Export PDF
-        </button>
+        </Button>
         {!hideActions?.includes('sendToClient') && (
-        <button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
+        <Button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
           <Icon as={sendingToClient === brief.id ? Loader2 : Send} size="sm" className={sendingToClient === brief.id ? 'animate-spin' : ''} />
           {sendingToClient === brief.id ? 'Sending...' : 'Send to Client'}
-        </button>
+        </Button>
         )}
-        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Copy} size="sm" /> Copy JSON
-        </button>
-        <button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
+        </Button>
+        <Button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
           showRegenerate ? 'bg-teal-600/20 border border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'
         }`}>
           <Icon as={RefreshCw} size="sm" className={regeneratingBrief === brief.id ? 'animate-spin' : ''} />
           {regeneratingBrief === brief.id ? 'Regenerating...' : 'Regenerate'}
-        </button>
+        </Button>
       </div>
 
       {/* Regenerate with feedback */}
       {showRegenerate && regeneratingBrief !== brief.id && (
         <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3 space-y-2">
           <div className="t-caption-sm text-teal-400 font-medium uppercase tracking-wider">Regenerate with Instructions</div>
-          <textarea
+          <FormTextarea
             value={regenFeedback}
-            onChange={e => setRegenFeedback(e.target.value)}
+            onChange={setRegenFeedback}
             placeholder="e.g. 'Make it more commercial', 'Add a comparison table section', 'Target a different audience'..."
-            className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]"
+            className="w-full min-h-[60px]"
             rows={2}
           />
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => { if (regenFeedback.trim()) { onRegenerate(brief.id, regenFeedback.trim()); setShowRegenerate(false); setRegenFeedback(''); } }}
               disabled={!regenFeedback.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
             >
               <Icon as={Send} size="sm" /> Regenerate Brief
-            </button>
+            </Button>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Creates a new brief — original is preserved</span>
           </div>
         </div>
@@ -105,7 +107,7 @@ export function BriefDetail({
         <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
           {editingBrief === brief.id ? (
-            <textarea defaultValue={brief.executiveSummary} onBlur={e => { if (e.target.value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]" rows={3} />
+            <FormTextarea value={brief.executiveSummary || ''} commitOnBlur onCommit={value => { if (value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed min-h-[60px]" rows={3} />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{brief.executiveSummary}</div>
           )}
@@ -117,7 +119,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
           {editingBrief === brief.id ? (
-            <input type="text" defaultValue={brief.suggestedTitle} onBlur={e => { if (e.target.value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: e.target.value }); }} className="w-full text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
+            <FormInput type="text" value={brief.suggestedTitle || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: value }); }} className="w-full text-xs text-teal-400" />
           ) : (
             <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedTitle}</div>
           )}
@@ -125,17 +127,17 @@ export function BriefDetail({
             <div className="mt-1.5 space-y-1">
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.titleVariants.map((variant, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedTitle: variant,
                     titleVariants: [brief.suggestedTitle, ...brief.titleVariants!.filter((_, j) => j !== i)],
                   })}
-                  className="w-full text-left text-xs text-[var(--brand-text)] hover:text-teal-400 bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
+                  className="text-xs text-[var(--brand-text)] hover:text-teal-400 bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-teal-400">{variant}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2 group-hover:text-teal-500">click to use</span>
-                </button>
+                </ClickableRow>
               ))}
             </div>
           )}
@@ -143,7 +145,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
           {editingBrief === brief.id ? (
-            <textarea defaultValue={brief.suggestedMetaDesc} onBlur={e => { if (e.target.value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+            <FormTextarea value={brief.suggestedMetaDesc || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: value }); }} className="w-full text-xs text-[var(--brand-text-bright)]" rows={2} />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedMetaDesc}</div>
           )}
@@ -151,17 +153,17 @@ export function BriefDetail({
             <div className="mt-1.5 space-y-1">
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.metaDescVariants.map((variant, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedMetaDesc: variant,
                     metaDescVariants: [brief.suggestedMetaDesc, ...brief.metaDescVariants!.filter((_, j) => j !== i)],
                   })}
-                  className="w-full text-left text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
+                  className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-[var(--brand-text-bright)]">{variant}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2 group-hover:text-teal-500">click to use</span>
-                </button>
+                </ClickableRow>
               ))}
             </div>
           )}
@@ -173,7 +175,7 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
           {editingBrief === brief.id ? (
-            <input type="number" defaultValue={brief.wordCountTarget} onBlur={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400 bg-transparent border-b border-[var(--brand-border)] focus:border-blue-400 focus:outline-none py-0.5" />
+            <FormInput type="number" value={brief.wordCountTarget} commitOnBlur onCommit={value => { const v = parseInt(value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400" />
           ) : (
             <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
           )}
@@ -181,7 +183,7 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
           {editingBrief === brief.id ? (
-            <input type="text" defaultValue={brief.intent} onBlur={e => { if (e.target.value !== brief.intent) onSaveBriefField(brief.id, { intent: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
+            <FormInput type="text" value={brief.intent || ''} commitOnBlur onCommit={value => { if (value !== brief.intent) onSaveBriefField(brief.id, { intent: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium" />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{brief.intent}</div>
           )}
@@ -190,9 +192,7 @@ export function BriefDetail({
           <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
             {editingBrief === brief.id ? (
-              <select defaultValue={brief.contentFormat} onChange={e => onSaveBriefField(brief.id, { contentFormat: e.target.value })} className="w-full text-xs text-amber-400 capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 cursor-pointer">
-                {['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
+              <FormSelect value={brief.contentFormat} onChange={value => onSaveBriefField(brief.id, { contentFormat: value })} options={['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => ({ value: f, label: f }))} className="w-full text-xs text-amber-400 capitalize font-medium cursor-pointer" />
             ) : (
               <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
             )}
@@ -219,7 +219,7 @@ export function BriefDetail({
         <div>
           <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
           {editingBrief === brief.id ? (
-            <textarea defaultValue={brief.audience} onBlur={e => { if (e.target.value !== brief.audience) onSaveBriefField(brief.id, { audience: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+            <FormTextarea value={brief.audience || ''} commitOnBlur onCommit={value => { if (value !== brief.audience) onSaveBriefField(brief.id, { audience: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.audience}</div>
           )}
@@ -228,7 +228,7 @@ export function BriefDetail({
           <div>
             <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
             {editingBrief === brief.id ? (
-              <textarea defaultValue={brief.toneAndStyle} onBlur={e => { if (e.target.value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+              <FormTextarea value={brief.toneAndStyle || ''} commitOnBlur onCommit={value => { if (value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
             ) : (
               <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.toneAndStyle}</div>
             )}
@@ -242,7 +242,7 @@ export function BriefDetail({
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.secondaryKeywords.map((kw, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
+              <Badge key={i} label={kw} tone="zinc" shape="pill" />
             ))}
           </div>
         </div>
@@ -254,7 +254,7 @@ export function BriefDetail({
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.topicalEntities.map((entity, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
+              <Badge key={i} label={entity} tone="teal" variant="outline" shape="pill" />
             ))}
           </div>
         </div>
@@ -297,7 +297,7 @@ export function BriefDetail({
               <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                 <div className="flex items-center gap-2">
                   <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">#{result.position}</span>
-                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 truncate">{result.title}</a>
+                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-400 hover:text-teal-300 truncate">{result.title}</a>
                 </div>
               </div>
             ))}
@@ -315,7 +315,7 @@ export function BriefDetail({
               <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Avg Word Count:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{brief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
             </div>
             {brief.serpAnalysis.commonElements.length > 0 && (
-              <div><span className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)]">{el}</span>)}</div></div>
+              <div><span className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <Badge key={i} label={el} tone="zinc" />)}</div></div>
             )}
             {brief.serpAnalysis.gaps.length > 0 && (
               <div><span className="t-caption-sm text-emerald-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{brief.serpAnalysis.gaps.map((g, i) => <div key={i} className="t-caption-sm text-emerald-300/80 flex items-start gap-1.5"><span className="text-emerald-400 mt-0.5">&rarr;</span>{g}</div>)}</div></div>
@@ -327,42 +327,48 @@ export function BriefDetail({
       {/* Content Outline */}
       {brief.outline.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2">
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Content Outline</div>
             {onRegenerateOutline && (
-              <button
+              <Button
                 onClick={() => setShowOutlineRegen(!showOutlineRegen)}
                 disabled={regeneratingOutline === brief.id}
-                className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
+                variant="ghost"
+                size="sm"
+                className="t-caption-sm rounded-[var(--radius-sm)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
               >
                 <Icon as={regeneratingOutline === brief.id ? Loader2 : RefreshCw} size="sm" className={regeneratingOutline === brief.id ? 'animate-spin' : ''} />
                 {regeneratingOutline === brief.id ? 'Regenerating...' : 'Regenerate Outline'}
-              </button>
+              </Button>
             )}
           </div>
           {showOutlineRegen && onRegenerateOutline && (
             <div className="mb-3 p-3 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] space-y-2">
-              <textarea
+              <FormTextarea
                 value={outlineRegenFeedback}
-                onChange={e => setOutlineRegenFeedback(e.target.value)}
+                onChange={setOutlineRegenFeedback}
                 placeholder="Optional: describe what you'd like changed (e.g., 'Add a comparison section', 'Make it more practical')..."
-                className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y"
+                className="w-full"
                 rows={2}
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={() => { onRegenerateOutline(brief.id, outlineRegenFeedback.trim() || undefined); setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
                   disabled={regeneratingOutline === brief.id}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
                 >
                   Regenerate
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -373,22 +379,22 @@ export function BriefDetail({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">H2:</span>
-                      <input type="text" defaultValue={section.heading} onBlur={e => { if (e.target.value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: e.target.value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
-                      <input type="number" defaultValue={section.wordCount || ''} placeholder="words" onBlur={e => { const v = parseInt(e.target.value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 text-right" />
+                      <FormInput type="text" value={section.heading || ''} commitOnBlur onCommit={value => { if (value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)]" />
+                      <FormInput type="number" value={section.wordCount || ''} placeholder="words" commitOnBlur onCommit={value => { const v = parseInt(value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] text-right" />
                     </div>
-                    <textarea defaultValue={section.notes} onBlur={e => { if (e.target.value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: e.target.value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded px-2 py-1.5 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                    <FormTextarea value={section.notes || ''} commitOnBlur onCommit={value => { if (value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed" rows={2} />
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-medium text-[var(--brand-text-bright)]">H2: {section.heading}</div>
-                      {section.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{section.wordCount} words</span>}
+                      {section.wordCount && <Badge label={`${section.wordCount} words`} tone="zinc" />}
                     </div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{section.notes}</div>
                   </>
                 )}
                 {section.keywords && section.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <Badge key={j} label={kw} tone="teal" />)}</div>
                 )}
               </div>
             ))}
@@ -402,9 +408,9 @@ export function BriefDetail({
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
           <div className="space-y-1">{brief.ctaRecommendations.map((cta, i) => (
             <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
-              <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>
+              <Badge label={i === 0 ? 'Primary' : 'Secondary'} tone={i === 0 ? 'teal' : 'zinc'} className="flex-shrink-0" />
               {editingBrief === brief.id ? (
-                <input type="text" defaultValue={cta} onBlur={e => { if (e.target.value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = e.target.value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
+                <FormInput type="text" value={cta || ''} commitOnBlur onCommit={value => { if (value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)]" />
               ) : cta}
             </div>
           ))}</div>
@@ -416,7 +422,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
           {editingBrief === brief.id ? (
-            <textarea defaultValue={brief.competitorInsights} onBlur={e => { if (e.target.value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y leading-relaxed" rows={3} />
+            <FormTextarea value={brief.competitorInsights || ''} commitOnBlur onCommit={value => { if (value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: value }); }} className="w-full text-xs text-[var(--brand-text)] leading-relaxed" rows={3} />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{brief.competitorInsights}</div>
           )}
@@ -429,7 +435,7 @@ export function BriefDetail({
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
           <div className="flex flex-wrap gap-1.5">
             {brief.internalLinkSuggestions.map((link, i) => (
-              <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-blue-400">/{link}</span>
+              <Badge key={i} label={`/${link}`} tone="blue" />
             ))}
           </div>
         </div>
@@ -462,7 +468,7 @@ export function BriefDetail({
           <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
             {brief.contentChecklist.map((item, i) => (
               <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
-                <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border)] flex-shrink-0" />
+                <div className="w-4 h-4 mt-0.5 rounded-[var(--radius-sm)] border border-[var(--brand-border)] flex-shrink-0" />
                 <span className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{item}</span>
               </div>
             ))}
@@ -478,7 +484,7 @@ export function BriefDetail({
             {brief.schemaRecommendations.map((schema, i) => (
               <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
+                  <Badge label={schema.type} tone="blue" variant="outline" />
                 </div>
                 <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{schema.notes}</div>
               </div>
@@ -490,12 +496,14 @@ export function BriefDetail({
       {/* Delete */}
       {!hideActions?.includes('delete') && (
       <div className="pt-3 border-t border-[var(--brand-border)] flex items-center justify-between">
-        <button
+        <Button
           onClick={() => onConfirmDelete(brief)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+          variant="ghost"
+          size="sm"
+          className="rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
         >
           <Icon as={Trash2} size="md" /> Delete Brief
-        </button>
+        </Button>
         <span className="t-caption-sm text-[var(--brand-text-muted)]/50">Created {new Date(brief.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
       </div>
       )}

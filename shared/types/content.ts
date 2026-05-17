@@ -115,6 +115,20 @@ export interface AIReviewResult {
   pass: boolean;
   reason: string;
   humanReviewRequired?: boolean;
+  claimsToVerify?: string[];
+}
+
+export type AIReviewMap = Record<ReviewChecklistKey, AIReviewResult>;
+
+export interface ContentReviewEvidence {
+  peopleAlsoAsk: string[];
+  topResults: { position: number; title: string; url: string }[];
+  note: string;
+}
+
+export interface AIReviewResponse {
+  review: AIReviewMap;
+  evidence?: ContentReviewEvidence;
 }
 
 /**

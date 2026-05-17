@@ -31,6 +31,7 @@ export const queryKeys = {
 
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
+    brief: (wsId: string, briefId: string) => ['admin-brief', wsId, briefId] as const,
     briefingDrafts: (wsId: string) => ['admin-briefing-drafts', wsId] as const,
     briefingDraft: (wsId: string, draftId: string) => ['admin-briefing-draft', wsId, draftId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,
@@ -71,6 +72,7 @@ export const queryKeys = {
       wsId ? ['admin-asset-audit', siteId, wsId] as const : ['admin-asset-audit', siteId] as const,
     seoEditor: (siteId: string, wsId?: string) =>
       wsId ? ['seo-editor', siteId, wsId] as const : ['seo-editor', siteId] as const,
+    seoEditorAll: () => ['seo-editor'] as const,
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
@@ -116,6 +118,7 @@ export const queryKeys = {
     copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
 
     // Page join
+    pageJoinPagesAll: () => ['admin-page-join-pages'] as const,
     pageJoinPages: (siteId: string, wsId?: string) =>
       wsId ? ['admin-page-join-pages', siteId, wsId] as const : ['admin-page-join-pages', siteId] as const,
 
@@ -126,6 +129,7 @@ export const queryKeys = {
     diagnosticForInsightAll: (wsId: string) => ['admin-diagnostic-for-insight', wsId] as const,
 
     // CMS
+    cmsEditorAll: () => ['cms-editor'] as const,
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
     cmsCollections: (siteId: string, wsId?: string) =>
       wsId ? ['cms-collections', siteId, wsId] as const : ['cms-collections', siteId] as const,
@@ -135,6 +139,7 @@ export const queryKeys = {
     // Workspace / global
     workspaces: () => ['admin-workspaces'] as const,
     workspaceDetail: (wsId: string) => ['admin-workspace-detail', wsId] as const,
+    integrationHealth: (wsId: string) => ['admin-integration-health', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     health: () => ['admin-health'] as const,
@@ -177,6 +182,7 @@ export const queryKeys = {
     anomalies: (wsId: string) => ['client-anomalies', wsId] as const,
     approvals: (wsId: string) => ['client-approvals', wsId] as const,
     clientActions: (wsId: string) => ['client-actions', wsId] as const,
+    workOrders: (wsId: string) => ['client-work-orders', wsId] as const,
     requests: (wsId: string) => ['client-requests', wsId] as const,
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
@@ -185,6 +191,7 @@ export const queryKeys = {
     schemaSnapshot: (wsId: string) => ['client-schema-snapshot', wsId] as const,
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
+    contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
     pageKeywords: (wsId: string) => ['client-page-keywords', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,

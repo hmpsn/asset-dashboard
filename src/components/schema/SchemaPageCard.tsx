@@ -9,7 +9,7 @@ import {
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
   Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
-import { StatusBadge, Icon, cn } from '../ui';
+import { Badge, StatusBadge, FormSelect, FormTextarea, Icon, Button, IconButton, ClickableRow, cn } from '../ui';
 import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
@@ -102,89 +102,83 @@ export function SchemaPageCard({
       style={{ borderRadius: '10px 24px 10px 24px' }} // asymmetric-radius-ok
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        <button
+        <ClickableRow
           onClick={() => onToggleExpand(page.pageId)}
-          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity bg-transparent"
         >
           {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
           <div className="flex-1 min-w-0">
             <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
             <div className="t-caption text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
           </div>
-        </button>
+        </ClickableRow>
         <div className="flex items-center gap-2 flex-shrink-0">
           <StatusBadge status={editState?.status} />
           {page.existingSchemas.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-              <Icon as={CheckCircle} size="sm" /> {page.existingSchemas.length} existing
-            </span>
+            <Badge label={`${page.existingSchemas.length} existing`} tone="emerald" variant="outline" shape="pill" size="sm" icon={CheckCircle} />
           )}
           {graphTypes.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-teal-500/10 text-teal-400 border border-teal-500/20">
-              <Icon as={Sparkles} size="sm" /> {graphTypes.length} types
-            </span>
+            <Badge label={`${graphTypes.length} types`} tone="teal" variant="outline" shape="pill" size="sm" icon={Sparkles} />
           )}
           {eligibleCount > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
-              <Icon as={Star} size="sm" /> {eligibleCount} rich
-            </span>
+            <Badge label={`${eligibleCount} rich`} tone="emerald" variant="outline" shape="pill" size="sm" icon={Star} className="cursor-help" ariaLabel={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`} />
           )}
           {isStale && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Published ${staleDays} days ago — consider refreshing`}>
-              <Icon as={Clock} size="sm" /> {staleDays}d old
-            </span>
+            <Badge label={`${staleDays}d old`} tone="amber" variant="outline" shape="pill" size="sm" icon={Clock} className="cursor-help" ariaLabel={`Published ${staleDays} days ago - consider refreshing`} />
           )}
           {hasErrors && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-              <Icon as={AlertCircle} size="sm" /> {page.validationErrors!.length}
-            </span>
+            <Badge label={`${page.validationErrors!.length}`} tone="amber" variant="outline" shape="pill" size="sm" icon={AlertCircle} />
           )}
           {schemaRecs.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-              <Icon as={AlertTriangle} size="sm" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
-            </span>
+            <Badge label={`${schemaRecs.length} rec${schemaRecs.length > 1 ? 's' : ''}`} tone="amber" variant="outline" shape="pill" size="sm" icon={AlertTriangle} />
           )}
-          <select
+          <FormSelect
             value={pageType}
-            onChange={e => { e.stopPropagation(); onPageTypeChange(page.pageId, e.target.value); }}
+            onChange={value => onPageTypeChange(page.pageId, value)}
             onClick={e => e.stopPropagation()}
+            options={[
+              { value: 'auto', label: 'Auto-detect' },
+              { value: 'homepage', label: 'Homepage' },
+              { value: 'pillar', label: 'Pillar / Product Page' },
+              { value: 'service', label: 'Service Page' },
+              { value: 'audience', label: 'Audience / Use Case' },
+              { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
+              { value: 'blog', label: 'Blog Post' },
+              { value: 'about', label: 'About / Team' },
+              { value: 'contact', label: 'Contact' },
+              { value: 'location', label: 'Location' },
+              { value: 'product', label: 'Product' },
+              { value: 'partnership', label: 'Partnership' },
+              { value: 'faq', label: 'FAQ' },
+              { value: 'case-study', label: 'Case Study' },
+              { value: 'comparison', label: 'Comparison' },
+              { value: 'author', label: 'Author Profile' },
+              { value: 'howto', label: 'How-To / Tutorial' },
+              { value: 'video', label: 'Video Page' },
+              { value: 'job-posting', label: 'Job Posting' },
+              { value: 'course', label: 'Course / Training' },
+              { value: 'event', label: 'Event' },
+              { value: 'review', label: 'Review' },
+              { value: 'pricing', label: 'Pricing Page' },
+              { value: 'recipe', label: 'Recipe' },
+              { value: 'generic', label: 'General Page' },
+            ]}
             className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 cursor-pointer"
             title="Page type hint for schema generation"
-          >
-            <option value="auto">Auto-detect</option>
-            <option value="homepage">Homepage</option>
-            <option value="pillar">Pillar / Product Page</option>
-            <option value="service">Service Page</option>
-            <option value="audience">Audience / Use Case</option>
-            <option value="lead-gen">Lead-Gen / Conversion</option>
-            <option value="blog">Blog Post</option>
-            <option value="about">About / Team</option>
-            <option value="contact">Contact</option>
-            <option value="location">Location</option>
-            <option value="product">Product</option>
-            <option value="partnership">Partnership</option>
-            <option value="faq">FAQ</option>
-            <option value="case-study">Case Study</option>
-            <option value="comparison">Comparison</option>
-            <option value="author">Author Profile</option>
-            <option value="howto">How-To / Tutorial</option>
-            <option value="video">Video Page</option>
-            <option value="job-posting">Job Posting</option>
-            <option value="course">Course / Training</option>
-            <option value="event">Event</option>
-            <option value="review">Review</option>
-            <option value="pricing">Pricing Page</option>
-            <option value="recipe">Recipe</option>
-            <option value="generic">General Page</option>
-          </select>
-          <button
+          />
+          <IconButton
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
             disabled={isRegenLoading}
-            className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
+            icon={isRegenLoading ? Loader2 : RefreshCw}
+            label="Regenerate schema for this page"
+            size="sm"
+            variant="solid"
+            className={cn(
+              'rounded-[var(--radius-md)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]',
+              isRegenLoading && 'animate-pulse',
+            )}
             title="Regenerate schema for this page"
-          >
-            {isRegenLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />}
-          </button>
+          />
         </div>
       </div>
 
@@ -202,54 +196,64 @@ export function SchemaPageCard({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
-                  <button
+                  <Button
                     onClick={() => onToggleDiff(page.pageId)}
+                    icon={GitCompareArrows}
+                    variant="ghost"
+                    size="sm"
                     className={cn(
-                      'flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                      'rounded-[var(--radius-md)] font-medium',
                       showDiff
-                        ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                        ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]'
                         : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                     )}
                   >
-                    <Icon as={GitCompareArrows} size="sm" />
                     {showDiff ? 'Hide Diff' : 'Show Diff'}
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <button
+                <Button
                   onClick={() => onToggleSchemaEdit(page.pageId, schema.template)}
+                  icon={Pencil}
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    'flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                    'rounded-[var(--radius-md)] font-medium',
                     editingSchema
                       ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
                       : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                   )}
                 >
-                  <Icon as={Pencil} size="sm" />
                   {editingSchema ? 'Done Editing' : 'Edit'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onCopyTemplate(schema, page.pageId)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                  icon={copiedId === `${page.pageId}-${schema.type}` ? CheckCircle : Copy}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   {copiedId === `${page.pageId}-${schema.type}` ? (
-                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> Copied</>
+                    'Copied'
                   ) : (
-                    <><Icon as={Copy} size="sm" /> Copy script</>
+                    'Copy script'
                   )}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onCopyJsonLd(schema, page.pageId)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 border border-blue-500/20 transition-colors"
+                  icon={copiedId === `${page.pageId}-${schema.type}-json` ? CheckCircle : Copy}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/15 text-teal-300 border border-teal-500/25"
                   title="Copy JSON only for Webflow Page Settings -> Schema markup"
                 >
                   {copiedId === `${page.pageId}-${schema.type}-json` ? (
-                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> JSON copied</>
+                    'JSON copied'
                   ) : (
-                    <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
+                    'Copy JSON-LD'
                   )}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -257,7 +261,7 @@ export function SchemaPageCard({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <div className="t-caption-sm font-medium text-red-400/80 mb-1 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-red-400/60" /> Current (on page)
+                    <span className="badge-span-ok w-2 h-2 rounded-[var(--radius-pill)] bg-red-400/60" /> Current (on page)
                   </div>
                   <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-red-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
                     {JSON.stringify(page.existingSchemaJson.length === 1 ? page.existingSchemaJson[0] : page.existingSchemaJson, null, 2)}
@@ -265,7 +269,7 @@ export function SchemaPageCard({
                 </div>
                 <div>
                   <div className="t-caption-sm font-medium text-emerald-400/80 mb-1 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-400/60" /> Suggested <Icon as={ArrowRight} size="sm" />
+                    <span className="badge-span-ok w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-400/60" /> Suggested <Icon as={ArrowRight} size="sm" />
                   </div>
                   <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-emerald-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
                     {JSON.stringify(schema.template, null, 2)}
@@ -290,95 +294,99 @@ export function SchemaPageCard({
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               {/* Validation status badge */}
               {validationStatus === 'valid' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                  <Icon as={ShieldCheck} size="sm" /> Schema valid
-                </span>
+                <Badge label="Schema valid" tone="emerald" variant="outline" shape="pill" size="sm" icon={ShieldCheck} />
               )}
               {validationStatus === 'warnings' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-                  <Icon as={AlertTriangle} size="sm" /> Warnings
-                </span>
+                <Badge label="Warnings" tone="amber" variant="outline" shape="pill" size="sm" icon={AlertTriangle} />
               )}
               {validationStatus === 'errors' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption bg-red-500/8 text-red-400/80 border border-red-500/20" title="Fix errors before publishing">
-                  <Icon as={XCircle} size="sm" /> Fix errors to publish
-                </span>
+                <Badge label="Fix errors to publish" tone="red" variant="outline" shape="pill" size="sm" icon={XCircle} ariaLabel="Fix errors before publishing" />
               )}
               {!page.pageId.startsWith('cms-') && (
                 published ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                    <Icon as={CheckCircle} size="md" /> Published to Webflow
-                  </span>
+                  <Badge label="Published to Webflow" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />
                 ) : confirmPublish ? (
                   <div className="flex items-center gap-2">
                     <span className="t-caption text-amber-400/80">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
-                    <button
+                    <Button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
+                      loading={publishing}
+                      icon={publishing ? undefined : Upload}
+                      variant="primary"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] bg-emerald-600 hover:bg-emerald-500 text-white"
                     >
-                      {publishing ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Upload} size="md" />}
                       Yes, publish
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => onConfirmPublish(null)}
-                      className="px-2 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
+                  <Button
                     // pr-check-disable-next-line -- publish action with loading state
                     onClick={() => onConfirmPublish(page.pageId)}
                     disabled={publishing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
+                    loading={publishing}
+                    icon={publishing ? undefined : Upload}
+                    variant="primary"
+                    size="sm"
+                    className="rounded-[var(--radius-md)] bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                   >
                     {publishing ? (
-                      <><Icon as={Loader2} size="md" className="animate-spin" /> Publishing...</>
+                      'Publishing...'
                     ) : (
-                      <><Icon as={Upload} size="md" /> Publish to Webflow</>
+                      'Publish to Webflow'
                     )}
-                  </button>
+                  </Button>
                 )
               )}
               {isHomepage && (
                 templateSaved ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                    <Icon as={CheckCircle} size="md" /> Template Saved
-                  </span>
+                  <Badge label="Template Saved" tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} />
                 ) : (
-                  <button
+                  <Button
                     onClick={() => onSaveAsTemplate(page.pageId)}
                     disabled={savingTemplate}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    loading={savingTemplate}
+                    icon={savingTemplate ? undefined : Save}
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30"
                     title="Save Organization + WebSite nodes as the site-wide template for subpages"
                   >
                     {savingTemplate ? (
-                      <><Icon as={Loader2} size="md" className="animate-spin" /> Saving...</>
+                      'Saving...'
                     ) : (
-                      <><Icon as={Save} size="md" /> Save as Site Template</>
+                      'Save as Site Template'
                     )}
-                  </button>
+                  </Button>
                 )
               )}
               {published && !retracted && (
-                <button
+                <Button
                   onClick={() => onRetract(page.pageId)}
                   disabled={retracting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
+                  loading={retracting}
+                  icon={retracting ? undefined : Trash2}
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-[var(--radius-md)] bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
                 >
-                  {retracting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Trash2} size="md" />}
                   Retract
-                </button>
+                </Button>
               )}
               {retracted && (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border border-[var(--brand-border)]/20">
-                  <Icon as={Trash2} size="md" /> Retracted
-                </span>
+                <Badge label="Retracted" tone="zinc" variant="outline" shape="sm" size="md" icon={Trash2} />
               )}
               {publishError && (
-                <span className="t-caption text-red-400/80">{publishError}</span>
+                <span className="badge-span-ok t-caption text-red-400/80">{publishError}</span>
               )}
               {manualDelivery?.status === 'manual-required' && (
                 <div className="basis-full rounded-[var(--radius-md)] border border-amber-500/25 bg-amber-500/8 p-3 text-amber-100/90">
@@ -396,16 +404,19 @@ export function SchemaPageCard({
                             ? ` · API payload ${manualDelivery.characterCount}/${manualDelivery.apiLimit} chars`
                             : ''}
                         </span>
-                        <button
+                        <Button
                           onClick={() => onCopyJsonLd(schema, page.pageId)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-amber-500/12 hover:bg-amber-500/18 text-amber-200 border border-amber-500/25 transition-colors"
+                          icon={copiedId === `${page.pageId}-${schema.type}-json` ? CheckCircle : Copy}
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-[var(--radius-md)] bg-amber-500/12 hover:bg-amber-500/18 text-amber-200 border border-amber-500/25"
                         >
                           {copiedId === `${page.pageId}-${schema.type}-json` ? (
-                            <><Icon as={CheckCircle} size="sm" /> JSON copied</>
+                            'JSON copied'
                           ) : (
-                            <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
+                            'Copy JSON-LD'
                           )}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -413,55 +424,59 @@ export function SchemaPageCard({
               )}
               {workspaceId && (
                 sentPage ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                    <Icon as={CheckCircle} size="md" /> Sent for Approval
-                  </span>
+                  <Badge label="Sent to client" tone="blue" variant="outline" shape="sm" size="md" icon={CheckCircle} />
                 ) : (
                   <>
-                    <button
+                    <Button
                       onClick={() => onSendToClient(page, pageNote.trim() || undefined)}
                       disabled={sendingPage}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                      loading={sendingPage}
+                      icon={sendingPage ? undefined : Send}
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-[var(--radius-md)] bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
                     >
                       {sendingPage ? (
-                        <><Icon as={Loader2} size="md" className="animate-spin" /> Sending...</>
+                        'Sending...'
                       ) : (
-                        <><Icon as={Send} size="md" /> Send to Client</>
+                        'Send to client'
                       )}
-                    </button>
-                    <textarea
+                    </Button>
+                    <FormTextarea
                       value={pageNote}
-                      onChange={e => setPageNote(e.target.value)}
+                      onChange={setPageNote}
                       disabled={sendingPage}
                       maxLength={2000}
                       placeholder="Add a note for your client (optional)"
                       rows={2}
-                      className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-2 w-full t-caption placeholder:text-[var(--brand-text-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </>
                 )
               )}
               {/* Version History toggle */}
-              <button
+              <Button
                 onClick={() => setShowHistory(h => !h)}
+                icon={History}
+                variant="ghost"
+                size="sm"
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+                  'rounded-[var(--radius-md)] font-medium',
                   showHistory
-                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                    ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
                     : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
                 )}
                 title="View publish version history"
               >
-                <Icon as={History} size="md" />
                 History
-              </button>
+              </Button>
             </div>
 
             {/* Stale schema warning */}
             {isStale && (
               <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-amber-500/5 border border-amber-500/20">
                 <Icon as={Clock} size="md" className="text-amber-400/80 flex-shrink-0" />
-                <span className="t-caption-sm text-amber-300">
+                <span className="badge-span-ok t-caption-sm text-amber-300">
                   Schema published {staleDays} days ago — consider regenerating to reflect any content changes.
                 </span>
               </div>

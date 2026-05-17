@@ -6,6 +6,7 @@ export const seoBulkAcceptFixSchema = z.object({
   suggestedFix: z.string().min(1),
   message: z.string().optional(),
   pageSlug: z.string().optional(),
+  publishedPath: z.string().nullable().optional(),
   pageName: z.string().optional(),
 });
 

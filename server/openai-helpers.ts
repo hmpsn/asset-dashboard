@@ -10,6 +10,8 @@ import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
 import { stripCodeFences } from './helpers.js';
 import { abortableDelay, composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
+import { recordOperationTrace } from './platform-observability.js';
+import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 
 const log = createLogger('openai');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -319,9 +321,6 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
  * Internal function that actually calls OpenAI API
  */
 async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-
   const {
     model = 'gpt-5.4-mini',
     messages,
@@ -334,6 +333,25 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     timeoutMs = 60_000,
     signal,
   } = opts;
+
+  if (isLocalFakeProviderModeEnabled()) {
+    const fallbackText = responseFormat?.type === 'json_object'
+      ? JSON.stringify({
+          mode: 'local-fake-providers',
+          feature,
+          summary: 'Synthetic OpenAI response for local onboarding.',
+          hint: 'Disable LOCAL_FAKE_PROVIDERS for live provider calls.',
+        })
+      : `[local-fake-providers] Synthetic OpenAI response for "${feature}".`;
+    const promptTokens = Math.max(1, Math.round(messages.length * 9));
+    const completionTokens = Math.max(1, Math.round(fallbackText.length / 6));
+    const totalTokens = promptTokens + completionTokens;
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1 });
+    return { text: fallbackText, promptTokens, completionTokens, totalTokens };
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const tokenLimit = usesMaxCompletionTokens(model)
     ? { max_completion_tokens: maxTokens }
@@ -396,6 +414,14 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       // Track usage
       const durationMs = Date.now() - callStartMs;
       logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs });
+      recordOperationTrace({
+        source: 'ai',
+        operation: feature,
+        status: 'success',
+        durationMs,
+        workspaceId,
+        message: `${model} call completed`,
+      });
 
       return { text, promptTokens, completionTokens, totalTokens };
     } catch (err) {
@@ -405,7 +431,17 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
         await abortableDelay(2000 * (attempt + 1), signal, AI_REQUEST_CANCELLED_MESSAGE);
         continue;
       }
-      if (attempt === maxRetries) throw err;
+      if (attempt === maxRetries) {
+        recordOperationTrace({
+          source: 'ai',
+          operation: feature,
+          status: 'error',
+          durationMs: Date.now() - callStartMs,
+          workspaceId,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
       // Generic retry for network errors
       log.info(`[${feature}] OpenAI error: ${err instanceof Error ? err.message : err}, retrying (attempt ${attempt + 1}/${maxRetries})`);
       await abortableDelay(2000 * Math.pow(2, attempt), signal, AI_REQUEST_CANCELLED_MESSAGE);

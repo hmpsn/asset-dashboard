@@ -46,7 +46,7 @@ export function filterHttpUrls(urls: ReadonlyArray<string>): string[] {
  * (a single-item breadcrumb is just the homepage and adds no information).
  */
 export function buildBreadcrumb(items: BreadcrumbItem[], canonicalUrl: string): Record<string, unknown> | undefined {
-  if (items.length < 2) return undefined;
+  if (!shouldEmitBreadcrumb(items, canonicalUrl)) return undefined;
   return {
     '@type': 'BreadcrumbList',
     '@id': `${canonicalUrl}#breadcrumb`,
@@ -117,8 +117,38 @@ export function breadcrumbRef(
   canonicalUrl: string,
   breadcrumbs: BreadcrumbItem[],
 ): { '@id': string } | undefined {
-  if (breadcrumbs.length < 2) return undefined;
+  if (!shouldEmitBreadcrumb(breadcrumbs, canonicalUrl)) return undefined;
   return { '@id': `${canonicalUrl}#breadcrumb` };
+}
+
+const STANDALONE_BREADCRUMB_OMIT_SEGMENTS = new Set([
+  'book-a-call',
+  'book-demo',
+  'contact-sales',
+  'demo',
+  'get-started',
+  'schedule-a-call',
+  'schedule-a-demo',
+  'signup',
+  'thank-you',
+]);
+
+function canonicalPathSegments(canonicalUrl: string): string[] {
+  try {
+    const path = new URL(canonicalUrl).pathname.replace(/^\/|\/$/g, '');
+    return path ? path.split('/').filter(Boolean) : [];
+  } catch { // catch-ok: malformed canonical URLs should simply suppress low-value breadcrumbs
+    return [];
+  }
+}
+
+function shouldEmitBreadcrumb(items: BreadcrumbItem[], canonicalUrl: string): boolean {
+  if (items.length < 2) return false;
+
+  const segments = canonicalPathSegments(canonicalUrl);
+  if (segments.length >= 2) return true;
+  if (segments.length === 1) return !STANDALONE_BREADCRUMB_OMIT_SEGMENTS.has(segments[0].toLowerCase());
+  return false;
 }
 
 /**

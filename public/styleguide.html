@@ -129,7 +129,7 @@
     <div class="manifesto-rules">
       <div><span class="k">Emerald earns its own lane.</span> Success, +deltas, &ldquo;Live&rdquo; pills, approvals. Emerald is never clickable — if you pair it with a button, that&rsquo;s a bug.</div>
       <div><span class="k">Two tiers of muted text. Never three.</span> Body (<b>zinc-400</b>) and dim (<b>zinc-500</b>). Anything else is a spec violation masquerading as hierarchy.</div>
-      <div><span class="k">The radius signals status.</span> Asymmetric <b>6/12</b> or <b>10/24</b> only on StatCard and SectionCard. Everything else: uniform <b>10px</b>. Calm surrounds spotlight.</div>
+      <div><span class="k">The radius signals status.</span> <b>--radius-signature</b> and <b>--radius-signature-lg</b> belong only on StatCard and SectionCard. Everything else uses <b>--radius-lg</b>. Calm surrounds spotlight.</div>
     </div>
   </section>
 
@@ -161,7 +161,7 @@
       <p>DIN Pro carries numerals, headings, and UI chrome — everywhere figures need to dominate. Inter does the heavy lifting for body, UI copy, and captions. Small sizes bumped globally (13.5 / 15.5px).</p>
     </div>
 
-    <div class="card" style="padding:8px 28px;">
+    <div class="card" style="padding:0.5rem 1.75rem;">
       <div class="type-specimen">
         <div class="type-meta">
           <b>Display Hero</b>
@@ -320,7 +320,7 @@
       </p>
 
       <!-- Positive specimens -->
-      <div class="card" style="padding:8px 28px; margin-bottom:16px;">
+      <div class="card" style="padding:0.5rem 1.75rem; margin-bottom:16px;">
 
         <div class="type-specimen">
           <div class="type-meta">
@@ -511,7 +511,7 @@
         <div class="law l-blue">
           <div class="law-num">Law 02</div>
           <div class="law-title">Blue for data.</div>
-          <div class="law-body">Clicks, sessions, impressions, links, progress bars, &ldquo;Needs Review&rdquo; — all blue. Blue is read-only. It labels a number; it never invites a click.</div>
+          <div class="law-body">Clicks, sessions, impressions, links, progress bars, and info badges — all blue. Blue is read-only. It labels a number; it never invites a click.</div>
           <span class="law-chip">text-blue-400 · bg-blue-500/10</span>
         </div>
         <div class="law l-emerald">
@@ -593,7 +593,7 @@
         <div class="dd-tile dd-dont">
           <div class="dd-head"><span class="dd-mark">✗</span> Don't · blue CTAs or mint numbers</div>
           <div class="dd-stage" style="gap:12px; flex-wrap:wrap;">
-            <button class="btn" style="padding:9px 16px; border-radius:8px; background:linear-gradient(90deg,var(--blue),#2563eb); color:#fff; font-size:13px; font-weight:600;">Send brief</button>
+            <button class="btn" style="padding:0.5625rem 1rem; border-radius:8px; background:linear-gradient(90deg,var(--blue),#2563eb); color:#fff; font-size:13px; font-weight:600;">Send brief</button>
             <div class="statcard" style="min-width:160px;">
               <div class="row1"><svg class="i" style="color:var(--teal)"><use href="#i-mouse"/></svg><span class="lab">Clicks</span></div>
               <div><span class="val" style="color:var(--teal)">12,340</span></div>
@@ -614,8 +614,8 @@
         <div class="dd-tile dd-dont">
           <div class="dd-head"><span class="dd-mark">✗</span> Don't · emerald buttons</div>
           <div class="dd-stage" style="gap:10px;">
-            <button class="btn" style="padding:9px 16px; border-radius:8px; background:var(--emerald); color:#062a1f; font-size:13px; font-weight:600;">Approve</button>
-            <button class="btn" style="padding:9px 16px; border-radius:8px; background:rgba(16,185,129,.15); color:var(--emerald); font-size:13px; font-weight:600; border:1px solid rgba(16,185,129,.35);">Publish</button>
+            <button class="btn" style="padding:0.5625rem 1rem; border-radius:8px; background:var(--emerald); color:#062a1f; font-size:13px; font-weight:600;">Approve</button>
+            <button class="btn" style="padding:0.5625rem 1rem; border-radius:8px; background:rgba(16,185,129,.15); color:var(--emerald); font-size:13px; font-weight:600; border:1px solid rgba(16,185,129,.35);">Publish</button>
           </div>
           <div class="dd-note"><b>Emerald is signal, not surface.</b> Use mint for the button; reserve green to confirm the result <em>after</em> it's clicked.</div>
         </div>
@@ -679,7 +679,7 @@
         </div>
         <div class="accent-card">
           <div class="dots"><div class="dot" style="background:#a78bfa"></div><div class="dot" style="background:#7c3aed"></div></div>
-          <div class="meta"><b>Purple</b><span>4.6:1 · AI / premium</span></div>
+          <div class="meta"><b>Purple</b><span>4.6:1 · admin AI only</span></div>
         </div>
       </div>
     </div>
@@ -691,7 +691,7 @@
       <span class="sec-num">04 ·</span>
       <h2>Spacing · Radius · Shadow</h2>
       <div class="rule"></div>
-      <p>Everything snaps to a <span class="t-mono">4px</span> rhythm at the layout scale. Inside components, a tighter micro-scale (<span class="t-mono">6 / 10 / 14</span>) earns its place — but never mix the two in the same region. Card radius defaults to <span class="t-mono">10px</span>. StatCards are asymmetric (<span class="t-mono">6 / 12 / 6 / 12</span>) — the signature shape. Focus rings are always mint at 2px offset.</p>
+      <p>Everything snaps to a <span class="t-mono">4px</span> rhythm at the layout scale. Inside components, a tighter micro-scale (<span class="t-mono">6 / 10 / 14</span>) earns its place — but never mix the two in the same region. Card radius defaults to <span class="t-mono">--radius-lg</span>. StatCards use <span class="t-mono">--radius-signature</span> — the signature shape. Focus rings are always mint at 2px offset.</p>
     </div>
 
     <div class="sub-section">
@@ -729,8 +729,8 @@
             <h3>The forward lean.</h3>
             <p>Diagonal corners — tight on top-left and bottom-right, generous on top-right and bottom-left — give every page-level card a subtle forward motion. It reads as &ldquo;this is live data, not chrome.&rdquo;</p>
             <p>We reserve the shape for two things only: <b style="color:var(--brand-text-bright)">SectionCard</b> (page-level containers) and <b style="color:var(--brand-text-bright)">StatCard</b> (metric tiles). The restraint is the point — if every surface leaned forward, none of them would.</p>
-            <div class="formula">--radius-signature:     6px 12px 6px 12px;
---radius-signature-lg: 10px 24px 10px 24px;</div>
+            <div class="formula">StatCard:    var(--radius-signature)
+SectionCard: var(--radius-signature-lg)</div>
           </div>
         </div>
 
@@ -738,12 +738,12 @@
           <div class="sig-use yes">
             <span class="tag">✓ Signature</span>
             <span class="what">SectionCard</span>
-            <span class="why">Page-level containers · 10 / 24</span>
+            <span class="why">Page-level containers · --radius-signature-lg</span>
           </div>
           <div class="sig-use yes" style="border-radius:var(--radius-signature);">
             <span class="tag">✓ Signature</span>
             <span class="what">StatCard · CompactStatBar</span>
-            <span class="why">Metric tiles · 6 / 12</span>
+            <span class="why">Metric tiles · --radius-signature</span>
           </div>
           <div class="sig-use no">
             <span class="tag">✗ Uniform 10</span>
@@ -763,8 +763,8 @@
         <div class="radius-tile" style="border-radius:6px"><b>6</b><span>chip, dot button</span></div>
         <div class="radius-tile" style="border-radius:8px"><b>8</b><span>button, input, nav item</span></div>
         <div class="radius-tile" style="border-radius:10px"><b>10</b><span>default card<br/>everything else</span></div>
-        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature)"><b>6 / 12</b><span>StatCard<br/>asymmetric</span></div>
-        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature-lg)"><b>10 / 24</b><span>SectionCard<br/>page-level</span></div>
+        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature)"><b>--radius-signature</b><span>StatCard<br/>asymmetric</span></div>
+        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature-lg)"><b>--radius-signature-lg</b><span>SectionCard<br/>page-level</span></div>
       </div>
     </div>
 
@@ -773,7 +773,7 @@
       <div class="sig-hero">
         <div class="sig-shape">
           <div>
-            <div class="sig-spec">SectionCard · 10 / 24 / 10 / 24</div>
+            <div class="sig-spec">SectionCard · --radius-signature-lg</div>
             <div class="big" style="margin-top:12px;">Tight top-left.<br/>Round top-right.</div>
           </div>
           <div class="sig-desc">The platform's signature shape. Diagonal radius — sharp on TL/BR, rounded on TR/BL — gives every card a subtle forward lean. Only SectionCards (page-level) and StatCards (metric-level) carry it. Everything else is uniform.</div>
@@ -782,11 +782,11 @@
           <div class="statcard hero-card" style="flex:1;">
             <div class="row1"><svg class="i" style="color:#60a5fa"><use href="#i-mouse"/></svg><span class="lab">Clicks</span></div>
             <div><span class="val hero">12,340</span><span class="deltaPos">+12%</span></div>
-            <div class="sub">StatCard · 6 / 12 / 6 / 12</div>
+            <div class="sub">StatCard · --radius-signature</div>
           </div>
           <div class="statcard" style="border-radius:10px; flex:1;">
             <div class="row1"><svg class="i" style="color:#10b981"><use href="#i-zap"/></svg><span class="lab">Everything else</span></div>
-            <div style="font-size:13px; color:var(--brand-text); line-height:1.5; margin-top:4px;">Insight cards, nested surfaces, modals, toasts → uniform <b style="color:var(--brand-text-bright); font-family:'DIN Pro';">10px</b>. The asymmetric shape is reserved; the rest is calm.</div>
+            <div style="font-size:13px; color:var(--brand-text); line-height:1.5; margin-top:4px;">Insight cards, nested surfaces, modals, toasts → uniform <b style="color:var(--brand-text-bright); font-family:'DIN Pro';">--radius-lg</b>. The asymmetric shape is reserved; the rest is calm.</div>
           </div>
         </div>
       </div>
@@ -796,13 +796,13 @@
         <div class="radius-tile" style="border-radius:6px"><b>6</b><span>chip, dot button</span></div>
         <div class="radius-tile" style="border-radius:8px"><b>8</b><span>button, input, nav item</span></div>
         <div class="radius-tile" style="border-radius:10px"><b>10</b><span>default card<br/>everything else</span></div>
-        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature)"><b>6 / 12</b><span>StatCard<br/>asymmetric</span></div>
-        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature-lg)"><b>10 / 24</b><span>SectionCard<br/>page-level</span></div>
+        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature)"><b>--radius-signature</b><span>StatCard<br/>asymmetric</span></div>
+        <div class="radius-tile is-sig" style="border-radius:var(--radius-signature-lg)"><b>--radius-signature-lg</b><span>SectionCard<br/>page-level</span></div>
       </div>
       <div class="usage-strip" style="margin-top:16px;">
-        <div><b>Page-level cards</b>SectionCard → <span class="t-mono">10 / 24 / 10 / 24</span> · signature asymmetric</div>
-        <div><b>Stat + compact bar</b>StatCard / CompactStatBar → <span class="t-mono">6 / 12 / 6 / 12</span> · signature asymmetric</div>
-        <div><b>Everything else</b>Insight, alert, modal, toast, nested → uniform <span class="t-mono">10px</span>. No middle tier.</div>
+        <div><b>Page-level cards</b>SectionCard → <span class="t-mono">--radius-signature-lg</span> · signature asymmetric</div>
+        <div><b>Stat + compact bar</b>StatCard / CompactStatBar → <span class="t-mono">--radius-signature</span> · signature asymmetric</div>
+        <div><b>Everything else</b>Insight, alert, modal, toast, nested → uniform <span class="t-mono">--radius-lg</span>. No middle tier.</div>
         <div><b>Chrome</b>Buttons + inputs <span class="t-mono">8px</span> · badges + pills <span class="t-mono">4px</span> · dots + chips <span class="t-mono">6px</span></div>
       </div>
     </div>
@@ -935,7 +935,7 @@
           <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Default</div>
           <div style="margin-bottom:4px;">
             <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Email address</label>
-            <input type="text" placeholder="you@example.com" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <input type="text" placeholder="you@example.com" style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
           </div>
           <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField label="Email"&gt;&lt;FormInput /&gt;&lt;/FormField&gt;</code>
         </div>
@@ -947,7 +947,7 @@
             <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">
               Full name <span style="color:#f87171; margin-left:2px;" aria-hidden="true">*</span>
             </label>
-            <input type="text" placeholder="Jane Smith" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <input type="text" placeholder="Jane Smith" style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
           </div>
           <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField label="Full name" required&gt;…&lt;/FormField&gt;</code>
         </div>
@@ -957,7 +957,7 @@
           <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Error</div>
           <div style="margin-bottom:4px;">
             <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Email address</label>
-            <input type="text" value="not-an-email" aria-invalid="true" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid rgba(239,68,68,0.5); border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <input type="text" value="not-an-email" aria-invalid="true" style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-1,#18181b); border:1px solid rgba(239,68,68,0.5); border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
             <p role="alert" style="margin-top:6px; font-size:11px; color:#f87171;">Please enter a valid email address.</p>
           </div>
           <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField error="…"&gt;…&lt;/FormField&gt;</code>
@@ -968,7 +968,7 @@
           <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Hint</div>
           <div style="margin-bottom:4px;">
             <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Username</label>
-            <input type="text" placeholder="jane_smith" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <input type="text" placeholder="jane_smith" style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
             <p style="margin-top:6px; font-size:11px; color:#71717a;">Letters, numbers, and underscores only.</p>
           </div>
           <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField hint="…"&gt;…&lt;/FormField&gt;</code>
@@ -983,7 +983,7 @@
           <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">FormTextarea — maxLength counter</div>
           <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Bio</label>
           <div style="position:relative;">
-            <textarea rows="4" maxlength="200" style="width:100%; padding:8px 12px; padding-bottom:24px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none; resize:none; box-sizing:border-box;">A short description about yourself.</textarea>
+            <textarea rows="4" maxlength="200" style="width:100%; padding:0.5rem 0.75rem; padding-bottom:24px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none; resize:none; box-sizing:border-box;">A short description about yourself.</textarea>
             <span style="position:absolute; bottom:8px; right:12px; font-size:11px; color:#71717a;" aria-live="polite">36/200</span>
           </div>
           <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormTextarea maxLength={200} /&gt;</code>
@@ -993,7 +993,7 @@
         <div>
           <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">FormSelect — 3 options</div>
           <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Report period</label>
-          <select style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;">
+          <select style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;">
             <option value="7">Last 7 days</option>
             <option value="30" selected>Last 30 days</option>
             <option value="90">Last 90 days</option>
@@ -1031,7 +1031,7 @@
           <label style="display:inline-flex; align-items:center; gap:12px; cursor:pointer; user-select:none;">
             <input type="checkbox" role="switch" checked class="sr-only" />
             <span style="position:relative; display:inline-flex; align-items:center; width:36px; height:20px; border-radius:9999px; background:var(--brand-mint,#2dd4bf); flex-shrink:0;">
-              <span style="position:absolute; top:2px; left:18px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);"></span>
+              <span style="position:absolute; top:2px; left:18px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 0.0625rem 0.1875rem rgba(0,0,0,.3);"></span>
             </span>
             <span class="t-ui" style="color:var(--brand-text);">On</span>
           </label>
@@ -1039,7 +1039,7 @@
           <label style="display:inline-flex; align-items:center; gap:12px; cursor:pointer; user-select:none;">
             <input type="checkbox" role="switch" class="sr-only" />
             <span style="position:relative; display:inline-flex; align-items:center; width:36px; height:20px; border-radius:9999px; background:#3f3f46; flex-shrink:0;">
-              <span style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);"></span>
+              <span style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 0.0625rem 0.1875rem rgba(0,0,0,.3);"></span>
             </span>
             <span class="t-ui" style="color:var(--brand-text);">Off</span>
           </label>
@@ -1075,7 +1075,7 @@
     <!-- Phase5:Forms END -->
     <!-- Phase5:Layout START -->
     <div class="col-label">Layout primitives · Phase 5 React wrappers</div>
-    <p style="color:var(--fg-muted);font-size:13px;margin:0 0 20px;">
+    <p class="sg-note" style="margin:0 0 20px;">
       Five typed layout primitives from <span class="t-mono">src/components/ui/layout/</span>:
       <strong>Row</strong>, <strong>Stack</strong>, <strong>Column</strong>, <strong>Grid</strong>, <strong>Divider</strong>.
       Gap values are strict enums (xs/sm/md/lg/xl) — no arbitrary Tailwind gap classes.
@@ -1085,25 +1085,25 @@
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Row · gap · justify · wrap</div>
       <div style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;flex-direction:row;align-items:center;gap:8px;background:var(--surface-2);padding:12px 16px;border-radius:8px;">
+        <div style="display:flex;flex-direction:row;align-items:center;gap:8px;background:var(--surface-2);padding:0.75rem 1rem;border-radius:8px;">
           <div style="width:40px;height:40px;background:var(--teal);border-radius:6px;"></div>
           <div style="width:60px;height:40px;background:var(--teal-soft,rgba(45,212,191,.15));border-radius:6px;"></div>
           <div style="width:50px;height:40px;background:var(--teal-soft,rgba(45,212,191,.15));border-radius:6px;"></div>
-          <span class="t-mono" style="margin-left:auto;font-size:11px;color:var(--fg-muted);">&lt;Row gap="sm"&gt; → gap-2</span>
+          <span class="t-mono" style="margin-left:auto;font-size:11px;color:var(--brand-text-muted);">&lt;Row gap="sm"&gt; → gap-2</span>
         </div>
-        <div style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-2);padding:12px 16px;border-radius:8px;">
+        <div style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-2);padding:0.75rem 1rem;border-radius:8px;">
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
-          <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Row gap="md" justify="between"&gt;</span>
+          <span class="t-mono" style="font-size:11px;color:var(--brand-text-muted);">&lt;Row gap="md" justify="between"&gt;</span>
         </div>
-        <div style="display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px;background:var(--surface-2);padding:12px 16px;border-radius:8px;">
+        <div style="display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px;background:var(--surface-2);padding:0.75rem 1rem;border-radius:8px;">
           <div style="width:60px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <div style="width:80px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <div style="width:50px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <div style="width:90px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <div style="width:40px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
-          <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Row gap="sm" wrap&gt;</span>
+          <span class="t-mono" style="font-size:11px;color:var(--brand-text-muted);">&lt;Row gap="sm" wrap&gt;</span>
         </div>
       </div>
     </div>
@@ -1116,13 +1116,13 @@
           <div style="height:28px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="height:28px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="height:28px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
-          <span class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:4px;">&lt;Stack gap="sm"&gt;</span>
+          <span class="t-mono" style="font-size:11px;color:var(--brand-text-muted);margin-top:4px;">&lt;Stack gap="sm"&gt;</span>
         </div>
         <div style="display:flex;flex-direction:row;align-items:center;gap:8px;background:var(--surface-2);padding:16px;border-radius:8px;">
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
-          <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Stack dir="row" gap="sm"&gt;</span>
+          <span class="t-mono" style="font-size:11px;color:var(--brand-text-muted);">&lt;Stack dir="row" gap="sm"&gt;</span>
         </div>
       </div>
     </div>
@@ -1131,14 +1131,14 @@
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Grid · responsive 3 columns</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;background:var(--surface-2);padding:16px;border-radius:8px;">
-        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-muted);">sm:1</div>
-        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-muted);">md:2</div>
-        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-muted);">lg:3</div>
+        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--brand-text-muted);">sm:1</div>
+        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--brand-text-muted);">md:2</div>
+        <div style="height:48px;background:rgba(52,211,153,.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--brand-text-muted);">lg:3</div>
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
       </div>
-      <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:8px;">&lt;Grid cols=&#123;&#123; sm: 1, md: 2, lg: 3 &#125;&#125; gap="md"&gt; → grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3</div>
+      <div class="sg-code-note">&lt;Grid cols=&#123;&#123; sm: 1, md: 2, lg: 3 &#125;&#125; gap="md"&gt; → grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3</div>
     </div>
 
     <!-- Divider specimens -->
@@ -1146,16 +1146,16 @@
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Divider · horizontal + vertical</div>
       <div style="display:flex;flex-direction:column;gap:16px;">
         <div style="background:var(--surface-2);padding:16px;border-radius:8px;">
-          <div style="font-size:12px;color:var(--fg-muted);margin-bottom:8px;">Above</div>
+          <div style="font-size:12px;color:var(--brand-text-muted);margin-bottom:8px;">Above</div>
           <div style="border-bottom:1px solid var(--brand-border,rgba(255,255,255,.1));width:100%;"></div>
-          <div style="font-size:12px;color:var(--fg-muted);margin-top:8px;">Below</div>
-          <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:8px;">&lt;Divider /&gt; → border-b border-[var(--brand-border)] w-full</div>
+          <div style="font-size:12px;color:var(--brand-text-muted);margin-top:8px;">Below</div>
+          <div class="sg-code-note">&lt;Divider /&gt; → border-b border-[var(--brand-border)] w-full</div>
         </div>
         <div style="background:var(--surface-2);padding:16px;border-radius:8px;display:flex;flex-direction:row;align-items:stretch;gap:16px;">
-          <div style="font-size:12px;color:var(--fg-muted);">Left panel</div>
+          <div style="font-size:12px;color:var(--brand-text-muted);">Left panel</div>
           <div style="border-right:1px solid var(--brand-border,rgba(255,255,255,.1));height:40px;"></div>
-          <div style="font-size:12px;color:var(--fg-muted);">Right panel</div>
-          <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-left:auto;">&lt;Divider orientation="vertical" /&gt;</div>
+          <div style="font-size:12px;color:var(--brand-text-muted);">Right panel</div>
+          <div class="sg-code-note" style="margin-left:auto;margin-top:0;">&lt;Divider orientation="vertical" /&gt;</div>
         </div>
       </div>
     </div>
@@ -1341,9 +1341,9 @@
         <div>
           <div class="t-label" style="margin-bottom:8px;">&lt;Button&gt; · 5 variants × 3 sizes</div>
           <div class="row" style="gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-primary" style="padding:4px 10px; font-size:11px;">primary sm</button>
+            <button class="btn btn-primary" style="padding:0.25rem 0.625rem; font-size:11px;">primary sm</button>
             <button class="btn btn-primary">primary md</button>
-            <button class="btn btn-primary" style="padding:10px 20px; font-size:14px;">primary lg</button>
+            <button class="btn btn-primary" style="padding:0.625rem 1.25rem; font-size:14px;">primary lg</button>
             <button class="btn btn-secondary">secondary md</button>
             <button class="btn btn-ghost">ghost md</button>
             <button class="btn" style="background:#dc2626; color:#fff;">danger md</button>
@@ -1391,9 +1391,9 @@
           <div class="t-label" style="margin-bottom:8px;">&lt;SegmentedControl&gt; · radiogroup · arrow-key navigation</div>
           <div class="row">
             <div style="display:inline-flex; background:#18181b; border:1px solid #27272a; border-radius:6px; padding:2px;">
-              <button style="padding:6px 12px; font-size:12px; background:#3f3f46; color:#fff; border-radius:4px; border:0;">Day</button>
-              <button style="padding:6px 12px; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Week</button>
-              <button style="padding:6px 12px; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Month</button>
+              <button style="padding:0.375rem 0.75rem; font-size:12px; background:#3f3f46; color:#fff; border-radius:4px; border:0;">Day</button>
+              <button style="padding:0.375rem 0.75rem; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Week</button>
+              <button style="padding:0.375rem 0.75rem; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Month</button>
             </div>
           </div>
           <div class="t-mono" style="margin-top:8px; color:var(--brand-text-muted); font-size:11px;">&lt;SegmentedControl options={[{id, label}]} value onChange size?="sm|md" /&gt;</div>
@@ -1419,17 +1419,18 @@
 
     <!-- Badges -->
     <div class="sub-section">
-      <div class="col-label">Badge · colored status labels</div>
+      <div class="col-label">Badge · semantic metadata pills · <span class="t-mono">tone</span> + <span class="t-mono">variant</span></div>
       <div class="card">
         <div class="row">
-          <span class="badge b-teal">New</span>
-          <span class="badge b-blue">In review</span>
-          <span class="badge b-emerald">Published</span>
-          <span class="badge b-amber">Needs attention</span>
-          <span class="badge b-red">Failed</span>
+          <span class="badge b-teal">Action</span>
+          <span class="badge b-blue">Data</span>
+          <span class="badge b-emerald">Success</span>
+          <span class="badge b-amber">Pending</span>
+          <span class="badge b-red">Error</span>
           <span class="badge b-orange">Changes requested</span>
-          <span class="badge b-zinc">Draft</span>
+          <span class="badge b-zinc">Metadata</span>
         </div>
+        <div class="spec-note">Use <span class="t-mono">&lt;Badge tone variant size shape icon dot /&gt;</span> for metadata/category/counter pills. Legacy <span class="t-mono">color</span> still works as a compatibility alias, but new call sites use <span class="t-mono">tone</span>.</div>
       </div>
     </div>
 
@@ -1539,17 +1540,17 @@
         <div class="toast success">
           <svg class="i" style="color:var(--emerald)"><use href="#i-check"/></svg>
           <span class="t-ui">Audit completed successfully — 119 pages scanned.</span>
-          <button class="btn btn-ghost" style="margin-left:auto; padding:2px 6px;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
+          <button class="btn btn-ghost" style="margin-left:auto; padding:0.125rem 0.375rem;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
         </div>
         <div class="toast error">
           <svg class="i" style="color:var(--red)"><use href="#i-alert"/></svg>
           <span class="t-ui">Failed to connect to Search Console. Please try again.</span>
-          <button class="btn btn-ghost" style="margin-left:auto; padding:2px 6px;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
+          <button class="btn btn-ghost" style="margin-left:auto; padding:0.125rem 0.375rem;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
         </div>
         <div class="toast info">
           <svg class="i" style="color:var(--blue)"><use href="#i-info"/></svg>
           <span class="t-ui">Schema changes pushed to 12 pages.</span>
-          <button class="btn btn-ghost" style="margin-left:auto; padding:2px 6px;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
+          <button class="btn btn-ghost" style="margin-left:auto; padding:0.125rem 0.375rem;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
         </div>
       </div>
     </div>
@@ -1581,7 +1582,7 @@
     <div class="sub-section">
       <div class="col-label">TrendBadge · directional delta indicator</div>
       <div class="card">
-        <p class="muted" style="margin:0 0 14px; font-size:12px;">Single reusable primitive for up/down deltas across metric tiles, chart titles, and inline rows. Replaces ~30 hand-rolled TrendingUp/Down + emerald-400/red-400 patterns. Props: <span class="t-mono">value, suffix, invert, showSign, label, size, hideOnZero</span>.</p>
+        <p class="sg-note sg-note-block">Single reusable primitive for up/down deltas across metric tiles, chart titles, and inline rows. Replaces ~30 hand-rolled TrendingUp/Down + emerald-400/red-400 patterns. Props: <span class="t-mono">value, suffix, invert, showSign, label, size, hideOnZero</span>.</p>
         <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px;">
           <div>
             <div class="t-label" style="margin:0 0 6px;">Positive</div>
@@ -1621,12 +1622,12 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Enforcement: hand-rolled <span class="t-mono">TrendingUp</span> / <span class="t-mono">TrendingDown</span> adjacent to <span class="t-mono">emerald-400</span>/<span class="t-mono">red-400</span> fires a pr-check <b>warn</b>. Escape hatch: <span class="t-mono">// pr-check-disable-next-line -- &lt;reason&gt;</span>.</div>
+      <div class="spec-note">Enforcement: hand-rolled <span class="t-mono">TrendingUp</span> / <span class="t-mono">TrendingDown</span> adjacent to <span class="t-mono">emerald-400</span>/<span class="t-mono">red-400</span> fires a pr-check <b>error</b>. Escape hatch: <span class="t-mono">// trend-badge-ok -- &lt;reason&gt;</span>.</div>
     </div>
 
     <div class="sub-section">
       <div class="col-label">ChartCard · chart-friendly SectionCard variant</div>
-      <div class="sectioncard" style="border-radius:10px 24px 10px 24px;">
+      <div class="sectioncard" style="border-radius:var(--radius-signature-lg);">
         <div class="sc-header" style="border-bottom:none;">
           <div class="sc-title"><svg class="i"><use href="#i-chart"/></svg> Clicks trend
             <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--emerald); margin-left:8px;">
@@ -1635,13 +1636,13 @@
           </div>
           <button class="btn btn-link">View details</button>
         </div>
-        <div class="sc-body" style="padding:0 16px 12px;">
+        <div class="sc-body" style="padding:0 1rem 0.75rem;">
           <div style="height:120px; background:linear-gradient(180deg, rgba(45,212,191,.08), transparent); border-radius:6px; display:flex; align-items:flex-end;">
             <svg viewBox="0 0 400 120" style="width:100%; height:100%;"><polyline points="0,90 40,80 80,85 120,60 160,55 200,40 240,50 280,30 320,25 360,15 400,20" fill="none" stroke="var(--teal)" stroke-width="1.5"/></svg>
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Thin <span class="t-mono">SectionCard</span> wrapper with chart-friendly defaults: tighter padding (<span class="t-mono">px-4 py-3</span>), inline title + <span class="t-mono">&lt;TrendBadge&gt;</span> row, no <span class="t-mono">border-b</span> separator before the chart body. Signature 10/24 radius preserved. Pairs with <span class="t-mono">&lt;AnnotatedTrendChart&gt;</span> and <span class="t-mono">&lt;MiniSparkline&gt;</span>.</div>
+      <div class="spec-note">Thin <span class="t-mono">SectionCard</span> wrapper with chart-friendly defaults: tighter padding (<span class="t-mono">px-4 py-3</span>), inline title + <span class="t-mono">&lt;TrendBadge&gt;</span> row, no <span class="t-mono">border-b</span> separator before the chart body. Signature 10/24 radius preserved. Pairs with <span class="t-mono">&lt;AnnotatedTrendChart&gt;</span> and <span class="t-mono">&lt;MiniSparkline&gt;</span>.</div>
     </div>
 
     <!-- TrendChart pointer — lives in §06 now -->
@@ -1797,7 +1798,7 @@
               <div class="sc-title"><svg class="i"><use href="#i-brain"/></svg> Competitor insights</div>
               <span class="badge b-amber">Premium</span>
             </div>
-            <div style="padding:32px 24px; text-align:center; position:relative;">
+            <div style="padding:2rem 1.5rem; text-align:center; position:relative;">
               <div style="width:44px; height:44px; margin:0 auto 12px; border-radius:10px; background:rgba(251,191,36,.14); display:flex; align-items:center; justify-content:center; color:var(--amber);">
                 <svg class="i" style="width:20px; height:20px;"><use href="#i-zap"/></svg>
               </div>
@@ -1833,7 +1834,7 @@
               <span class="t-caption">Updated 2m ago</span>
             </div>
             <div style="padding:4px 0;">
-              <div style="display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:14px 18px; border-top:1px solid rgba(63,63,70,.3);">
+              <div style="display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:0.875rem 1.125rem; border-top:1px solid rgba(63,63,70,.3);">
                 <span style="width:28px; height:28px; border-radius:8px; background:rgba(16,185,129,.14); display:inline-flex; align-items:center; justify-content:center; color:var(--emerald);"><svg class="i"><use href="#i-trend"/></svg></span>
                 <div>
                   <div style="color:var(--brand-text-bright); font-size:14px; line-height:1.45;"><b style="font-weight:500;">/blog/seo-strategy-2026</b> gained <b style="color:var(--emerald); font-family:'DIN Pro'; font-weight:700;">+214 clicks</b> this week.</div>
@@ -1841,7 +1842,7 @@
                 </div>
                 <button class="action-pill ap-start">Review</button>
               </div>
-              <div style="display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:14px 18px; border-top:1px solid rgba(63,63,70,.3);">
+              <div style="display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:0.875rem 1.125rem; border-top:1px solid rgba(63,63,70,.3);">
                 <span style="width:28px; height:28px; border-radius:8px; background:rgba(251,146,60,.14); display:inline-flex; align-items:center; justify-content:center; color:var(--orange);"><svg class="i"><use href="#i-alert"/></svg></span>
                 <div>
                   <div style="color:var(--brand-text-bright); font-size:14px; line-height:1.45;"><b style="font-weight:500;">/pricing</b> lost <b style="color:var(--red); font-family:'DIN Pro'; font-weight:700;">-31 sessions</b> after the last crawl.</div>
@@ -1899,9 +1900,9 @@
           </div>
         </div>
       </div>
-      <div class="dv-caption" style="margin-top:14px;">Stroke 1.5px · gradient .18 → 0 · <span class="t-mono">vector-effect: non-scaling-stroke</span> · sine/cosine-shaped data so every inflection is a real inflection</div>
+      <div class="dv-caption">Stroke 1.5px · gradient .18 → 0 · <span class="t-mono">vector-effect: non-scaling-stroke</span> · sine/cosine-shaped data so every inflection is a real inflection</div>
       <div class="dv-note" style="margin-top:6px; max-width:72ch;">This is the reference. Every chart in the atlas, the annotations overlay, the receipt treatment, and the anatomy diagram pulls its <b>stroke weight</b>, <b>gradient ramp</b>, <b>grid dashing</b>, and <b>axis type</b> from this one exhibit. If the two don&rsquo;t match, this one wins.</div>
-      <div class="dv-note" style="margin-top:10px; max-width:72ch; padding:10px 14px; border-left:2px solid var(--teal); background:rgba(74,222,198,.04); color:var(--brand-text-bright);">
+      <div class="dv-note" style="margin-top:10px; max-width:72ch; padding:0.625rem 0.875rem; border-left:2px solid var(--teal); background:rgba(74,222,198,.04); color:var(--brand-text-bright);">
         <b style="color:var(--teal);">Dual-series is canonical.</b> <span style="color:var(--brand-text);">Clicks (Blue 400) vs. impressions (Teal) — two different metrics on a dual axis is the <em>one place</em> we allow a second hue. Use it only when units differ; for same-unit comparisons (this period vs. prev, mobile vs. desktop) use two values of Blue. See §06.1.</span>
       </div>
     </div>
@@ -2279,7 +2280,7 @@
               <span class="hh">10PM</span>
               <span class="hc" style="opacity:.15"></span><span class="hc" style="opacity:.18"></span><span class="hc" style="opacity:.22"></span><span class="hc" style="opacity:.16"></span><span class="hc" style="opacity:.2"></span><span class="hc" style="opacity:.28"></span><span class="hc" style="opacity:.2"></span>
             </div>
-            <div class="dv-caption" style="margin-top:10px;">3.4× the weekend floor · opacity ramps .06 → 1.0</div>
+            <div class="dv-caption">3.4× the weekend floor · opacity ramps .06 → 1.0</div>
           </div>
         </div>
 
@@ -2413,7 +2414,7 @@
             <!-- Hover card — shown open on the Campaign (Mar 22, x≈79%) dot. Width 200px, arrow above, badge uses color+33 bg. -->
             <div class="atc-hover" style="--c:#a855f7; top:24px; left:calc(79% - 92px); width:200px;">
               <div class="ah-date">Mar 22 · 2026</div>
-              <div class="ah-cat" style="background:#a855f733; padding:2px 6px; border-radius:4px; font-weight:500;">Campaign</div>
+              <div class="ah-cat" style="background:#a855f733; padding:0.125rem 0.375rem; border-radius:4px; font-weight:500;">Campaign</div>
               <div class="ah-label">Newsletter send · 42k recipients · 3.1% CTR</div>
             </div>
 
@@ -2424,7 +2425,7 @@
             </div>
           </div>
 
-          <div class="dv-caption" style="margin-top:14px;">Dots in top gutter · <span class="t-mono">r=5</span> · <span class="t-mono">2px theme-bg ring</span> · reference line <span class="t-mono">dasharray 4 4</span> · band fill <span class="t-mono">color+15</span> (≈8%) · <b style="color:var(--brand-text-bright);">each Y-axis inherits the color of its first active line</b>.</div>
+          <div class="dv-caption">Dots in top gutter · <span class="t-mono">r=5</span> · <span class="t-mono">2px theme-bg ring</span> · reference line <span class="t-mono">dasharray 4 4</span> · band fill <span class="t-mono">color+15</span> (≈8%) · <b style="color:var(--brand-text-bright);">each Y-axis inherits the color of its first active line</b>.</div>
         </div>
       </div>
 
@@ -2502,17 +2503,17 @@
           <div class="ar-note">A volume metric <em>would</em> move right, but the right axis already holds a <b>rate</b> (CTR, position). Moving would break both. Rule 13 &mdash; rate wins; volume stays compressed on left.</div>
         </div>
       </div>
-      <div class="dv-caption" style="margin-top:10px;">Ratio threshold is hard-coded: <span class="t-mono">&ge; 10</span>. Below that, metrics share. <span class="t-mono">assignAxes()</span> also color-codes each axis fill via <span class="t-mono">activeLines.find(l =&gt; axisAssignments.get(l.key) === &lsquo;left&rsquo;)?.color</span>.</div>
+      <div class="dv-caption">Ratio threshold is hard-coded: <span class="t-mono">&ge; 10</span>. Below that, metrics share. <span class="t-mono">assignAxes()</span> also color-codes each axis fill via <span class="t-mono">activeLines.find(l =&gt; axisAssignments.get(l.key) === &lsquo;left&rsquo;)?.color</span>.</div>
 
       <!-- ─── Dots-only mode (>10 annotations) ─── -->
       <div class="col-label" style="margin-top:26px;">Density threshold &mdash; <span style="color:var(--brand-text);">the 10-annotation rule</span></div>
       <div class="dv-grid2" style="gap:16px;">
         <div class="dv-card" style="padding:0; overflow:hidden;">
-          <div style="padding:12px 16px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
+          <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
             <div class="dv-title" style="font-size:13px;">&le; 10 annotations</div>
             <span class="dv-sub" style="color:var(--brand-mint);">LINES + DOTS</span>
           </div>
-          <div style="padding:14px 16px;">
+          <div style="padding:0.875rem 1rem;">
             <svg viewBox="0 0 360 110" style="width:100%; display:block;">
               <line x1="30" y1="100" x2="350" y2="100" stroke="var(--chart-grid)"/>
               <!-- ref lines visible -->
@@ -2525,16 +2526,16 @@
               <circle cx="260" cy="12" r="5" fill="#a855f7" stroke="var(--brand-bg)" stroke-width="2"/>
             </svg>
           </div>
-          <div style="padding:0 16px 14px;">
+          <div style="padding:0 1rem 0.875rem;">
             <div class="dv-note" style="margin:0;">Reference lines drawn in category color. <span class="t-mono">stroke-dasharray: 4 4</span>, opacity .7.</div>
           </div>
         </div>
         <div class="dv-card" style="padding:0; overflow:hidden;">
-          <div style="padding:12px 16px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
+          <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
             <div class="dv-title" style="font-size:13px;">&gt; 10 annotations</div>
             <span class="dv-sub" style="color:var(--brand-yellow);">DOTS ONLY</span>
           </div>
-          <div style="padding:14px 16px;">
+          <div style="padding:0.875rem 1rem;">
             <svg viewBox="0 0 360 110" style="width:100%; display:block;">
               <line x1="30" y1="100" x2="350" y2="100" stroke="var(--chart-grid)"/>
               <path d="M30,80 C60,72 90,66 120,62 C160,54 200,50 240,44 C280,40 320,34 350,30" fill="none" stroke="var(--blue-400)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
@@ -2554,7 +2555,7 @@
               </g>
             </svg>
           </div>
-          <div style="padding:0 16px 14px;">
+          <div style="padding:0 1rem 0.875rem;">
             <div class="dv-note" style="margin:0;">Vertical reference lines set to <span class="t-mono">stroke: transparent</span> &mdash; only dots remain. Hover still works per-dot. <b>Rule:</b> if you see &gt;10 on 28 days, filter by category.</div>
           </div>
         </div>
@@ -2562,15 +2563,15 @@
 
       <!-- ─── Hover card anatomy ─── -->
       <div class="col-label" style="margin-top:26px;">Hover-card anatomy &mdash; <span style="color:var(--brand-text);">200&times;80 foreignObject, centered on dot</span></div>
-      <div class="dv-card" style="padding:22px 26px; position:relative; min-height:180px;">
+      <div class="dv-card" style="padding:1.375rem 1.625rem; position:relative; min-height:180px;">
         <!-- The dot + card, exploded -->
-        <div style="position:relative; display:inline-block; margin:10px 100px 10px 140px;">
+        <div style="position:relative; display:inline-block; margin:0.625rem 6.25rem 0.625rem 8.75rem;">
           <!-- Dot -->
           <div style="position:absolute; left:92px; top:0; width:10px; height:10px; border-radius:50%; background:#a855f7; border:2px solid var(--brand-bg); box-shadow:0 0 0 1px var(--brand-border);"></div>
           <!-- Hover card, standalone -->
           <div class="atc-hover" style="--c:#a855f7; position:relative; top:20px; left:0; width:200px; display:inline-block;">
             <div class="ah-date">Mar 22 · 2026</div>
-            <div class="ah-cat" style="background:#a855f733; padding:2px 6px; border-radius:4px; font-weight:500;">Campaign</div>
+            <div class="ah-cat" style="background:#a855f733; padding:0.125rem 0.375rem; border-radius:4px; font-weight:500;">Campaign</div>
             <div class="ah-label">Newsletter send · 42k recipients · 3.1% CTR</div>
           </div>
 
@@ -2590,10 +2591,10 @@
       <div class="col-label" style="margin-top:26px;">Callout bubble &mdash; <span style="color:var(--brand-text);">the ChartCallout type</span></div>
       <div class="dv-grid2" style="gap:16px;">
         <div class="dv-card" style="padding:0; overflow:hidden;">
-          <div style="padding:12px 16px; border-bottom:1px solid var(--brand-border);">
+          <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--brand-border);">
             <div class="dv-title" style="font-size:13px;">In situ</div>
           </div>
-          <div style="padding:18px 16px 10px; position:relative;">
+          <div style="padding:1.125rem 1rem 0.625rem; position:relative;">
             <svg viewBox="0 0 360 140" style="width:100%; display:block;">
               <line x1="30" y1="120" x2="350" y2="120" stroke="var(--chart-grid)"/>
               <path d="M30,100 C60,92 90,86 120,78 C160,66 200,62 240,54 C280,46 320,40 350,36" fill="none" stroke="var(--blue-400)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
@@ -2605,7 +2606,7 @@
               <span class="cb-detail">Mar 22 · 12.4K clicks</span>
             </div>
           </div>
-          <div style="padding:0 16px 14px;">
+          <div style="padding:0 1rem 0.875rem;">
             <div class="dv-note" style="margin:0;">Dashed <span class="t-mono">6 3</span>, stroke 1.5. Label + detail, two-line. Use <b>sparingly</b> &mdash; one per chart, for a number the user must see.</div>
           </div>
         </div>
@@ -2613,7 +2614,7 @@
           <div class="dv-title" style="font-size:13px; margin-bottom:10px;">Callout vs. annotation &mdash; when to use which</div>
           <div class="dv-note" style="margin:0 0 10px;"><b>Annotation</b> = something <em>happened</em> at a moment. Event-shaped. Has a category. Hover reveals.</div>
           <div class="dv-note" style="margin:0 0 10px;"><b>Callout</b> = something you want the user to <em>see</em>. Editorial. Always visible. Pre-formatted.</div>
-          <div class="dv-note" style="margin:0; padding:10px 12px; border-left:2px solid var(--teal); background:rgba(45,212,191,.04);"><b style="color:var(--teal);">Rule:</b> <span style="color:var(--brand-text-bright);">Annotations outnumber callouts 10:1.</span> If you catch yourself using a callout to document an event, it's an annotation.</div>
+          <div class="dv-note" style="margin:0; padding:0.625rem 0.75rem; border-left:2px solid var(--teal); background:rgba(45,212,191,.04);"><b style="color:var(--teal);">Rule:</b> <span style="color:var(--brand-text-bright);">Annotations outnumber callouts 10:1.</span> If you catch yourself using a callout to document an event, it's an annotation.</div>
         </div>
       </div>
 
@@ -2622,12 +2623,12 @@
       <div class="dv-grid2" style="gap:16px;">
         <!-- Exhibit B · Click-to-annotate popover (separate overlay state) -->
         <div class="dv-card" style="padding:0; overflow:hidden; position:relative;">
-          <div style="padding:14px 18px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
+          <div style="padding:0.875rem 1.125rem; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
             <div class="dv-title" style="font-size:14px;"><svg class="i" style="width:14px; height:14px; color:var(--brand-text-dim);"><use href="#i-plus"/></svg> Click-to-annotate</div>
             <span class="dv-sub">OVERLAY STATE</span>
           </div>
 
-          <div style="position:relative; padding:18px 22px 22px; min-height:230px;">
+          <div style="position:relative; padding:1.125rem 1.375rem 1.375rem; min-height:230px;">
             <!-- Under-popover mini chart, dimmed -->
             <svg viewBox="0 0 360 140" style="width:100%; display:block; opacity:.4;">
               <defs>
@@ -2664,14 +2665,14 @@
             </div>
           </div>
 
-          <div style="padding:0 22px 18px;">
+          <div style="padding:0 1.375rem 1.125rem;">
             <div class="dv-note" style="margin:0;">Click any empty area on the chart to open. Pre-fills the date from the x-coordinate. Teal <b>Add</b> commits; closes on Esc or Cancel.</div>
           </div>
         </div>
 
         <!-- Exhibit C · Category tokens reference -->
         <div class="dv-card" style="padding:0; overflow:hidden;">
-          <div style="padding:14px 18px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
+          <div style="padding:0.875rem 1.125rem; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; justify-content:space-between;">
             <div class="dv-title" style="font-size:14px;"><svg class="i" style="width:14px; height:14px; color:var(--brand-text-dim);"><use href="#i-palette"/></svg> Category tokens</div>
             <span class="dv-sub">4 CATEGORIES</span>
           </div>
@@ -2681,7 +2682,7 @@
             <div class="ann-row"><span class="ann-swatch" style="background:#a855f7;"></span><span class="ann-label">Campaign</span><span class="ann-desc">Marketing did something — email, paid push, launch.</span><span class="ann-hex">#A855F7</span></div>
             <div class="ann-row"><span class="ann-swatch" style="background:#71717a;"></span><span class="ann-label">Other</span><span class="ann-desc">Neutral fallback — use sparingly.</span><span class="ann-hex">#71717A</span></div>
           </div>
-          <div style="padding:14px 18px 18px;">
+          <div style="padding:0.875rem 1.125rem 1.125rem;">
             <div class="dv-note" style="margin:0;"><b>Rule:</b> one marker per annotation, one annotation per event. Six or more on a 28-day view means the chart is too busy — filter by category. Fill uses <span class="t-mono">color + 15</span> hex alpha (≈8%); stroke is the unfilled color.</div>
           </div>
         </div>
@@ -2745,7 +2746,7 @@
         <div class="dv-state">
           <div class="dv-head"><div class="dv-title">Loading</div><span class="dv-sub">Fetching</span></div>
           <div class="dv-state-body"><div class="dv-shimmer"></div></div>
-          <div class="dv-caption" style="margin-top:10px;">Shimmer at the chart&rsquo;s final dimensions — never a spinner, never a skeleton that resizes.</div>
+          <div class="dv-caption">Shimmer at the chart&rsquo;s final dimensions — never a spinner, never a skeleton that resizes.</div>
         </div>
         <div class="dv-state">
           <div class="dv-head"><div class="dv-title">Empty</div><span class="dv-sub">No data</span></div>
@@ -2765,7 +2766,7 @@
             </div>
             <div style="font-family:'DIN Pro'; font-weight:600; font-size:14px; color:var(--brand-text-bright); margin-bottom:4px;">Couldn&rsquo;t load</div>
             <div style="font-size:12px; color:var(--brand-text); max-width:22ch; margin-bottom:10px;">GA4 timed out after 30s.</div>
-            <button class="btn btn-ghost" style="font-size:11px; padding:4px 10px;">Retry</button>
+            <button class="btn btn-ghost" style="font-size:11px; padding:0.25rem 0.625rem;">Retry</button>
           </div>
         </div>
         <div class="dv-state">
@@ -2782,7 +2783,7 @@
               <text x="85" y="14" fill="var(--chart-axis)" font-size="8" font-family="JetBrains Mono" text-anchor="middle">2 DAYS MISSING</text>
             </svg>
           </div>
-          <div class="dv-caption" style="margin-top:10px;">Dashed segment where data is missing — never interpolate silently.</div>
+          <div class="dv-caption">Dashed segment where data is missing — never interpolate silently.</div>
         </div>
       </div>
     </div>
@@ -2959,7 +2960,7 @@
               </li>
             </ol>
           </nav>
-          <div class="muted" style="font-size:11px; margin-top:16px;">Completed: emerald border + check icon · Current: teal ring-offset + bold label · Upcoming: zinc-700 border + muted text. Each step optional <span class="t-mono">onClick</span> makes it a focusable button.</div>
+          <div class="spec-note">Completed: emerald border + check icon · Current: teal ring-offset + bold label · Upcoming: zinc-700 border + muted text. Each step optional <span class="t-mono">onClick</span> makes it a focusable button.</div>
         </div>
 
         <!-- Compact variant -->
@@ -2997,7 +2998,7 @@
       <div class="grid2">
         <!-- success variant -->
         <div class="sectioncard" style="border-radius:var(--radius-signature-lg);">
-          <div class="sc-header" style="padding:12px 16px;">
+          <div class="sc-header" style="padding:0.75rem 1rem;">
             <div class="sc-title" style="font-size:13px;">
               <svg class="i i-sm" style="color:var(--emerald)"><use href="#i-check"/></svg>
               <span>Brief approved — what's next</span>
@@ -3035,7 +3036,7 @@
 
         <!-- info variant -->
         <div class="sectioncard" style="border-radius:var(--radius-signature-lg);">
-          <div class="sc-header" style="padding:12px 16px;">
+          <div class="sc-header" style="padding:0.75rem 1rem;">
             <div class="sc-title" style="font-size:13px;">
               <svg class="i i-sm" style="color:var(--blue)"><use href="#i-info"/></svg>
               <span>You might also want to…</span>
@@ -3062,7 +3063,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Built on SectionCard (asymmetric radius inherited). Rows hover to teal-500/5 with label → teal-300. Use after completing a workflow step; always teal on hover because these are <b>actions</b>.</div>
+      <div class="spec-note">Built on SectionCard (asymmetric radius inherited). Rows hover to teal-500/5 with label → teal-300. Use after completing a workflow step; always teal on hover because these are <b>actions</b>.</div>
     </div>
 
     <!-- ══ WorkspaceHealthBar ══ -->
@@ -3126,7 +3127,7 @@
           </div>
           <div class="ob-progress">
             <div class="ob-progress-labels">
-              <span class="muted" style="font-size:11px;">2 of 5 steps completed</span>
+              <span class="sg-note sg-note-inline">2 of 5 steps completed</span>
               <span style="font-size:11px; font-weight:500; color:var(--blue);">40%</span>
             </div>
             <div class="ob-progress-track"><div class="ob-progress-fill" style="width:40%"></div></div>
@@ -3165,7 +3166,7 @@
           <div class="ob-foot"><button class="btn btn-ghost" style="font-size:11px; padding:4px 0;">Dismiss for now</button></div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Uses the <b>10/24 asymmetric radius</b> (matches SectionCard). Completed state: teal check + zinc-500 struck-through label. Pending: zinc-600 circle + full-opacity label + optional <span class="t-mono">~time</span> chip. Auto-dismisses 2s after all steps complete. Escape + Tab trap focus inside the panel.</div>
+      <div class="spec-note">Uses the <b>10/24 asymmetric radius</b> (matches SectionCard). Completed state: teal check + zinc-500 struck-through label. Pending: zinc-600 circle + full-opacity label + optional <span class="t-mono">~time</span> chip. Auto-dismisses 2s after all steps complete. Escape + Tab trap focus inside the panel.</div>
     </div>
 
     <!-- ══ TierGate ══ -->
@@ -3228,7 +3229,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:12px;">Tiers: <b>free → growth → premium</b>. Growth uses <b>teal</b> chrome; Premium uses <b>amber</b>. Compact variant inherits the <b>10/24 asymmetric radius</b> — the gate is part of the same visual family as cards. Full overlay uses its own 10/24 container. <span class="t-mono">onGateHit</span> fires once per render to feed upgrade-funnel analytics.</div>
+      <div class="spec-note">Tiers: <b>free → growth → premium</b>. Growth uses <b>teal</b> chrome; Premium uses <b>amber</b>. Compact variant inherits the <b>10/24 asymmetric radius</b> — the gate is part of the same visual family as cards. Full overlay uses its own 10/24 container. <span class="t-mono">onGateHit</span> fires once per render to feed upgrade-funnel analytics.</div>
     </div>
 
     <!-- ══ ConfirmDialog ══ -->
@@ -3256,7 +3257,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Note: the live primitive uses <span class="t-mono">rounded-xl</span> (12px) instead of the asymmetric 10/24. <b>Inconsistency worth considering</b> — modals could inherit the signature shape to strengthen brand recognition.</div>
+      <div class="spec-note">Note: the live <span class="t-mono">Modal</span> panel uses <span class="t-mono">rounded-[var(--radius-lg)]</span> (10px), while <span class="t-mono">ConfirmDialog</span> uses <span class="t-mono">rounded-[var(--radius-xl)]</span> (12px). SectionCard and ChartCard own the asymmetric signature shape via <span class="t-mono">--radius-signature-lg</span>.</div>
     </div>
 
     <!-- ══ ProgressIndicator ══ -->
@@ -3284,12 +3285,12 @@
           <div class="pi-detail" style="margin-top:4px;">Report ready · 12 issues found · 4 quick wins</div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Bar is <b>blue</b> (data) not teal — this is read-only progress, not an action. Complete state fades out after 3s. Indeterminate uses animated pulse at 2/3 width.</div>
+      <div class="spec-note">Bar is <b>blue</b> (data) not teal — this is read-only progress, not an action. Complete state fades out after 3s. Indeterminate uses animated pulse at 2/3 width.</div>
     </div>
 
     <!-- ══ StatusBadge ══ -->
     <div class="sub-section">
-      <div class="col-label">StatusBadge · page-edit lifecycle · <span class="t-mono">ui/StatusBadge.tsx</span> + <span class="t-mono">statusConfig.ts</span></div>
+      <div class="col-label">StatusBadge · semantic status registry · <span class="t-mono">ui/StatusBadge.tsx</span> + <span class="t-mono">statusConfig.ts</span></div>
       <div class="card" style="padding:20px;">
         <div class="row" style="gap:8px; margin-bottom:20px;">
           <span class="sb sb-issue">Issue Detected</span>
@@ -3298,6 +3299,13 @@
           <span class="sb sb-approved">Approved</span>
           <span class="sb sb-rejected">Rejected</span>
           <span class="sb sb-live">Live</span>
+        </div>
+        <div class="t-label" style="margin-bottom:10px;">Domain statuses · content / approval / schema</div>
+        <div class="row" style="gap:8px; margin-bottom:20px;">
+          <span class="sb sb-review">Needs Your Review</span>
+          <span class="sb sb-review">Awaiting Review</span>
+          <span class="sb sb-review">Sent to client</span>
+          <span class="sb sb-changes">Changes Requested</span>
         </div>
         <div class="t-label" style="margin-bottom:10px;">Dot-only variant · <span class="t-mono">showLabel={false}</span> · for dense tables</div>
         <div class="row" style="gap:14px;">
@@ -3308,7 +3316,7 @@
           <span class="sb-dot" style="background:rgba(248,113,113,.8);"></span>
           <span class="sb-dot" style="background:var(--teal);"></span>
         </div>
-        <div class="muted" style="font-size:11px; margin-top:14px;">Lifecycle: <b>issue-detected</b> (amber) → <b>fix-proposed</b> (blue) → <b>in-review</b> (teal = needs review) → <b>approved</b> (emerald) / <b>rejected</b> (red) → <b>live</b> (teal).</div>
+        <div class="spec-note">Default domain is <span class="t-mono">page-edit</span>. Other domains include <span class="t-mono">content</span>, <span class="t-mono">approval</span>, <span class="t-mono">client-action</span>, <span class="t-mono">schema</span>, <span class="t-mono">matrix</span>, <span class="t-mono">integration</span>, <span class="t-mono">job</span>, <span class="t-mono">severity</span>, and <span class="t-mono">priority</span>. Unknown statuses hide unless <span class="t-mono">fallback="neutral"</span> is set.</div>
       </div>
     </div>
 
@@ -3354,7 +3362,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Severity map: <b>critical</b> (red, TrendingDown) · <b>warning</b> (amber, AlertTriangle) · <b>opportunity</b> (blue, Target) · <b>positive</b> (emerald, TrendingUp). All share a 28px icon tile with <span class="t-mono">rounded-md</span> (6px) — note this is a <b>different radius</b> than status badges (4px) and asymmetric cards (10/24). Consider unifying.</div>
+      <div class="sg-note">Severity map: <b>critical</b> (red, TrendingDown) · <b>warning</b> (amber, AlertTriangle) · <b>opportunity</b> (blue, Target) · <b>positive</b> (emerald, TrendingUp). All share a 28px icon tile with <span class="t-mono">--radius-md</span>; status badges use <span class="t-mono">--radius-sm</span>, while cards reserve <span class="t-mono">--radius-signature</span> / <span class="t-mono">--radius-signature-lg</span>.</div>
     </div>
 
     <!-- ══ EmptyState ══ -->
@@ -3404,7 +3412,7 @@
           <div class="sk" style="width:67%; height:10px;"></div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Variants: <span class="t-mono">StatCardSkeleton</span> (matches 6/12 asymmetric radius) · <span class="t-mono">SectionCardSkeleton</span> (10/24) · <span class="t-mono">OverviewSkeleton</span> + <span class="t-mono">AnalyticsSkeleton</span> compose the atoms into tab-level layouts. Animation: <span class="t-mono">animate-pulse</span> (1.5s ease-in-out infinite).</div>
+      <div class="sg-note">Variants: <span class="t-mono">StatCardSkeleton</span> (matches 6/12 asymmetric radius) · <span class="t-mono">SectionCardSkeleton</span> (10/24) · <span class="t-mono">OverviewSkeleton</span> + <span class="t-mono">AnalyticsSkeleton</span> compose the atoms into tab-level layouts. Animation: <span class="t-mono">animate-pulse</span> (1.5s ease-in-out infinite).</div>
     </div>
 
     <!-- ══ LoadingState + ErrorState ══ -->
@@ -3429,21 +3437,21 @@
         </div>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px;">
-        <div class="card" style="padding:20px 16px;">
+        <div class="card" style="padding:1.25rem 1rem;">
           <div class="err" style="padding:0;">
             <div class="err-icon data"><svg class="i" style="width:20px;height:20px;"><use href="#i-database"/></svg></div>
             <div class="err-title" style="font-size:14px;">Data loading failed</div>
             <div class="err-desc" style="font-size:12px;">Temporary issue — try again.</div>
           </div>
         </div>
-        <div class="card" style="padding:20px 16px;">
+        <div class="card" style="padding:1.25rem 1rem;">
           <div class="err" style="padding:0;">
             <div class="err-icon perm"><svg class="i" style="width:20px;height:20px;"><use href="#i-alert"/></svg></div>
             <div class="err-title" style="font-size:14px;">Access denied</div>
             <div class="err-desc" style="font-size:12px;">Contact your admin if unexpected.</div>
           </div>
         </div>
-        <div class="card" style="padding:20px 16px;">
+        <div class="card" style="padding:1.25rem 1rem;">
           <div class="err" style="padding:0;">
             <div class="err-icon general"><svg class="i" style="width:20px;height:20px;"><use href="#i-alert"/></svg></div>
             <div class="err-title" style="font-size:14px;">Something went wrong</div>
@@ -3451,7 +3459,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">
+      <div class="sg-note">
         <b style="color:var(--brand-text-bright)">ErrorState</b> types: <span class="t-mono">network</span> · <span class="t-mono">data</span> · <span class="t-mono">permission</span> · <span class="t-mono">general</span>. Helpers exported: <span class="t-mono">&lt;NetworkError&gt;</span>, <span class="t-mono">&lt;DataError&gt;</span>, <span class="t-mono">&lt;PermissionError&gt;</span>. <b style="color:var(--brand-text-bright)">LoadingState</b> sizes: sm (16) / md (24) / lg (32) with py-4/8/12 container.
       </div>
     </div>
@@ -3461,7 +3469,7 @@
       <div class="col-label">SerpPreview · SocialPreview · <span class="t-mono">ui/SerpPreview.tsx · ui/SocialPreview.tsx</span></div>
       <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:16px; align-items:start;">
         <!-- SERP -->
-        <div class="prev-white" style="padding:14px 16px;">
+        <div class="prev-white" style="padding:0.875rem 1rem;">
           <div class="serp-url">hmpsn.com › blog › keyword-research</div>
           <div class="serp-title">Keyword research guide 2026: from seed terms to quick-wins</div>
           <div class="serp-desc">The full playbook we use for clients — topic mapping, SERP gap analysis, and the brief templates we ship to writers. Includes our tracked-keywords spreadsheet.</div>
@@ -3490,7 +3498,7 @@
           <div class="x-title">Keyword research guide 2026</div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Both primitives always render on <b style="color:var(--brand-text-bright)">#ffffff</b> regardless of theme — they represent external chrome (Google / Meta / X) that doesn't inherit our dark mode. SERP sizes: <span class="t-mono">sm</span> 16px · <span class="t-mono">md</span> 18px · <span class="t-mono">lg</span> 20px title. Social widths: 300 / 400 / 500px.</div>
+      <div class="sg-note">Both primitives always render on <b style="color:var(--brand-text-bright)">#ffffff</b> regardless of theme — they represent external chrome (Google / Meta / X) that doesn't inherit our dark mode. SERP sizes: <span class="t-mono">sm</span> 16px · <span class="t-mono">md</span> 18px · <span class="t-mono">lg</span> 20px title. Social widths: 300 / 400 / 500px.</div>
     </div>
 
     <!-- ══ DateRangeSelector ══ -->
@@ -3509,13 +3517,13 @@
           <button>All time</button>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Takes <span class="t-mono">{ label, value }[]</span>. Selected pill uses <span class="t-mono">zinc-700/200</span>; unselected <span class="t-mono">zinc-500</span> with hover to <span class="t-mono">zinc-300</span>. Note: darker than the main segmented control (<span class="t-mono">teal-on</span>) — this one stays neutral because date range is a lens, not an action.</div>
+      <div class="sg-note">Takes <span class="t-mono">{ label, value }[]</span>. Selected pill uses <span class="t-mono">zinc-700/200</span>; unselected <span class="t-mono">zinc-500</span> with hover to <span class="t-mono">zinc-300</span>. Note: darker than the main segmented control (<span class="t-mono">teal-on</span>) — this one stays neutral because date range is a lens, not an action.</div>
     </div>
 
     <!-- ══ PageHeader ══ -->
     <div class="sub-section">
       <div class="col-label">PageHeader · tab / page title bar · <span class="t-mono">ui/PageHeader.tsx</span></div>
-      <div class="card" style="padding:4px 20px;">
+      <div class="card" style="padding:0.25rem 1.25rem;">
         <div class="ph">
           <div class="ph-left">
             <div class="ph-icon"><svg class="i i-md"><use href="#i-chart"/></svg></div>
@@ -3546,7 +3554,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Title <span class="t-mono">17px / 600</span>, subtitle <span class="t-mono">11px zinc-500</span>. Icon tile is optional, 32×32 <span class="t-mono">rounded-lg</span>. Actions live right-aligned; no gap between title and actions on narrow viewports — <span class="t-mono">truncate</span> handles overflow.</div>
+      <div class="sg-note">Title <span class="t-mono">17px / 600</span>, subtitle <span class="t-mono">11px zinc-500</span>. Icon tile is optional, 32×32 <span class="t-mono">--radius-lg</span>. Actions live right-aligned; no gap between title and actions on narrow viewports — <span class="t-mono">truncate</span> handles overflow.</div>
     </div>
 
     <!-- ══ AIContextIndicator ══ -->
@@ -3606,19 +3614,19 @@
           </div>
         </div>
         <div class="row" style="gap:10px; align-items:center;">
-          <span class="aci connected" style="padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
+          <span class="aci connected" style="padding:0.125rem 0.5rem; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
             <svg class="i" style="width:12px;height:12px;"><use href="#i-brain"/></svg> 8/8
           </span>
-          <span class="aci" style="padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
+          <span class="aci" style="padding:0.125rem 0.5rem; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
             <svg class="i" style="width:12px;height:12px;"><use href="#i-brain"/></svg> 5/8
           </span>
-          <span class="aci low" style="padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
+          <span class="aci low" style="padding:0.125rem 0.5rem; border-radius:9999px; font-size:11px; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
             <svg class="i" style="width:12px;height:12px;"><use href="#i-brain"/></svg> 2/8
           </span>
-          <span class="muted" style="font-size:11px; margin-left:8px;">compact mode — collapses to a pill for tab-bar rails</span>
+          <span class="sg-note sg-note-inline sg-note-left">compact mode — collapses to a pill for tab-bar rails</span>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Color thresholds: <b style="color:var(--emerald)">emerald</b> (all connected) · <b style="color:var(--amber)">amber</b> (≥60%) · <b style="color:var(--red)">red</b> (&lt;60%). Per-feature filtering via <span class="t-mono">feature="strategy"|"briefs"|"posts"|"chat"|"internal-links"|"all"</span> — only shows sources that impact the requesting tab.</div>
+      <div class="sg-note">Color thresholds: <b style="color:var(--emerald)">emerald</b> (all connected) · <b style="color:var(--amber)">amber</b> (≥60%) · <b style="color:var(--red)">red</b> (&lt;60%). Per-feature filtering via <span class="t-mono">feature="strategy"|"briefs"|"posts"|"chat"|"internal-links"|"all"</span> — only shows sources that impact the requesting tab.</div>
     </div>
 
     <!-- ══ MetricToggleCard ══ -->
@@ -3651,7 +3659,7 @@
           <div class="mtc-delta" style="color:var(--zinc-500);">—</div>
         </button>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Active: <b style="color:var(--brand-text-bright)">2px border in metric color</b> + 6% tinted bg. Inactive: <span class="t-mono">opacity-50</span>, hover to <span class="t-mono">opacity-70</span>. Delta color flips via <span class="t-mono">invertDelta</span> for "lower is better" metrics (position, bounce rate). Neutral delta (<span class="t-mono">—</span> or numeric 0) always renders zinc-500.</div>
+      <div class="sg-note">Active: <b style="color:var(--brand-text-bright)">2px border in metric color</b> + 6% tinted bg. Inactive: <span class="t-mono">opacity-50</span>, hover to <span class="t-mono">opacity-70</span>. Delta color flips via <span class="t-mono">invertDelta</span> for "lower is better" metrics (position, bounce rate). Neutral delta (<span class="t-mono">—</span> or numeric 0) always renders zinc-500.</div>
     </div>
 
     <!-- ══ FeatureFlag ══ -->
@@ -3675,7 +3683,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Flags live in <span class="t-mono">shared/types/feature-flags</span> and are resolved via the <span class="t-mono">useFeatureFlag</span> hook. Use <b style="color:var(--brand-text-bright)">FeatureFlag</b> to gate entire routes/pages; use <span class="t-mono">useFeatureFlag</span> directly when you need branching logic inside a component.</div>
+      <div class="sg-note">Flags live in <span class="t-mono">shared/types/feature-flags</span> and are resolved via the <span class="t-mono">useFeatureFlag</span> hook. Use <b style="color:var(--brand-text-bright)">FeatureFlag</b> to gate entire routes/pages; use <span class="t-mono">useFeatureFlag</span> directly when you need branching logic inside a component.</div>
     </div>
 
     <!-- ══ CharacterCounter ══ -->
@@ -3701,7 +3709,7 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:11px; margin-top:10px;">Thresholds: <b style="color:rgba(16,185,129,.85)">&lt;80%</b> emerald · <b style="color:rgba(251,191,36,.85)">80–95%</b> amber · <b style="color:rgba(248,113,113,.85)">≥95%</b> red. Always monospace (JetBrains Mono) so the number column stays aligned across multiple counters stacked in forms.</div>
+      <div class="sg-note">Thresholds: <b style="color:rgba(16,185,129,.85)">&lt;80%</b> emerald · <b style="color:rgba(251,191,36,.85)">80–95%</b> amber · <b style="color:rgba(248,113,113,.85)">≥95%</b> red. Always monospace (JetBrains Mono) so the number column stays aligned across multiple counters stacked in forms.</div>
     </div>
 
     <!-- ══ System audit: insight-card duplication ══ -->
@@ -3734,7 +3742,7 @@
     <div class="sub-section">
       <div class="col-label">Coverage check · <span class="t-mono">src/components/ui/</span></div>
       <div class="card" style="padding:20px;">
-        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px 24px; font-size:12px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0.5rem 1.5rem; font-size:12px;">
           <div class="cov"><span class="cov-dot cov-done"></span><span>StatCard · CompactStatBar</span></div>
           <div class="cov"><span class="cov-dot cov-done"></span><span>SectionCard</span></div>
           <div class="cov"><span class="cov-dot cov-done"></span><span>MetricRing · MetricRingSvg</span></div>
@@ -3769,7 +3777,7 @@
           <div class="cov"><span class="cov-dot cov-done"></span><span>CharacterCounter <span class="muted">(pass 2)</span></span></div>
           <div class="cov"><span class="cov-dot cov-done"></span><span>ScannerReveal <span class="muted">(see §06 Motion)</span></span></div>
         </div>
-        <div class="muted" style="font-size:11px; margin-top:14px;">Complete · all primitives in <span class="t-mono">src/components/ui/</span> now have specimens. Follow-up candidates for v2.5: Sidebar collapsed / mobile states, SectionCard header variants (with tabs, with filter chips), and a Density toggle (compact · default · comfortable) threaded across StatCard, DataList, and Table.</div>
+        <div class="sg-note">Complete · all primitives in <span class="t-mono">src/components/ui/</span> now have specimens. Follow-up candidates for v2.5: Sidebar collapsed / mobile states, SectionCard header variants (with tabs, with filter chips), and a Density toggle (compact · default · comfortable) threaded across StatCard, DataList, and Table.</div>
       </div>
     </div>
 
@@ -3982,17 +3990,17 @@
           <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Modal&gt; with Header / Body / Footer</div>
           <div class="dd-stage" style="flex-direction:column; align-items:stretch; gap:0; padding:0; background:rgba(0,0,0,0.25); position:relative; min-height:260px;">
             <div style="position:absolute; inset:0; background:rgba(0,0,0,.35); backdrop-filter: blur(3px); display:flex; align-items:center; justify-content:center; padding:16px;">
-              <div style="width:100%; max-width:360px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:10px; box-shadow:0 20px 40px rgba(0,0,0,.35);">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px 10px; border-bottom:1px solid var(--brand-border);">
+              <div style="width:100%; max-width:360px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:10px; box-shadow:0 1.25rem 2.5rem rgba(0,0,0,.35);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:1rem 1.25rem 0.625rem; border-bottom:1px solid var(--brand-border);">
                   <div style="font-weight:600; color:var(--brand-text-bright); font-size:15px;">Delete workspace?</div>
                   <button aria-label="Close" style="background:transparent; border:0; color:var(--brand-text); cursor:pointer;">✕</button>
                 </div>
-                <div style="padding:14px 20px; color:var(--brand-text); font-size:13px; line-height:1.55;">
+                <div style="padding:0.875rem 1.25rem; color:var(--brand-text); font-size:13px; line-height:1.55;">
                   This action is permanent. All pages, keywords, and briefs will be removed.
                 </div>
-                <div style="display:flex; justify-content:flex-end; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--brand-border);">
-                  <button style="font-size:13px; padding:6px 12px; border-radius:6px; background:transparent; border:1px solid var(--brand-border); color:var(--brand-text);">Cancel</button>
-                  <button style="font-size:13px; padding:6px 12px; border-radius:6px; background:#b91c1c; border:0; color:#fff;">Delete</button>
+                <div style="display:flex; justify-content:flex-end; gap:8px; padding:0.625rem 1.25rem 1rem; border-top:1px solid var(--brand-border);">
+                  <button style="font-size:13px; padding:0.375rem 0.75rem; border-radius:6px; background:transparent; border:1px solid var(--brand-border); color:var(--brand-text);">Cancel</button>
+                  <button style="font-size:13px; padding:0.375rem 0.75rem; border-radius:6px; background:#b91c1c; border:0; color:#fff;">Delete</button>
                 </div>
               </div>
             </div>
@@ -4003,7 +4011,7 @@
           <div class="dd-head"><span class="dd-mark">✗</span> Don't · hand-roll <span class="t-mono">&lt;div className="fixed inset-0 …"&gt;</span></div>
           <div class="dd-stage" style="flex-direction:column; gap:8px; padding:16px;">
             <pre style="margin:0; font-family:var(--font-mono); font-size:12px; color:var(--brand-text); white-space:pre-wrap; line-height:1.45;">&lt;div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"&gt;
-  &lt;div className="bg-zinc-900 rounded-lg p-6"&gt;
+  &lt;div className="bg-zinc-900 rounded-[var(--radius-lg)] p-6"&gt;
     …
   &lt;/div&gt;
 &lt;/div&gt;</pre>
@@ -4019,13 +4027,13 @@
       <div class="dd-grid">
         <div class="dd-tile dd-do">
           <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Popover&gt; with &lt;Popover.Item&gt; children</div>
-          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:12px; padding:20px 24px;">
-            <button style="padding:6px 10px; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Menu ▾</button>
-            <div style="display:inline-block; min-width:180px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.3); padding:4px 0;">
-              <div style="padding:6px 12px; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Edit</div>
-              <div style="padding:6px 12px; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Duplicate</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:12px; padding:1.25rem 1.5rem;">
+            <button style="padding:0.375rem 0.625rem; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Menu ▾</button>
+            <div style="display:inline-block; min-width:180px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:8px; box-shadow:0 0.625rem 1.875rem rgba(0,0,0,.3); padding:4px 0;">
+              <div style="padding:0.375rem 0.75rem; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Edit</div>
+              <div style="padding:0.375rem 0.75rem; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Duplicate</div>
               <div style="border-top:1px solid var(--brand-border); margin:4px 0;"></div>
-              <div style="padding:6px 12px; font-size:13px; color:#f87171; cursor:pointer;">Delete</div>
+              <div style="padding:0.375rem 0.75rem; font-size:13px; color:#f87171; cursor:pointer;">Delete</div>
             </div>
           </div>
           <div class="dd-note"><b>API.</b> <span class="t-mono">&lt;Popover trigger={…} placement? closeOnSelect?&gt;&lt;Popover.Item onClick&gt;…&lt;/Popover.Item&gt;&lt;Popover.Separator /&gt;&lt;Popover.Item danger&gt;…&lt;/Popover.Item&gt;&lt;/Popover&gt;</span>. Placement: <span class="t-mono">bottom-start / bottom-end / top-start / top-end / top / bottom / left / right</span>. Arrow keys walk items, Enter activates, Escape closes.</div>
@@ -4050,10 +4058,10 @@
       <div class="dd-grid">
         <div class="dd-tile dd-do">
           <div class="dd-head"><span class="dd-mark">✓</span> Do · wrap the interactive with &lt;Tooltip&gt;</div>
-          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:18px; padding:22px 24px;">
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:18px; padding:1.375rem 1.5rem;">
             <div style="position:relative; display:inline-block;">
-              <button style="padding:6px 10px; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Disconnect</button>
-              <div role="tooltip" style="position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#09090b; color:#e4e4e7; font-size:12px; padding:4px 8px; border-radius:4px; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.4);">Remove Google integration</div>
+              <button style="padding:0.375rem 0.625rem; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Disconnect</button>
+              <div role="tooltip" style="position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#09090b; color:#e4e4e7; font-size:12px; padding:0.25rem 0.5rem; border-radius:4px; white-space:nowrap; box-shadow:0 0.25rem 0.75rem rgba(0,0,0,.4);">Remove Google integration</div>
             </div>
           </div>
           <div class="dd-note"><b>API.</b> <span class="t-mono">&lt;Tooltip content="…" placement? delay?&gt;&lt;button&gt;…&lt;/button&gt;&lt;/Tooltip&gt;</span>. Shows after <span class="t-mono">delay</span> (default 500ms) on hover; instant on focus. Trigger gets <span class="t-mono">aria-describedby</span> while visible.</div>

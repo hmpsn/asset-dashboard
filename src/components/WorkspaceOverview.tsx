@@ -9,7 +9,7 @@ import {
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
 } from 'lucide-react';
-import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
+import { Button, ClickableRow, MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
 import { timeAgo } from '../lib/timeAgo';
@@ -96,21 +96,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         icon={<Icon as={Rocket} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
-              <Icon as={FileSearch} size="sm" /> Prospect
-            </button>
-            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
-              <Icon as={Map} size="sm" /> Roadmap
-            </button>
-            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
-              <Icon as={Zap} size="sm" /> AI Usage
-            </button>
-            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
-              <Icon as={DollarSign} size="sm" /> Revenue
-            </button>
-            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
-              <Icon as={Layers} size="sm" /> Features
-            </button>
+            <Button variant="secondary" size="sm" icon={FileSearch} onClick={() => navigate('/prospect')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Prospect</Button>
+            <Button variant="secondary" size="sm" icon={Map} onClick={() => navigate('/roadmap')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]">Roadmap</Button>
+            <Button variant="secondary" size="sm" icon={Zap} onClick={() => navigate('/ai-usage')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20">AI Usage</Button>
+            <Button variant="secondary" size="sm" icon={DollarSign} onClick={() => navigate('/revenue')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20">Revenue</Button>
+            <Button variant="secondary" size="sm" icon={Layers} onClick={() => navigate('/features')} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20">Features</Button>
           </div>
         }
       />
@@ -125,7 +115,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                   <ItemIcon className={cn('w-3.5 h-3.5 flex-shrink-0', item.color)} />
                   <span className="t-caption text-[var(--brand-text-bright)] flex-1">{item.label}</span>
-                  <Badge label={item.value} color="zinc" />
+                  <Badge label={item.value} tone="zinc" />
                 </div>
               );
             })}
@@ -153,10 +143,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           <SectionCard
             title={`Online Now · ${totalOnline}`}
             titleIcon={
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-[var(--radius-pill)] h-3 w-3 bg-emerald-500" />
-              </span>
+              <div className="relative flex h-3 w-3">
+                <div className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                <div className="relative inline-flex rounded-[var(--radius-pill)] h-3 w-3 bg-emerald-500" />
+              </div>
             }
             noPadding
           >
@@ -172,7 +162,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <span className="t-micro text-[var(--brand-text-muted)] ml-2">{u.email}</span>
                     </div>
                     <span className="t-micro text-[var(--brand-text-muted)] flex-shrink-0">{wsNames[wsId] || wsId}</span>
-                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'emerald'} />
+                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} tone={u.role === 'admin' ? 'blue' : 'emerald'} />
                   </div>
                 ))
               )}
@@ -195,7 +185,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             const onlineUsers = presence[ws.id] || [];
 
             return (
-              <button
+              <ClickableRow
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
                 className={cn(
@@ -209,18 +199,24 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-bold bg-red-500 text-white shadow-lg">
-                    <Icon as={Bell} size="sm" /> {ws.requests.new} new
-                  </div>
+                  <Badge
+                    label={`${ws.requests.new} new`}
+                    tone="red"
+                    variant="solid"
+                    shape="pill"
+                    size="md"
+                    icon={Bell}
+                    className="absolute -top-2 -right-2 shadow-lg"
+                  />
                 )}
 
                 {/* Online users banner */}
                 {onlineUsers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-emerald-500/10 border-b border-emerald-500/20">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-[var(--radius-pill)] h-2.5 w-2.5 bg-emerald-500" />
-                    </span>
+                    <div className="relative flex h-2.5 w-2.5">
+                      <div className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                      <div className="relative inline-flex rounded-[var(--radius-pill)] h-2.5 w-2.5 bg-emerald-500" />
+                    </div>
                     <span className="t-caption-sm font-semibold text-accent-success">
                       {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
                     </span>
@@ -232,23 +228,24 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   <div className="flex items-center gap-2 min-w-0">
                     <h3 className="t-caption font-semibold truncate group-hover:text-accent-brand transition-colors text-[var(--brand-text-bright)]">{ws.name}</h3>
                     {isAtRisk && (
-                      <span className={cn(
-                        'flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border',
-                        (ws.churnSignals?.critical || 0) > 0
-                          ? 'bg-red-500/15 text-accent-danger border-red-500/20'
-                          : 'bg-amber-500/15 text-accent-warning border-amber-500/20'
-                      )}>
-                        <Icon as={Flag} size="sm" />
-                        At Risk
-                      </span>
+                      <Badge
+                        label="At Risk"
+                        tone={(ws.churnSignals?.critical || 0) > 0 ? 'red' : 'amber'}
+                        variant="outline"
+                        icon={Flag}
+                        className="flex-shrink-0 font-bold"
+                      />
                     )}
                     {ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
-                        Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
-                      </span>
+                      <Badge
+                        label={`Trial${ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}`}
+                        tone="amber"
+                        variant="outline"
+                        className="flex-shrink-0 font-bold"
+                      />
                     )}
                     {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border bg-teal-500/15 text-accent-brand border-teal-500/20">{ws.tier}</span>
+                      <Badge label={ws.tier} tone="teal" variant="outline" className="flex-shrink-0 font-bold" />
                     )}
                   </div>
                   <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
@@ -348,17 +345,17 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <div>
                         <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">SEO Status</div>
                         <div className="flex flex-wrap gap-1">
-                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-accent-warning">{ws.pageStates!.issueDetected} issues</span>}
-                          {(ws.pageStates?.inReview || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.inReview} in review</span>}
-                          {(ws.pageStates?.approved || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success">{ws.pageStates!.approved} approved</span>}
-                          {(ws.pageStates?.rejected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-accent-danger">{ws.pageStates!.rejected} rejected</span>}
-                          {(ws.pageStates?.live || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.live} live</span>}
+                          {(ws.pageStates?.issueDetected || 0) > 0 && <Badge label={`${ws.pageStates!.issueDetected} issues`} tone="amber" variant="outline" />}
+                          {(ws.pageStates?.inReview || 0) > 0 && <Badge label={`${ws.pageStates!.inReview} in review`} tone="teal" variant="outline" />}
+                          {(ws.pageStates?.approved || 0) > 0 && <Badge label={`${ws.pageStates!.approved} approved`} tone="emerald" variant="outline" />}
+                          {(ws.pageStates?.rejected || 0) > 0 && <Badge label={`${ws.pageStates!.rejected} rejected`} tone="red" variant="outline" />}
+                          {(ws.pageStates?.live || 0) > 0 && <Badge label={`${ws.pageStates!.live} live`} tone="teal" variant="outline" />}
                         </div>
                       </div>
                     </>
                   )}
                 </div>
-              </button>
+              </ClickableRow>
             );
           })}
         </div>

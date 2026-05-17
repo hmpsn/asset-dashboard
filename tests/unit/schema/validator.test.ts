@@ -792,13 +792,22 @@ describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
       );
     });
 
-    it('flags missing Review.reviewRating as error', () => {
+    it('flags Review without reviewRating or datePublished as error', () => {
       const broken = JSON.parse(JSON.stringify(fullReview));
       delete broken['@graph'][1].reviewRating;
       const findings = validateLeanSchema(broken, 'Service');
       expect(findings).toContainEqual(
         expect.objectContaining({ severity: 'error', type: 'Review', field: 'reviewRating' }),
       );
+    });
+
+    it('allows Review without reviewRating when datePublished is present', () => {
+      const dated = JSON.parse(JSON.stringify(fullReview));
+      delete dated['@graph'][1].reviewRating;
+      dated['@graph'][1].datePublished = '2026-05-01';
+      const findings = validateLeanSchema(dated, 'Service').filter(f =>
+        f.type === 'Review' && f.severity === 'error');
+      expect(findings).toEqual([]);
     });
 
     it('flags missing Review.author as error', () => {

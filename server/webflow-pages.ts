@@ -6,6 +6,7 @@ import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { fetchPublicWebText } from './external-fetch.js';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
 
 const log = createLogger('webflow-pages');
@@ -521,10 +522,13 @@ export async function discoverCmsUrls(
   limit: number = 50,
 ): Promise<{ cmsUrls: CmsPageUrl[]; totalFound: number }> {
   try {
-    const sitemapRes = await fetch(`${sitemapBaseUrl}/sitemap.xml`, { redirect: 'follow' });
-    if (!sitemapRes.ok) return { cmsUrls: [], totalFound: 0 };
-
-    const sitemapText = await sitemapRes.text();
+    const sitemapText = await fetchPublicWebText({
+      url: `${sitemapBaseUrl}/sitemap.xml`,
+      redirect: 'follow',
+      timeoutMs: 8_000,
+      defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+      logContext: { module: 'webflow-pages', fetchPath: 'discover-cms-sitemap' },
+    });
     const isXml = sitemapText.trimStart().startsWith('<?xml') || sitemapText.trimStart().startsWith('<urlset') || sitemapText.trimStart().startsWith('<sitemapindex');
     if (!isXml) return { cmsUrls: [], totalFound: 0 };
 
@@ -565,20 +569,27 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
   };
 
   try {
-    const res = await fetch(`${baseUrl}/sitemap.xml`, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return urls;
-    const text = await res.text();
+    const text = await fetchPublicWebText({
+      url: `${baseUrl}/sitemap.xml`,
+      redirect: 'follow',
+      timeoutMs: 8_000,
+      defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+      logContext: { module: 'webflow-pages', fetchPath: 'discover-sitemap-root' },
+    });
     if (!text.includes('<urlset') && !text.includes('<sitemapindex')) return urls;
 
     if (text.includes('<sitemapindex')) {
       const subUrls = extractLocs(text);
       for (const subUrl of subUrls) {
         try {
-          const subRes = await fetch(subUrl, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
-          if (subRes.ok) {
-            const subText = await subRes.text();
-            urls.push(...extractLocs(subText));
-          }
+          const subText = await fetchPublicWebText({
+            url: subUrl,
+            redirect: 'follow',
+            timeoutMs: 8_000,
+            defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
+            logContext: { module: 'webflow-pages', fetchPath: 'discover-sitemap-child' },
+          });
+          urls.push(...extractLocs(subText));
         } catch { /* skip failed sub-sitemap */ } // catch-ok
       }
     } else {

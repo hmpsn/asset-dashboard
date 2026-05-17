@@ -196,9 +196,13 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <Icon as={XCircle} size="xl" className="text-accent-danger mx-auto mb-2" />
         <p className="t-caption text-[var(--brand-text)]">Failed to load recommendations</p>
-        <button onClick={handleRegenerate} className="mt-2 t-caption text-accent-brand hover:text-accent-brand">
+        <Button
+          onClick={handleRegenerate}
+          variant="link"
+          className="mt-2 t-caption text-accent-brand hover:text-accent-brand no-underline"
+        >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -288,12 +292,16 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                   </span>
                 )}
                 {onNavigate && (
-                  <button
+                  <Button
                     onClick={() => onNavigate(REC_TYPE_TAB[rec.type] || 'seo-audit', { pageSlug: rec.affectedPages[0], recType: rec.type })}
-                    className="flex items-center gap-0.5 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors flex-shrink-0"
+                    variant="link"
+                    size="sm"
+                    icon={ArrowUpRight}
+                    iconPosition="right"
+                    className="t-caption-sm text-accent-brand hover:text-accent-brand no-underline flex-shrink-0"
                   >
-                    Fix <Icon as={ArrowUpRight} size="sm" />
-                  </button>
+                    Fix
+                  </Button>
                 )}
               </div>
             );
@@ -323,14 +331,16 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
           <div className="ml-auto flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">{activeCount} active · {completedCount} done</span>
-            <button
+            <Button
               onClick={handleRegenerate}
-              disabled={regenerating}
-              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+              loading={regenerating}
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              className="t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border-0"
             >
-              <Icon as={RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} />
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
         {isPremium ? (
@@ -364,9 +374,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           return (
             <div key={priority}>
               {/* Priority header */}
-              <button
+              <Button
                 onClick={() => togglePriority(priority)}
-                className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+                variant="ghost"
+                size="sm"
+                className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left justify-start rounded-none"
               >
                 <div className={`w-8 h-8 rounded-[var(--radius-md)] ${config.bg} border ${config.border} flex items-center justify-center flex-shrink-0`}>
                   <Icon as={PriorityIcon} size="md" className={config.color} />
@@ -386,7 +398,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                   ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 }
-              </button>
+              </Button>
 
               {/* Recommendations in this priority */}
               {isExpanded && (
@@ -403,15 +415,17 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                       <div key={rec.id} className={`border-b border-[var(--brand-border)]/20 last:border-b-0 ${isCompleted ? 'opacity-50' : ''}`}>
                         {/* Recommendation row */}
                         <div className="px-5 py-3 flex items-start gap-3">
-                          <button
+                          <Button
                             onClick={() => toggleRec(rec.id)}
-                            className="w-6 h-6 rounded-[var(--radius-sm)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-[var(--brand-border-hover)] transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="w-6 h-6 p-0 rounded-[var(--radius-sm)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-[var(--brand-border-hover)] transition-colors"
                           >
                             {isRecExpanded
                               ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text)]" />
                               : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text)]" />
                             }
-                          </button>
+                          </Button>
 
                           <div className="w-7 h-7 rounded-[var(--radius-md)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Icon as={TypeIcon} size="md" className="text-[var(--brand-text)]" />
@@ -429,12 +443,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 {effortBadge.label}
                               </span>
                               {rec.status === 'in_progress' && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-accent-brand">
                                   In Progress
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
                                   <Icon as={CheckCircle2} size="sm" /> Done
                                 </span>
                               )}
@@ -548,7 +562,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                       Let Us Fix This — {fmt(rec.productPrice)}
                                     </Button>
                                   ) : inCart ? (
-                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] badge-span-ok t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                                       <Icon as={ShoppingCart} size="sm" />
                                       In Cart
                                     </span>
@@ -583,12 +597,14 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                               {/* Dismiss */}
                               {rec.status !== 'completed' && (
-                                <button
+                                <Button
                                   onClick={() => handleDismiss(rec.id)}
-                                  className="t-caption text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors ml-auto"
+                                  variant="link"
+                                  size="sm"
+                                  className="t-caption text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors ml-auto no-underline"
                                 >
                                   Dismiss
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </div>

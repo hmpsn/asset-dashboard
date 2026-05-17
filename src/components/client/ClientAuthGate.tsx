@@ -4,7 +4,7 @@ import { Lock } from 'lucide-react';
 import { post } from '../../api/client';
 import TurnstileWidget from '../TurnstileWidget';
 import { STUDIO_NAME } from '../../constants';
-import { Icon, Button } from '../ui';
+import { Icon, Button, FormInput } from '../ui';
 import type { WorkspaceInfo } from './types';
 
 export interface ClientAuthGateProps {
@@ -164,15 +164,17 @@ export function ClientAuthGate({
 
           {/* Mode switch link when both modes are available */}
           {showsBothModes && loginTab === 'password' && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={() => {
                 setLoginTab('user');
                 setAuthError('');
               }}
-              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] mb-4 transition-colors"
+              className="w-full py-1 mb-4 text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
             >
               Sign in with your email instead
-            </button>
+            </Button>
           )}
 
           {/* Individual user login / forgot / reset form */}
@@ -188,28 +190,31 @@ export function ClientAuthGate({
                         If an account exists with that email, we've sent a password reset link.
                       </p>
                     </div>
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="lg"
                       onClick={() => {
                         setLoginView('login');
                         setForgotSent(false);
                         setForgotEmail('');
                         setAuthError('');
                       }}
-                      className="w-full py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-body font-medium transition-all"
+                      className="w-full rounded-[var(--radius-xl)] text-[var(--brand-text)]"
                     >
                       Back to Sign In
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <form onSubmit={handleForgotPasswordSubmit} className="space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text)] text-center">
                       Enter your email and we'll send you a link to reset your password.
                     </p>
-                    <input
+                    <FormInput
                       type="email"
                       value={forgotEmail}
-                      onChange={(e) => {
-                        setForgotEmail(e.target.value);
+                      onChange={(value) => {
+                        setForgotEmail(value);
                         setAuthError('');
                       }}
                       placeholder="Email address"
@@ -227,16 +232,18 @@ export function ClientAuthGate({
                     >
                       {authLoading ? '' : 'Send Reset Link'}
                     </Button>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setLoginView('login');
                         setAuthError('');
                       }}
-                      className="w-full py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-full py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                     >
                       Back to Sign In
-                    </button>
+                    </Button>
                   </form>
                 )}
               </div>
@@ -266,22 +273,22 @@ export function ClientAuthGate({
                 ) : (
                   <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text)] text-center">Choose a new password for your account.</p>
-                    <input
+                    <FormInput
                       type="password"
                       value={resetPassword}
-                      onChange={(e) => {
-                        setResetPassword(e.target.value);
+                      onChange={(value) => {
+                        setResetPassword(value);
                         setAuthError('');
                       }}
                       placeholder="New password"
                       autoFocus
                       className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
-                    <input
+                    <FormInput
                       type="password"
                       value={resetConfirm}
-                      onChange={(e) => {
-                        setResetConfirm(e.target.value);
+                      onChange={(value) => {
+                        setResetConfirm(value);
                         setAuthError('');
                       }}
                       placeholder="Confirm new password"
@@ -304,11 +311,11 @@ export function ClientAuthGate({
               // Normal login form
               <form onSubmit={handleClientUserLoginWithTurnstile} className="space-y-3">
                 <div>
-                  <input
+                  <FormInput
                     type="email"
                     value={loginEmail}
-                    onChange={(e) => {
-                      setLoginEmail(e.target.value);
+                    onChange={(value) => {
+                      setLoginEmail(value);
                       setAuthError('');
                     }}
                     placeholder="Email address"
@@ -317,11 +324,11 @@ export function ClientAuthGate({
                   />
                 </div>
                 <div>
-                  <input
+                  <FormInput
                     type="password"
                     value={loginPassword}
-                    onChange={(e) => {
-                      setLoginPassword(e.target.value);
+                    onChange={(value) => {
+                      setLoginPassword(value);
                       setAuthError('');
                     }}
                     placeholder="Password"
@@ -339,27 +346,31 @@ export function ClientAuthGate({
                 >
                   {authLoading ? '' : 'Sign In'}
                 </Button>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setLoginView('forgot');
                     setAuthError('');
                   }}
-                  className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                  className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                 >
                   Forgot your password?
-                </button>
+                </Button>
                 {showsBothModes && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setLoginTab('password');
                       setAuthError('');
                     }}
-                    className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                    className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-transparent hover:bg-transparent"
                   >
                     Have a shared password instead?
-                  </button>
+                  </Button>
                 )}
               </form>
             )
@@ -367,11 +378,11 @@ export function ClientAuthGate({
             /* Shared password form */
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <input
+                <FormInput
                   type="password"
                   value={passwordInput}
-                  onChange={(e) => {
-                    setPasswordInput(e.target.value);
+                  onChange={(value) => {
+                    setPasswordInput(value);
                     setAuthError('');
                   }}
                   placeholder="Dashboard password"

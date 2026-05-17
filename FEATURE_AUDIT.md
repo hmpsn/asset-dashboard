@@ -1,8 +1,75 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **357 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **363 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 363. MCP Server — Intelligence Facade
+
+**What it does:** Exposes 10 read-only workspace intelligence tools via the Model Context Protocol at `POST /mcp`. Tools call the existing intelligence layer (`buildWorkspaceIntelligence()`, insights store, keyword tables) directly. Bearer-token auth via `MCP_API_KEY` env var. Compatible with Claude.ai and Claude Code MCP clients. Tools: `list_workspaces`, `get_workspace_overview`, `get_workspace_intelligence`, `get_insights`, `get_anomalies`, `get_content_decay`, `get_keyword_analysis`, `get_seo_context`, `get_client_signals`, `get_pending_work`.
+
+**Agency value:** Query workspace health, surface insights, and diagnose client issues from within Claude chat sessions without opening the dashboard. Seeds the content rewrite workflow (identify decaying pages via MCP, rewrite in Claude).
+
+**Client value:** Foundation for v2 client MCP tokens — eventually clients can query their own workspace data from any MCP-compatible AI tool.
+
+**Mutual:** Turns the intelligence layer into an agentic interface. The same data assembly that powers AdminChat becomes directly addressable by AI sessions.
+
+---
+
+### 362. Wave 5 Architecture Decision Record Log
+**What it does:** Adds a lightweight Architecture Decision Record system under `docs/adr/` with a short authoring contract (`docs/adr/README.md`) and six seed ADRs for major platform architecture choices: background jobs, workspace-intelligence slices, feature-flag lifecycle/sunset governance, client/admin route split, unified AI dispatch, and bounded-context route-to-service extraction. Adds verifier command `npm run verify:adr-log` (`scripts/adr-log.ts`) to enforce required ADR sections and required topic coverage, with test coverage in `tests/unit/adr-log.test.ts`. Also adds the ADR workflow guide at `docs/workflows/adr-log.md` and wires the audit into `verify-platform`.
+
+**Agency value:** Preserves architectural intent in a durable, searchable format so implementation decisions stay consistent even as contributors rotate.
+
+**Client value:** Indirectly improves reliability and delivery speed by reducing decision churn and preventing accidental reversals of proven architecture patterns.
+
+**Mutual:** Converts architecture choices from tribal knowledge into an auditable system that can be validated in CI-era workflows.
+
+---
+
+### 361. Wave 5 Recurring Platform Health Cadence
+**What it does:** Establishes a measurable recurring platform-health checkpoint contract every 4-6 product sprints. Adds a source-of-truth cadence registry (`data/platform-health-cadence.json`) with required dimensions (oversized modules, ownership gaps, docs updates, contract tests, duplication fixes, pr-check warnings), checkpoint evidence links, and Wave 5 baseline metrics. Adds verifier command `npm run verify:platform-health-cadence` (`scripts/platform-health-cadence.ts`) that validates cadence policy integrity, roadmap references, checkpoint metric contracts, and computes due/overdue checkpoint windows. Wires this audit into `verify-platform` and documents operational flow in `docs/workflows/platform-health-cadence.md`.
+
+**Agency value:** Prevents platform maintenance from becoming reactive by turning architecture hygiene into a scheduled, auditable operational rhythm.
+
+**Client value:** More stable product quality over time because regressions from architecture drift are addressed before they compound into visible UX issues.
+
+**Mutual:** Creates a durable governance loop that ties roadmap planning, code evidence, and quality signals together with clear accountability.
+
+---
+
+### 360. Wave 5 Local Dev & Agent Onboarding Confidence
+**What it does:** Adds a first-hour onboarding baseline for local development and autonomous agent work. Introduces deterministic fake-provider mode (`LOCAL_FAKE_PROVIDERS=true`) via `server/local-provider-mode.ts` and `server/providers/fake-seo-provider.ts`, with OpenAI/Anthropic helper fallbacks that emit synthetic responses for local workflows without external API keys. Adds one-command demo data seeding (`npm run seed:demo`, `scripts/seed-demo-workspaces.ts`) for three fixture workspaces (Free/Growth/Premium) and a one-command core smoke suite (`npm run smoke:core`) for fast local confidence. Documents environment tiers, setup flow, and fixture routes in `docs/workflows/local-dev-onboarding.md`.
+
+**Agency value:** New teammates and operators can verify critical platform paths quickly without credential setup blocking initial productivity.
+
+**Client value:** Faster internal onboarding reduces operational lag and lowers the chance of delayed responses caused by local environment drift.
+
+**Mutual:** Increases reliability by turning local setup from ad hoc steps into reproducible commands with typed provider contracts and tests.
+
+---
+
+### 359. Wave 5 Platform Performance Budget Registry
+**What it does:** Adds a typed platform performance-budget registry in `scripts/performance-budgets.ts` with a verification command (`npm run verify:performance-budgets`) and unit tests. Each budget entry defines per-workflow AI call caps, external fetch caps, route response targets, query-count budgets, expected job duration (for background jobs), cache expectation, and escalation trigger/action with required code and test evidence references.
+
+**Agency value:** Converts vague "this feels slow/expensive" debates into explicit, reviewable performance contracts tied to owned workflows.
+
+**Client value:** Improves consistency and reliability by creating concrete escalation rules before latency or failure patterns impact client-facing experiences.
+
+**Mutual:** Performance and cost posture become measurable release criteria, not tribal knowledge.
+
+---
+
+### 358. Wave 5 Mobile Breakpoint Smoke Harness
+**What it does:** Adds a staging-targeted Playwright smoke suite at `tests/playwright/visual/wave5-mobile-smoke.spec.ts` that validates responsive behavior across 4 breakpoints (375, 640, 768, 1024) and 7 key routes (admin overview, admin audit, workspace settings connections/client-dashboard tabs, client overview/strategy/content). The suite authenticates with workspace credentials, captures screenshots for each route+breakpoint, and fails on document-level horizontal overflow.
+
+**Agency value:** Turns one-off visual QA into a repeatable guardrail for token migrations and mobile regression checks.
+
+**Client value:** Catches real mobile layout issues before release (for example, 375px horizontal scrolling in the client shell).
+
+**Mutual:** Faster rollout confidence with objective pass/fail evidence for staging verification.
 
 ---
 
@@ -75,7 +142,7 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 ---
 
 ### 5. PageSpeed / Performance
-**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit as a **dedicated summary card** — runs both mobile + desktop in parallel, shows CrUX field-data pass/fail (actual Google ranking signal) with per-metric ratings and Lighthouse lab score as secondary diagnostic. CWV data lives in `cwvSummary` on the audit response (not cluttering siteWideIssues). **Platform-wide integration**: CWV summary renders in client HealthTab (mobile/desktop pass/fail with plain-language metrics), client AI chatbot context (answers "how's my page speed?"), monthly report emails (Mobile/Desktop speed badges with Lighthouse scores), InsightsDigest cards (proactive "Page speed: Passed/Needs Work" insight on Overview tab), admin AI chat, audit report exports (CSV + HTML), and AI recommendations engine. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys.
+**What it does:** Runs Google PageSpeed Insights on key pages. Reports Core Web Vitals (LCP, INP, CLS) with per-page breakdowns and optimization opportunities. Single-page on-demand testing by slug. Homepage CWV wired into the site audit as a **dedicated summary card** — runs both mobile + desktop in parallel, shows CrUX field-data pass/fail (actual Google ranking signal) with per-metric ratings and Lighthouse lab score as secondary diagnostic. CWV data lives in `cwvSummary` on the audit response (not cluttering siteWideIssues). **Platform-wide integration**: CWV summary renders in client HealthTab (mobile/desktop pass/fail with plain-language metrics), client AI chatbot context (answers "how's my page speed?"), monthly report emails (Mobile/Desktop speed badges with Lighthouse scores), InsightsDigest cards (proactive "Page speed: Passed/Needs Work" insight on Overview tab), admin AI chat, audit report exports (CSV + HTML), and AI recommendations engine. **Auto-restore**: bulk and single-page test results persist to disk and load on mount — expensive 30-60s tests survive navigation and deploys. Mobile and desktop PageSpeed snapshots are stored separately, with legacy mobile fallback for older persisted rows.
 
 **Agency value:** Performance data directly from Google's own tool. No "but my site feels fast" debates — the numbers are objective.
 
@@ -95,6 +162,8 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 **Mutual:** High-value SEO deliverable that's visible in search results. Clients see their listings stand out; agency delivers it efficiently. The approval flow ensures nothing ships without sign-off. **Collection-Aware Schema Generation + CMS Delivery (May 2026):** Adds a `siteInventory` intelligence slice and schema inventory service that joins static pages, Webflow CMS collections, CMS items, field definitions, field values, canonical URLs, utility-page exclusions, inferred collection roles, and mapped collection roles. Schema role precedence now supports explicit UI override → active schema plan → mapped collection role → inferred collection role → saved page type → rendered URL/content classification. CMS item suggestions carry collection identity, evidence sources, and CMS delivery diagnostics; single-page generation supports synthetic CMS page IDs. Publishing CMS item schema writes JSON-only JSON-LD into a mapped collection field such as `schema-json-ld`, while static pages keep page custom-code publishing. **Schema Authority Hardening (May 2026):** Bulk generation now honors saved `schema_page_types` only when no active schema plan or collection role applies, schema plan role edits recompute `primaryType` and canonical entity references before persistence, legacy `/api/schema/*`, free-form CMS template generation, and old consistency validation routes were stripped, and whole-site graph validation is the remaining sitewide validation surface. **Canonical Graph Validation Gate (May 2026):** Active plan canonical entities are emitted as stable `@id` graph nodes on their owner pages when source data is sufficient, assigned pages reference those nodes via `about`/`mentions`, malformed entity IDs are filtered out, and graph validation detects duplicate site identity nodes plus broken hub-child relationships before bulk publish. **Schema Output Polish (May 2026):** Contact pages now reference canonical site identity nodes instead of re-emitting partial root `LocalBusiness`/`Organization` bodies, canonical entity IDs normalize trailing-slash variants before merging so owner-page Service nodes keep verified `provider`, `areaServed`, and `serviceType`, and whole-site validation treats intentional Blog/BlogPosting equivalents as compatible with active plan metadata. **Schema Quality Field Mapping (May 2026):** Detect + Map now persists collection field bindings for location NAP fields and service fields, resolves human-readable reference values before JSON-LD emission, blocks raw Webflow IDs from public schema, emits Service offers only when price/currency are verified, keeps multi-location homepages as Organization/WebSite unless a primary address is verified, and suppresses FAQPage on index/card layouts unless a dedicated FAQ section is present. **Location Schema Evidence Hardening (May 2026):** Location generation now treats valid existing local-business JSON-LD as trusted evidence rather than final output, so dental/location pages can preserve verified `Dentist` subtype, location name, address, geo, image, phone, and normalized hours while still rebuilding the canonical `@graph`; same-site rendered canonical URLs also drive page-level `@id` values to avoid `www`/non-`www` graph splits. **Semantic Extraction & AI-Powered Generation (May 2026):** `extractSemanticData()` (Haiku 4.5 tool_use) runs per page after element extraction and pulls phone, address, hours, staff members, services, aggregate ratings, social profiles (sameAs), FAQ pairs, and primary image directly from HTML — stored on `PageElementCatalog.semantics`. `applyPostEnrichment()` appends FAQPage, AggregateRating, sameAs, and VideoObject nodes to the generated `@graph` from semantics data, with a rollback-on-new-errors safety pattern that never introduces invalid nodes. `generateSchemaForUnknownType()` provides a second Haiku generation pass for `WebPage`-classified pages that have non-empty semantics — ensures LocalBusiness location pages, specialty service pages, and industry-specific pages get correct schema types instead of generic WebPage. Validator extended with `DEDICATED_VALIDATOR_TYPES` guard, `unverified-type` warnings for unknown Schema.org types, and `addressCountry` on ContactPage. **GSC URL Inspection (May 2026):** `inspectUrlForRichResults()` calls GSC URL Inspection API 3 minutes after every schema publish; result stored as `google_validation_status` on `schema_publish_history`. **Schema.org Pre-Publish Validator (May 2026):** `validateWithSchemaOrg()` posts generated schemas to validator.schema.org at generation time (fire-and-forget, result logged). **Entity Graph — Cross-Page @id References (Workstream C, April 2026):** Hub pages now emit semantically correct schema types with cross-page `@id` references when a `siteContext` is provided to `generateLeanSchema`: (a) **BlogIndex** (`/blog`, `/insights`, etc.) → `Blog` with `blogPost[]` containing `@id` refs to every child `BlogPosting`, sorted newest-first by `lastPublished`, capped at 10 with `numberOfItems` reflecting the true count; (b) **ServiceIndex** (`/services`) → `Service` with `hasOfferCatalog: { @type: OfferCatalog, hasPart[] }` referencing each child service's canonical `@id`; (c) **CaseStudyIndex** (`/our-work`, `/case-studies`, etc.) → `CollectionPage` with `mainEntity: { @type: ItemList, itemListElement[] }` containing positional `ListItem` entries pointing to each case study's `@id`. All three fall back to `CollectionPage` when no `siteContext` is supplied. Non-hub pages (individual `BlogPosting`, `Service`, `AboutPage`, etc.) are unchanged. 18 integration tests added in `tests/integration/schema-entity-graph.test.ts`. **Schema Generator Quality Hardening (April 2026):** Seven post-processing and intelligence-wiring improvements shipped together: (1) **UTILITY_SLUGS filter** — single regex `/^\/(401|403|404|500|password|robots|sitemap|privacy|terms|legal|cookie|maintenance)/` applied at four injection points (hasPart, relatedLink, generation queue pre-filter) to prevent error/utility pages from entering schema output or the generation pipeline; (2) **Healthcare type upgrade** — deterministic `upgradeHealthcareType()` fallback reads `businessContext` at post-processing time and rewrites Organization/LocalBusiness → Dentist, Physician, Optician, Chiropractor, MedicalClinic, Hospital, or MedicalBusiness — catches cases where the AI ignores the prompt rule; (3) **Product zero-price strip** — `autoFixSchema` now strips `offers` arrays where every Offer has price 0 or "0.00" to prevent implying free services on dental/healthcare pages; (4) **knowsAbout trim** — `autoFixSchema` enforces max 5 items in `knowsAbout` arrays (prompt says 3–5 but had no code enforcement); (5) **Intelligence signals wired** — `buildSchemaContext` now populates `_serpFeatures` (featured snippets, PAA, local pack) and `_backlinkReferringDomains` from the workspace intelligence layer; three new prompt blocks (SERP FEATURES, SITE AUTHORITY by domain tier, PRIOR SCHEMA VALIDATION ERRORS) injected when data is available; declined keywords filtered from `siteKeywords`/`pageKeywords` before context assembly; (6) **Prior validation errors** — `_existingErrors` populated from `schema_validations` table at all three call sites (single-page route, batch route, jobs route) so the AI avoids re-introducing known invalid fields; (7) **Business profile completeness warning** — `BusinessProfileTab` shows an amber banner when profile is empty/null and `businessContext` matches a local-business keyword (dental, clinic, attorney, restaurant, etc.), prompting the user to add contact fields that schema generation uses directly.
 
 **Blog/Article Schema Quality Hardening (May 2026):** BlogPosting/Article output preserves rendered editorial headlines over title-cased CMS fallbacks, emits visible-content `wordCount` instead of bloated `articleBody`, resolves authors from mapped CMS fields or visible bylines before Organization fallback, filters citations to authority-style external references, and gates ImageGallery to meaningful safe body images.
+
+**Service, Persona, Breadcrumb, and Evidence Schema Hardening (May 2026):** Service pages now normalize noisy slugs/titles into clean service names, reject discount copy as service pricing, and only emit offers when a sellable package price is verified. Existing SaaS/product/persona JSON-LD is treated as trusted evidence rather than copied output, enriching canonical graphs with safe SoftwareApplication, Audience, FAQ, and Review nodes where page evidence supports them. Breadcrumbs now emit only for meaningful hierarchy, SaaS workspaces avoid local-business completion pressure unless local intent is present, and Organization logo evidence avoids unsafe or non-logo image fallbacks.
 
 ---
 
@@ -146,7 +215,7 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 ---
 
 ### 9. SEO Editor
-**What it does:** Edit page titles, meta descriptions, and OG tags directly through the Webflow API — with AI-powered suggestions based on actual page content and target keywords. **Audit Fix→ auto-expand**: when arriving from the Site Health Audit Fix→ button for metadata issues, the target page automatically expands and scrolls into view so the user can immediately edit. **Recommendation flags**: `useRecommendations` hook surfaces metadata-type recommendations inline per page — amber badge count in the page header and expandable recommendation banners (title, insight, traffic at risk, priority tier) inside the expanded editing section. **Audit-aware AI rewrites**: the `/api/webflow/seo-rewrite` endpoint now looks up the latest audit snapshot for the workspace, finds page-specific issues (title length, missing description, duplicate title/description, thin content, H1 issues), and injects them into the AI prompt so rewrite suggestions directly address known audit findings. **Per-page Send to Client**: each page row now has a "Send to Client" button (next to "Save to Webflow") that sends changed SEO title/description fields to the client approval queue for that single page. Bulk "Send to Client" button relabeled for consistency with Schema Suggester. **Prompt standardization (April 2026):** Single-page rewrite now injects keyword map context (`buildKeywordMapContext`) and page-level intelligence (cannibalization conflicts, content decay, page health — matched via URL-aware `pageId.endsWith(pagePath)` lookup). All 4 `callCreativeAI` calls (single + bulk × both/single modes) wrapped with `buildSystemPrompt()` so voice DNA (Layer 2) and custom notes (Layer 3) activate automatically.
+**What it does:** Edit page titles, meta descriptions, and OG tags directly through the Webflow API — with AI-powered suggestions based on actual page content and target keywords. **Audit Fix→ auto-expand**: when arriving from the Site Health Audit Fix→ button for metadata issues, the target page automatically expands and scrolls into view so the user can immediately edit. **Recommendation flags**: `useRecommendations` hook surfaces metadata-type recommendations inline per page — amber badge count in the page header and expandable recommendation banners (title, insight, traffic at risk, priority tier) inside the expanded editing section. **Audit-aware AI rewrites**: the `/api/webflow/seo-rewrite` endpoint now looks up the latest audit snapshot for the workspace, finds page-specific issues (title length, missing description, duplicate title/description, thin content, H1 issues), and injects them into the AI prompt so rewrite suggestions directly address known audit findings. **Per-page Send to Client**: each page row now has a "Send to Client" button (next to "Save to Webflow") that sends changed SEO title/description fields to the client approval queue for that single page. Bulk "Send to Client" button relabeled for consistency with Schema Suggester. **Static/CMS split:** the Pages tab shows writable static Webflow pages only; CMS collection items remain in the adjacent CMS Collections editor so sitemap-discovered CMS rows do not enter static page save flows until the unified write-target model is revisited. **Prompt standardization (April 2026):** Single-page rewrite now injects keyword map context (`buildKeywordMapContext`) and page-level intelligence (cannibalization conflicts, content decay, page health — matched via URL-aware `pageId.endsWith(pagePath)` lookup). All 4 `callCreativeAI` calls (single + bulk × both/single modes) wrapped with `buildSystemPrompt()` so voice DNA (Layer 2) and custom notes (Layer 3) activate automatically.
 
 **Agency value:** No more logging into Webflow, finding the page, editing, saving, and publishing. Batch-edit dozens of pages from one screen. Fix→ from audit eliminates the search step entirely.
 
@@ -493,6 +562,10 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 **Form validation standardization (2026-05-11):** React Hook Form + Zod resolver added as the standard client form stack. Shared form primitives now carry error-authoritative valid/success state through context: `aria-invalid`, `aria-describedby`, alert/status messages, red error borders, and emerald valid borders are all applied consistently by `FormField` + `FormInput`/`FormSelect`/`FormTextarea`. Admin `LoginScreen` and client `EmailCaptureGate` migrated from manual/basic HTML validation to Zod-backed forms with inline field-level errors, disabled-invalid submit buttons, loading states, trimmed submit values, and tests covering valid/error precedence plus both migrated flows.
 
+**Admin button primitive sweep (2026-05-15):** Parallel Wave follow-up migrated high-traffic admin controls from raw `<button>` markup to shared action primitives (`Button`, `IconButton`, `ClickableRow`) across SEO Editor action surfaces (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls (Google connect/disconnect, storage refresh, prune actions, booking save), Workspace Home action links/status cards, and SchemaSuggester top controls. Verified by style-drift report improvement from `raw_button_unallowlisted_count: 891 → 855`, `non_primitive_action_count: 876 → 840`, and admin raw-button count `753 → 717`.
+
+**Admin settings + audit follow-up sweep (2026-05-15):** Continued migration of admin control surfaces to shared action primitives across `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and the SEO Audit share banner. Replaced raw CTA/button stacks and icon-only action buttons with `Button` / `IconButton` while preserving existing behavior and tokens. Verified by style-drift report improvement to `raw_button_unallowlisted_count: 808`, `non_primitive_action_count: 793`, and admin raw-button count `670`.
+
 **Status:** Phases 0, 2, 3, A, B, C, D, follow-up sweep, and final promotion complete. Phase 1 (primitive implementation — superseded by Phase A) and Phase 4 (light-theme parity validation) remain. 20 warn-level rules remain with active violations for future cleanup passes.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
@@ -791,7 +864,7 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 ---
 
 ### 60. AI Content Post Generator
-**What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. Every prompt includes the total article word budget and strict ±10% per-section tolerances. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions, removing cross-section repetition, ensuring consistent voice, verifying the intro's promises are fulfilled by the body, and **trimming word count to the brief's target** when over budget. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement with dynamic maxTokens (8K–16K based on target word count). Unification status (`success`/`failed`/`skipped`) is tracked on the post and surfaced in the PostEditor UI. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate` creates a skeleton post and durable `content-post-generation` background job, GET/PATCH/DELETE per post, export as markdown/HTML. **Content quality engine (v5)**: comprehensive `WRITING_QUALITY_RULES` injected into every prompt — forbidden phrase lists (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution), structural anti-patterns (no section-ending summaries, no repetitive bullet patterns), fabrication rules (no invented stats/percentages, directional case study outcomes only), anchor text accuracy rules, and mandatory H3 subheadings for sections 200+ words. Internal links use the workspace `liveDomain` for correct URLs. Full Webflow sitemap (published pages + CMS pages via `getAllSitePages`) passed to both brief and post generation for comprehensive internal link suggestions. Brand name limited to intro + conclusion only.
+**What it does:** Generates full SEO-optimized content posts from content briefs. `server/content-posts.ts` generates each section independently using the brief's outline as the writing spec, with page-type-specific writer roles (blog, landing, service, location, product, pillar, resource). Each section gets full context: brand voice, keyword strategy, E-E-A-T guidance, SERP competitive analysis, and internal link suggestions. Every prompt includes the total article word budget and strict ±10% per-section tolerances. After all sections + conclusion are generated, a **unification pass** (`unifyPost`) reviews the full assembled draft and refines it for cohesion — smoothing transitions, removing cross-section repetition, ensuring consistent voice, verifying the intro's promises are fulfilled by the body, and **trimming word count to the brief's target** when over budget. Uses GPT-4.1 at temperature 0.4 for precise editorial refinement with dynamic maxTokens (8K–16K based on target word count). Unification status (`success`/`failed`/`skipped`) is tracked on the post and surfaced in the PostEditor UI. Non-critical: if unification fails, the post is still usable. Progress saved after each section so partial results are available during generation. API: POST `/api/content-posts/:workspaceId/generate` creates a skeleton post and durable `content-post-generation` background job, GET/PATCH/DELETE per post, export as markdown/HTML. **Content quality engine (v5)**: comprehensive `WRITING_QUALITY_RULES` injected into every prompt — forbidden phrase lists (AI clichés, corporate buzzwords, hollow intensifiers, vague attribution), structural anti-patterns (no section-ending summaries, no repetitive bullet patterns), fabrication rules (no invented stats/percentages, directional case study outcomes only), anchor text accuracy rules, and mandatory H3 subheadings for sections 200+ words. Internal links use the workspace `liveDomain` for correct URLs. Full Webflow sitemap (published pages + CMS pages via `getAllSitePages`) passed to both brief and post generation for comprehensive internal link suggestions. Brand name limited to intro + conclusion only. **Review evidence panel (May 2026):** the post review checklist now shows stored brief SERP evidence (`realPeopleAlsoAsk`, `realTopResults`) as reviewer support, while provenance-sensitive checklist items remain human-review-only and are not auto-checked by AI review.
 
 **Agency value:** Full blog posts generated in minutes instead of hours. Page-type-specific prompts produce content that matches the intent (landing page copy reads differently from a blog post). Unification pass eliminates the "obviously AI-generated" seams between sections. Quality guardrails prevent common AI writing tells — no "Let's dive in", no fabricated statistics, no repetitive brand mentions, no buzzword-laden prose. Claude produces noticeably more natural prose than GPT alone.
 
@@ -1081,7 +1154,7 @@ A comprehensive value assessment of every feature in the platform — **357 feat
 
 ### 84a. Intelligence Layer Gap Follow-Up
 
-**What it does:** Tightens audit finding auto-resolution so scheduled and on-demand audit passes only resolve bridge-generated `audit_finding` insights from `bridge-audit-page-health` or `bridge-audit-site-health`, leaving manual findings untouched. Also populates `siteHealth.cwvPassRate.desktop` from the latest audit `cwvSummary.desktop` as a homepage/site-level pass indicator until PageSpeed snapshots are keyed by strategy.
+**What it does:** Tightens audit finding auto-resolution so scheduled and on-demand audit passes only resolve bridge-generated `audit_finding` insights from `bridge-audit-page-health` or `bridge-audit-site-health`, leaving manual findings untouched. Also populates `siteHealth.cwvPassRate.desktop` from the latest audit `cwvSummary.desktop` as a homepage/site-level fallback when no explicit desktop PageSpeed snapshot exists.
 
 **Files:** `server/scheduled-audits.ts`, `server/routes/webflow-seo.ts`, `server/workspace-intelligence.ts`, `tests/integration/audit-insight-resolution.test.ts`, `tests/assemble-site-health.test.ts`
 
@@ -2836,8 +2909,8 @@ When the user asks to update this document with recent features, follow this pro
 
 
 ### 168. Page Intelligence — Full Analysis Persistence, Hydration & Cross-Feature Integration
-**What it does:** Three enhancements: (1) All 15 AI analysis fields now persisted to strategy.pageMap (was 7) and hydrated back into the UI on load so full reports survive page reloads. (2) `buildPageAnalysisContext()` enriched with optimization score, keyword presence gaps, competitor keywords, topic cluster, and difficulty — feeds into 5 AI features (rewrite chat, SEO bulk rewrite, single rewrite, audit auto-fix, content decay). (3) Analysis data wired into 3 additional features: Schema Generator receives topicCluster/contentGaps/optimizationScore via `_pageAnalysis` context; Content Brief Generator matches target keyword to pageMap and injects analysis data; Internal Links annotates pages with topic clusters and groups cluster summaries for intra-cluster linking priority.
-**Files:** `shared/types/workspace.ts` (8 new fields on PageKeywordMap), `server/routes/webflow-keywords.ts` (expanded persist endpoint), `src/components/PageIntelligence.tsx` (full persist call, hydration effect, KeywordData/StrategyPage interfaces), `server/seo-context.ts` (enriched buildPageAnalysisContext), `server/schema-suggester.ts` (_pageAnalysis on SchemaContext, getPageAnalysis helper, wired into pageCtx), `server/helpers.ts` (enriched buildSchemaContext pageKeywordMap), `server/content-brief.ts` (keyword→page matching + pageAnalysisBlock injection), `server/internal-links.ts` (topic cluster annotations + cluster summary block)
+**What it does:** Three enhancements: (1) All 15 AI analysis fields now persisted to strategy.pageMap (was 7) and hydrated back into the UI on load so full reports survive page reloads. (2) `buildPageAnalysisContext()` enriched with optimization score, keyword presence gaps, competitor keywords, topic cluster, and difficulty — feeds into 5 AI features (rewrite chat, SEO bulk rewrite, single rewrite, audit auto-fix, content decay). (3) Analysis data wired into 3 additional features: Schema Generator receives topicCluster/contentGaps/optimizationScore via `_pageAnalysis` context; Content Brief Generator matches target keyword to pageMap and injects analysis data; Internal Links annotates pages with topic clusters and groups cluster summaries for intra-cluster linking priority. **Output quality follow-up (May 2026):** Page Intelligence now records append-only per-page optimization score snapshots when analysis scores change and shows compact score deltas in the page list. Keyword strategy enrichment can also preserve URL-level provider keyword data per page and prefer it over domain-level fallback for page-specific assignments when the active SEO provider supports URL organic keyword reports.
+**Files:** `shared/types/workspace.ts` (8 new fields on PageKeywordMap), `server/routes/webflow-keywords.ts` (expanded persist endpoint), `src/components/PageIntelligence.tsx` (full persist call, hydration effect, KeywordData/StrategyPage interfaces), `server/seo-context.ts` (enriched buildPageAnalysisContext), `server/schema-suggester.ts` (_pageAnalysis on SchemaContext, getPageAnalysis helper, wired into pageCtx), `server/helpers.ts` (enriched buildSchemaContext pageKeywordMap), `server/content-brief.ts` (keyword→page matching + pageAnalysisBlock injection), `server/internal-links.ts` (topic cluster annotations + cluster summary block), `server/page-keywords.ts` + migration `095-page-keyword-quality-followups.sql` (score history + URL-level keyword persistence), `server/keyword-strategy-enrichment.ts` (URL-level provider enrichment), `src/components/page-intelligence/PageIntelligencePageRow.tsx` (score trend chip)
 
 **Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
 
@@ -3754,6 +3827,7 @@ Current feature count: **329**. Last updated: May 2026.
 - **applyBulkKeywordGuards** — moved to `server/helpers.ts`; now also called in `webflow-seo.ts` bulk analyze path (BUG-0003: prevents AI-hallucinated keyword metrics from being persisted).
 - **GSC path-boundary matching** — replaced `.includes(page.slug)` substring matching with exact path + prefix matching in `webflow-seo.ts` (BUG-0004: eliminates false-positive query attribution).
 - **bare-slug-pagepath pr-check rule** — new rule flags any future `` `/${page.slug}` `` pagePath constructions across server and frontend files.
+- **Canonical Page Address contract** — added typed `PageAddress` contract (`canonicalPath`, `canonicalUrl`, `rawSlug`, `source`, `legacyFallbackPath`) with mirrored helpers in `server/helpers.ts` and `src/lib/pathUtils.ts`. High-risk live-page fetch, analysis, approval/schema outcome tracking, direct SEO save, PageSpeed fallback, audit traffic join, and fix-context matching paths now normalize through the shared contract instead of reconstructing URLs from leaf slugs.
 
 ---
 
@@ -5355,6 +5429,8 @@ Bug hardening included:
 
 **Files:** `server/db/migrations/089-topic-clusters.sql`; `server/topic-clusters.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/topic-clusters.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
 
+**May 2026 integrity hardening:** Public `/api/public/seo-strategy/:workspaceId` now reassembles `topicClusters` from `topic_clusters` with legacy blob fallback, including shell-state responses when normalized strategy rows exist without a workspace strategy blob. Strategy persistence and manual strategy PATCH writes now run table replacements under one transaction so topic-cluster rows cannot land in a mixed-generation state if a later normalized write fails.
+
 ### 396. Hardening Sprint — Cannibalization Table Normalization
 **What it does:** Normalizes `keywordStrategy.cannibalization[]` into a dedicated `cannibalization_issues` SQLite table and updates strategy read/write paths to use table-backed cannibalization issues.
 
@@ -5385,6 +5461,8 @@ Bug hardening included:
 
 **Files:** `server/db/migrations/090-cannibalization-issues.sql`; `server/cannibalization-issues.ts`; `server/index.ts`; `server/keyword-strategy-persistence.ts`; `server/routes/keyword-strategy.ts`; `shared/types/workspace.ts`; `tests/unit/cannibalization-issues.test.ts`; `tests/integration/keyword-strategy-partial-state.test.ts`; `data/roadmap.json`.
 
+**May 2026 integrity hardening:** Cannibalization issues now preserve reviewer-facing `canonicalPath`, `canonicalUrl`, and `action` metadata through migration `094-cannibalization-action-metadata.sql`, shared types, storage mappers, admin reads, public strategy serialization, and history snapshots. Public strategy reads now include table-backed cannibalization data with shell-state parity, feedback delete broadcasts `STRATEGY_UPDATED`, and provider-grounding status is stored on generated strategies when SEO provider data is degraded or unavailable.
+
 ### 397. Hardening Sprint — Per-Feature Usage Budget Split
 **What it does:** Splits the previously shared `strategy_generations` monthly budget into dedicated feature pools so different AI workflows no longer cannibalize each other.
 
@@ -5413,14 +5491,14 @@ Bug hardening included:
 
 ---
 
-### 398. Client Wins Surface (`client-wins-surface` flag)
-**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. Mutually exclusive with `PredictionShowcaseCard` ("We called it"): flag off → PredictionShowcaseCard remains on OverviewTab, WinsSurface hidden; flag on → WinsSurface shows, PredictionShowcaseCard hidden. Mutual-exclusivity invariant enforced by pr-check rule.
+### 398. Client Wins Surface
+**What it does:** `WinsSurface` component on `InsightsBriefingPage` (between MonthlyDigestContent and DataSpread, paid path only). Sources wins from `tracked_actions` + `action_outcomes` via `GET /api/public/outcomes/:wsId/wins`. Growth+ sees full win cards; free tier sees a win-count teaser prompting upgrade. This surface is now the promoted default (the temporary `client-wins-surface` flag has been sunset).
 
 **Agency value:** Closes the loop on recommendations — shows which tracked actions led to measurable outcomes, giving account managers proof points for client retention conversations.
 
 **Client value:** Surfaces concrete wins ("We called it — your traffic grew 23%") in the client briefing page; Growth+ sees full win cards; Free tier sees a win-count teaser prompting upgrade.
 
-**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard enforced by pr-check rule `prediction-showcase-ungated`.
+**Mutual:** Mutual-exclusivity invariant with PredictionShowcaseCard remains enforced by pr-check rule `prediction-showcase-ungated`.
 
 **Files:** `src/components/client/Briefing/WinsSurface.tsx`; `src/hooks/client/useClientOutcomeWins.ts`; `server/routes/public-portal.ts` (`GET /api/public/outcomes/:wsId/wins`); `shared/types/outcomes.ts` (score field); `tests/unit/wins-surface.test.tsx`; `tests/integration/outcome-wins.test.ts`.
 
@@ -5521,3 +5599,429 @@ Bug hardening included:
 **Client value:** Immediately see what needs attention most — highest-impact items are highlighted above the full list.
 
 **Files:** `src/components/client/inbox/PriorityStrip.tsx` (new).
+
+---
+
+### 407. SEO Editor Job Safety + Page State Wiring
+**What it does:** Hardens SEO Editor durable mutations. The old synchronous AI bulk-fix route now returns a supported-path error and the editor starts the existing `bulk-seo-fix` background job instead. Background bulk fixes broadcast page-edit-state updates and write activity context when pages are changed. SEO suggestion selection and dismissal now read pending rows before mutation, then broadcast/cache-refresh and log activity. SEO Editor also reads from the all-pages source so CMS rows can be reviewed while direct write paths remain guarded for static Webflow pages only.
+
+**Agency value:** Long-running AI/write work no longer ties up a request, cross-tab SEO Editor state refreshes after suggestion changes, and activity history explains durable SEO decisions.
+
+**Client value:** Reviewable SEO work is less likely to show stale state or impossible CMS write behavior.
+
+**Files:** `server/routes/jobs.ts`; `server/routes/webflow-seo-apply.ts`; `server/routes/webflow-seo-suggestions.ts`; `server/seo-suggestions.ts`; `src/components/SeoEditor.tsx`; `src/components/editor/useSeoEditorBulkWorkflow.ts`; `src/hooks/admin/useSeoEditor.ts`; `src/api/seo.ts`; `tests/integration/webflow-seo-writes.test.ts`; `tests/integration/webflow-seo-bulk-slugless.test.ts`; `tests/unit/useSeoEditor.test.ts`.
+
+---
+
+### 408. Unified SEO Editor Static + CMS Write Targets
+**What it does:** Unifies static Webflow page SEO editing and CMS collection-item SEO editing into one SEO Editor surface with source, collection, and search filters. A shared write-target resolver classifies rows as static pages, real CMS items, or manual-only sitemap CMS URLs. Static pages keep the existing page SEO write path. Real CMS items keep collection item save/publish behavior with collection and item identity. Unmatched sitemap-only CMS URLs remain visible but read-only so synthetic `cms-*` IDs never reach Webflow writes.
+
+**Agency value:** Admins can work through static and CMS SEO opportunities from one place without guessing which rows can be saved automatically.
+
+**Client value:** Client-approved CMS SEO changes can now be applied to real Webflow collection items instead of stopping at manual implementation.
+
+**Mutual:** Durable CMS saves/publishes now log activity, broadcast page-state updates, and refresh both static and CMS editor caches. Approval apply still blocks synthetic CMS discovery rows.
+
+**Files:** `shared/types/seo-editor-write-target.ts`; `src/components/SeoEditorWrapper.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `src/components/CmsEditor.tsx`; `server/routes/webflow-cms.ts`; `server/routes/approvals.ts`; `docs/rules/seo-editor-write-targets.md`; `tests/unit/seo-write-target-resolver.test.ts`.
+
+---
+
+### 409. External Fetch Safety + Reliability Rails
+**What it does:** Adds a shared server external-fetch layer for public-web and provider fetches with consistent defaults and error contracts. `server/external-fetch.ts` now centralizes timeout defaults, user-agent/header composition, redirect handling, response error classification, and URL safety policy modes. Public-web fetches enforce SSRF protections (unsafe host blocking, DNS resolution guard against private/reserved IPs, redirect-chain revalidation, IPv6-mapped loopback/private blocking including hex forms like `::ffff:7f00:1`). Provider-mode fetches keep internal/private compatibility where required.
+
+**Agency value:** High-risk integrations no longer hand-roll fetch logic. Failure modes are predictable (`unsafe_url`, `timeout`, `network`, `http`) and easier to debug. Safer defaults reduce production risk from accidental localhost/private-network fetches in crawl and rewrite workflows.
+
+**Client value:** More reliable page analysis/rewrite/sitemap/media workflows with fewer silent external-call failures and clearer error behavior.
+
+**Mutual:** Shared rails reduce regression risk during future endpoint migrations because fetch behavior, logging, and safety checks are centralized and tested once.
+
+**Files:** `server/external-fetch.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/sales-audit.ts`; `server/web-scraper.ts`; `server/routes/webflow-alt-text.ts`; `server/routes/rewrite-chat.ts`; `server/webflow-pages.ts`; `server/internal-links.ts`; `tests/unit/external-fetch-helper.test.ts`; `tests/integration/rewrite-chat-pages.test.ts`.
+
+---
+
+### 410. Workspace Mutation Helper Graduation
+**What it does:** Graduates the shared `runWorkspaceMutation` route helper from content-plan pilot usage into inbox client-action mutations. `server/routes/client-actions.ts` now routes create, admin update, and public respond writes through one helper lifecycle with explicit read-before-write guards, transaction boundaries, mapped transition/not-found error behavior, and post-mutation activity/broadcast hooks.
+
+**Agency value:** High-churn workspace-scoped writes now share one mutation lifecycle surface instead of duplicating side-effect sequencing and error-mapping logic per route branch.
+
+**Client value:** No API contract changes; client action lifecycle behavior stays the same while reducing risk of missing activity or broadcast feedback-loop regressions.
+
+**Mutual:** A contract test now guards helper adoption across the highest-churn routes so future refactors don't silently drift away from the lifecycle rails.
+
+**Files:** `server/routes/client-actions.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/integration/workspace-mutation-helper-pilot.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.
+---
+
+### 411. Unified SEO Editor Surface Quality Fixes
+**What it does:** Resolves staging follow-up issues in the unified SEO Editor path by rendering one shared SEO-scoped `PendingApprovals` panel in unified mode and disabling duplicate nested panels inside static/CMS child sections. It also enforces effective title fallback semantics for CMS items (blank SEO title now falls back to item name) in both resolver output and preview rendering, and removes extra UI truncation on CMS approval history/value summaries. The temporary `seo-editor-unified` rollout flag has been sunset, so unified is now the only runtime path.
+
+**Agency value:** Eliminates duplicate review surfaces and tightens cross-component title semantics without changing backend route contracts.
+
+**Client value:** Cleaner unified SEO review workflow and more accurate CMS title previews when dedicated SEO title fields are empty.
+
+**Mutual:** Adds regression guardrails in contract/unit coverage for unified approval panel wiring and resolver fallback behavior.
+
+**Files:** `src/components/SeoEditorWrapper.tsx`; `src/components/SeoEditor.tsx`; `src/components/editor/SeoEditorWorkflowPanels.tsx`; `src/components/CmsEditor.tsx`; `src/components/cms-editor/CmsEditorShellPanels.tsx`; `src/components/cms-editor/CmsEditorCollections.tsx`; `src/components/editor/seoWriteTargetResolver.ts`; `tests/contract/seo-editor-unified-flag-gate.test.ts`; `tests/unit/seo-write-target-resolver.test.ts`; `data/roadmap.json`.
+
+---
+
+### 412. Platform Org Extraction Pilot (Inbox Route-to-Service)
+**What it does:** Delivers the platform-organization proof by extracting client-actions mutation orchestration out of the HTTP adapter route and into an Inbox domain module. `server/routes/client-actions.ts` now delegates admin create/update and public respond mutations to `server/domains/inbox/client-actions-mutations.ts`, preserving existing URLs, response serialization, side effects, and mutation error semantics. The shared mutation lifecycle helper ownership is promoted to `server/workspace-mutation-helper.ts`, while `server/routes/workspace-mutation-helper.ts` remains a compatibility shim export.
+
+**Agency value:** Creates a repeatable route-to-service extraction pattern for bounded-context ownership without changing external contracts.
+
+**Client value:** No client contract change; inbox mutation behavior remains stable while reducing regression risk in high-churn mutation paths.
+
+**Mutual:** Adds extraction guardrails so future edits keep route handlers thin and domain-owned mutation logic centralized.
+
+**Files:** `server/domains/inbox/client-actions-mutations.ts`; `server/routes/client-actions.ts`; `server/workspace-mutation-helper.ts`; `server/routes/workspace-mutation-helper.ts`; `server/routes/content-matrices.ts`; `server/routes/content-templates.ts`; `tests/contract/workspace-mutation-helper-adoption.test.ts`; `tests/contract/inbox-route-service-extraction.test.ts`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`.
+
+---
+
+### 413. Integration Health Center
+**What it does:** Adds a single workspace-scoped operational health view across critical integrations. Backend route `GET /api/integrations/health/:workspaceId` aggregates typed status for Webflow, Google auth, GSC property, GA4 property, SEMRush, DataForSEO, Stripe, OpenAI, Anthropic, and SMTP email, including configured/missing/degraded state, last-success timestamps where available, last-error context, quota/rate-limit status placeholders, Google token expiry visibility, and affected feature mapping. Frontend renders this in Workspace Settings → Connections as an Integration Health Center card with summary pills and per-integration detail rows.
+
+**Agency value:** Gives operators one place to diagnose integration drift and missing setup before it causes downstream tool failures.
+
+**Client value:** Fewer silent failures and faster issue resolution because integration breakage is visible before client-facing workflows degrade.
+
+**Mutual:** Strengthens runtime confidence by turning scattered status checks into one consistent, typed, test-covered surface.
+
+**Files:** `shared/types/integration-health.ts`; `server/routes/health.ts`; `server/google-auth.ts`; `src/api/misc.ts`; `src/api/index.ts`; `src/lib/queryKeys.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/components/settings/ConnectionsTab.tsx`; `src/components/WorkspaceSettings.tsx`; `tests/integration/health-routes.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `data/roadmap.json`.
+
+---
+
+### 414. Data Integrity & Recovery Drills
+**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed.
+
+**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks.
+
+**Client value:** Reduces risk of silent data drift and shortens recovery time when a migration or runtime issue impacts stored customer state.
+
+**Mutual:** Documents a consistent backup/restore drill and restore-based rollback workflow, improving operational confidence without changing product-facing behavior.
+
+**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `docs/workflows/data-integrity-recovery.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `package.json`; `data/roadmap.json`.
+
+---
+
+### 415. Workspace Observability Layer
+**What it does:** Adds an operational observability layer for workspace-scoped incident diagnosis. New file-backed telemetry (`server/platform-observability.ts`) captures operation traces across AI calls, integration/provider calls, background job lifecycle transitions, and slow HTTP routes. A typed observability report contract (`shared/types/platform-observability.ts`) and report builder (`server/platform-observability-report.ts`) aggregate this telemetry with job state and AI usage into a single report surface. New workspace endpoint `GET /api/observability/:workspaceId` returns failed-job/error dashboard data, external API failure rates + latency, AI cost/latency by feature, slow-route leaderboards, critical sync last-success timestamps, and recent operation traces. CLI report added via `npm run verify:observability` for operator workflows.
+
+**Agency value:** Provides a practical "what happened?" answer path per workspace without digging through scattered logs or ad hoc SQL queries. Failed jobs, provider instability, and AI cost/latency hotspots are visible in one place.
+
+**Client value:** Faster issue triage and recovery for customer-facing incidents, reducing time-to-resolution when syncs or generation flows degrade.
+
+**Mutual:** Establishes reusable observability primitives for future platform-health work, with typed contracts, a protected API surface, and integration test coverage.
+
+**Files:** `server/platform-observability.ts`; `server/platform-observability-report.ts`; `shared/types/platform-observability.ts`; `server/middleware/request-logger.ts`; `server/openai-helpers.ts`; `server/semrush.ts`; `server/providers/dataforseo-provider.ts`; `server/jobs.ts`; `server/routes/health.ts`; `src/api/misc.ts`; `src/api/index.ts`; `scripts/platform-observability.ts`; `scripts/report-platform-observability.ts`; `docs/workflows/platform-observability.md`; `tests/integration/health-routes.test.ts`; `package.json`; `data/roadmap.json`.
+
+---
+
+### 416. Release Safety Checklist & Smoke Flow
+**What it does:** Adds a practical release-safety operating layer that combines roadmap-derived deploy notes with a repeatable release checklist. New script `npm run verify:release-safety` (`scripts/platform-release-safety.ts`) generates a release report for a configurable window or sprint, including shipped-item notes from `data/roadmap.json` plus five checklist sections: feature-class release gates, staging smoke suite, rollback readiness, feature-flag rollout, and post-release monitoring window. Companion workflow doc `docs/workflows/release-safety.md` codifies the end-to-end flow with concrete commands (`verify-platform --quick`, domain smoke matrix, health/observability checks, and rollback/flag procedures).
+
+**Agency value:** Standardizes release execution and reduces tribal knowledge. Operators can move from PR-ready to production with one report-driven checklist instead of scattered docs and memory.
+
+**Client value:** Fewer production regressions and faster incident handling because smoke checks, rollback expectations, and short-window monitoring are explicit before and after release.
+
+**Mutual:** Improves operational confidence without changing product UI by making release quality controls repeatable, auditable, and tied to shipped roadmap work.
+
+**Files:** `scripts/platform-release-safety.ts`; `scripts/report-release-safety.ts`; `tests/unit/platform-release-safety.test.ts`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 417. Recurring Permission & Tenant Boundary Audit
+**What it does:** Adds a recurring tenant-boundary audit command that inspects high-risk permission surfaces and reports pass/warn/fail findings. New script `npm run verify:tenant-boundary` (`scripts/platform-tenant-boundary-audit.ts`) audits workspace-scoped route guard coverage, file-upload middleware protection, Stripe webhook raw-body/signature trust boundaries, public-portal serialization hygiene, known foreign-ID regression test coverage, and client-user mutation `expectedWorkspaceId` assertion contracts. Companion wrapper `scripts/report-tenant-boundary-audit.ts` and workflow guide `docs/workflows/tenant-boundary-audit.md` make the audit easy to run in weekly platform-health sweeps and pre-release gates.
+
+**Agency value:** Gives operators a repeatable, concrete tenant-isolation safety check instead of relying on memory and ad hoc grep reviews.
+
+**Client value:** Reduces risk of cross-workspace data leaks or mutation regressions by keeping boundary checks continuously visible and actionable.
+
+**Mutual:** Strengthens runtime security posture with test-backed audit logic that can fail fast on contract breaks while keeping advisory warnings explicit.
+
+**Files:** `scripts/platform-tenant-boundary-audit.ts`; `scripts/report-tenant-boundary-audit.ts`; `tests/unit/platform-tenant-boundary-audit.test.ts`; `docs/workflows/tenant-boundary-audit.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 418. Product Surface Rationalization Map (Wave 5)
+**What it does:** Adds a typed, repeatable product-surface governance map for major platform capabilities. New script `npm run verify:product-surface` (`scripts/product-surface-map.ts`) classifies major capabilities by placement (first-class navigation vs contextual vs progressive-disclosure vs internal-only), role (client differentiator vs agency operations vs support/infrastructure), lifecycle state (active, dark-launch, deprecated-but-present, legacy alias), and recommendation (promote/keep/hide/deprecate). It enforces canonical bounded-context coverage and emits a human-verification queue for non-obvious decisions (e.g., nav demotions and legacy alias retirement). Companion rule doc `docs/rules/product-surface-rationalization.md` codifies when humans must explicitly approve a surface decision.
+
+**Agency value:** Reduces dashboard sprawl and decision ambiguity by turning "what belongs in primary nav" into a documented, test-covered contract instead of opinion drift.
+
+**Client value:** Keeps client-facing workflows easier to discover by protecting first-class outcome surfaces while progressively disclosing operator-only tooling.
+
+**Mutual:** Creates a stable base for recurring platform-health cadences and future deprecation/flag lifecycle work without forcing immediate route removals.
+
+**Files:** `scripts/product-surface-map.ts`; `tests/unit/product-surface-map.test.ts`; `docs/rules/product-surface-rationalization.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 419. Feature Flag Lifecycle Management (Wave 5)
+**What it does:** Establishes a single-source-of-truth lifecycle contract for every feature flag. `shared/types/feature-flags.ts` now carries typed catalog metadata for each flag (owner, created date, rollout target, removal condition, linked roadmap item, stale-audit cadence, last reviewed date) alongside centralized labels/grouping used by the admin UI. Server metadata responses now include this lifecycle payload (`FeatureFlagAdminMeta`) so flag operators can see lifecycle context where they toggle rollout behavior. Added a dedicated lifecycle audit command `npm run verify:feature-flags` (`scripts/feature-flag-lifecycle.ts`) that validates metadata/date/roadmap-link integrity and emits a review-due queue.
+
+**Agency value:** Prevents hidden architecture debt from stale dark-launch toggles by making ownership and cleanup conditions explicit, test-backed, and runnable in recurring platform-health sweeps.
+
+**Client value:** Safer, clearer feature rollout behavior because flags are governed with visible ownership and cleanup conditions, reducing long-lived split-path regressions.
+
+**Mutual:** Aligns product rollout discipline with operational safety by joining runtime toggles, documentation, and roadmap traceability in one contract.
+
+**Files:** `shared/types/feature-flags.ts`; `server/feature-flags.ts`; `src/components/FeatureFlagSettings.tsx`; `scripts/feature-flag-lifecycle.ts`; `tests/unit/feature-flag-lifecycle.test.ts`; `tests/component/FeatureFlagSettings.test.tsx`; `docs/rules/feature-flag-lifecycle.md`; `docs/rules/development-patterns.md`; `docs/workflows/release-safety.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 420. Deprecation Lifecycle Discipline (Wave 5)
+**What it does:** Adds a typed, repeatable deprecation governance registry and verifier for retired or duplicate capability surfaces. New command `npm run verify:deprecations` (`scripts/deprecation-lifecycle.ts`) tracks lifecycle state (`deprecated`, `hidden`, `read-only`, `migrated`, `removed`), requires replacement guidance, and enforces state-specific contracts (redirect, safe-failure, read-only enforcement, visibility gate, migration) with linked code evidence and linked automated-test evidence. The verifier also requires human-review gating for deprecated/migrated/removed entries and fails when lifecycle states are missing from the registry or policy gaps are detected.
+
+**Agency value:** Prevents cleanup drift by making deprecation decisions explicit, auditable, and owned instead of implicit tribal memory.
+
+**Client value:** Preserves bookmark and route stability while reducing surprises from partial migrations or resurrected legacy endpoints.
+
+**Mutual:** Strengthens platform reliability by keeping retirement behavior contract-tested and visible in recurring platform-health sweeps.
+
+**Files:** `scripts/deprecation-lifecycle.ts`; `tests/unit/deprecation-lifecycle.test.ts`; `docs/rules/deprecation-lifecycle.md`; `scripts/verify-platform.ts`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 421. Styleguide Lock-In Infrastructure (Phase 0/1 Foundation)
+**What it does:** Establishes a hard styleguide lock contract and machine-verifiable drift gates so UI consistency stops depending on ad hoc cleanup waves. Added a canonical migration contract doc (`docs/rules/styleguide-lockdown-contract.md`) that defines authority order, non-negotiable invariants, scorecard metrics, and ratchet policy. Added a style exception registry contract (`data/style-exceptions.json`) with required owner/expiry metadata and a new pr-check error rule that validates schema, duplicates, and expired entries. Added two new drift-detection rules in `scripts/pr-check.ts`: raw `<button>` usage outside primitive/infra allowlist and raw CTA class literals outside Button/IconButton. Added a style drift report CLI (`scripts/report-style-drift.ts`) with baseline regression guardrails (`data/style-drift-baseline.json`) and package scripts (`verify:style-drift`, `report:style-drift`) to produce CI-friendly JSON artifacts and fail on metric regressions (including net-new exceptions). **Styleguide migration audit completion (May 2026):** Added advisory drift counts for raw form controls, client purple, and static styleguide debt; synchronized radius/type/color docs to token authority; converted static styleguide note chrome to reusable classes; and patched high-confidence client/schema/editor drift found by the parallel audit. **Full migration ratchet (May 2026):** Migrated all visible raw form controls to shared form primitives, cleared static styleguide note/radius advisory debt, and promoted raw form/static styleguide debt to pr-check error rules with fixture coverage and verified-clean documentation.
+
+**Agency value:** Converts style consistency from best-effort review into enforceable platform policy with measurable regression protection.
+
+**Client value:** Improves visual consistency and trust by reducing recurring UI drift in high-touch admin/client workflows.
+
+**Mutual:** Creates the enforcement foundation for phased admin-first/client-second migration without requiring a single mega-PR.
+
+**Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `data/style-exceptions.json`; `data/style-drift-baseline.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `package.json`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 422. Frontend Container Decomposition Pass (Wave 6 Item 1)
+**What it does:** Ships a behavior-preserving decomposition pass across three high-churn client containers in three sequential staging-first PRs. **PR1 (HealthTab):** extracted shell orchestration into `useHealthTabShell` and moved detailed section rendering into `HealthTabSections` while preserving content-request and render behavior. **PR2 (InboxTab):** extracted local shell state/effects into `useInboxTabShell`, extracted deep-link/legacy filter contract into `inbox-filter`, and moved branch-specific layout scaffolding into focused new/legacy layout wrappers without changing `?tab=` compatibility, alias mapping, or modal workflows. **PR3 (ClientDashboard):** extracted workspace bootstrap side effects into `useClientWorkspaceBootstrap`, extracted nav derivation into `clientDashboardNav`, and moved tab shell composition into `ClientDashboardTabContent` while preserving workspace-event invalidation behavior, query-key mapping, and flag semantics.
+
+**Agency value:** Reduces maintenance friction and review blast radius in the most frequently touched client orchestration surfaces, making future feature work safer and faster.
+
+**Client value:** No UX disruption from this pass itself, but lower regression risk and quicker iteration on client-facing tabs because orchestration responsibilities are now isolated.
+
+**Mutual:** Establishes extraction contracts (`tests/contract/*-shell-extraction.test.ts`) and updates deep-link route-map parsing to keep architecture improvements measurable and guarded in CI.
+
+**Files:** `src/components/client/HealthTab.tsx`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `src/components/client/InboxTab.tsx`; `src/components/client/inbox/useInboxTabShell.ts`; `src/components/client/inbox/inbox-filter.ts`; `src/components/client/inbox/InboxTabLayouts.tsx`; `src/components/ClientDashboard.tsx`; `src/components/client/client-dashboard/useClientWorkspaceBootstrap.ts`; `src/components/client/client-dashboard/clientDashboardNav.ts`; `src/components/client/client-dashboard/ClientDashboardTabContent.tsx`; `tests/contract/health-tab-phase1-shell-extraction.test.ts`; `tests/contract/inbox-tab-phase2-shell-extraction.test.ts`; `tests/contract/client-dashboard-phase3-shell-extraction.test.ts`; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 423. HealthTab Model Centralization Follow-Up (Wave 6)
+**What it does:** Adds a focused follow-up on top of the existing HealthTab shell/sections decomposition by extracting repeated pure model logic into `src/components/client/health-tab/healthTabModel.ts`. The new model module now owns check-impact copy lookup, filtered page derivation, category-stat aggregation, informational-issue counting, and by-fix-type grouping logic. `useHealthTabShell` now delegates derived state calculation to model helpers, and `HealthTabSections` delegates fix-type grouping and impact-text lookup to the same shared model module.
+
+**Agency value:** Reduces duplicated logic across shell and section modules, making behavior changes easier to review and less likely to drift between views.
+
+**Client value:** No route/UI contract change; health-tab behavior remains consistent while maintainability improves.
+
+**Mutual:** Adds extraction guardrails and helper-level unit tests to lock the split and prevent model logic from drifting back into rendering modules.
+
+**Files:** `src/components/client/health-tab/healthTabModel.ts`; `src/components/client/health-tab/useHealthTabShell.ts`; `src/components/client/health-tab/HealthTabSections.tsx`; `tests/contract/health-tab-model-extraction.test.ts`; `tests/unit/health-tab-model.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 424. API Wrapper Domain Cleanup (Wave 6 Item 2)
+**What it does:** Completes an incremental domain split of broad frontend API wrappers while preserving compatibility. Added `src/api/platform.ts` for platform-foundation API surfaces (jobs, roadmap/features, notifications, workspace overview/home badges, integration health, observability) and `src/api/schema.ts` for schema-domain surfaces (schema retract, schema validation, schema plan, schema impact). `src/api/misc.ts` and `src/api/seo.ts` now act as compatibility facades by re-exporting moved wrappers, so existing imports continue to work while new work can target focused modules. Updated adjacent consumers to import from new domain wrappers in place (`useWorkspaceHome`, `useIntegrationHealth`, `useNotifications`, `FeatureLibrary`, `Roadmap`, `BulkAcceptPanel`, `useSchemaValidation`, `SchemaPlanPanel`, `SchemaImpactPanel`, `useSchemaSuggesterPublishingWorkflow`). Added contract coverage to lock module ownership boundaries and updated schema wrapper compatibility tests.
+
+**Agency value:** Lowers API-surface sprawl and makes ownership clearer, so wrapper edits are easier to review and less likely to cause cross-domain regressions.
+
+**Client value:** No behavior change to API calls or UX; this is a maintainability pass with preserved runtime contracts.
+
+**Mutual:** Enables gradual migration away from catch-all wrapper files without breaking existing call sites, creating safer footing for subsequent Wave 6 cleanup items.
+
+**Files:** `src/api/platform.ts`; `src/api/schema.ts`; `src/api/misc.ts`; `src/api/seo.ts`; `src/api/index.ts`; `src/hooks/admin/useWorkspaceHome.ts`; `src/hooks/admin/useIntegrationHealth.ts`; `src/hooks/admin/useNotifications.ts`; `src/components/FeatureLibrary.tsx`; `src/components/Roadmap.tsx`; `src/components/audit/BulkAcceptPanel.tsx`; `src/hooks/admin/useSchemaValidation.ts`; `src/components/schema/SchemaPlanPanel.tsx`; `src/components/schema/SchemaImpactPanel.tsx`; `src/components/schema/useSchemaSuggesterPublishingWorkflow.ts`; `tests/contract/api-wrapper-domain-cleanup.test.ts`; `tests/unit/schema-suggester-cms-workflow.test.ts`; `tests/component/useIntegrationHealth.test.tsx`; `tests/component/audit/BulkAcceptPanel.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 425. Deterministic QA/Demo Workspace Matrix (Wave 6 Item 3)
+**What it does:** Upgrades `npm run seed:demo` from a three-workspace onboarding baseline to a deterministic six-scenario QA/demo matrix aligned with platform-confidence requirements. `scripts/seed-demo-workspaces.ts` now declares explicit scenario coverage (`empty-new`, `free-client`, `growth-active`, `premium-history`, `broken-integrations`, `rich-cms`) with fixed workspace IDs and deterministic fixture values. Seeding now runs as a transactional reset-and-reseed workflow for core workspace-scoped artifact tables (`requests`, `work_orders`, `approval_batches`, `client_actions`, `content_topic_requests`, `content_briefs`, `content_posts`, `schema_site_plans`, `schema_snapshots`, `schema_publish_history`, `page_edit_states`) so repeated runs produce stable manual QA and smoke-test starting states. Scenario-specific history population adds active workflow state (growth), content/schema/inbox history (premium), and rich CMS/edit-state context (rich-cms), while preserving an intentionally disconnected broken-integrations fixture.
+
+**Agency value:** Creates repeatable, low-variance QA environments for local validation and demos without hand-curating workspace state each run.
+
+**Client value:** Improves confidence that client-facing workflows are validated against realistic, scenario-specific data setups before changes ship.
+
+**Mutual:** Reduces “works on my machine” drift by making onboarding/demo seeds deterministic, test-backed, and aligned with planned smoke coverage.
+
+**Files:** `scripts/seed-demo-workspaces.ts`; `tests/unit/seed-demo-workspaces.test.ts`; `docs/workflows/local-dev-onboarding.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 426. Risky Module Health Dashboard (Wave 6 Item 4)
+**What it does:** Adds a repeatable risk-ranking analyzer for platform-health prioritization. New script `scripts/platform-risky-module-dashboard.ts` scans module files across `server/`, `src/`, `shared/`, and `scripts/` and computes weighted risk scores from seven signals: module line count, recent git churn touch frequency, internal import graph fan-in/fan-out, TODO/FIXME/HACK + `*-ok` hatch density, test-linkage presence, route write-handler coverage gaps (write routes with no nearby integration test), and `pr-check` warning-hit concentration by file. Added a CLI wrapper (`scripts/report-risky-modules.ts`) plus package commands (`verify:risky-modules`, `report:risky-modules`) and wired the audit into `scripts/verify-platform.ts` so the scorecard can run with routine platform verification. Added workflow guidance for operational use in `docs/workflows/risky-module-dashboard.md` and unit coverage for scoring primitives and route-coverage detection in `tests/unit/platform-risky-module-dashboard.test.ts`.
+
+**Agency value:** Creates an objective triage lens so refactor effort targets modules with highest combined change/regression risk instead of ad hoc intuition.
+
+**Client value:** Lowers regression probability in high-touch areas by surfacing fragile hotspots before they cause client-visible incidents.
+
+**Mutual:** Makes platform-health cleanup measurable and repeatable by tracking risk concentration with explicit, test-backed signals.
+
+**Files:** `scripts/platform-risky-module-dashboard.ts`; `scripts/report-risky-modules.ts`; `tests/unit/platform-risky-module-dashboard.test.ts`; `scripts/verify-platform.ts`; `package.json`; `docs/workflows/risky-module-dashboard.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 427. Bounded-Context Spec Header Contract (Wave 6 Item 5)
+**What it does:** Adds a required feature-spec skeleton so ownership and integration contracts are captured before implementation planning starts. New doc `docs/workflows/feature-spec-template.md` standardizes seven pre-plan sections: ownership snapshot, route/API surface, shared contracts, query cache + WebSocket contract, test ownership, verification commands, and open risks. Updated planning workflow docs so this template is part of default execution: `docs/PLAN_WRITING_GUIDE.md` now requires filling the spec skeleton before task breakdown, `docs/workflows/new-feature-checklist.md` includes a mandatory pre-implementation checklist item for the skeleton, and `docs/workflows/platform-golden-paths.md` now points teams to complete the spec skeleton before selecting a feature-class template.
+
+**Agency value:** Reduces planning ambiguity and review churn by forcing explicit ownership boundaries and integration surfaces up front.
+
+**Client value:** Lowers regression risk by making cache invalidation, event wiring, and test coverage explicit before code is written.
+
+**Mutual:** Converts a previously prose-only expectation into a reusable planning artifact that is easy to copy and enforce across specs.
+
+**Files:** `docs/workflows/feature-spec-template.md`; `docs/PLAN_WRITING_GUIDE.md`; `docs/workflows/new-feature-checklist.md`; `docs/workflows/platform-golden-paths.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 428. Feature Maturity Scorecard (Wave 6 Item 6)
+**What it does:** Introduces a standardized maturity rubric for major capability placement decisions. New workflow doc `docs/workflows/feature-maturity-scorecard.md` defines an 8-dimension score (`shipped`, `documented`, `tested`, `client-visible value`, `monitored`, `monetizable`, `owner assigned`, and `intelligence/reporting integration where relevant`) with 0-2 scoring semantics, total-score thresholds, hard-stop promotion gates, and a reusable worksheet template with evidence links. Product-surface governance now requires this maturity evidence for placement recommendations via `docs/rules/product-surface-rationalization.md`, and PR process wiring now prompts scorecard completion when promoting/demoting major surfaces via `docs/workflows/pr-readiness-checklist.md`.
+
+**Agency value:** Makes surface-priority decisions less subjective by introducing repeatable, evidence-backed criteria.
+
+**Client value:** Reduces churn in navigation and feature discoverability by promoting only surfaces with proven delivery maturity.
+
+**Mutual:** Aligns product simplification decisions with operational readiness so teams can balance visibility, reliability, and monetization intentionally.
+
+**Files:** `docs/workflows/feature-maturity-scorecard.md`; `docs/rules/product-surface-rationalization.md`; `docs/workflows/pr-readiness-checklist.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 429. Styleguide Parity Rule Registry Contract (Wave 6)
+**What it does:** Adds a canonical rule registry for styleguide parity work with both human-readable and machine-readable authority. `docs/rules/styleguide-rule-registry.md` now defines registry semantics, tier policy (`error|warn|manual`), and promotion gates, while `data/styleguide-rule-registry.json` tracks rule-level metadata (`id`, `sourceAnchor`, `detectability`, `enforcementLevel`, `metricKey`, `owner`, `status`, `fixtureRequirement`, `hatch`). Existing enforcement docs now reference the registry as the source-of-truth for parity ratchet planning and rule promotions.
+
+**Agency value:** Converts style migration planning from scattered notes into a durable governance artifact that supports faster, lower-risk enforcement ratchets.
+
+**Client value:** Improves consistency over time by making rule promotion criteria explicit, which reduces recurring visual regressions between styleguide and live surfaces.
+
+**Mutual:** Aligns docs, enforcement, and roadmap notes around one contract so parallel cleanup waves can coordinate on shared rule IDs and ownership.
+
+**Files:** `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 430. Styleguide Parity Advisory Detector Wave (Wave 6)
+**What it does:** Adds three advisory (warn-tier) `pr-check` detectors to catch token/typography drift before promotion to blocking errors: (1) `styleguide-css-must-import-public-tokens` ensures `public/styleguide.css` includes `@import url('/tokens.css')`; (2) `styleguide-typography-extra-class-drift` flags extra static-styleguide `.t-*` classes not present in `src/index.css`; and (3) `global-token-declaration-outside-canonical-token-files` flags `--*` token declarations outside `src/tokens.css` and the `public/tokens.css` mirror. Added fixture coverage in `tests/pr-check.test.ts` and synchronized design-system docs/registry statuses to mark these checks as active advisories.
+
+**Agency value:** Catches subtle styleguide parity regressions early without blocking delivery while signal quality is proven.
+
+**Client value:** Reduces the chance that the styleguide stays clean while live surfaces silently drift on typography or token source contracts.
+
+**Mutual:** Advances the ratchet strategy by moving high-confidence directives from “planned” to measurable advisory enforcement with tests.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 431. Styleguide Parity Ratchet Wave 8 (Promotions + Badge Cleanup)
+**What it does:** Completes the next parity ratchet by promoting five zero-backlog style rules from advisory to blocking errors: `hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, and `global-token-declaration-outside-canonical-token-files`. Adds four new warn-tier detectors to measure remaining migration debt without blocking delivery: `src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, and `primitive-override-drift-on-form-controls`. To keep the badge-span promotion clean, migrates the final four client badge-like spans to shared `Badge` primitives in `ClientHeader`, `ClientOnboardingQuestionnaire`, `BrandTab`, and `StrategyPageImprovementsSection`. Regenerates automated rule docs and synchronizes registry/enforcement documentation for the new tier/status state.
+
+**Agency value:** Converts another set of high-confidence style guarantees into CI-enforced invariants while keeping larger migration debt visible and trackable as advisories.
+
+**Client value:** Improves visual consistency on live client surfaces by replacing last-mile hand-rolled badge chrome with canonical primitives and tighter token enforcement.
+
+**Mutual:** Keeps the parity ratchet sustainable: zero-hit rules get promoted, noisy categories stay advisory with metrics, and governance docs stay aligned with real enforcement state.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `src/components/client/ClientHeader.tsx`; `src/components/client/ClientOnboardingQuestionnaire.tsx`; `src/components/client/BrandTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 432. Styleguide Parity Ratchet Wave 10 (Form Primitive Override Promotion)
+**What it does:** Clears remaining structural override drift on shared form primitives and promotes `primitive-override-drift-on-form-controls` from advisory to blocking enforcement. The sweep removes hand-rolled structural classes (`rounded*`, `border*`, `bg-*`, `focus:*`, `px/py`, `resize-*`) from `FormInput`, `FormTextarea`, and `FormSelect` call sites across client/admin/editor surfaces while preserving layout/behavior classes. The detector contract in `scripts/pr-check.ts` is tightened to structural overrides only, fixture/docs/registry state is synchronized, and the rule is ratcheted to `error` after the backlog reaches zero.
+
+**Agency value:** Locks one of the highest-volume drift vectors behind deterministic CI enforcement so future form work stays primitive-first by default.
+
+**Client value:** Improves consistency of form controls across the live product so typography, spacing, and focus treatment align with styleguide primitives.
+
+**Mutual:** Advances the phased parity ratchet with measurable debt burn-down and a clean advisory-to-error promotion path.
+
+**Files:** `scripts/pr-check.ts`; `src/components/**` (form primitive callsites); `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 433. Styleguide Parity Ratchet Wave 12 (Advisory Surface Signals)
+**What it does:** Adds three non-blocking styleguide-parity advisory detectors to improve live-surface cleanliness targeting before promotion to error-tier enforcement: `duplicate-heading-signal`, `nested-card-density-signal`, and `blue-action-semantic-drift`. The checks live in `scripts/pr-check.ts` as warn-tier custom detectors with explicit hatches, and `tests/pr-check.test.ts` now includes fixture coverage for trigger + hatch behavior so each detector has stable regression tests. `scripts/report-style-drift.ts` was extended to report file-level advisory counts for all three categories, including top-file breakdown output to guide ownership-slice cleanup.
+
+**Agency value:** Gives us actionable, low-noise visibility into styleguide drift patterns that are currently most responsible for “clean styleguide vs busier live UI” perception.
+
+**Client value:** Enables focused polish passes on real client/admin routes by surfacing duplicated headings, over-nested card surfaces, and action-color semantics that feel inconsistent.
+
+**Mutual:** Keeps delivery velocity high by measuring these rules in advisory mode first, while building the data and fixture confidence needed for later ratchet-to-error promotions.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 434. Styleguide Parity Ratchet Wave 13 (Advisory Debt Burn-Down)
+**What it does:** Clears the active advisory backlog introduced in Wave 12. Blue-styled actionable controls were migrated to teal semantics in `AssetAudit`, `assets/AssetCard`, `SearchDetail`, `briefs/BriefDetail`, and `post-editor/ReviewChecklist`, aligning interaction color behavior with the Four Laws of Color. Intentional duplicate heading detections caused by feature-flagged parallel layouts and repeated dynamic-title patterns were explicitly documented using `duplicate-heading-ok` hatches in `InboxTab`, `LandingPage`, and `PostEditor`. Post-change `verify:style-drift` now reports `duplicateHeadingSignalCount=0`, `nestedCardDensitySignalCount=0`, and `blueActionSemanticDriftCount=0`.
+
+**Agency value:** Removes the remaining high-signal advisory noise so future parity regressions are easier to spot and ratchet promotions can proceed with cleaner evidence.
+
+**Client value:** Makes live surfaces feel closer to the styleguide by tightening interaction color semantics and reducing heading duplication artifacts across migrated views.
+
+**Mutual:** Advances the phased parity program from “measuring drift” to “driving drift to zero,” preparing the next promotion wave with objective zero-backlog metrics.
+
+**Files:** `src/components/AssetAudit.tsx`; `src/components/assets/AssetCard.tsx`; `src/components/SearchDetail.tsx`; `src/components/briefs/BriefDetail.tsx`; `src/components/post-editor/ReviewChecklist.tsx`; `src/components/client/InboxTab.tsx`; `src/components/LandingPage.tsx`; `src/components/PostEditor.tsx`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 435. Styleguide Parity Ratchet Wave 14 (Warn → Error Promotions)
+**What it does:** Promotes three zero-backlog styleguide parity heuristics from warn-tier to error-tier enforcement in `pr-check`: `duplicate-heading-signal`, `nested-card-density-signal`, and `blue-action-semantic-drift`. The promotion uses existing fixture coverage in `tests/pr-check.test.ts` plus sustained zero-hit `verify:style-drift` results from Wave 13 cleanup. Registry and enforcement documentation are updated in the same PR so policy, machine-readable rule tiers, and verified-clean rationale stay in lockstep.
+
+**Agency value:** Locks in route-level cleanliness guarantees so duplicate headings, card-density drift, and blue-action semantic regressions are blocked at PR time rather than resurfacing in later polish passes.
+
+**Client value:** Preserves the cleaner styleguide-aligned interaction hierarchy and page structure in live surfaces by preventing these high-signal regressions from re-entering the product.
+
+**Mutual:** Completes another ratchet step with objective evidence (zero-hit metrics + fixtures), reducing advisory noise and tightening parity governance for future waves.
+
+**Files:** `scripts/pr-check.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 436. Styleguide Parity Ratchet Wave 15 (Token Promotion + Status Semantics Detector)
+**What it does:** Promotes `src-index-css-no-token-declarations` from warn-tier to error-tier after sustained zero-hit verification, hardening token-authority enforcement so `src/index.css` remains import/utilities-only. Adds a new warn-tier detector, `status-semantic-mapping-drift`, to surface local per-component status tone maps and hand-rolled status badge functions that bypass centralized `StatusBadge` domain semantics. The same detector logic is mirrored into `scripts/report-style-drift.ts` with file-level advisory breakdowns (`statusSemanticMappingDriftCount` + top files) so cleanup can be routed by ownership slice. Added fixture coverage in `tests/pr-check.test.ts` for trigger, negative (`StatusBadge` usage), and hatch (`// status-semantic-ok`) behavior.
+
+**Agency value:** Locks one more deterministic zero-backlog invariant as blocking CI while creating a focused signal for remaining status-semantic drift hotspots.
+
+**Client value:** Moves live surfaces closer to styleguide consistency by steering lifecycle/status UI toward shared semantic mappings instead of ad hoc local color logic.
+
+**Mutual:** Continues the ratchet pattern: promote what’s clean, instrument what’s still noisy, and keep docs + machine registry in sync in the same PR.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 436. Styleguide Parity Ratchet Wave 16 (Status Semantics Promotion)
+**What it does:** Closes the remaining status-semantic parity gap and promotes `status-semantic-mapping-drift` from warn-tier to error-tier. Live surfaces with local status tone maps were migrated to shared `StatusBadge` semantics: client Requests now uses `toClientRequestStatus()` + `StatusBadge domain="request"`, workspace-home request summaries use `StatusBadge` instead of local tone ternaries, and batch generation progress uses `StatusBadge domain="job"` for lifecycle state rendering. Redirect-manager HTTP code badges remain intentionally local protocol semantics and are explicitly annotated with `status-semantic-ok` as a scoped exception. Added a new canonical `request` registry domain in `statusConfig` for request lifecycle states (`awaiting_team`, `team_replied`, `in_progress`, `resolved`, plus raw request aliases).
+
+**Agency value:** Removes the final known status-semantic drift hotspot and hardens badge consistency through blocking enforcement rather than advisory monitoring.
+
+**Client value:** Request and job lifecycle states now render with one shared semantic contract across client/admin surfaces, improving visual predictability and reducing conflicting tone behavior.
+
+**Mutual:** Advances the ratchet model from detection to lock-in: advisory reaches zero, then immediately graduates to error with registry/docs/test synchronization.
+
+**Files:** `src/components/ui/statusConfig.ts`; `src/components/client/RequestsTab.tsx`; `src/components/workspace-home/ActiveRequestsAnnotations.tsx`; `src/components/brand/BatchGenerationPanel.tsx`; `src/components/RedirectManager.tsx`; `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `DESIGN_SYSTEM.md`; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 437. Styleguide Parity Ratchet Wave 17 (Pre-Plan Audit + Registry Expansion)
+**What it does:** Starts Wave 17 by rebasing parity work onto `staging` baseline (including Wave 16 status-semantic migration), running a parallel pre-plan audit across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing, then registering newly discovered directives in the canonical parity registry as non-blocking backlog contracts. Added `docs/rules/styleguide-wave17-pre-plan-audit.md` as the execution artifact and expanded `data/styleguide-rule-registry.json` with planned warn/manual directives (focus-visible contract, reduced-motion contract, embedded-tab heading duplication, muted-tier discipline, raw inline z-index detection, report-metric parity, stat primitive bypass signal, and chart/spacing/specimen manual checks). Updated parity governance docs so the new backlog is tracked before detector rollout/promotion.
+
+**Agency value:** Converts the next migration wave from ad hoc cleanup into an owned, parallelizable workstream with explicit detector candidates and promotion sequencing.
+
+**Client value:** Keeps live-surface polish moving toward styleguide parity while avoiding noisy CI by classifying ambiguous directives as warn/manual first.
+
+**Mutual:** Preserves ratchet discipline: discover comprehensively, register canonically, enforce gradually with fixtures and zero-hit evidence.
+
+**Files:** `data/styleguide-rule-registry.json`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-wave17-pre-plan-audit.md`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 438. Staging Merge Integrity Guardrail (Stacked PR Landing Audit)
+**What it does:** Adds an automated integrity audit for stacked-branch merge flows so we can detect when merged PRs do not actually land on `staging`. New script `scripts/report-staging-merge-integrity.ts` scans recent merged PRs using GitHub metadata, enforces that `base=staging` merge commits are reachable from `origin/staging`, and verifies patch-equivalence for non-`staging` stacked merges via `git cherry`. Known historical anomalies are explicitly tracked in `data/staging-merge-integrity-exceptions.json` with reason and expiry to avoid silent drift. Wired into CI (`.github/workflows/ci.yml`) and nightly checks (`.github/workflows/pr-check-nightly.yml`) via `npm run verify:staging-merge-integrity`.
+
+**Agency value:** Prevents silent loss of stacked-wave work by turning branch-flow integrity into a machine-checked contract.
+
+**Client value:** Reduces risk of “we thought this shipped” regressions in styleguide and UX polish work that directly affect product consistency.
+
+**Mutual:** Complements the styleguide ratchet by adding delivery-path integrity gates, not just code-style enforcement.
+
+**Files:** `scripts/report-staging-merge-integrity.ts`; `data/staging-merge-integrity-exceptions.json`; `package.json`; `.github/workflows/ci.yml`; `.github/workflows/pr-check-nightly.yml`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

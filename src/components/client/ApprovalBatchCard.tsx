@@ -10,12 +10,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, ConfirmDialog, type Tier, Icon, Button, ClickableRow } from '../ui';
-import { StatusBadge } from '../ui/StatusBadge';
+import { TierGate, ConfirmDialog, type Tier, Icon, Button, ClickableRow, FormInput, FormTextarea, Badge, StatusBadge } from '../ui';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
 import { findPageMapEntryBySlug } from '../../lib/pathUtils';
+import { isClientApplyableBatch } from './approvalApplyability';
 
 interface ApprovalBatchCardProps {
   batch: ApprovalBatch;
@@ -159,9 +159,6 @@ export function ApprovalBatchCard({
     );
   };
 
-  const isClientApplyableBatch = (b: ApprovalBatch) =>
-    b.items.every(i => (i.field === 'seoTitle' || i.field === 'seoDescription') && !i.collectionId && !i.pageId.startsWith('cms-'));
-
   const batchPending = batch.items.filter(i => i.status === 'pending').length;
   const batchApproved = batch.items.filter(i => i.status === 'approved').length;
   const batchApplied = batch.items.filter(i => i.status === 'applied').length;
@@ -173,13 +170,6 @@ export function ApprovalBatchCard({
     grouped.get(item.pageId)!.push(item);
   }
 
-  const statusColors = {
-    pending: 'bg-amber-500/10 border-amber-500/30 text-accent-warning',
-    approved: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-    rejected: 'bg-red-500/10 border-red-500/30 text-accent-danger',
-    applied: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
-  };
-
   return (
     // pr-check-disable-next-line -- brand signature radius intentional; mirrors DecisionCard visual identity
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
@@ -187,9 +177,7 @@ export function ApprovalBatchCard({
       {/* ── Card header ── */}
       <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-[var(--brand-border)]/60">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] shrink-0">
-            SEO Changes
-          </span>
+          <Badge label="SEO Changes" tone="zinc" variant="outline" shape="pill" className="shrink-0" />
           <span className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{batch.name}</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">
             {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -197,9 +185,9 @@ export function ApprovalBatchCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {batchPending > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{batchPending} pending</span>}
-          {batchApproved > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{batchApproved} approved</span>}
-          {batchApplied > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 border border-blue-500/30 text-accent-info">{batchApplied} applied</span>}
+          {batchPending > 0 && <Badge label={`${batchPending} pending`} tone="amber" variant="outline" shape="pill" />}
+          {batchApproved > 0 && <Badge label={`${batchApproved} approved`} tone="emerald" variant="outline" shape="pill" />}
+          {batchApplied > 0 && <Badge label={`${batchApplied} applied`} tone="blue" variant="outline" shape="pill" />}
         </div>
       </div>
 
@@ -224,8 +212,8 @@ export function ApprovalBatchCard({
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">/{first.pageSlug}</span>
                 <StatusBadge status={pageState?.status} />
                 <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>
-                {pagePending > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{pagePending} pending</span>}
-                {pageApprovedCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{pageApprovedCount} approved</span>}
+                {pagePending > 0 && <Badge label={`${pagePending} pending`} tone="amber" variant="outline" />}
+                {pageApprovedCount > 0 && <Badge label={`${pageApprovedCount} approved`} tone="emerald" variant="outline" />}
               </ClickableRow>
 
               {/* Page items */}
@@ -262,11 +250,9 @@ export function ApprovalBatchCard({
                         {/* Field label + status + keyword targeting */}
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">{fieldLabel}</span>
-                          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${statusColors[item.status || 'pending']}`}>
-                            {item.status || 'pending'}
-                          </span>
+                          <StatusBadge status={item.status || 'pending'} domain="approval" variant="outline" />
                           {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
-                            <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">{t}</span>
+                            <Badge key={t} label={t} tone="teal" variant="outline" />
                           ))}
                           {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
                             const kw = findPageMapEntryBySlug(pageMap ?? [], item.pageSlug);
@@ -274,13 +260,9 @@ export function ApprovalBatchCard({
                             return (
                               <>
                                 <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">targeting:</span>
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">
-                                  {kw.primaryKeyword}
-                                </span>
+                                <Badge label={kw.primaryKeyword} tone="blue" variant="outline" />
                                 {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                  <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/60 border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]">
-                                    {kw2}
-                                  </span>
+                                  <Badge key={kw2} label={kw2} tone="zinc" variant="outline" />
                                 ))}
                               </>
                             );
@@ -321,18 +303,18 @@ export function ApprovalBatchCard({
                               {isEditing ? (
                                 <div className="space-y-2">
                                   {item.field === 'seoTitle' ? (
-                                    <input
+                                    <FormInput
                                       type="text"
                                       value={editDraft}
-                                      onChange={e => setEditDraft(e.target.value)}
-                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400"
+                                      onChange={setEditDraft}
+                                      className="w-full t-caption"
                                     />
                                   ) : (
-                                    <textarea
+                                    <FormTextarea
                                       value={editDraft}
-                                      onChange={e => setEditDraft(e.target.value)}
+                                      onChange={setEditDraft}
                                       rows={2}
-                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400 resize-none"
+                                      className="w-full t-caption"
                                     />
                                   )}
                                   <div className="flex gap-1.5">
@@ -386,12 +368,12 @@ export function ApprovalBatchCard({
                         {(item.status === 'pending' || !item.status) && !isEditing && rejectingItem === item.id && effectiveTier !== 'free' && (
                           <div className="mt-3 space-y-2">
                             <div className="t-caption-sm text-[var(--brand-text-muted)]">Add an optional note for the agency:</div>
-                            <textarea
+                            <FormTextarea
                               value={rejectDraft}
-                              onChange={e => setRejectDraft(e.target.value)}
+                              onChange={setRejectDraft}
                               rows={2}
                               placeholder="Reason for rejection (optional)"
-                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-red-500/30 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-red-400 resize-none placeholder:text-[var(--brand-text-faint)]"
+                              className="w-full t-caption placeholder:text-[var(--brand-text-faint)]"
                             />
                             <div className="flex gap-1.5">
                               <Button variant="danger" size="sm" icon={X} onClick={() => {

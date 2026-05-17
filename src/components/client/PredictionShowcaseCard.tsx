@@ -1,4 +1,4 @@
-import { Trophy, TrendingUp, Calendar } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar } from 'lucide-react'; // trend-icon-ok — this icon is narrative decoration ("we predicted"), not a directional metric trend indicator.
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
 import { Icon } from '../ui/Icon';

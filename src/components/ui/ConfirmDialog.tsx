@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Button } from './Button';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -47,22 +48,22 @@ export function ConfirmDialog({
         <h3 className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
         <p className="text-[var(--brand-text)] t-body mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={onCancel}
-            className="px-4 py-2 rounded-[var(--radius-lg)] t-body font-medium text-[var(--brand-text)] border border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors"
+            variant="secondary"
+            size="md"
+            className="rounded-[var(--radius-lg)]"
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className={
-              variant === 'destructive'
-                ? 'px-4 py-2 rounded-[var(--radius-lg)] t-body font-semibold bg-red-600 hover:bg-red-500 text-white transition-colors'
-                : 'px-4 py-2 rounded-[var(--radius-lg)] t-body font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all'
-            }
+            variant={variant === 'destructive' ? 'danger' : 'primary'}
+            size="md"
+            className="rounded-[var(--radius-lg)]"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

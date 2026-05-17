@@ -205,7 +205,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 { label: 'Session growth', value: comparison.changePercent.sessions },
                 { label: 'Pageview growth', value: comparison.changePercent.pageviews },
               ].map(g => (
-                <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
+                <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                   <span className="text-[var(--brand-text)]">{g.label}</span>
                   <span className={`font-medium ${g.value > 0 ? 'text-emerald-400' : g.value < 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>
                     {g.value > 0 ? '+' : ''}{g.value}%
@@ -213,7 +213,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 </div>
               ))}
               {comparison.change.bounceRate !== 0 && (
-                <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
+                <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                   <span className="text-[var(--brand-text)]">Bounce rate change</span>
                   <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}pt
@@ -228,7 +228,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <SectionCard title="Engagement Analysis" titleIcon={<Icon as={Eye} size="md" className="text-blue-400" />}>
           <div className="space-y-2">
             {newVsReturning.map(seg => (
-              <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
+              <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                 <span className="text-[var(--brand-text)] capitalize">{seg.segment} user engagement</span>
                 <span className={`font-medium ${seg.engagementRate > 60 ? 'text-emerald-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
                   {seg.engagementRate}%
@@ -236,13 +236,13 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               </div>
             ))}
             {topPages.length > 0 && (
-              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
+              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                 <span className="text-[var(--brand-text)]">Top page avg. engagement</span>
                 <span className="text-[var(--brand-text-bright)] font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
               </div>
             )}
             {organic && (
-              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
+              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/30">
                 <span className="text-[var(--brand-text)]">Organic avg. engagement</span>
                 <span className="text-[var(--brand-text-bright)] font-medium">{formatDuration(organic.avgEngagementTime)}</span>
               </div>
@@ -258,8 +258,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             <div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Users</div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="h-2 flex-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${organic.shareOfTotalUsers}%` }} />
+                <div className="h-2 flex-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-[var(--radius-pill)]" style={{ width: `${organic.shareOfTotalUsers}%` }} />
                 </div>
                 <span className="t-caption-sm text-emerald-400 font-medium w-10 text-right">{organic.shareOfTotalUsers}%</span>
               </div>
@@ -355,8 +355,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                       <span className="text-[var(--brand-text-bright)] capitalize">{d.device}</span>
                       <span className="text-[var(--brand-text-muted)]">{d.percentage}%</span>
                     </div>
-                    <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
+                    <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${d.percentage}%` }} />
                     </div>
                   </div>
                   <span className="text-xs text-[var(--brand-text-muted)] tabular-nums w-10 text-right">{formatNumber(d.users)}</span>
@@ -389,8 +389,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                         </div>
                         <span className="text-xs text-[var(--brand-text-muted)]">{seg.percentage}%</span>
                       </div>
-                      <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden mb-1">
-                        <div className={`h-full rounded-full transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
+                      <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden mb-1">
+                        <div className={`h-full rounded-[var(--radius-pill)] transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
                       </div>
                       <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
                         <span>{seg.users.toLocaleString()} users</span>
@@ -410,15 +410,17 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
 
       {/* ── 9. Events & Conversions (collapsible, collapsed by default) ── */}
       <SectionCard>
-        <button
+        <Button
           onClick={() => setEventsExpanded(!eventsExpanded)}
-          className="w-full flex items-center justify-between text-sm font-semibold text-[var(--brand-text-bright)]"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-between text-sm font-semibold text-[var(--brand-text-bright)] px-0 py-0 h-auto"
         >
           <span>Events &amp; Conversions</span>
           <span className="text-xs text-[var(--brand-text-muted)]">
             {conversions.length} tracked event{conversions.length !== 1 ? 's' : ''} {eventsExpanded ? '▴' : '▾'}
           </span>
-        </button>
+        </Button>
         {eventsExpanded && (
           <div className="mt-4 space-y-4">
             {/* Key Events grid */}

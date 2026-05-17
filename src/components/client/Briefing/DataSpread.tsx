@@ -6,8 +6,7 @@
 
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown } from 'lucide-react';
-import { SectionCard, Icon } from '../../ui';
+import { SectionCard, TrendBadge, Button } from '../../ui';
 import type { BriefingStory } from '../../../../shared/types/briefing';
 
 // ---------------------------------------------------------------------------
@@ -135,11 +134,12 @@ function SpreadItemRow({ item }: SpreadItemRowProps): ReactNode {
   const navigate = useNavigate();
 
   const iconNode = (
-    <Icon
-      as={item.tone === 'win' ? TrendingUp : TrendingDown}
-      size="sm"
+    <TrendBadge
+      value={item.tone === 'win' ? 1 : -1}
+      hideOnZero={false}
+      iconOnly
+      size="md"
       className={item.tone === 'win' ? 'text-accent-success' : 'text-accent-warning'}
-      aria-hidden="true"
     />
   );
 
@@ -160,13 +160,14 @@ function SpreadItemRow({ item }: SpreadItemRowProps): ReactNode {
   if (item.drillInUrl) {
     const target = item.drillInUrl;
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => navigate(target)}
         className="w-full text-left flex flex-col gap-0.5 px-2 py-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]/60 transition-colors cursor-pointer"
       >
         {content}
-      </button>
+      </Button>
     );
   }
 

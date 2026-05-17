@@ -156,7 +156,7 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
               </div>
               <Badge
                 label={r.status}
-                color={r.status === 'completed' ? 'emerald' : r.status === 'failed' ? 'red' : 'amber'}
+                tone={r.status === 'completed' ? 'emerald' : r.status === 'failed' ? 'red' : 'amber'}
               />
             </div>
           </SectionCard>

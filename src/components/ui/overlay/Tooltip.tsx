@@ -194,7 +194,7 @@ export function Tooltip({
               zIndex: 'var(--z-tooltip)' as unknown as number,
               pointerEvents: 'none',
             }}
-            className={cn('bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg max-w-xs', motionClass)}
+            className={cn('bg-[var(--surface-1)] text-[var(--brand-text-bright)] text-xs px-2 py-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] shadow-lg max-w-xs', motionClass)}
           >
             {content}
           </div>,

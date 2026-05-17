@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, Check, FileText, Layers, Tag,
   Eye, Sparkles, X,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader, EmptyState, Button } from '../ui';
+import { SectionCard, Badge, PageHeader, EmptyState, Button, IconButton, FormInput } from '../ui';
 import type { ContentTemplate, ContentMatrix, MatrixDimension, MatrixCell } from './types';
 
 interface MatrixBuilderProps {
@@ -29,7 +29,7 @@ function StepIndicator({ current }: { current: Step }) {
         <div key={step} className="flex items-center gap-2">
           {i > 0 && <div className={`w-8 h-px ${step <= current ? 'bg-teal-500/50' : 'bg-[var(--brand-border-hover)]'}`} />}
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center t-caption font-bold ${
+            <div className={`w-6 h-6 rounded-[var(--radius-pill)] flex items-center justify-center t-caption font-bold ${
               step < current ? 'bg-teal-500 text-white' :
               step === current ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40' :
               'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
@@ -48,17 +48,20 @@ function StepIndicator({ current }: { current: Step }) {
 
 function TemplateCard({ template, isSelected, onSelect }: { template: ContentTemplate; isSelected: boolean; onSelect: () => void }) {
   return (
-    <button
+    <Button
       onClick={onSelect}
+      type="button"
+      variant="ghost"
+      size="sm"
       className={`w-full text-left p-4 rounded-[var(--radius-xl)] border transition-all ${
         isSelected
           ? 'bg-teal-500/10 border-teal-500/30 ring-2 ring-teal-400'
           : 'bg-[var(--surface-1)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
-      }`}
+      } block`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{template.name}</span>
-        <Badge label={template.pageType.replace(/-/g, ' ')} color="teal" />
+        <Badge label={template.pageType.replace(/-/g, ' ')} tone="teal" />
       </div>
       {template.description && (
         <p className="text-xs text-[var(--brand-text)] mb-3">{template.description}</p>
@@ -67,7 +70,7 @@ function TemplateCard({ template, isSelected, onSelect }: { template: ContentTem
         <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {template.variables.length} variable{template.variables.length !== 1 ? 's' : ''}</span>
         <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> {template.sections.length} section{template.sections.length !== 1 ? 's' : ''}</span>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -98,21 +101,27 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
   return (
     <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] min-h-[42px] focus-within:border-teal-500/40 transition-colors">
       {values.map(val => (
-        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
+        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
-          <button onClick={() => onChange(values.filter(v => v !== val))} className="hover:text-red-400 transition-colors">
-            <X className="w-2.5 h-2.5" />
-          </button>
+          <IconButton
+            onClick={() => onChange(values.filter(v => v !== val))}
+            icon={X}
+            label={`Remove ${val}`}
+            title={`Remove ${val}`}
+            variant="ghost"
+            size="sm"
+            className="w-3.5 h-3.5 p-0 rounded-none hover:bg-transparent text-current hover:text-red-400 transition-colors"
+          />
         </span>
       ))}
-      <input
+      <FormInput
         type="text"
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={setInput}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={values.length === 0 ? placeholder : 'Add more...'}
-        className="flex-1 min-w-[100px] bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] outline-none"
+        className="flex-1 min-w-[100px] outline-none"
       />
     </div>
   );
@@ -236,9 +245,15 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
           subtitle="Build a matrix of planned pages from a template"
           icon={<Layers className="w-5 h-5 text-teal-400" />}
         />
-        <button onClick={onCancel} className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button
+          onClick={onCancel}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors px-0 py-0 h-auto"
+        >
           Cancel
-        </button>
+        </Button>
       </div>
 
       {/* Step indicator */}
@@ -309,10 +324,10 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                       <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{varLabel}</p>
                       <p className="t-caption-sm font-mono text-[var(--brand-text-muted)] truncate">{cell.plannedUrl}</p>
                     </div>
-                    <input
+                    <FormInput
                       type="text"
                       value={cellKeywordOverrides[cell.id] ?? cell.targetKeyword}
-                      onChange={e => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: e.target.value }))}
+                      onChange={value => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: value }))}
                       className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
@@ -328,12 +343,12 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
           <div className="space-y-4">
             <div>
               <label className="t-caption text-[var(--brand-text-muted)] font-medium">Matrix Name</label>
-              <input
+              <FormInput
                 type="text"
                 value={matrixName}
-                onChange={e => setMatrixName(e.target.value)}
+                onChange={setMatrixName}
                 placeholder="e.g. Houston Area Service Pages"
-                className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 transition-colors"
               />
             </div>
 
@@ -369,12 +384,16 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">
-        <button
+        <Button
           onClick={() => step > 1 ? setStep((step - 1) as Step) : onCancel()}
-          className="flex items-center gap-1 px-4 py-2 rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          type="button"
+          variant="ghost"
+          size="md"
+          icon={ArrowLeft}
+          className="px-4 py-2 rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> {step > 1 ? 'Back' : 'Cancel'}
-        </button>
+          {step > 1 ? 'Back' : 'Cancel'}
+        </Button>
 
         {step < 4 ? (
           <Button

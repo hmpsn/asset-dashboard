@@ -49,6 +49,29 @@ describe('cannibalization-issues table', () => {
     expect(countCannibalizationIssues(ws.id)).toBe(2);
   });
 
+  it('preserves canonical action metadata', () => {
+    const ws = createWorkspace(`Cannibalization Metadata ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    replaceAllCannibalizationIssues(ws.id, [
+      makeIssue({
+        keyword: 'implant pricing',
+        canonicalPath: '/services/dental-implants',
+        canonicalUrl: 'https://example.com/services/dental-implants',
+        action: 'canonical_tag',
+      }),
+    ]);
+
+    const issues = listCannibalizationIssues(ws.id);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toEqual(expect.objectContaining({
+      keyword: 'implant pricing',
+      canonicalPath: '/services/dental-implants',
+      canonicalUrl: 'https://example.com/services/dental-implants',
+      action: 'canonical_tag',
+    }));
+  });
+
   it('keeps one row per keyword (case-insensitive dedupe, last keyword wins)', () => {
     const ws = createWorkspace(`Cannibalization Unique ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
@@ -73,7 +96,13 @@ describe('cannibalization-issues table', () => {
         siteKeywords: [],
         opportunities: [],
         cannibalization: [
-          makeIssue({ keyword: 'migrate keyword', severity: 'high' }),
+          makeIssue({
+            keyword: 'migrate keyword',
+            severity: 'high',
+            canonicalPath: '/canonical',
+            canonicalUrl: 'https://example.com/canonical',
+            action: 'differentiate',
+          }),
         ],
         generatedAt: new Date().toISOString(),
       },
@@ -85,6 +114,9 @@ describe('cannibalization-issues table', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].keyword).toBe('migrate keyword');
     expect(issues[0].severity).toBe('high');
+    expect(issues[0].canonicalPath).toBe('/canonical');
+    expect(issues[0].canonicalUrl).toBe('https://example.com/canonical');
+    expect(issues[0].action).toBe('differentiate');
 
     const reloaded = getWorkspace(ws.id);
     expect(reloaded?.keywordStrategy?.cannibalization).toBeUndefined();

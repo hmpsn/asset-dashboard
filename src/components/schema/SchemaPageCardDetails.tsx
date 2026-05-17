@@ -4,7 +4,7 @@ import type { ValidationFinding } from '../../../shared/types/schema-validation'
 import type { SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
 import type { Recommendation } from '../../../shared/types/recommendations';
 import type { RichResultEligibility } from './schemaSuggesterTypes';
-import { Icon, cn } from '../ui';
+import { Badge, Icon, cn, Button } from '../ui';
 
 export type SchemaPageCardRecommendation = Pick<Recommendation, 'id' | 'type' | 'title' | 'insight' | 'priority' | 'trafficAtRisk' | 'estimatedGain'>;
 
@@ -34,9 +34,7 @@ export function ExistingSchemasSection({ schemas }: { schemas: string[] }) {
       <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Already on page</div>
       <div className="flex flex-wrap gap-1.5">
         {schemas.map((schema, index) => (
-          <span key={index} className="px-2 py-1 rounded-[var(--radius-md)] t-caption font-mono bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-            {schema}
-          </span>
+          <Badge key={index} label={schema} tone="emerald" variant="outline" shape="sm" size="md" className="font-mono" />
         ))}
       </div>
     </div>
@@ -81,7 +79,7 @@ export function ValidationFindingsSection({ findings, validationErrors }: Valida
           if (field !== '__noField' && fieldFindings.length === 1) {
             return (
               <div key={field} className={`${colorClass} t-caption-sm flex items-start gap-2`}>
-                <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                <span aria-hidden="true" className="t-micro font-semibold shrink-0">{badge}</span>
                 <span>{fieldFindings[0].message}</span>
               </div>
             );
@@ -94,7 +92,7 @@ export function ValidationFindingsSection({ findings, validationErrors }: Valida
               const fieldBadge = fieldSeverity === 'error' ? 'Error' : 'Recommended';
               return (
                 <div key={`__noField-${index}`} className={`${fieldColor} t-caption-sm flex items-start gap-2`}>
-                  <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{fieldBadge}</span>
+                  <span aria-hidden="true" className="t-micro font-semibold shrink-0">{fieldBadge}</span>
                   <span>{finding.message}</span>
                 </div>
               );
@@ -103,16 +101,18 @@ export function ValidationFindingsSection({ findings, validationErrors }: Valida
 
           return (
             <div key={field}>
-              <button
+              <Button
                 type="button"
                 onClick={() => setExpandedField(expanded ? null : field)}
                 aria-expanded={expanded}
-                className={`flex items-center gap-2 w-full text-left ${colorClass} t-caption-sm hover:opacity-80`}
+                variant="ghost"
+                size="sm"
+                className={`w-full h-auto px-0 py-0 justify-start gap-2 text-left ${colorClass} t-caption-sm hover:opacity-80 hover:bg-transparent`}
               >
-                <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                <span aria-hidden="true" className="t-micro font-semibold shrink-0">{badge}</span>
                 <span className="truncate">{field} ({fieldFindings.length})</span>
                 <span aria-hidden="true" className="text-[var(--brand-text-muted)] shrink-0">{expanded ? '▾' : '▸'}</span>
-              </button>
+              </Button>
               {expanded && (
                 <div className="ml-4 mt-1 space-y-0.5">
                   {fieldFindings.map((finding, index) => (
@@ -149,14 +149,14 @@ export function RecommendationBanners({ recommendations }: { recommendations: Sc
               </div>
             )}
           </div>
-          <span className={cn(
-            'flex-shrink-0 t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium',
-            recommendation.priority === 'fix_now' ? 'bg-red-500/15 text-red-400/80' :
-            recommendation.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400/80' :
-            'bg-[var(--surface-3)]/15 text-[var(--brand-text-muted)]'
-          )}>
-            {recommendation.priority.replace('_', ' ')}
-          </span>
+          <Badge
+            label={recommendation.priority.replace('_', ' ')}
+            tone={recommendation.priority === 'fix_now' ? 'red' : recommendation.priority === 'fix_soon' ? 'amber' : 'zinc'}
+            variant="soft"
+            shape="sm"
+            size="sm"
+            className="flex-shrink-0"
+          />
         </div>
       ))}
     </div>
@@ -174,9 +174,7 @@ export function GraphTypesSection({ graphTypes, reason }: GraphTypesSectionProps
       <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-1.5">@graph types</div>
       <div className="flex flex-wrap gap-1.5">
         {graphTypes.map((type, index) => (
-          <span key={index} className="px-2 py-1 rounded-[var(--radius-md)] t-caption font-mono bg-teal-500/10 text-teal-300 border border-teal-500/20">
-            {type}
-          </span>
+          <Badge key={index} label={type} tone="teal" variant="outline" shape="sm" size="md" className="font-mono" />
         ))}
       </div>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">{reason}</p>
@@ -196,8 +194,8 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
         <div className="t-caption font-medium text-[var(--brand-text-muted)]">Generation diagnostics</div>
       </div>
       <div className="flex flex-wrap gap-1.5 mb-1.5">
-        <span className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-          {diagnostics.roleSource === 'auto-detect'
+        <Badge
+          label={`${diagnostics.roleSource === 'auto-detect'
             ? 'Auto-detected'
             : diagnostics.roleSource === 'site-plan'
               ? 'Site plan'
@@ -207,19 +205,19 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
                   ? 'Collection inferred'
                   : diagnostics.roleSource === 'saved-page-type'
                     ? 'Saved page type'
-                    : 'UI override'}
-          {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
-        </span>
-        <span className={cn(
-          'px-2 py-1 rounded-[var(--radius-md)] t-caption-sm border',
-          diagnostics.validationStatus === 'errors'
-            ? 'bg-red-500/8 text-red-400/80 border-red-500/20'
-            : diagnostics.validationStatus === 'warnings'
-              ? 'bg-amber-500/8 text-amber-400/80 border-amber-500/20'
-              : 'bg-emerald-500/8 text-emerald-400/80 border-emerald-500/20',
-        )}>
-          {diagnostics.validationStatus}
-        </span>
+                    : 'UI override'}${diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}`}
+          tone="zinc"
+          variant="outline"
+          shape="sm"
+          size="md"
+        />
+        <Badge
+          label={diagnostics.validationStatus}
+          tone={diagnostics.validationStatus === 'errors' ? 'red' : diagnostics.validationStatus === 'warnings' ? 'amber' : 'emerald'}
+          variant="outline"
+          shape="sm"
+          size="md"
+        />
       </div>
       {diagnostics.collection && (
         <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">
@@ -248,18 +246,15 @@ export function GenerationDiagnosticsSection({ diagnostics }: { diagnostics?: Sc
       {diagnostics.fieldEvidence && diagnostics.fieldEvidence.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-1.5">
           {diagnostics.fieldEvidence.slice(0, 6).map((evidence, index) => (
-            <span
+            <Badge
               key={`${evidence.field}-${index}`}
-              className={cn(
-                'px-2 py-1 rounded-[var(--radius-md)] t-caption-sm border',
-                evidence.status === 'resolved' || evidence.status === 'fallback-used'
-                  ? 'bg-blue-500/8 text-blue-300 border-blue-500/20'
-                  : 'bg-amber-500/8 text-amber-300 border-amber-500/20',
-              )}
-              title={evidence.message}
-            >
-              {evidence.field}: {evidence.status ?? evidence.source}
-            </span>
+              label={`${evidence.field}: ${evidence.status ?? evidence.source}`}
+              tone={evidence.status === 'resolved' || evidence.status === 'fallback-used' ? 'blue' : 'amber'}
+              variant="outline"
+              shape="sm"
+              size="md"
+              ariaLabel={evidence.message}
+            />
           ))}
         </div>
       )}
@@ -290,15 +285,9 @@ export function RichResultsEligibilitySection({ eligibility }: { eligibility?: R
       <div className="flex flex-wrap gap-1.5">
         {eligibility.map((result, index) => (
           result.eligible ? (
-            <span key={index} className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`Eligible for: ${result.feature}`}>
-              <Icon as={CheckCircle} size="sm" className="flex-shrink-0" />
-              {result.type}: {result.feature}
-            </span>
+            <Badge key={index} label={`${result.type}: ${result.feature}`} tone="emerald" variant="outline" shape="sm" size="md" icon={CheckCircle} ariaLabel={`Eligible for: ${result.feature}`} />
           ) : (
-            <span key={index} className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Missing for ${result.feature}: ${result.missingFields?.join(', ')}`}>
-              <Icon as={AlertCircle} size="sm" className="flex-shrink-0" />
-              {result.type}: missing {result.missingFields?.join(', ')}
-            </span>
+            <Badge key={index} label={`${result.type}: missing ${result.missingFields?.join(', ')}`} tone="amber" variant="outline" shape="sm" size="md" icon={AlertCircle} ariaLabel={`Missing for ${result.feature}: ${result.missingFields?.join(', ')}`} />
           )
         ))}
       </div>

@@ -32,6 +32,7 @@ import { listDiagnosticReports } from './diagnostic-store.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { normalizePageUrl } from './helpers.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -366,7 +367,8 @@ function isCriticalCheck(check: string): boolean {
 }
 
 export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
-  const t = traffic[`/${slug}`] || traffic[slug];
+  const pagePath = normalizePageUrl(slug);
+  const t = traffic[pagePath] || traffic[slug];
   if (!t) return 0;
   const base = t.clicks * 2 + t.impressions * 0.1 + t.pageviews;
   const convMultiplier = conversionRate && conversionRate > 2
@@ -376,7 +378,8 @@ export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRat
 }
 
 function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number; impressions: number } {
-  const t = traffic[`/${slug}`] || traffic[slug] || { clicks: 0, impressions: 0 };
+  const pagePath = normalizePageUrl(slug);
+  const t = traffic[pagePath] || traffic[slug] || { clicks: 0, impressions: 0 };
   return { clicks: t.clicks, impressions: t.impressions };
 }
 
@@ -417,10 +420,11 @@ function determinePriority(
  * All other callers pass relative paths (/foo or foo) — those work unchanged.
  */
 function toPageSlug(url: string): string {
+  let path = url;
   if (url.startsWith('http')) {
-    try { return new URL(url).pathname.replace(/^\//, ''); } catch { /* fall through */ }
+    try { path = new URL(url).pathname; } catch { /* fall through */ }
   }
-  return url.replace(/^\//, '');
+  return normalizePageUrl(path).replace(/^\//, '');
 }
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
@@ -1255,7 +1259,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const slug = page.slug.replace(/^\//, '');
       slugToPageId.set(slug, page.pageId);
       // Also store with leading slash for lookups
-      slugToPageId.set(`/${slug}`, page.pageId);
+      slugToPageId.set(`/${slug}`, page.pageId); // page-slug-url-ok — legacy lookup key, not a new persisted path
     }
   }
 
@@ -1323,7 +1327,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     const pagesWithActiveRecs = new Set<string>();
     for (const r of recs) {
       if (r.status !== 'completed' && r.status !== 'dismissed') {
-        for (const p of r.affectedPages) pagesWithActiveRecs.add(p);
+        for (const p of r.affectedPages) pagesWithActiveRecs.add(toPageSlug(p));
       }
     }
 
@@ -1331,7 +1335,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     for (const oldRec of autoResolvedRecs) {
       if (oldRec.affectedPages && oldRec.affectedPages.length > 0) {
         for (const pageSlug of oldRec.affectedPages) {
-          if (pagesWithActiveRecs.has(pageSlug)) continue;
+          if (pagesWithActiveRecs.has(toPageSlug(pageSlug))) continue;
           const resolvedPageId = slugToPageId.get(pageSlug)
             ?? getPageIdBySlug(workspaceId, pageSlug)
             ?? pageSlug;

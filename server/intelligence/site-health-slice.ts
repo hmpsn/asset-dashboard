@@ -77,13 +77,13 @@ export async function assembleSiteHealth(
   // ── Audit snapshot (reports.ts) ──────────────────────────────────────
   if (siteId) {
     try {
-      const { getLatestSnapshot, listSnapshots } = await import('../reports.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const latest = getLatestSnapshot(siteId);
+      const { getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const latest = getLatestEffectiveSnapshot(siteId, workspace?.auditSuppressions);
       if (latest) {
         auditScore = latest.audit.siteScore ?? null;
         latestAuditCwvSummary = latest.audit.cwvSummary;
         // Delta: compare with previous snapshot
-        const summaries = listSnapshots(siteId);
+        const summaries = listEffectiveSnapshotSummaries(siteId, workspace?.auditSuppressions);
         if (summaries.length >= 2) {
           const prevScore = summaries[1].siteScore;
           auditScoreDelta = auditScore !== null ? auditScore - prevScore : null;
@@ -111,47 +111,51 @@ export async function assembleSiteHealth(
   }
 
   // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
-  // TODO(IG-5): Desktop CWV is always null because getPageSpeed(siteId) returns a single
-  // snapshot keyed by siteId alone, holding only the last run (mobile OR desktop).
-  // Fixing this requires changing performance-store.ts to key snapshots by siteId + strategy.
-  // Deferred to Sprint IG-5 (strategic gaps).
   if (siteId) {
     try {
       const { getPageSpeed } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const speedSnap = getPageSpeed(siteId);
-      if (speedSnap?.result) {
-        const siteSpeed = speedSnap.result as {
+      const readSiteSpeed = (strategy: 'mobile' | 'desktop') => {
+        const speedSnap = getPageSpeed(siteId, strategy);
+        return speedSnap?.result as {
           pages?: Array<{ score?: number; vitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null } }>;
           averageScore?: number;
           averageVitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null };
-        };
+        } | undefined;
+      };
+      const passRate = (siteSpeed: ReturnType<typeof readSiteSpeed>) => {
+        const pages = siteSpeed?.pages ?? [];
+        if (pages.length === 0) return null;
+        const passing = pages.filter(p => (p.score ?? 0) >= 90).length;
+        return passing / pages.length;
+      };
+
+      const mobileSpeed = readSiteSpeed('mobile');
+      const desktopSpeed = readSiteSpeed('desktop');
+      cwvPassRate.mobile = passRate(mobileSpeed);
+      cwvPassRate.desktop = passRate(desktopSpeed);
+
+      const summarySource = mobileSpeed ?? desktopSpeed;
+      if (summarySource?.averageVitals) {
         // CWV pass rate: % of pages with score >= 90
-        const pages = siteSpeed.pages ?? [];
-        if (pages.length > 0) {
-          const passing = pages.filter(p => (p.score ?? 0) >= 90).length;
-          const rate = passing / pages.length;
-          cwvPassRate.mobile = rate;
-        }
-        // Performance summary from averageVitals
-        if (siteSpeed.averageVitals) {
-          performanceSummary = {
-            avgLcp: siteSpeed.averageVitals.LCP ?? null,
-            avgFid: siteSpeed.averageVitals.FID ?? null,
-            avgCls: siteSpeed.averageVitals.CLS ?? null,
-            score: siteSpeed.averageScore ?? null,
-          };
-        }
+        performanceSummary = {
+          avgLcp: summarySource.averageVitals.LCP ?? null,
+          avgFid: summarySource.averageVitals.FID ?? null,
+          avgCls: summarySource.averageVitals.CLS ?? null,
+          score: summarySource.averageScore ?? null,
+        };
       }
     } catch (err) {
       log.debug({ workspaceId, err }, 'siteHealth: pagespeed failed — skipping');
     }
   }
 
-  // Desktop CWV currently comes from the homepage/site-level audit summary until
-  // PageSpeed snapshots are keyed by siteId + strategy.
+  const mobileAssessment = latestAuditCwvSummary?.mobile?.assessment;
+  if (cwvPassRate.mobile === null && mobileAssessment === 'good') cwvPassRate.mobile = 1;
+  else if (cwvPassRate.mobile === null && (mobileAssessment === 'needs-improvement' || mobileAssessment === 'poor')) cwvPassRate.mobile = 0;
+
   const desktopAssessment = latestAuditCwvSummary?.desktop?.assessment;
-  if (desktopAssessment === 'good') cwvPassRate.desktop = 1;
-  else if (desktopAssessment === 'needs-improvement' || desktopAssessment === 'poor') cwvPassRate.desktop = 0;
+  if (cwvPassRate.desktop === null && desktopAssessment === 'good') cwvPassRate.desktop = 1;
+  else if (cwvPassRate.desktop === null && (desktopAssessment === 'needs-improvement' || desktopAssessment === 'poor')) cwvPassRate.desktop = 0;
 
   // ── Redirect chains (redirect-store.ts) ─────────────────────────────
   if (siteId) {

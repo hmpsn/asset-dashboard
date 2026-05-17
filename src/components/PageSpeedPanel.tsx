@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Gauge, Smartphone, Monitor, ChevronDown, ChevronRight,
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { MetricRing, EmptyState, Icon, Button } from './ui';
+import { MetricRing, EmptyState, Icon, Button, PageHeader, ClickableRow } from './ui';
 import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
@@ -57,6 +57,7 @@ interface SiteSpeedResult {
 interface Props {
   siteId: string;
   workspaceId?: string;
+  showHeader?: boolean;
 }
 
 function scoreColor(score: number): string {
@@ -117,9 +118,10 @@ interface WebflowPage {
   id: string;
   title: string;
   slug: string;
+  publishedPath?: string | null;
 }
 
-export function PageSpeedPanel({ siteId, workspaceId }: Props) {
+export function PageSpeedPanel({ siteId, workspaceId, showHeader = true }: Props) {
   const [data, setData] = useState<SiteSpeedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -131,6 +133,8 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
   const [selectedPage, setSelectedPage] = useState<string>('');
   const [singleResult, setSingleResult] = useState<PageSpeedResult | null>(null);
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const bulkRunInFlightRef = useRef(false);
+  const bulkRunVersionRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,18 +146,31 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
         if (list.length > 0) setSelectedPage(list[0].id);
       })
       .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
-    // Load last saved bulk PageSpeed snapshot
-    pageWeight.pagespeedSnapshot(siteId, workspaceId)
-      .then(snap => {
-        if (cancelled) return;
-        const s = snap as { result?: SiteSpeedResult } | null;
-        if (s?.result) { setData(s.result); setHasRun(true); }
-      })
-      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId, workspaceId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const snapshotVersion = bulkRunVersionRef.current;
+    pageWeight.pagespeedSnapshot(siteId, workspaceId, strategy)
+      .then(snap => {
+        if (cancelled || bulkRunInFlightRef.current || snapshotVersion !== bulkRunVersionRef.current) return;
+        const s = snap as { result?: SiteSpeedResult } | null;
+        if (s?.result) {
+          setData(s.result);
+          setHasRun(true);
+        } else {
+          setData(null);
+          setHasRun(false);
+        }
+      })
+      .catch((err) => { console.error('PageSpeedPanel operation failed:', err); });
+    return () => { cancelled = true; };
+  }, [siteId, workspaceId, strategy]);
+
   const runBulkTest = (strat: 'mobile' | 'desktop') => {
+    bulkRunInFlightRef.current = true;
+    bulkRunVersionRef.current += 1;
     setLoading(true);
     setHasRun(true);
     setStrategy(strat);
@@ -166,9 +183,13 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
         if (result.error) { setError(result.error); return; }
         if ((result as { pages?: unknown[] }).pages?.length === 0) { setError('No pages could be tested. The Google PageSpeed API may be rate-limited. Add a GOOGLE_PSI_KEY env variable for higher limits.'); return; }
         setData(result);
+        setHasRun(true);
       })
       .catch(e => setError(e instanceof Error ? e.message : 'PageSpeed analysis failed'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        bulkRunInFlightRef.current = false;
+        setLoading(false);
+      });
   };
 
   const runSingleTest = (strat: 'mobile' | 'desktop') => {
@@ -183,7 +204,7 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
     setSingleResult(null);
     setError(null);
 
-    pageWeight.pagespeedSingle(siteId, { pageSlug: page.slug, strategy: strat, pageTitle: page.title }, workspaceId)
+    pageWeight.pagespeedSingle(siteId, { pageId: page.id, pageSlug: page.publishedPath ?? page.slug, strategy: strat, pageTitle: page.title }, workspaceId)
       .then(d => {
         const result = d as PageSpeedResult & { error?: string };
         if (result.error) { setError(result.error); return; }
@@ -201,6 +222,14 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
     });
   };
 
+  const pageHeader = showHeader ? (
+    <PageHeader
+      title="Page Speed"
+      subtitle="Core Web Vitals and performance diagnostics."
+      icon={<Icon as={Gauge} size="lg" className="text-accent-brand" />}
+    />
+  ) : null;
+
   // Single result view (re-uses same VitalCard / opportunity / diagnostic rendering)
   const renderSingleResult = (result: PageSpeedResult) => (
     <div className="space-y-5">
@@ -210,19 +239,23 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
           <span className="t-caption-sm text-[var(--brand-text-muted)]">{result.page}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
+          <Button
             onClick={() => runSingleTest(strategy === 'mobile' ? 'desktop' : 'mobile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+            variant="ghost"
+            size="sm"
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             {strategy === 'mobile' ? <Icon as={Monitor} size="sm" /> : <Icon as={Smartphone} size="sm" />}
             Test {strategy === 'mobile' ? 'Desktop' : 'Mobile'}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => { setHasRun(false); setSingleResult(null); setData(null); }}
-            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1"
+            variant="ghost"
+            size="sm"
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             ← Back
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -294,30 +327,36 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
 
   if (!hasRun) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-5">
-        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
-          <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
-        </div>
-        <p className="text-[var(--brand-text)] t-caption-sm">Core Web Vitals &amp; Performance</p>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-12 gap-5">
+          <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
+            <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
+          </div>
+          <p className="text-[var(--brand-text)] t-caption-sm">Core Web Vitals &amp; Performance</p>
 
         {/* Mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-          <button
+          <Button
             onClick={() => setMode('single')}
-            className={`px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${mode === 'single' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`${mode === 'single' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Single Page
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setMode('bulk')}
-            className={`px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
+            variant="ghost"
+            size="sm"
+            className={`${mode === 'bulk' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Bulk Test (Top 3)
-          </button>
+          </Button>
         </div>
 
-        {mode === 'single' ? (
-          <div className="w-full max-w-md space-y-3">
+          {mode === 'single' ? (
+            <div className="w-full max-w-md space-y-3">
             <SearchableSelect
               options={pages.map(p => ({ value: p.id, label: `${p.title} ${p.slug ? `(/${p.slug})` : '(Home)'}` }))}
               value={selectedPage}
@@ -344,9 +383,9 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                 Test Desktop
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2 text-center">
+            </div>
+          ) : (
+            <div className="space-y-2 text-center">
             <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md">
               Tests the top 3 most important pages automatically (homepage + key pages).
             </p>
@@ -366,42 +405,54 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                 Test Desktop
               </Button>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
-        <p className="t-caption-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
+          <p className="t-caption-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
+        </div>
       </div>
     );
   }
 
   // Single page result
   if (singleResult) {
-    return renderSingleResult(singleResult);
+    return (
+      <div className="space-y-6">
+        {pageHeader}
+        {renderSingleResult(singleResult)}
+      </div>
+    );
   }
 
   if (error || !data || data.pages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        {error ? (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
-            <p className="text-accent-danger t-ui mb-1">PageSpeed Analysis Failed</p>
-            <p className="t-caption-sm text-accent-danger">{error}</p>
-          </div>
-        ) : (
-          <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
-        )}
-        <Button variant="primary" onClick={() => { setHasRun(false); setError(null); }}>
-          Try Again
-        </Button>
+      <div className="space-y-6">
+        {pageHeader}
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          {error ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
+              <p className="text-accent-danger t-ui mb-1">PageSpeed Analysis Failed</p>
+              <p className="t-caption-sm text-accent-danger">{error}</p>
+            </div>
+          ) : (
+            <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
+          )}
+          <Button variant="primary" onClick={() => { setHasRun(false); setError(null); }}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -410,25 +461,30 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
 
   return (
     <div className="space-y-8">
+      {pageHeader}
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-          <button
+          <Button
             onClick={() => { if (strategy !== 'mobile') runBulkTest('mobile'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+            variant="ghost"
+            size="sm"
+            className={`${
               strategy === 'mobile' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
             <Icon as={Smartphone} size="sm" /> Mobile
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => { if (strategy !== 'desktop') runBulkTest('desktop'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
+            variant="ghost"
+            size="sm"
+            className={`${
               strategy === 'desktop' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
             <Icon as={Monitor} size="sm" /> Desktop
-          </button>
+          </Button>
         </div>
         <div className="t-caption-sm text-[var(--brand-text-muted)]">
           {data.pages.length} pages tested · {new Date(data.testedAt).toLocaleTimeString()}
@@ -459,9 +515,9 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
           return (
             // pr-check-disable-next-line -- brand asymmetric signature on page-level result card; intentional non-SectionCard chrome
             <div key={page.url} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-              <button
+              <ClickableRow
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50"
               >
                 {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
                 <div className={`t-stat-sm tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
@@ -474,7 +530,7 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   <span>CLS {formatCLS(page.vitals.CLS)}</span>
                   <span>INP {formatMs(page.vitals.INP)}</span>
                 </div>
-              </button>
+              </ClickableRow>
 
               {isOpen && (
                 <div className="border-t border-[var(--brand-border)] bg-[var(--surface-1)]/50">
@@ -491,14 +547,16 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   {/* Opportunities */}
                   {page.opportunities.length > 0 && (
                     <div className="px-4 pb-3">
-                      <button
+                      <Button
                         onClick={() => toggleExpand(`opp-${page.url}`)}
-                        className="flex items-center gap-2 t-caption-sm font-medium text-[var(--brand-text)] mb-2"
+                        variant="ghost"
+                        size="sm"
+                        className="text-[var(--brand-text)] mb-2 !px-0"
                       >
                         <Icon as={Zap} size="sm" className="text-accent-warning" />
                         Opportunities ({page.opportunities.length})
                         {expanded.has(`opp-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
-                      </button>
+                      </Button>
                       {expanded.has(`opp-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.opportunities.map(opp => (
@@ -523,14 +581,16 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
                   {/* Diagnostics */}
                   {page.diagnostics.length > 0 && (
                     <div className="px-4 pb-4">
-                      <button
+                      <Button
                         onClick={() => toggleExpand(`diag-${page.url}`)}
-                        className="flex items-center gap-2 t-caption-sm font-medium text-[var(--brand-text)] mb-2"
+                        variant="ghost"
+                        size="sm"
+                        className="text-[var(--brand-text)] mb-2 !px-0"
                       >
                         <Icon as={Info} size="sm" className="text-accent-info" />
                         Diagnostics ({page.diagnostics.length})
                         {expanded.has(`diag-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
-                      </button>
+                      </Button>
                       {expanded.has(`diag-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.diagnostics.map(diag => (

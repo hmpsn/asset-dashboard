@@ -6,6 +6,7 @@ import { classifyPage } from './classifier.js';
 import type { PageKind } from './classifier.js';
 import type { WebflowPage } from '../webflow-pages.js';
 import type { CanonicalEntity } from '../../shared/types/schema-plan.js';
+import { resolvePagePath } from '../helpers.js';
 
 export interface SiteContextPage {
   /** URL path segment, e.g. '/services/design' */
@@ -49,10 +50,7 @@ function kindToIdSuffix(kind: PageKind): string {
 
 /** Derive the canonical path for a page, handling homepage slug variants. */
 function derivePath(page: WebflowPage): string {
-  if (page.publishedPath) return page.publishedPath;
-  const slug = page.slug ?? '';
-  if (!slug || slug === 'index' || slug === 'home') return '/';
-  return `/${slug}`;
+  return resolvePagePath(page);
 }
 
 /**

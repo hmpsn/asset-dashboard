@@ -1,9 +1,9 @@
 import type { RefObject } from 'react';
 import { BarChart3, Ban, CheckCircle2, ChevronDown, Eye, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
-import { Button, Icon, SectionCard, TierGate, TrendBadge, type Tier } from '../../ui';
+import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type BadgeTone, type Tier } from '../../ui';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
-import { fmtNum, intentColor, kdColor } from './strategyKeywordDisplay';
+import { fmtNum, kdColor } from './strategyKeywordDisplay';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];
 type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
@@ -54,17 +54,19 @@ const SERP_FEATURE_LABELS: Record<string, string> = {
 };
 
 function requestStatusLabel(status?: ClientContentRequest['status']) {
-  if (status === 'published') return { icon: CheckCircle2, text: 'Published', tone: 'success' as const };
-  if (status === 'delivered') return { icon: CheckCircle2, text: 'In Production', tone: 'brand' as const };
-  if (status === 'approved' || status === 'in_progress') return { icon: Sparkles, text: 'In Production', tone: 'brand' as const };
-  if (status === 'brief_generated' || status === 'client_review') return { icon: FileText, text: 'Brief Requested', tone: 'warning' as const };
-  return { icon: CheckCircle2, text: 'Brief Ordered', tone: 'warning' as const };
+  if (status === 'published') return { icon: CheckCircle2, text: 'Published', tone: 'emerald' as const };
+  if (status === 'delivered') return { icon: CheckCircle2, text: 'In Production', tone: 'teal' as const };
+  if (status === 'approved' || status === 'in_progress') return { icon: Sparkles, text: 'In Production', tone: 'teal' as const };
+  if (status === 'brief_generated' || status === 'client_review') return { icon: FileText, text: 'Brief Requested', tone: 'amber' as const };
+  return { icon: CheckCircle2, text: 'Brief Ordered', tone: 'amber' as const };
 }
 
-function requestStatusClass(tone: 'success' | 'brand' | 'warning') {
-  if (tone === 'success') return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
-  if (tone === 'brand') return 'text-accent-brand bg-teal-500/10 border-teal-500/20';
-  return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+function intentTone(intent?: string): BadgeTone {
+  if (intent === 'informational') return 'blue';
+  if (intent === 'commercial') return 'teal';
+  if (intent === 'transactional') return 'emerald';
+  if (intent === 'navigational') return 'amber';
+  return 'zinc';
 }
 
 function ContentGapCard({
@@ -99,17 +101,15 @@ function ContentGapCard({
         <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
           {gap.topic}
           {gap.opportunityScore != null && (
-            <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
-              {gap.opportunityScore}/100
-            </span>
+            <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
           )}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {gap.intent && (
-            <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+            <Badge label={gap.intent} tone={intentTone(gap.intent)} variant="outline" shape="pill" className="uppercase" />
           )}
           {pageType !== 'blog' && (
-            <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{pageType}</span>
+            <Badge label={pageType} tone="teal" variant="outline" className="capitalize" />
           )}
         </div>
       </div>
@@ -147,9 +147,7 @@ function ContentGapCard({
             <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] font-medium"><TrendBadge value={0} hideOnZero={false} suffix="" iconOnly />Stable</span>
           )}
           {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => (
-            <span key={feat} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-              {SERP_FEATURE_LABELS[feat] ?? feat}
-            </span>
+            <Badge key={feat} label={SERP_FEATURE_LABELS[feat] ?? feat} tone="blue" variant="outline" />
           ))}
           {gap.competitorProof && (
             <span className="t-caption-sm text-accent-warning font-medium">{gap.competitorProof}</span>
@@ -167,9 +165,16 @@ function ContentGapCard({
             <div className="flex items-center gap-2 px-2 py-1 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
               <Icon as={Ban} size="sm" className="text-accent-danger flex-shrink-0" />
               <span className="t-caption-sm text-accent-danger">Not relevant</span>
-              <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex items-center gap-0.5 transition-colors disabled:opacity-50">
-                <Icon as={Undo2} size="sm" /> Undo
-              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Undo2}
+                onClick={() => undoFeedback(gap.targetKeyword)}
+                disabled={loading}
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-0.5 py-0.5"
+              >
+                Undo
+              </Button>
             </div>
           );
           if (fbStatus === 'approved') return (
@@ -180,20 +185,26 @@ function ContentGapCard({
           );
           return (
             <div className="flex items-center gap-1.5">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={ThumbsUp}
                 onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
                 disabled={loading}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
+                className="px-2 py-1 rounded-[var(--radius-sm)] text-accent-brand bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20"
               >
-                <Icon as={ThumbsUp} size="sm" /> Relevant
-              </button>
-              <button
+                Relevant
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={ThumbsDown}
                 onClick={() => onDeclineKeyword(gap.targetKeyword, 'content_gap')}
                 disabled={loading}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                className="px-2 py-1 rounded-[var(--radius-sm)] text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20"
               >
-                <Icon as={ThumbsDown} size="sm" /> Not relevant
-              </button>
+                Not relevant
+              </Button>
             </div>
           );
         })()}
@@ -202,29 +213,32 @@ function ContentGapCard({
           (() => {
             const status = requestStatusLabel(matchingReq?.status);
             return (
-              <span className={`flex items-center gap-1 t-caption-sm px-2.5 py-1.5 rounded-[var(--radius-lg)] border flex-shrink-0 ${requestStatusClass(status.tone)}`}>
-                <Icon as={status.icon} size="md" /> {status.text}
-              </span>
+              <Badge label={status.text} tone={status.tone} variant="outline" size="md" icon={status.icon} className="flex-shrink-0" />
             );
           })()
         ) : planStatus ? (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Layers}
             onClick={() => onTabChange?.('content-plan')}
-            className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
+            className="text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20"
             title="View in Content Plan"
           >
-            <Icon as={Layers} size="md" />
             {planStatus === 'published' ? 'Published' : planStatus === 'approved' ? 'Approved' : planStatus === 'in_progress' || planStatus === 'brief_generated' ? 'In Progress' : 'Planned'}
-          </button>
+          </Button>
         ) : (
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={FileText}
               onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-accent-brand font-medium hover:bg-teal-600/40"
             >
-              <Icon as={FileText} size="sm" /> Get Brief
+              Get Brief
               {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
-            </button>
+            </Button>
             {(hidePrices || fullPostPrice != null) && (
               <Button
                 variant="primary"
@@ -273,9 +287,10 @@ export function StrategyContentOpportunitiesSection({
     <div ref={newContentRef}>
       <TierGate tier={effectiveTier} required="growth" feature="Create Content" teaser={`${newContentTopicCount} content ideas identified - upgrade to unlock recommendations`}>
         <SectionCard noPadding>
-          <button
+          <ClickableRow
             onClick={() => toggleSection('new-content')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
+            className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
+            aria-expanded={expandedSections.has('new-content')}
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
@@ -287,10 +302,10 @@ export function StrategyContentOpportunitiesSection({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-teal-500/20">{newContentTopicCount}</span>
+              <Badge label={String(newContentTopicCount)} tone="teal" variant="outline" shape="pill" />
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('new-content') ? '' : '-rotate-90'}`} />
             </div>
-          </button>
+          </ClickableRow>
 
           {expandedSections.has('new-content') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
@@ -333,12 +348,14 @@ export function StrategyContentOpportunitiesSection({
                       ))}
                   </div>
                   {strategyData.contentGaps.length > 6 && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleSection('new-content-gaps-all')}
-                      className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
+                      className="w-full mt-3 text-center py-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
                     >
                       {expandedSections.has('new-content-gaps-all') ? 'Show fewer' : `View all ${strategyData.contentGaps.length} opportunities`}
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
@@ -369,12 +386,14 @@ export function StrategyContentOpportunitiesSection({
                     ))}
                   </div>
                   {strategyData.keywordGaps.length > 6 && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleSection('competitor-gaps-all')}
-                      className="w-full mt-2 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      className="w-full mt-2 text-center py-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                     >
                       {expandedSections.has('competitor-gaps-all') ? 'Show fewer' : `View all ${strategyData.keywordGaps.length}`}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}

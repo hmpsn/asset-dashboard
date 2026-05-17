@@ -6,6 +6,7 @@ import { recordSeoChange } from './seo-change-tracker.js';
 import { updatePageSeo } from './webflow.js';
 import { getWorkspace, updatePageState } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
+import { normalizePageUrl } from './helpers.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');
@@ -65,7 +66,15 @@ export async function runSeoBulkAcceptFixesJob({
                 fields: [changedField],
                 updatedBy: 'admin',
               });
-              recordSeoChange(ws.id, fix.pageId, fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
+              const pagePath = fix.publishedPath
+                ? normalizePageUrl(fix.publishedPath)
+                : fix.pageSlug ? normalizePageUrl(fix.pageSlug) : '';
+              recordSeoChange(ws.id, fix.pageId, pagePath, fix.pageName || '', [changedField], 'audit-fix');
+              broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
+                pageId: fix.pageId,
+                fields: [changedField],
+                source: 'audit-fix',
+              });
             } else {
               log.debug({ workspaceId, pageId: fix.pageId }, 'bulk-accept-fixes: workspace missing during local state tracking');
             }
@@ -105,6 +114,25 @@ export async function runSeoBulkAcceptFixesJob({
         jobId,
         operation: 'bulk-accept-fixes',
         error: 'Cancelled',
+      });
+      return;
+    }
+
+    if (applied.length === 0 && failed > 0) {
+      const errorMessage = `Bulk accept fixes failed for all ${fixes.length} fixes`;
+      updateJob(jobId, {
+        status: 'error',
+        progress: done,
+        message: errorMessage,
+        error: errorMessage,
+        result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId,
+        operation: 'bulk-accept-fixes',
+        error: errorMessage,
+        failed,
+        total: fixes.length,
       });
       return;
     }

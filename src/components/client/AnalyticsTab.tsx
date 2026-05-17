@@ -3,7 +3,7 @@ import {
   LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
-import { StatCard, EmptyState, Icon, PageHeader, SectionCard, ChartCard } from '../ui';
+import { StatCard, EmptyState, Icon, SectionCard, ChartCard, Button, FormInput } from '../ui';
 import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -154,19 +154,18 @@ export function AnalyticsTab({
 
   return (<>
     <div className="space-y-6">
-    <PageHeader
-      title="Analytics"
-      subtitle={ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
-    />
+    <p className="t-caption-sm text-[var(--brand-text-muted)]">
+      {ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}
+    </p>
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      <StatCard size="hero" icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-accent-brand" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
+      <StatCard size="hero" icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-accent-info" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
       <StatCard size="hero" icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-accent-info" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
-      <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-accent-brand" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
+      <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-accent-info" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
       <StatCard size="hero" icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-accent-warning" staggerIndex={3} />
       <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'} delta={ga4Comparison?.change.bounceRate || undefined} deltaLabel="pp" invertDelta staggerIndex={4} />
-      <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-accent-brand" staggerIndex={5} />
+      <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-accent-info" staggerIndex={5} />
     </div>
 
     {/* Traffic Trend + Devices row */}
@@ -177,8 +176,8 @@ export function AnalyticsTab({
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" hide />
@@ -193,22 +192,22 @@ export function AnalyticsTab({
                   <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
                     <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                     <div className="px-3 py-1.5 space-y-1">
-                      <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-accent-info">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
                       <div className="flex justify-between t-caption-sm"><span className="text-accent-info">Sessions</span><span className="text-[var(--brand-text)] font-medium">{row.sessions.toLocaleString()}</span></div>
-                      <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Pageviews</span><span className="text-[var(--brand-text)] font-medium">{row.pageviews.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-accent-info">Pageviews</span><span className="text-[var(--brand-text)] font-medium">{row.pageviews.toLocaleString()}</span></div>
                     </div>
                   </div>
                 );
               }} />
-              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(45,212,191,0.3)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
+              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(96,165,250,0.3)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
               <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
-              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(96,165,250,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
-            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-teal-400 inline-block" /> Users</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-blue-400 inline-block" /> Users</span>
             <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-blue-400 inline-block" /> Sessions</span>
-            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-teal-400/40 inline-block" /> Pageviews</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded-[var(--radius-sm)] bg-blue-400/40 inline-block" /> Pageviews</span>
           </div>
         </ChartCard>
 
@@ -217,7 +216,7 @@ export function AnalyticsTab({
           <ChartCard title="Devices" className="flex flex-col">
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
-                const PIE_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber]; // chart-hex-ok — #14b8a6 is teal-500 for pie anchor
+                const PIE_COLORS = [CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.orange];
                 let cursor = 0;
                 const stops = ga4Devices.map((d, i) => {
                   const start = cursor;
@@ -264,7 +263,7 @@ export function AnalyticsTab({
             <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]">
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-5 text-right">{i + 1}</span>
               <span className="t-caption text-[var(--brand-text)] flex-1 truncate font-mono">{p.path}</span>
-              <span className="t-caption text-accent-brand font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+              <span className="t-caption text-accent-info font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-14 text-right">{p.users.toLocaleString()} u</span>
             </div>
           ))}
@@ -316,9 +315,8 @@ export function AnalyticsTab({
         const isSelected = ga4SelectedEvent === c.eventName;
         const pinned = isEventPinned(c.eventName);
         return (
-          <button key={i} onClick={() => loadEventTrend(c.eventName)}
-            className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}
-            style={{ borderRadius: 'var(--radius-signature)' }}>
+          <Button key={i} variant="ghost" size="sm" onClick={() => loadEventTrend(c.eventName)}
+            className={`w-full !p-4 !rounded-[var(--radius-signature)] !text-left !justify-start !items-start !flex !flex-col border transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
@@ -328,7 +326,7 @@ export function AnalyticsTab({
             </div>
             <div className="t-stat text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{c.users.toLocaleString()} users</div>
-          </button>
+          </Button>
         );
       };
       const renderPageFilter = (moduleId: string, allowedPages?: string[]) => {
@@ -398,15 +396,20 @@ export function AnalyticsTab({
           {ga4SelectedEvent && ga4EventTrend.length > 2 && (
             <ChartCard
               title={eventDisplayName(ga4SelectedEvent)}
-              action={<button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>}
+              action={(
+                <Button variant="ghost" size="sm" onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }}
+                  className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption-sm text-[var(--brand-text-muted)] hover:!text-[var(--brand-text)]">
+                  Clear
+                </Button>
+              )}
             >
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Daily event count over the selected period</p>
               <ResponsiveContainer width="100%" height={112}>
                 <AreaChart data={ga4EventTrend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.15} />
-                      <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="date" hide />
@@ -419,12 +422,12 @@ export function AnalyticsTab({
                       <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
                         <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                         <div className="px-3 py-1.5">
-                          <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
+                          <div className="flex justify-between t-caption-sm"><span className="text-accent-info">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
                         </div>
                       </div>
                     );
                   }} />
-                  <Area type="monotone" dataKey="eventCount" stroke={CHART_SERIES_COLORS.teal} strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: CHART_SERIES_COLORS.teal, opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="eventCount" stroke={CHART_SERIES_COLORS.blue} strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: CHART_SERIES_COLORS.blue, opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
                 </AreaChart>
               </ResponsiveContainer>
               <div className="flex items-center justify-between mt-2 t-caption-sm text-[var(--brand-text-muted)]">
@@ -440,13 +443,14 @@ export function AnalyticsTab({
 
     {/* ── Collapsible Event Explorer ── */}
     <SectionCard noPadding>
-      <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
+      <Button variant="ghost" onClick={() => setShowExplorer(!showExplorer)}
+        className="w-full !rounded-none !px-5 !py-3 !flex !items-center !justify-between hover:!bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-accent-brand" />
           <span className="t-ui font-medium text-[var(--brand-text-bright)]">Event Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
-      </button>
+      </Button>
       {showExplorer && (
         <div className="px-5 pb-5">
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Break down events by page, or see which events fire on a specific page.</p>
@@ -464,18 +468,22 @@ export function AnalyticsTab({
             </div>
             <div className="flex-1 min-w-[180px]">
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Page Path (contains)</label>
-              <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
+              <FormInput value={explorerPage} onChange={setExplorerPage}
                 placeholder="/contact, /blog, etc."
                 onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
                 className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
             </div>
-            <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-              className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors flex items-center gap-1.5">
-              {explorerLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" />} Explore
-            </button>
+            <Button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
+              loading={explorerLoading}
+              icon={Search}
+              className="!px-4 !py-1.5 !rounded-[var(--radius-lg)] !t-caption !font-medium transition-colors">
+              Explore
+            </Button>
             {explorerData.length > 0 && (
-              <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
-                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Clear</button>
+              <Button variant="ghost" size="sm" onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
+                className="!px-3 !py-1.5 !rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:!text-[var(--brand-text)] transition-colors">
+                Clear
+              </Button>
             )}
           </div>
           {explorerData.length > 0 && (
@@ -496,17 +504,21 @@ export function AnalyticsTab({
                     return (
                       <tr key={i} className="border-b border-[var(--brand-border)] hover:bg-[var(--surface-3)]">
                         <td className="py-2 pr-3">
-                          <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                            className="t-caption text-accent-brand hover:text-accent-brand">{eventDisplayName(row.eventName)}</button>
+                          <Button variant="ghost" size="sm" onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
+                            className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption !text-accent-brand hover:!text-accent-brand">
+                            {eventDisplayName(row.eventName)}
+                          </Button>
                         </td>
                         <td className="py-2 pr-3">
-                          <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                            className="t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                          <Button variant="ghost" size="sm" onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
+                            className="!px-0 !py-0 !rounded-none hover:!bg-transparent t-caption !text-[var(--brand-text)] hover:!text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">
+                            {row.pagePath}
+                          </Button>
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-16 h-1 rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden">
-                              <div className="h-full rounded-[var(--radius-pill)] bg-teal-500/40" style={{ width: `${pct}%` }} />
+                              <div className="h-full rounded-[var(--radius-pill)] bg-blue-500/40" style={{ width: `${pct}%` }} />
                             </div>
                             <span className="t-caption text-[var(--brand-text)] tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                           </div>

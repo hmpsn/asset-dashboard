@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional, post } from '../../api/client';
-import { Button, EmptyState, Icon} from '../ui';
+import { Badge, Button, EmptyState, FormTextarea, Icon, StatusBadge, type BadgeTone } from '../ui';
 import {
   Loader2, CheckCircle, Globe, ChevronDown, ChevronRight,
   MessageSquare, Sparkles, Shield,
@@ -34,28 +34,28 @@ interface SchemaSnapshotSummary {
 interface Props {
   workspaceId: string;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  showHeader?: boolean;
 }
 
-const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
-  homepage: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
-  pillar: 'bg-teal-500/15 text-accent-brand border-teal-500/30',
-  service: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  audience: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  'lead-gen': 'bg-teal-500/15 text-accent-brand border-teal-500/30',
-  blog: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  about: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
-  contact: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
-  location: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
-  product: 'bg-emerald-500/15 text-accent-success border-emerald-500/30',
-  partnership: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
-  faq: 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  'case-study': 'bg-blue-500/15 text-accent-info border-blue-500/30',
-  comparison: 'bg-amber-500/15 text-accent-warning border-amber-500/30',
-  generic: 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30',
+const ROLE_TONES: Partial<Record<SchemaPageRole, BadgeTone>> = {
+  homepage: 'amber',
+  pillar: 'teal',
+  service: 'blue',
+  audience: 'blue',
+  'lead-gen': 'teal',
+  blog: 'blue',
+  about: 'zinc',
+  contact: 'zinc',
+  location: 'emerald',
+  product: 'emerald',
+  partnership: 'amber',
+  faq: 'blue',
+  'case-study': 'blue',
+  comparison: 'amber',
+  generic: 'zinc',
 };
-const DEFAULT_ROLE_COLOR = 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30';
 
-export function SchemaReviewTab({ workspaceId, setToast }: Props) {
+export function SchemaReviewTab({ workspaceId, setToast, showHeader = true }: Props) {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
@@ -132,30 +132,19 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
     }
   }
 
-  const statusBadge = (status: string) => {
-    const map: Record<string, { label: string; cls: string }> = {
-      draft: { label: 'Awaiting Review', cls: 'bg-amber-500/15 text-accent-warning border-amber-500/30' },
-      sent_to_client: { label: 'Ready for Review', cls: 'bg-teal-500/15 text-accent-brand border-teal-500/30' },
-      client_approved: { label: 'Approved', cls: 'bg-emerald-500/15 text-accent-success border-emerald-500/30' },
-      client_changes_requested: { label: 'Changes Requested', cls: 'bg-amber-500/15 text-accent-warning border-amber-500/30' },
-      active: { label: 'Active', cls: 'bg-emerald-500/15 text-accent-success border-emerald-500/30' },
-    };
-    const s = map[status] || map.draft;
-    return <span className={`inline-flex items-center px-2.5 py-1 rounded-[var(--radius-pill)] t-caption-sm font-medium border ${s.cls}`}>{s.label}</span>;
-  };
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Icon as={Shield} size="lg" className="text-accent-brand" />
-        <div>
-          <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
-          <p className="t-body text-[var(--brand-text-muted)] mt-1">
-            Review the structured data plan for your website. This determines how your pages appear in Google search results.
-          </p>
+      {showHeader && (
+        <div className="flex items-center gap-3">
+          <Icon as={Shield} size="lg" className="text-accent-brand" />
+          <div>
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema Strategy Review</h2>
+            <p className="t-body text-[var(--brand-text-muted)] mt-1">
+              Review the structured data plan for your website. This determines how your pages appear in Google search results.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* What is schema — education blurb */}
       <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] px-5 py-4" style={{ borderRadius: 'var(--radius-signature)' }}>
@@ -176,7 +165,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
             <div className="flex items-center gap-3">
               <Icon as={Globe} size="md" className="text-accent-brand" />
               <span className="t-ui font-medium text-[var(--brand-text-bright)]">Your Schema Plan</span>
-              {statusBadge(plan.status)}
+              <StatusBadge status={plan.status} domain="schema" variant="outline" shape="pill" />
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {plan.pageRoles.length} pages · {plan.canonicalEntities.length} entities
@@ -189,12 +178,13 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
               {Object.entries(roleGroups)
                 .sort((a, b) => b[1].length - a[1].length)
                 .map(([role, pages]) => (
-                  <span
+                  <Badge
                     key={role}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-pill)] t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
-                  >
-                    {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({pages.length})
-                  </span>
+                    label={`${SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} (${pages.length})`}
+                    tone={ROLE_TONES[role as SchemaPageRole] ?? 'zinc'}
+                    variant="outline"
+                    shape="pill"
+                  />
                 ))}
             </div>
           </div>
@@ -208,19 +198,22 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 const desc = SCHEMA_ROLE_CLIENT_DESC[role as SchemaPageRole] || '';
                 return (
                   <div key={role}>
-                    <button
+                    <Button
                       onClick={() => toggleRole(role)}
-                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+                      variant="ghost"
+                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left rounded-none"
                     >
                       {isExpanded
                         ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                         : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}>
-                        {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role}
-                      </span>
+                      <Badge
+                        label={SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role}
+                        tone={ROLE_TONES[role as SchemaPageRole] ?? 'zinc'}
+                        variant="outline"
+                      />
                       <span className="t-caption text-[var(--brand-text-muted)] flex-1 min-w-0 truncate">{desc}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">{pages.length} page{pages.length !== 1 ? 's' : ''}</span>
-                    </button>
+                    </Button>
                     {isExpanded && (
                       <div className="px-5 pb-3 pl-12 space-y-1">
                         {pages.map(pr => (
@@ -259,12 +252,12 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
             <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-[var(--surface-2)]/50">
               {showFeedback ? (
                 <div className="space-y-3">
-                  <textarea
+                  <FormTextarea
                     value={feedbackNote}
-                    onChange={e => setFeedbackNote(e.target.value)}
+                    onChange={setFeedbackNote}
                     placeholder="What changes would you like? (optional)"
                     rows={3}
-                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
+                    className="w-full t-caption"
                   />
                   <div className="flex items-center gap-2">
                     <Button
@@ -276,30 +269,35 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                     >
                       Send Feedback
                     </Button>
-                    <button
+                    <Button
                       onClick={() => { setShowFeedback(false); setFeedbackNote(''); }}
-                      className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+                      variant="ghost"
+                      className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                    icon={CheckCircle}
+                    loading={submitting}
+                    variant="ghost"
+                    className="px-5 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-teal-600 hover:bg-teal-500 text-white"
                   >
-                    {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowFeedback(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-strong)] transition-colors"
+                    icon={MessageSquare}
+                    variant="secondary"
+                    className="px-4 py-2.5 rounded-[var(--radius-lg)] t-ui font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-strong)]"
                   >
-                    <Icon as={MessageSquare} size="md" /> Request Changes
-                  </button>
+                    Request Changes
+                  </Button>
                 </div>
               )}
             </div>
@@ -353,14 +351,10 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   {page.existingSchemas.length > 0 && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-accent-success border border-emerald-500/20">
-                      {page.existingSchemas.length} live
-                    </span>
+                    <Badge label={`${page.existingSchemas.length} live`} tone="emerald" variant="outline" />
                   )}
                   {page.schemaTypes.map(t => (
-                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-mono">
-                      {t}
-                    </span>
+                    <Badge key={t} label={t} tone="teal" variant="outline" className="font-mono" />
                   ))}
                 </div>
               </div>

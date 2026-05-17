@@ -8,9 +8,11 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 
 import db from '../../server/db/index.js';
+import { signToken } from '../../server/auth.js';
 import { saveSuggestion, selectVariation } from '../../server/seo-suggestions.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import { createUser, deleteUser } from '../../server/users.js';
 import {
   setupOpenAIMocks,
   mockOpenAIJsonResponse,
@@ -100,6 +102,17 @@ function deleteSeoSuggestions(workspaceId: string): void {
   db.prepare('DELETE FROM seo_suggestions WHERE workspace_id = ?').run(workspaceId);
 }
 
+function seedPageKeyword(workspaceId: string, pagePath: string, pageTitle: string, primaryKeyword: string): void {
+  db.prepare(`
+    INSERT INTO page_keywords (workspace_id, page_path, page_title, primary_keyword, secondary_keywords)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(workspace_id, page_path) DO UPDATE SET
+      page_title = excluded.page_title,
+      primary_keyword = excluded.primary_keyword,
+      secondary_keywords = excluded.secondary_keywords
+  `).run(workspaceId, pagePath, pageTitle, primaryKeyword, JSON.stringify([]));
+}
+
 describe('Webflow SEO suggestions route coverage', () => {
   let ws: SeededFullWorkspace;
   let baseUrl = '';
@@ -117,6 +130,55 @@ describe('Webflow SEO suggestions route coverage', () => {
     await stopServer();
     deleteSeoSuggestions(ws.workspaceId);
     ws.cleanup();
+  });
+
+  it('rejects keyword analysis when body workspaceId is outside the JWT scope', async () => {
+    const forbiddenWs = seedWorkspace();
+    const originalOpenAiKey = process.env.OPENAI_API_KEY;
+    const scopedUser = await createUser(
+      `keyword-analysis-scope-${Date.now()}@test.local`,
+      'ScopedPass1!',
+      'Keyword Analysis Scoped User',
+      'member',
+      [ws.workspaceId],
+    );
+    const token = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
+    delete process.env.OPENAI_API_KEY;
+
+    try {
+      const allowedRes = await fetch(`${baseUrl}/api/webflow/keyword-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          workspaceId: ws.workspaceId,
+          pageTitle: 'Allowed Page',
+        }),
+      });
+      expect(allowedRes.status).toBe(500);
+      await expect(allowedRes.json()).resolves.toMatchObject({ error: 'OPENAI_API_KEY not configured' });
+
+      const res = await fetch(`${baseUrl}/api/webflow/keyword-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          workspaceId: forbiddenWs.workspaceId,
+          pageTitle: 'Forbidden Page',
+        }),
+      });
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toMatchObject({ error: 'You do not have access to this workspace' });
+    } finally {
+      if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalOpenAiKey;
+      deleteUser(scopedUser.id);
+      forbiddenWs.cleanup();
+    }
   });
 
   it('lists pending suggestions with counts for a workspace', async () => {
@@ -235,6 +297,9 @@ describe('Webflow SEO copy route coverage', () => {
   });
 
   it('returns mocked optimized copy from POST /api/webflow/seo-copy', async () => {
+    seedPageKeyword(ws.workspaceId, '/services/local-seo', 'Local SEO', 'local SEO services');
+    seedPageKeyword(ws.workspaceId, '/case-studies', 'Case Studies', 'local SEO case studies');
+
     const mockedCopy: SeoCopyResponse = {
       seoTitle: 'Local SEO Services for Growth',
       metaDescription: 'Improve visibility with practical local SEO services built for teams that need measurable growth.',
@@ -272,7 +337,9 @@ describe('Webflow SEO copy route coverage', () => {
       feature: 'content-score',
       model: 'gpt-5.4-mini',
     });
-    expect(calls[0].messages[1]?.content).toContain('PAGE: /services/local-seo');
+    expect(calls[0].messages[1]?.content).toContain('PAGE METADATA EVIDENCE');
+    expect(calls[0].messages[1]?.content).toContain('<untrusted_user_content>');
+    expect(calls[0].messages[1]?.content).toContain('"pagePath": "/services/local-seo"');
   });
 
   it('returns an error instead of success when SEO copy AI generation fails', async () => {

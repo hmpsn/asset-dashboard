@@ -7,7 +7,7 @@ import {
 import { brandscripts } from '../../api/brand-engine';
 import { ApiError } from '../../api/client';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, ConfirmDialog } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, ClickableRow, IconButton, cn, ConfirmDialog, FormInput, FormSelect, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -53,29 +53,28 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1">
           <label htmlFor="bs-name" className="t-caption text-[var(--brand-text-muted)]">Name</label>
-          <input
+          <FormInput
             id="bs-name"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={setName}
             placeholder="e.g. StoryBrand 2024"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+            className="w-full"
             autoFocus
           />
         </div>
 
         <div className="space-y-1">
           <label htmlFor="bs-framework" className="t-caption text-[var(--brand-text-muted)]">Framework (optional)</label>
-          <select
+          <FormSelect
             id="bs-framework"
             value={frameworkType}
-            onChange={e => setFrameworkType(e.target.value)}
+            onChange={setFrameworkType}
+            options={[
+              { value: '', label: 'Custom (blank)' },
+              ...templates.map(t => ({ value: t.id, label: t.name })),
+            ]}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-600"
-          >
-            <option value="">Custom (blank)</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+          />
         </div>
 
         <div className="flex items-center gap-3 pt-1">
@@ -144,24 +143,24 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
 
         <div className="space-y-1">
           <label htmlFor="import-name" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
-          <input
+          <FormInput
             id="import-name"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={setName}
             placeholder="e.g. Imported v1"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+            className="w-full"
           />
         </div>
 
         <div className="space-y-1">
           <label htmlFor="import-raw-text" className="t-caption text-[var(--brand-text-muted)]">Raw text</label>
-          <textarea
+          <FormTextarea
             id="import-raw-text"
             value={rawText}
-            onChange={e => setRawText(e.target.value)}
+            onChange={setRawText}
             placeholder="Paste your brandscript content here..."
             rows={8}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none font-mono"
+            className="w-full"
           />
         </div>
 
@@ -246,10 +245,9 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
   return (
     // pr-check-disable-next-line -- expandable section editor: the entire header row IS the toggle button, SectionCard title would duplicate it
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden">
-      <button
-        type="button"
+      <ClickableRow
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
+        className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 text-left"
       >
         <div className="flex-1 min-w-0">
           <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{section.title}</span>
@@ -265,19 +263,19 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
         ) : (
           <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0 ml-2" />
         )}
-      </button>
+      </ClickableRow>
 
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t border-[var(--brand-border)]">
           {section.purpose && (
             <p className="t-caption text-[var(--brand-text-muted)] pt-3 italic">{section.purpose}</p>
           )}
-          <textarea
+          <FormTextarea
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={setContent}
             rows={5}
             placeholder="Enter section content..."
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-y"
+            className="w-full"
           />
           <div className="flex justify-end">
             <Button
@@ -365,14 +363,15 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <Button
           onClick={onBack}
           aria-label="Back to all brandscripts"
-          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+          variant="ghost"
+          size="sm"
+          className="px-0 py-0 h-auto min-h-0 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
         >
           ← All brandscripts
-        </button>
+        </Button>
         <span className="text-[var(--brand-text-muted)]">/</span>
         <span className="text-sm font-semibold text-[var(--brand-text-bright)] truncate">{brandscript.name}</span>
         {brandscript.frameworkType && (
@@ -385,9 +384,10 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
       {/* Mode toggle + AI complete */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className={cn('flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1')}>
-          <button
-            type="button"
+          <Button
             onClick={() => setMode('edit')}
+            variant="ghost"
+            size="sm"
             className={cn(
               'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
               mode === 'edit'
@@ -396,10 +396,11 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
             )}
           >
             Edit sections
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => setMode('import')}
+            variant="ghost"
+            size="sm"
             className={cn(
               'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
               mode === 'import'
@@ -408,7 +409,7 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
             )}
           >
             Import text
-          </button>
+          </Button>
         </div>
 
         {mode === 'edit' && emptySectionCount > 0 && (
@@ -545,11 +546,10 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
       <div className="space-y-3">
         {items.map(bs => (
           // pr-check-disable-next-line -- list item button row, not a section card
-          <button
+          <ClickableRow
             key={bs.id}
-            type="button"
             onClick={() => onSelect(bs)}
-            className="w-full text-left bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 hover:border-[var(--brand-border-hover)] transition-colors group"
+            className="text-left bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 hover:border-[var(--brand-border-hover)] group"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -564,21 +564,20 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
                 </div>
               </div>
 
-              <button
-                type="button"
+              <IconButton
                 onClick={e => { e.stopPropagation(); setConfirmDeleteId(bs.id); }}
                 disabled={deletingId === bs.id}
-                className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
-                aria-label="Delete brandscript"
-              >
-                {deletingId === bs.id ? (
-                  <Icon as={Loader2} size="md" className="animate-spin" />
-                ) : (
-                  <Icon as={Trash2} size="md" />
+                icon={deletingId === bs.id ? Loader2 : Trash2}
+                label="Delete brandscript"
+                size="sm"
+                variant="ghost"
+                className={cn(
+                  'shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors',
+                  deletingId === bs.id && '[&_svg]:animate-spin',
                 )}
-              </button>
+              />
             </div>
-          </button>
+          </ClickableRow>
         ))}
       </div>
     </div>

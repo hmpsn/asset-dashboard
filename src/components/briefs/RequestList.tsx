@@ -4,7 +4,7 @@ import {
   Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button, FormInput, FormTextarea } from '../ui';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../../shared/types/content';
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
@@ -140,21 +140,21 @@ export function RequestList({
                     <span className={`flex items-center gap-1 t-caption-sm ${sc.color}`}><Icon as={StatusIcon} size="sm" /> {sc.label}</span>
                     <div className="flex items-center gap-1 flex-wrap justify-end">
                       {hasBrief && req.status !== 'requested' && (
-                        <button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-teal-600/30 border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
+                        <Button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} variant="ghost" size="sm" className={`rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-teal-600/30 border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
                           {loadingBrief === req.id ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Loading...</> : expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
-                        </button>
+                        </Button>
                       )}
                       {req.status === 'requested' && (
                         <>
-                          <button disabled={isGenerating} onClick={() => onGenerateBriefForRequest(req)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+                          <Button disabled={isGenerating} onClick={() => onGenerateBriefForRequest(req)} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
                             <Icon as={isGenerating ? Loader2 : Sparkles} size="sm" className={isGenerating ? 'animate-spin' : ''} />
                             {isGenerating ? 'Generating...' : 'Generate Brief'}
-                          </button>
-                          <button onClick={() => onUpdateRequestStatus(req.id, 'declined')} className="px-2 py-1 rounded bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">Decline</button>
+                          </Button>
+                          <Button onClick={() => onUpdateRequestStatus(req.id, 'declined')} variant="ghost" size="sm" className="rounded bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">Decline</Button>
                         </>
                       )}
                       {req.status === 'brief_generated' && (
-                        <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</button>
+                        <Button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} variant="ghost" size="sm" className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Send to Client</Button>
                       )}
                       {req.status === 'client_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Awaiting client feedback</span>
@@ -166,17 +166,19 @@ export function RequestList({
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
                         return (
-                          <button
+                          <Button
                             onClick={() => onOpenPost?.(existingPost.id)}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
                             title="Open post in editor"
                           >
                             <Icon as={PenLine} size="sm" /> Open Post
-                          </button>
+                          </Button>
                         );
                       })()}
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt && deliveringReqId !== req.id && (
-                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Brief</button>
+                        <Button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} variant="ghost" size="sm" className="rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors"><Icon as={Link2} size="sm" /> Deliver Brief</Button>
                       )}
                       {req.status === 'changes_requested' && (() => {
                         const existingPost = req.briefId
@@ -185,23 +187,27 @@ export function RequestList({
                         const isPostFlow = !!existingPost && req.serviceType === 'full_post';
                         if (isPostFlow) {
                           return (
-                            <button
+                            <Button
                               onClick={() => onUpdateRequestStatus(req.id, 'in_progress')}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                              variant="ghost"
+                              size="sm"
+                              className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
                               title="Re-queue for revision before resending to client"
                             >
                               <Icon as={Zap} size="sm" /> Re-queue for Revision
-                            </button>
+                            </Button>
                           );
                         }
                         return (
-                          <button
+                          <Button
                             onClick={() => onUpdateRequestStatus(req.id, 'client_review', { clientFeedback: '' })}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
                             title="Send the revised brief back to client for review"
                           >
                             <Icon as={Send} size="sm" /> Resubmit to Client
-                          </button>
+                          </Button>
                         );
                       })()}
                       {req.status === 'in_progress' && req.briefId && (() => {
@@ -210,17 +216,19 @@ export function RequestList({
                         const canSendToClient = existingPost.status === 'review' || existingPost.status === 'approved';
                         if (!canSendToClient) return null;
                         return (
-                          <button
+                          <Button
                             onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
                             title="Send post to client for review and approval"
                           >
                             <Icon as={Send} size="sm" /> Send Post to Client
-                          </button>
+                          </Button>
                         );
                       })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
-                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Content</button>
+                        <Button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} variant="ghost" size="sm" className="rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors"><Icon as={Link2} size="sm" /> Deliver Content</Button>
                       )}
                     </div>
                   </div>
@@ -229,18 +237,18 @@ export function RequestList({
                 {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
                   <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
                     <div className="flex items-center gap-1.5 mb-1"><Icon as={Link2} size="md" className="text-emerald-400" /><span className="t-caption-sm uppercase tracking-wider text-emerald-400 font-medium">Attach Deliverable</span></div>
-                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
-                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
+                    <FormInput type="url" value={deliveryUrl} onChange={onSetDeliveryUrl} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full" />
+                    <FormTextarea value={deliveryNotes} onChange={onSetDeliveryNotes} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full" rows={2} />
                     <div className="flex items-center gap-2">
-                      <button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-emerald-600/20 border border-emerald-500/30 t-caption-sm font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Mark Delivered</button>
-                      <button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                      <Button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-emerald-600/20 border border-emerald-500/30 t-caption-sm font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors"><Icon as={Check} size="sm" /> Mark Delivered</Button>
+                      <Button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</Button>
                     </div>
                   </div>
                 )}
                 {/* Mark Published button for delivered content */}
                 {req.status === 'delivered' && (
                   <div className="mt-2 flex items-center gap-2">
-                    <button onClick={() => onUpdateRequestStatus(req.id, 'published')} className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={CheckCircle2} size="sm" /> Mark Published</button>
+                    <Button onClick={() => onUpdateRequestStatus(req.id, 'published')} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={CheckCircle2} size="sm" /> Mark Published</Button>
                     {req.targetPageId && <span className="t-caption-sm text-[var(--brand-text-muted)]">Will mark target page as Live</span>}
                   </div>
                 )}
@@ -261,9 +269,9 @@ export function RequestList({
                   <div className="mt-2 t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)]/50 px-2.5 py-1.5 rounded border border-[var(--brand-border)]"><span className="text-[var(--brand-text)] font-medium">Reason:</span> {req.declineReason}</div>
                 )}
                 <div className="flex items-center justify-end mt-1.5">
-                  <button onClick={(e) => { e.stopPropagation(); onConfirmDeleteRequest(req); }} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10">
+                  <Button onClick={(e) => { e.stopPropagation(); onConfirmDeleteRequest(req); }} variant="ghost" size="sm" className="t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10">
                     <Icon as={Trash2} size="sm" /> Delete Request
-                  </button>
+                  </Button>
                 </div>
               </div>
               {/* Brief error message */}
@@ -273,9 +281,9 @@ export function RequestList({
                     <Icon as={XCircle} size="md" className="flex-shrink-0" />
                     <span>{briefError}</span>
                   </div>
-                  <button onClick={() => { onGenerateBriefForRequest(req); onSetBriefError(null); onSetExpandedRequest(null); }} className="mt-2 flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">
+                  <Button onClick={() => { onGenerateBriefForRequest(req); onSetBriefError(null); onSetExpandedRequest(null); }} variant="ghost" size="sm" className="mt-2 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">
                     <Icon as={Sparkles} size="sm" /> Regenerate Brief
-                  </button>
+                  </Button>
                 </div>
               )}
               {/* Full inline brief detail */}

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { put, post } from '../../api/client';
 import { keywords } from '../../api/seo';
@@ -36,6 +36,7 @@ export function useSeoEditorPageWorkflow({
   const [aiLoading, setAiLoading] = useState<Record<string, string>>({});
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
+  const pageById = useMemo(() => new Map(pages.map(page => [page.id, page])), [pages]);
 
   const updateField = useCallback((pageId: string, field: keyof SeoEditState, value: string) => {
     setEdits(prev => ({
@@ -56,7 +57,7 @@ export function useSeoEditorPageWorkflow({
         seoDescription: edit.seoDescription,
         savedAt: new Date().toISOString(),
         pageId,
-        pageSlug: pages.find(page => page.id === pageId)?.slug || '',
+        pageSlug: pageById.get(pageId)?.slug || '',
       };
       localStorage.setItem(draftKey, JSON.stringify(draftData));
       setDraftSaved(prev => new Set(prev).add(pageId));
@@ -90,16 +91,20 @@ export function useSeoEditorPageWorkflow({
         return next;
       });
     }
-  }, [edits, pages, workspaceId]);
+  }, [edits, pageById, workspaceId]);
 
   const savePage = useCallback(async (pageId: string) => {
     const edit = edits[pageId];
     if (!edit) return;
+    const page = pageById.get(pageId);
     setSaving(prev => new Set(prev).add(pageId));
     try {
       const data = await put<{ success?: boolean; error?: string }>(`/api/webflow/pages/${pageId}/seo`, {
         siteId,
         workspaceId,
+        slug: page ? resolvePagePath(page) : '',
+        publishedPath: page?.publishedPath,
+        pageTitle: page?.title || '',
         seo: { title: edit.seoTitle, description: edit.seoDescription },
         openGraph: { title: edit.seoTitle, description: edit.seoDescription },
       });
@@ -124,6 +129,7 @@ export function useSeoEditorPageWorkflow({
       setEdits(prev => ({ ...prev, [pageId]: { ...prev[pageId], dirty: false } }));
       setSaved(prev => new Set(prev).add(pageId));
       refreshStates();
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId, workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
       setTimeout(() => {
         setSaved(prev => {
@@ -155,10 +161,10 @@ export function useSeoEditorPageWorkflow({
         return next;
       });
     }
-  }, [edits, queryClient, refreshStates, setEdits, siteId, workspaceId]);
+  }, [edits, pageById, queryClient, refreshStates, setEdits, siteId, workspaceId]);
 
   const aiRewrite = useCallback(async (pageId: string, field: 'title' | 'description' | 'both') => {
-    const page = pages.find(entry => entry.id === pageId);
+    const page = pageById.get(pageId);
     if (!page) return;
     const edit = edits[pageId];
     setAiLoading(prev => ({ ...prev, [pageId]: field }));
@@ -203,10 +209,10 @@ export function useSeoEditorPageWorkflow({
         return next;
       });
     }
-  }, [edits, pages, setVariations, updateField, workspaceId]);
+  }, [edits, pageById, setVariations, updateField, workspaceId]);
 
   const analyzePage = useCallback(async (pageId: string) => {
-    const page = pages.find(entry => entry.id === pageId);
+    const page = pageById.get(pageId);
     if (!page || !workspaceId) return;
     const edit = edits[pageId];
 
@@ -224,6 +230,7 @@ export function useSeoEditorPageWorkflow({
         await keywords.persistAnalysis({
           workspaceId,
           pagePath: resolvePagePath(page),
+          pageTitle: page.title,
           analysis,
         });
 
@@ -239,7 +246,7 @@ export function useSeoEditorPageWorkflow({
         return next;
       });
     }
-  }, [edits, pages, queryClient, setLocalAnalyzedPages, workspaceId]);
+  }, [edits, pageById, queryClient, setLocalAnalyzedPages, workspaceId]);
 
   return {
     saving,

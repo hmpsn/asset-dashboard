@@ -3,6 +3,7 @@ import {
   buildEffectiveAnalyses,
   buildFilteredPages,
   buildFixQueue,
+  summarizeScoreTrend,
 } from '../../src/components/page-intelligence/pageIntelligenceData';
 import type { KeywordData } from '../../src/components/page-intelligence/pageIntelligenceTypes';
 import type { UnifiedPage } from '../../shared/types/page-join.js';
@@ -163,5 +164,18 @@ describe('PageIntelligence data helpers', () => {
       { id: 'fresh', impact: 300, score: 25 },
       { id: 'fallback-impact', impact: 80, score: 20 },
     ]);
+  });
+
+  it('summarizes optimization score history against the previous distinct score', () => {
+    expect(summarizeScoreTrend(undefined)).toBeNull();
+    expect(summarizeScoreTrend([
+      { score: 40, recordedAt: '2026-05-01T00:00:00.000Z', source: 'page-analysis' },
+      { score: 40, recordedAt: '2026-05-02T00:00:00.000Z', source: 'page-analysis' },
+    ])).toBeNull();
+    expect(summarizeScoreTrend([
+      { score: 40, recordedAt: '2026-05-01T00:00:00.000Z', source: 'page-analysis' },
+      { score: 55, recordedAt: '2026-05-03T00:00:00.000Z', source: 'page-analysis' },
+      { score: 50, recordedAt: '2026-05-02T00:00:00.000Z', source: 'page-analysis' },
+    ])).toEqual({ previous: 50, current: 55, delta: 5, direction: 'up' });
   });
 });

@@ -4,7 +4,9 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { recordOperationTrace } from './platform-observability.js';
 import { getBackgroundJobLabel, type BackgroundJobType } from '../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TRANSITIONS, validateTransition } from './state-machines.js';
 
 
 const log = createLogger('jobs');
@@ -234,6 +236,13 @@ export function createJob(type: BackgroundJobType | string, opts?: { message?: s
   stmts().insert.run(jobToParams(job));
   jobs.set(job.id, job);
   broadcastFn?.('job:created', job);
+  recordOperationTrace({
+    source: 'job',
+    operation: `job:${job.type}`,
+    status: 'warning',
+    workspaceId: job.workspaceId,
+    message: `Job created (${job.status})`,
+  });
   return job;
 }
 
@@ -241,9 +250,15 @@ export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 
   const job = jobs.get(id);
   if (!job) return;
   const normalizedUpdate = { ...update };
-  if (job.status === 'cancelled' && update.status && update.status !== 'cancelled') {
-    delete normalizedUpdate.status;
-    delete normalizedUpdate.message;
+  if (normalizedUpdate.status && normalizedUpdate.status !== job.status) {
+    try {
+      validateTransition('background_job', BACKGROUND_JOB_TRANSITIONS, job.status, normalizedUpdate.status);
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, jobId: id, from: job.status, to: normalizedUpdate.status }, 'jobs/updateJob: invalid status transition ignored');
+      }
+      return;
+    }
   }
   Object.assign(job, normalizedUpdate, { updatedAt: new Date().toISOString() });
   // Write through to SQLite
@@ -258,6 +273,18 @@ export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 
     updatedAt: job.updatedAt,
   });
   broadcastFn?.('job:update', job);
+
+  if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+    const durationMs = Math.max(0, new Date(job.updatedAt).getTime() - new Date(job.createdAt).getTime());
+    recordOperationTrace({
+      source: 'job',
+      operation: `job:${job.type}`,
+      status: job.status === 'done' ? 'success' : 'error',
+      workspaceId: job.workspaceId,
+      durationMs,
+      message: job.error ?? job.message ?? `Job ${job.status}`,
+    });
+  }
 }
 
 export function getJob(id: string): Job | undefined {

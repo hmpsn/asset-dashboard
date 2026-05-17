@@ -111,8 +111,8 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     recommended: ['totalTime', 'estimatedCost'],
   },
   Review: {
-    required: ['itemReviewed', 'reviewRating', 'author'],
-    recommended: ['datePublished', 'reviewBody'],
+    required: ['itemReviewed', 'author'],
+    recommended: ['reviewRating', 'datePublished', 'reviewBody'],
   },
   AggregateRating: {
     required: ['ratingValue', 'reviewCount'],
@@ -141,6 +141,10 @@ function hasSchemaField(node: Record<string, unknown>, field: string): boolean {
   if (typeof value === 'string') return value.trim().length > 0;
   if (Array.isArray(value)) return value.length > 0;
   return true;
+}
+
+function hasReviewRatingOrDate(node: Record<string, unknown>): boolean {
+  return hasSchemaField(node, 'reviewRating') || hasSchemaField(node, 'datePublished');
 }
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
@@ -595,6 +599,15 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             message: `${t} missing required field: ${field}`,
           });
         }
+      }
+      if (t === 'Review' && !hasReviewRatingOrDate(node)) {
+        findings.push({
+          severity: 'error',
+          type: t,
+          field: 'reviewRating',
+          ruleId: 'review-rating-or-date-missing',
+          message: 'Review missing reviewRating or datePublished',
+        });
       }
       for (const field of rules.recommended ?? []) {
         if (!hasSchemaField(node, field)) {

@@ -6,7 +6,7 @@ import {
   Loader2, CheckCircle, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
 import { get, post, patch, del } from '../../api/client';
-import { EmptyState, Icon, SectionCard, cn } from '../ui';
+import { Button, EmptyState, FormInput, Icon, IconButton, SectionCard, cn } from '../ui';
 
 interface ActionItem {
   id: string;
@@ -95,20 +95,22 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             </span>
           )}
         </div>
-        <button
+        <Button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium hover:bg-[var(--surface-3)] transition-colors text-teal-400"
+          variant="ghost"
+          size="sm"
+          className="px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium hover:bg-[var(--surface-3)] transition-colors text-teal-400"
         >
           <Icon as={Plus} size="sm" /> Add
-        </button>
+        </Button>
       </div>
 
       {/* Progress bar */}
       {items.length > 0 && (
         <div className="px-4 pt-3">
-          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-[var(--surface-2)]">
-            {counts.completed > 0 && <div className="bg-emerald-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
-            {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-full" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
+          <div className="flex gap-1 h-1.5 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-2)]">
+            {counts.completed > 0 && <div className="bg-emerald-500 rounded-[var(--radius-pill)]" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
+            {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-[var(--radius-pill)]" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
           </div>
         </div>
       )}
@@ -116,36 +118,57 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       {/* Add form */}
       {adding && (
         <div className="px-4 py-3 border-b border-[var(--brand-border)] space-y-2">
-          <input
+          <FormInput
             value={newTitle}
-            onChange={e => setNewTitle(e.target.value)}
+            onChange={setNewTitle}
             placeholder="What needs to be done?"
-            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full t-body"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
-          <input
+          <FormInput
             value={newDesc}
-            onChange={e => setNewDesc(e.target.value)}
+            onChange={setNewDesc}
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full t-body"
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-1">
               {(['high', 'medium', 'low'] as const).map(p => (
-                <button
+                <Button
                   key={p}
                   onClick={() => setNewPriority(p)}
-                  className={cn('px-2 py-1 rounded t-caption font-medium border', newPriority === p ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-transparent text-[var(--brand-text-muted)]')}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'px-2 py-1 rounded-[var(--radius-sm)] t-caption font-medium border',
+                    newPriority === p
+                      ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]'
+                      : 'border-transparent text-[var(--brand-text-muted)]',
+                  )}
                 >
-                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', PRIORITY_CONFIG[p].dot)} />
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-[var(--radius-pill)] mr-1', PRIORITY_CONFIG[p].dot)} />
                   {PRIORITY_CONFIG[p].label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
-              <button onClick={addItem} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-400 text-[#0f1219]" /* arbitrary-text-ok: has .dashboard-light override */>Add</button>
+              <Button
+                onClick={() => setAdding(false)}
+                variant="ghost"
+                size="sm"
+                className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={addItem}
+                size="sm"
+                className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-400 text-[#0f1219]"
+                /* arbitrary-text-ok: has .dashboard-light override */
+              >
+                Add
+              </Button>
             </div>
           </div>
         </div>
@@ -154,7 +177,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       {/* Load error */}
       {loadError && (
         <div className="px-4 py-2 border-b border-[var(--brand-border)] t-caption-sm text-red-400/80">
-          Couldn't load action items. <button onClick={load} className="underline hover:text-red-400">Retry</button>
+          Couldn't load action items. <Button onClick={load} variant="link" size="sm" className="text-red-400/90 hover:text-red-400 align-baseline">Retry</Button>
         </div>
       )}
 
@@ -165,18 +188,30 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
           const StatusIcon = cfg.icon;
           return (
             <div key={item.id} className="flex items-start gap-3 px-4 py-3 group">
-              <button onClick={() => cycleStatus(item)} className={cn('mt-0.5', cfg.color)} title={`Click to change status (${cfg.label})`}>
-                <StatusIcon className={cn('w-4 h-4', item.status === 'in-progress' && 'animate-spin')} />
-              </button>
+              <IconButton
+                onClick={() => cycleStatus(item)}
+                icon={StatusIcon}
+                label={`Change status (${cfg.label})`}
+                title={`Click to change status (${cfg.label})`}
+                variant="ghost"
+                size="sm"
+                className={cn('mt-0.5', cfg.color, item.status === 'in-progress' && '[&_svg]:animate-spin')}
+              />
               <div className="flex-1 min-w-0">
                 <div className={cn('t-body', item.status === 'completed' ? 'line-through text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-bright)]')}>{item.title}</div>
                 {item.description && <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{item.description}</div>}
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[item.priority]?.dot || 'bg-[var(--brand-text-muted)]')} title={item.priority} />
-                <button onClick={() => deleteItem(item.id)} className="text-[var(--brand-text-muted)] hover:text-red-400">
-                  <Icon as={Trash2} size="sm" />
-                </button>
+                <span className={cn('w-1.5 h-1.5 rounded-[var(--radius-pill)]', PRIORITY_CONFIG[item.priority]?.dot || 'bg-[var(--brand-text-muted)]')} title={item.priority} />
+                <IconButton
+                  onClick={() => deleteItem(item.id)}
+                  icon={Trash2}
+                  label="Delete action item"
+                  title="Delete action item"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[var(--brand-text-muted)] hover:text-red-400"
+                />
               </div>
             </div>
           );
@@ -188,13 +223,15 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             description='Track work items for this audit report.'
             className="py-6"
             action={
-              <button
+              <Button
                 onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
               >
                 <Icon as={Plus} size="sm" />
                 Add Item
-              </button>
+              </Button>
             }
           />
         )}
