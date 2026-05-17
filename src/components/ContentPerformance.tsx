@@ -283,7 +283,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.targetKeyword}</span>
                         {item.targetPageSlug && (
-                          <span className="t-caption-sm text-[var(--brand-text-dim)]">{item.targetPageSlug}</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.targetPageSlug}</span>
                         )}
                       </div>
                     </div>
@@ -308,7 +308,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                           </div>
                         </>
                       ) : (
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">No GSC data</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">No GSC data</span>
                       )}
 
                       <div className="text-right pl-3 border-l border-[var(--brand-border)]">

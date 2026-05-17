@@ -379,7 +379,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                           <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                             <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
-                          <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
+                          <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                             <span>{d.clicks.toLocaleString()} clicks</span>
                             <span>{d.ctr}% CTR</span>
                           </div>
@@ -424,7 +424,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                           <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                             <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${pct}%` }} />
                           </div>
-                          <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-dim)] mt-0.5">
+                          <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                             <span>{st.clicks.toLocaleString()} clicks · {st.impressions.toLocaleString()} imp</span>
                             <span>pos {st.position}</span>
                           </div>

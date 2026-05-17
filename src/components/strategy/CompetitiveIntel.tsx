@@ -235,7 +235,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
                 {/* Side-by-side bars */}
                 <div className="flex items-center gap-6 t-caption-sm mb-2">
                   <span className="text-teal-400 font-medium">{myDomain?.domain}</span>
-                  <span className="text-[var(--brand-text-dim)]">vs</span>
+                  <span className="text-[var(--brand-text-muted)]">vs</span>
                   <span className="text-orange-400 font-medium">{comp.domain}</span>
                 </div>
                 <div className="space-y-3">
@@ -308,7 +308,7 @@ export function CompetitiveIntel({ workspaceId, competitors, seoDataAvailable, c
             </Button>
           </p>
         )}
-        <p className="t-caption-sm text-[var(--brand-text-dim)] text-right ml-auto">
+        <p className="t-caption-sm text-[var(--brand-text-muted)] text-right ml-auto">
           Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'
             : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}

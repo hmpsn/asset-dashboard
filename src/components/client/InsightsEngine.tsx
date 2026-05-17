@@ -280,7 +280,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                         </span>
                       ))}
                       {rec.affectedPages.length > 3 && (
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">+{rec.affectedPages.length - 3} more</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">+{rec.affectedPages.length - 3} more</span>
                       )}
                     </div>
                   )}
@@ -601,7 +601,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   onClick={() => handleDismiss(rec.id)}
                                   variant="link"
                                   size="sm"
-                                  className="t-caption text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors ml-auto no-underline"
+                                  className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors ml-auto no-underline"
                                 >
                                   Dismiss
                                 </Button>

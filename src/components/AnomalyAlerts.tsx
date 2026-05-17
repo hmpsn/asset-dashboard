@@ -180,7 +180,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`t-caption-sm px-1.5 py-0.5 rounded ${style.badge}`}>{SOURCE_LABELS[anomaly.source]}</span>
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">{timeAgo(anomaly.detectedAt)}</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">{timeAgo(anomaly.detectedAt)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">

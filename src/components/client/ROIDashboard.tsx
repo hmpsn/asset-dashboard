@@ -186,7 +186,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="t-stat-sm text-accent-success">{fmtMoney(page.trafficValue)}<span className="t-caption-sm text-[var(--brand-text-dim)] font-normal">/mo</span></div>
+                    <div className="t-stat-sm text-accent-success">{fmtMoney(page.trafficValue)}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
                     <div className="flex items-center justify-end gap-2 mt-0.5">
                       <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={MousePointerClick} size="sm" /> {page.clicks}
@@ -263,7 +263,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="t-stat-sm text-accent-success">{item.trafficValue > 0 ? fmtMoney(item.trafficValue) : '$0'}<span className="t-caption-sm text-[var(--brand-text-dim)] font-normal">/mo</span></div>
+                    <div className="t-stat-sm text-accent-success">{item.trafficValue > 0 ? fmtMoney(item.trafficValue) : '$0'}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></div>
                     <div className="flex items-center justify-end gap-2 mt-0.5">
                       <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={MousePointerClick} size="sm" /> {item.clicks}
@@ -289,7 +289,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
       )}
 
       {/* Methodology note */}
-      <div className="t-caption-sm text-[var(--brand-text-dim)] text-center px-4">
+      <div className="t-caption-sm text-[var(--brand-text-muted)] text-center px-4">
         Values calculated from Google Search Console click data × SEMRush CPC estimates.
         Actual value may vary based on conversion rates and business metrics.
       </div>

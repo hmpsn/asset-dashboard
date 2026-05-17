@@ -192,7 +192,7 @@ export function AeoReview({ workspaceId }: Props) {
             AI-powered analysis of your existing pages with specific copy rewrites, section additions,
             citation recommendations, and structural changes to maximize AI citation likelihood.
           </p>
-          <p className="t-caption-sm text-[var(--brand-text-dim)] mt-2">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
             Requires a completed SEO audit. Reviews pages with AEO issues first, prioritized by traffic.
           </p>
         </div>
@@ -221,7 +221,7 @@ export function AeoReview({ workspaceId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
         <p className="t-caption-sm text-[var(--brand-text)]">Running AEO review across site pages...</p>
-        <p className="t-caption-sm text-[var(--brand-text-dim)]">This may take 1-2 minutes depending on the number of pages</p>
+        <p className="t-caption-sm text-[var(--brand-text-muted)]">This may take 1-2 minutes depending on the number of pages</p>
       </div>
     );
   }
