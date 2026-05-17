@@ -5882,3 +5882,16 @@ Bug hardening included:
 **Mutual:** Aligns product simplification decisions with operational readiness so teams can balance visibility, reliability, and monetization intentionally.
 
 **Files:** `docs/workflows/feature-maturity-scorecard.md`; `docs/rules/product-surface-rationalization.md`; `docs/workflows/pr-readiness-checklist.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 429. Styleguide Parity Rule Registry Contract (Wave 6)
+**What it does:** Adds a canonical rule registry for styleguide parity work with both human-readable and machine-readable authority. `docs/rules/styleguide-rule-registry.md` now defines registry semantics, tier policy (`error|warn|manual`), and promotion gates, while `data/styleguide-rule-registry.json` tracks rule-level metadata (`id`, `sourceAnchor`, `detectability`, `enforcementLevel`, `metricKey`, `owner`, `status`, `fixtureRequirement`, `hatch`). Existing enforcement docs now reference the registry as the source-of-truth for parity ratchet planning and rule promotions.
+
+**Agency value:** Converts style migration planning from scattered notes into a durable governance artifact that supports faster, lower-risk enforcement ratchets.
+
+**Client value:** Improves consistency over time by making rule promotion criteria explicit, which reduces recurring visual regressions between styleguide and live surfaces.
+
+**Mutual:** Aligns docs, enforcement, and roadmap notes around one contract so parallel cleanup waves can coordinate on shared rule IDs and ownership.
+
+**Files:** `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

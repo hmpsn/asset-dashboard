@@ -3,6 +3,8 @@
 > Canonical contract for the platform-wide styleguide migration lock.
 > This complements `CLAUDE.md`, `BRAND_DESIGN_LANGUAGE.md`, `DESIGN_SYSTEM.md`,
 > `/styleguide`, and `src/tokens.css`.
+> Rule-level registry authority lives in `docs/rules/styleguide-rule-registry.md`
+> and `data/styleguide-rule-registry.json`.
 
 ## Authority Order
 
@@ -36,6 +38,16 @@ If two sources conflict, higher authority wins.
 
 Baselines are persisted in `data/style-drift-baseline.json`.
 Any metric increase versus baseline is a regression.
+
+## Rule Registry Contract
+
+All style/design directives must be represented in the canonical registry:
+
+- Human-readable: `docs/rules/styleguide-rule-registry.md`
+- Machine-readable: `data/styleguide-rule-registry.json`
+
+Each directive must include enforcement tier, detectability class, metric key,
+and fixture requirements before promotion.
 
 ## Enforcement and Ratchet Policy
 
