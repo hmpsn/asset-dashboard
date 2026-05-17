@@ -5135,6 +5135,139 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'styleguide-css-must-import-public-tokens',
+    severity: 'warn',
+    fileGlobs: ['*.css'],
+    message:
+      "public/styleguide.css must include @import url('/tokens.css'); without it, specimen styles can drift from canonical tokens.",
+    rationale:
+      "Token parity requires static styleguide CSS to import public/tokens.css. A missing import silently decouples styleguide rendering from canonical token values.",
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const styleguidePath = files.find(
+        f => f.endsWith(path.join('public', 'styleguide.css')) || f.endsWith('public/styleguide.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'public/styleguide.css') : null);
+      if (!styleguidePath) return hits;
+
+      let css: string;
+      try {
+        css = readFileSync(styleguidePath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      const hasTokensImport = /@import\s+url\(\s*['"]\/tokens\.css['"]\s*\)\s*;/.test(css);
+      if (!hasTokensImport) {
+        hits.push({
+          file: styleguidePath,
+          line: 1,
+          text: "missing @import url('/tokens.css') in public/styleguide.css",
+        });
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'styleguide-typography-extra-class-drift',
+    severity: 'warn',
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css contains .t-* classes not defined in src/index.css. Remove stale styleguide-only typography aliases.',
+    rationale:
+      'The styleguide must not invent extra typography utilities. Extra .t-* classes in static specimens reintroduce drift despite parity for shared class names.',
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css vs src/index.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const indexPath = files.find(
+        f => f.endsWith(path.join('src', 'index.css')) || f.endsWith('src/index.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'src/index.css') : null);
+      const styleguidePath = files.find(
+        f => f.endsWith(path.join('public', 'styleguide.css')) || f.endsWith('public/styleguide.css'),
+      ) ?? (SCAN_ALL ? path.join(ROOT, 'public/styleguide.css') : null);
+
+      if (!indexPath || !styleguidePath) return hits;
+
+      let indexCss: string;
+      let styleguideCss: string;
+      try {
+        indexCss = readFileSync(indexPath, 'utf-8');
+        styleguideCss = readFileSync(styleguidePath, 'utf-8');
+      } catch {
+        return hits;
+      }
+
+      type TypoClass = { className: string; line: number };
+      const parseTypoClasses = (css: string): TypoClass[] => {
+        const out: TypoClass[] = [];
+        const re = /\.(t-[\w-]+)\s*\{/g;
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(css)) !== null) {
+          const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          out.push({ className: match[1], line });
+        }
+        return out;
+      };
+
+      const canonical = new Set(parseTypoClasses(indexCss).map(item => item.className));
+      const styleguideClasses = parseTypoClasses(styleguideCss);
+
+      for (const item of styleguideClasses) {
+        if (!canonical.has(item.className)) {
+          hits.push({
+            file: styleguidePath,
+            line: item.line,
+            text: `.${item.className} exists in public/styleguide.css but not in src/index.css`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'global-token-declaration-outside-canonical-token-files',
+    severity: 'warn',
+    fileGlobs: ['*.css'],
+    message:
+      'Token declarations (--*) are only allowed in src/tokens.css and public/tokens.css. Move declarations into src/tokens.css.',
+    rationale:
+      'Token authority requires one canonical declaration file plus the public build mirror. Declarations elsewhere create hidden drift and theme inconsistencies.',
+    claudeMdRef: 'Design System — Token authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const tokenDeclarationRe = /^\s*(--[\w-]+)\s*:/gm;
+
+      for (const file of files) {
+        if (!file.endsWith('.css')) continue;
+        const normalized = file.replaceAll('\\', '/');
+        if (normalized.endsWith('src/tokens.css') || normalized.endsWith('public/tokens.css')) continue;
+
+        let css: string;
+        try {
+          css = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        let match: RegExpExecArray | null;
+        while ((match = tokenDeclarationRe.exec(css)) !== null) {
+          const line = (css.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          hits.push({
+            file,
+            line,
+            text: `token declaration ${match[1]} found outside src/tokens.css/public/tokens.css`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
 
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;

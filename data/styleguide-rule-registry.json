@@ -196,7 +196,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "styleguide_tokens_import_missing_count",
       "owner": "enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "styleguide-typography-extra-class-drift",
@@ -209,10 +209,10 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "styleguide_extra_typography_class_count",
       "owner": "enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
-      "id": "global-token-declaration-outside-src-tokens",
+      "id": "global-token-declaration-outside-canonical-token-files",
       "sourceAnchor": "docs/rules/styleguide-lockdown-contract.md#authority-order",
       "intent": "Disallow --* token declarations outside src/tokens.css and public/tokens.css build mirror.",
       "scope": "*.css",
@@ -222,7 +222,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "global_token_declaration_drift_count",
       "owner": "enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "badge-color-prop-deprecation",

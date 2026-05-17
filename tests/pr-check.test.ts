@@ -4676,8 +4676,11 @@ describe('Meta: customCheck rule name registry', () => {
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    'styleguide-css-must-import-public-tokens',
     // Phase 6A — .t-* typography parity between styleguide.css and index.css
     'styleguide-typography-parity',
+    'styleguide-typography-extra-class-drift',
+    'global-token-declaration-outside-canonical-token-files',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -5646,6 +5649,34 @@ describe('Rule: styleguide-token-parity', () => {
     // Passing a path to a non-existent file should not throw
     const hits = runRule(RULE, ['/nonexistent/public/styleguide.css']);
     expect(hits).toHaveLength(0);
+  });
+});
+
+describe('Rule: styleguide-css-must-import-public-tokens', () => {
+  const RULE = 'styleguide-css-must-import-public-tokens';
+
+  it('flags public/styleguide.css when @import url(/tokens.css) is missing', () => {
+    const file = write(
+      uniqPath('rule-styleguide-import', 'public/styleguide.css'),
+      lines(
+        '.sg-header { color: var(--brand-text-bright); }',
+        '.sg-card { border: 1px solid var(--brand-border); }',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain("missing @import url('/tokens.css')");
+  });
+
+  it('passes when public/styleguide.css imports /tokens.css', () => {
+    const file = write(
+      uniqPath('rule-styleguide-import', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.sg-header { color: var(--brand-text-bright); }',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
@@ -6962,6 +6993,82 @@ describe('Rule: styleguide-typography-parity', () => {
       write(uniqPath('typo-parity', 'src/components/Foo.tsx'), 'export const Foo = () => null;'),
     ]);
     expect(hits).toHaveLength(0);
+  });
+});
+
+describe('Rule: styleguide-typography-extra-class-drift', () => {
+  const RULE = 'styleguide-typography-extra-class-drift';
+
+  it('flags extra .t-* classes present only in public/styleguide.css', () => {
+    const indexFile = write(
+      uniqPath('rule-typo-extra', 'src/index.css'),
+      lines(
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    const styleguideFile = write(
+      uniqPath('rule-typo-extra', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+        '.t-legacy { font-size: 11px; line-height: 1.2; }',
+      ),
+    );
+    const hits = runRule(RULE, [indexFile, styleguideFile]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('.t-legacy');
+  });
+
+  it('passes when styleguide uses only canonical .t-* classes', () => {
+    const indexFile = write(
+      uniqPath('rule-typo-extra', 'src/index.css'),
+      lines(
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    const styleguideFile = write(
+      uniqPath('rule-typo-extra', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        '.t-body { font-size: 14px; line-height: 1.5; }',
+        '.t-caption { font-size: 12px; line-height: 1.4; }',
+      ),
+    );
+    expect(runRule(RULE, [indexFile, styleguideFile])).toHaveLength(0);
+  });
+});
+
+describe('Rule: global-token-declaration-outside-canonical-token-files', () => {
+  const RULE = 'global-token-declaration-outside-canonical-token-files';
+
+  it('flags --* declarations in non-canonical CSS files', () => {
+    const file = write(
+      uniqPath('rule-global-token-decl', 'src/components/probe.css'),
+      lines(
+        '.probe { color: red; }',
+        ':root {',
+        '  --rogue-token: #fff;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('--rogue-token');
+  });
+
+  it('does not flag declarations inside src/tokens.css and public/tokens.css', () => {
+    const srcTokens = write(
+      uniqPath('rule-global-token-decl', 'src/tokens.css'),
+      lines(':root {', '  --allowed: #000;', '}'),
+    );
+    const publicTokens = write(
+      uniqPath('rule-global-token-decl', 'public/tokens.css'),
+      lines(':root {', '  --allowed-mirror: #111;', '}'),
+    );
+    expect(runRule(RULE, [srcTokens, publicTokens])).toHaveLength(0);
   });
 });
 

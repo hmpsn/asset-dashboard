@@ -36,6 +36,9 @@ from the `CHECKS` array.
   tests in `tests/pr-check.test.ts`.
 - Every style directive under migration must be represented in the styleguide
   rule registry with owner, metric key, and promotion prerequisites.
+- Current advisory detector wave also tracks: required `/tokens.css` import in
+  `public/styleguide.css`, stale extra `.t-*` classes in static styleguide CSS,
+  and token declarations outside canonical token files.
 
 ## Escape hatch
 
