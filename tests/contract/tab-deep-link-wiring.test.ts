@@ -107,10 +107,17 @@ function buildClientRouteMap(): Map<string, string> {
   const dashboard = readFileSync(CLIENT_DASHBOARD, 'utf8'); // readFile-ok — intentional static analysis of client route table
   const componentPaths = new Map<string, string>();
 
-  const importRe = /import\s+\{\s*(\w+)[\s,}].*from\s+'([^']+)'/g;
+  const lazyRe = /const\s+(\w+)\s*=\s*lazyWithRetry\(\(\)\s*=>\s*import\(\s*'([^']+)'\s*\)/g;
   let m: RegExpExecArray | null;
-  while ((m = importRe.exec(dashboard)) !== null) {
+  while ((m = lazyRe.exec(dashboard)) !== null) {
     componentPaths.set(m[1], m[2]);
+  }
+
+  const importRe = /import\s+\{\s*(\w+)[\s,}].*from\s+'([^']+)'/g;
+  while ((m = importRe.exec(dashboard)) !== null) {
+    if (!componentPaths.has(m[1])) {
+      componentPaths.set(m[1], m[2]);
+    }
   }
 
   const routeRe = /\{tab\s*===\s*'([^']+)'\s*&&\s*\(\s*<(\w+)/g;

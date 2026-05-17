@@ -38,7 +38,7 @@
 - `StrategyKeywordTableRow` has no `rationale` or `trendDirection` fields — Task 1 adds them
 - `trendDirection` only exists on `contentGaps[]`, not on all keyword types — look it up via content gap match in `buildKeywordRow`
 - Drawer animation pattern: follow `src/components/ContentPipeline.tsx` lines 248–266
-- `fixed inset-0` requires `// fixed-inset-ok` comment; z-index must use `z-[var(--z-*)]` tokens
+- `fixed inset-0` requires `// fixed-inset-ok` comment; z-index must use concrete token classes such as `z-[var(--z-modal)]`
 - `t-micro` is monospace uppercase (timestamps/IDs only) — use `t-caption-sm` for small labels
 
 ---
@@ -712,7 +712,7 @@ Expected:
 
 Specifically confirm in pr-check output:
 - ✓ Hand-rolled fixed inset-0 outside overlay — the `fixed-inset-ok` comment satisfies this
-- ✓ Raw z-index class — all z-index uses `z-[var(--z-*)]` tokens
+- ✓ Raw z-index class — all z-index uses concrete `--z-*` token classes
 - ✓ text-green-{N} — none (used `text-emerald-*` for success)
 - ✓ Forbidden hues — no violet, indigo, rose, pink
 
@@ -785,7 +785,7 @@ EOF
 ## Systemic Improvements
 
 - **Shared utilities:** None needed. The drawer is sufficiently local to `StrategyTab.tsx`. Extract only if a second component needs the same pattern.
-- **pr-check rules:** None needed. Existing rules for `fixed-inset-ok` (backdrop), `z-[var(--z-*)]` (z-index tokens), and forbidden hue classes already cover everything introduced here.
+- **pr-check rules:** None needed. Existing rules for `fixed-inset-ok` (backdrop), concrete `--z-*` token classes, and forbidden hue classes already cover everything introduced here.
 - **New tests:** None required. This is a render-layer replacement with no new data logic, API routes, or state transitions. Existing integration tests cover the `removePriorityKeyword` and `addStrategyKeyword` API calls unchanged. Revisit if the drawer's `submitFeedback` (dismiss) path lacks coverage.
 
 ---

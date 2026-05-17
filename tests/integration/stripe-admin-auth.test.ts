@@ -51,6 +51,7 @@ async function startGatedServer(): Promise<void> {
       PORT: String(GATED_PORT),
       NODE_ENV: 'test',
       APP_PASSWORD: TEST_APP_PASSWORD,
+      LOG_LEVEL: 'info',
       // Pin SESSION_SECRET so EXPECTED_HMAC_TOKEN derivation stays deterministic
       SESSION_SECRET: TEST_APP_PASSWORD,
       JWT_SECRET: TEST_JWT_SECRET,

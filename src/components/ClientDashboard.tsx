@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Suspense, useState, useEffect, useMemo, useRef, useCallback, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, patch, getOptional } from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { clientPath } from '../routes';
 import { resolveClientTab, type ResolvedClientTab } from '../lib/client-dashboard-tab';
 import {
@@ -12,19 +13,10 @@ import {
 } from 'lucide-react';
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
-import { HealthTab } from './client/HealthTab';
-import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
-import { ROIDashboard } from './client/ROIDashboard';
-import { PlansTab } from './client/PlansTab';
-import { ContentPlanTab } from './client/ContentPlanTab';
-import { StrategyTab } from './client/StrategyTab';
-import { PerformanceTab } from './client/PerformanceTab';
-import { InboxTab } from './client/InboxTab';
-import { OverviewTab } from './client/OverviewTab';
 import { SeoEducationTip } from './client/SeoEducationTip';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
@@ -56,7 +48,6 @@ import {
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { BrandTab } from './client/BrandTab';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
@@ -73,6 +64,25 @@ import {
   type ApprovalBatch,
   type ClientContentRequest,
 } from './client/types';
+
+const HealthTab = lazyWithRetry(() => import('./client/HealthTab').then(m => ({ default: m.HealthTab })));
+const InsightsEngine = lazyWithRetry(() => import('./client/InsightsEngine').then(m => ({ default: m.InsightsEngine })));
+const ROIDashboard = lazyWithRetry(() => import('./client/ROIDashboard').then(m => ({ default: m.ROIDashboard })));
+const PlansTab = lazyWithRetry(() => import('./client/PlansTab').then(m => ({ default: m.PlansTab })));
+const ContentPlanTab = lazyWithRetry(() => import('./client/ContentPlanTab').then(m => ({ default: m.ContentPlanTab })));
+const StrategyTab = lazyWithRetry(() => import('./client/StrategyTab').then(m => ({ default: m.StrategyTab })));
+const PerformanceTab = lazyWithRetry(() => import('./client/PerformanceTab').then(m => ({ default: m.PerformanceTab })));
+const InboxTab = lazyWithRetry(() => import('./client/InboxTab').then(m => ({ default: m.InboxTab })));
+const OverviewTab = lazyWithRetry(() => import('./client/OverviewTab').then(m => ({ default: m.OverviewTab })));
+const BrandTab = lazyWithRetry(() => import('./client/BrandTab').then(m => ({ default: m.BrandTab })));
+
+function ClientTabFallback() {
+  return <OverviewSkeleton />;
+}
+
+function LazyClientTabPanel({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<ClientTabFallback />}>{children}</Suspense>;
+}
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const queryClient = useQueryClient();
@@ -684,52 +694,72 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           )}
           panels={{
             overview: (
-              <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
+              <LazyClientTabPanel>
+                <OverviewTab ws={ws!} overview={overview} searchComparison={searchComparison} trend={trend} ga4Overview={ga4Overview} ga4Trend={ga4Trend} ga4Comparison={ga4Comparison} ga4Organic={ga4Organic} ga4Conversions={ga4Conversions} ga4NewVsReturning={ga4NewVsReturning} audit={audit} auditDetail={auditDetail} strategyData={strategyData} insights={insights} contentRequests={contentRequests} requests={requests} approvalBatches={approvalBatches} activityLog={activityLog} pendingApprovals={pendingApprovals} unreadTeamNotes={unreadTeamNotes} eventDisplayName={eventDisplayName} isEventPinned={isEventPinned} workspaceId={workspaceId} onAskAi={chatApi?.askAi ?? (() => Promise.resolve())} onOpenChat={() => chatApi?.openChat()} clientUser={clientUser} contentPlanSummary={contentPlanSummary} />
+              </LazyClientTabPanel>
             ),
             performance: (
-              <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+              <LazyClientTabPanel>
+                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} ga4Overview={ga4Overview} ga4Comparison={ga4Comparison} ga4Trend={ga4Trend} ga4Devices={ga4Devices} ga4Pages={ga4Pages} ga4Sources={ga4Sources} ga4Organic={ga4Organic} ga4LandingPages={ga4LandingPages} ga4NewVsReturning={ga4NewVsReturning} ga4Conversions={ga4Conversions} ga4Events={ga4Events} ws={ws!} days={days} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+              </LazyClientTabPanel>
             ),
             health: (
-              <ErrorBoundary label="Site Health">
-                <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
-                  <ErrorBoundary label="Action Plan">
-                    <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
-                  </ErrorBoundary>
-                ) : undefined}
-                />
-              </ErrorBoundary>
+              <LazyClientTabPanel>
+                <ErrorBoundary label="Site Health">
+                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
+                    <ErrorBoundary label="Action Plan">
+                      <LazyClientTabPanel>
+                        <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
+                      </LazyClientTabPanel>
+                    </ErrorBoundary>
+                  ) : undefined}
+                  />
+                </ErrorBoundary>
+              </LazyClientTabPanel>
             ),
             strategy: (
-              <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+              <LazyClientTabPanel>
+                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
+              </LazyClientTabPanel>
             ),
             inbox: (
-              <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+              <LazyClientTabPanel>
+                <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+              </LazyClientTabPanel>
             ),
             'content-plan': (
-              <ErrorBoundary label="Content Plan">
-                <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
-              </ErrorBoundary>
+              <LazyClientTabPanel>
+                <ErrorBoundary label="Content Plan">
+                  <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
+                </ErrorBoundary>
+              </LazyClientTabPanel>
             ),
             plans: (
-              <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
+              <LazyClientTabPanel>
+                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setToast={setToast} onOpenChat={() => chatApi?.openChat()} pricingData={pricingData} />
+              </LazyClientTabPanel>
             ),
             roi: (
-              <ErrorBoundary label="ROI Dashboard">
-                <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
-              </ErrorBoundary>
+              <LazyClientTabPanel>
+                <ErrorBoundary label="ROI Dashboard">
+                  <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} />
+                </ErrorBoundary>
+              </LazyClientTabPanel>
             ),
             brand: brandTabEnabled ? (
-              <ErrorBoundary label="Brand">
-                <BrandTab
-                  businessProfile={ws?.businessProfile ?? undefined}
-                  onSaveBusinessProfile={async (profile) => {
-                    const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
-                    if (res?.businessProfile) {
-                      setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
-                    }
-                  }}
-                />
-              </ErrorBoundary>
+              <LazyClientTabPanel>
+                <ErrorBoundary label="Brand">
+                  <BrandTab
+                    businessProfile={ws?.businessProfile ?? undefined}
+                    onSaveBusinessProfile={async (profile) => {
+                      const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                      if (res?.businessProfile) {
+                        setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+                      }
+                    }}
+                  />
+                </ErrorBoundary>
+              </LazyClientTabPanel>
             ) : null,
           }}
         />
