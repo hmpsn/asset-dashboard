@@ -4,7 +4,7 @@ import {
   Target,
 } from 'lucide-react';
 import { STUDIO_NAME } from '../../constants';
-import { Icon, Button, FormInput, FormTextarea, cn } from '../ui';
+import { Badge, Icon, Button, FormInput, FormTextarea, cn } from '../ui';
 
 // ── Step types ──
 
@@ -449,7 +449,13 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 </SummaryCard>
 
                 <SummaryCard icon={Palette} title="Brand Voice" filled={brand.personality.length > 0 || !!brand.tone} onClick={() => setStep('brand')}>
-                  {brand.personality.length > 0 && <div className="flex flex-wrap gap-1">{brand.personality.map(p => <span key={p} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand">{p}</span>)}</div>}
+                  {brand.personality.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {brand.personality.map(p => (
+                        <Badge key={p} label={p} tone="teal" variant="soft" shape="sm" size="sm" />
+                      ))}
+                    </div>
+                  )}
                   {brand.tone && <div className="t-caption-sm text-[var(--brand-text)] mt-1 line-clamp-1">{brand.tone}</div>}
                   {!brand.personality.length && !brand.tone && <div className="t-caption-sm text-[var(--brand-text-muted)] italic">Not filled in yet</div>}
                 </SummaryCard>

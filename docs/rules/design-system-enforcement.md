@@ -36,9 +36,16 @@ from the `CHECKS` array.
   tests in `tests/pr-check.test.ts`.
 - Every style directive under migration must be represented in the styleguide
   rule registry with owner, metric key, and promotion prerequisites.
-- Current advisory detector wave also tracks: required `/tokens.css` import in
-  `public/styleguide.css`, stale extra `.t-*` classes in static styleguide CSS,
-  and token declarations outside canonical token files.
+- Wave 8 ratchet (2026-05-18) promoted these zero-hit checks to error:
+  `styleguide-css-must-import-public-tokens`,
+  `styleguide-typography-extra-class-drift`,
+  `global-token-declaration-outside-canonical-token-files`,
+  `hardcoded card radius outside ui primitives`, and
+  `badge-like-span-outside-primitives`.
+- Current advisory backlog is warn-tier and intentionally non-blocking:
+  `badge-color-prop-deprecation`,
+  `interactive-div-role-button`, and
+  `primitive-override-drift-on-form-controls`.
 
 ## Escape hatch
 
@@ -69,7 +76,7 @@ backfill before CI can fail on it.
 | Hand-rolled form controls | error | Inline visible `<input>`, `<select>`, `<textarea>` — use `<FormInput>`, `<FormSelect>`, `<FormTextarea>`, `<Checkbox>`, or `<Toggle>`. Native `hidden`, `file`, and `color` inputs are allowed. |
 | Static styleguide inline note chrome | error | Inline note typography/spacing in `public/styleguide.html` — use `.spec-note` / `.sg-note` |
 | Static styleguide radius prose drift | error | Raw or stale pixel radius prose — name `--radius-*` tokens and primitive ownership |
-| Hand-rolled badge-like spans | advisory | Inline rounded status/category/count pills — use `<Badge>` or `<StatusBadge>` |
+| Hand-rolled badge-like spans | error | Inline rounded status/category/count pills — use `<Badge>` or `<StatusBadge>` |
 | Static styleguide raw controls/specimens | manual review | Static examples may intentionally show raw HTML; label bad examples clearly |
 | `flex items-center gap-*` without layout primitive | manual review | Inline flex layouts — use `<Row>`, `<Stack>`, `<Column>` when the abstraction adds value |
 
@@ -77,8 +84,8 @@ backfill before CI can fail on it.
 client purple, static styleguide debt, and badge-like spans. Raw visible form
 controls and static styleguide note/radius debt are now also enforced by
 `pr-check` after the May 2026 ratchet sweep drove both counts to zero. Badge-like
-spans remain advisory until the shared `Badge`/`StatusBadge` migration reaches
-zero and fixtures cover allowed exceptions.
+spans are now enforced as error after the Wave 8 client sweep removed the final
+violations and fixture coverage was added.
 
 ---
 
@@ -94,11 +101,9 @@ zero and fixtures cover allowed exceptions.
 Verification: `npx tsx scripts/verify-styleguide-parity.ts`
 pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 
-**Phase 3 author note — `src/index.css` gap:** The `styleguide-token-parity` rule currently
-only checks `public/styleguide.css` for stray `--*` declarations. A matching rule for
-`src/index.css` (ensuring it stays token-free beyond the `@import`) is not yet mechanized.
-Phase 3 should add a `customCheck` that scans `src/index.css` for `--*` lines outside the
-import statement. Until then, `verify-styleguide-parity.ts` check #3 provides a manual gate.
+`src/index.css` token declaration gap is now mechanized via
+`src-index-css-no-token-declarations` (warn tier). `verify-styleguide-parity.ts`
+remains as an additional parity gate.
 
 ### Outstanding hatches to migrate
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-17",
+  "updatedAt": "2026-05-18",
   "sourceOfTruth": "docs/rules/styleguide-rule-registry.md",
   "rules": [
     {
@@ -152,12 +152,12 @@
       "intent": "Keep card-radius usage on tokens/primitives while allowing focused exceptions.",
       "scope": "src/**/*.tsx",
       "detectability": "heuristic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "tests/pr-check.test.ts",
       "metricKey": "hardcoded_card_radius_warn_count",
       "owner": "enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "badge-like-span-outside-primitives",
@@ -165,12 +165,12 @@
       "intent": "Migrate hand-rolled status/category pills to Badge or StatusBadge.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": "// badge-span-ok",
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "badge_like_span_total_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "src-index-css-no-token-declarations",
@@ -183,7 +183,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "src_index_token_decl_count",
       "owner": "enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "styleguide-css-must-import-public-tokens",
@@ -191,12 +191,12 @@
       "intent": "Require @import url('/tokens.css') in public/styleguide.css.",
       "scope": "public/styleguide.css",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "styleguide_tokens_import_missing_count",
       "owner": "enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "styleguide-typography-extra-class-drift",
@@ -204,12 +204,12 @@
       "intent": "Flag stale extra .t-* class definitions in public/styleguide.css not present in src/index.css.",
       "scope": "public/styleguide.css + src/index.css",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "styleguide_extra_typography_class_count",
       "owner": "enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "global-token-declaration-outside-canonical-token-files",
@@ -217,12 +217,12 @@
       "intent": "Disallow --* token declarations outside src/tokens.css and public/tokens.css build mirror.",
       "scope": "*.css",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "global_token_declaration_drift_count",
       "owner": "enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "badge-color-prop-deprecation",
@@ -235,7 +235,7 @@
       "fixtureRequirement": "component tests + tests/pr-check.test.ts before promotion",
       "metricKey": "badge_color_prop_usage_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "interactive-div-role-button",
@@ -248,7 +248,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "interactive_div_button_count",
       "owner": "admin-editor + client + enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "primitive-override-drift-on-form-controls",
@@ -261,7 +261,7 @@
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "form_primitive_override_drift_count",
       "owner": "admin-editor + client + enforcement",
-      "status": "planned"
+      "status": "advisory"
     },
     {
       "id": "duplicate-heading-signal",

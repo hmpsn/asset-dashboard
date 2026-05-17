@@ -5908,3 +5908,16 @@ Bug hardening included:
 **Mutual:** Advances the ratchet strategy by moving high-confidence directives from “planned” to measurable advisory enforcement with tests.
 
 **Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 431. Styleguide Parity Ratchet Wave 8 (Promotions + Badge Cleanup)
+**What it does:** Completes the next parity ratchet by promoting five zero-backlog style rules from advisory to blocking errors: `hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, and `global-token-declaration-outside-canonical-token-files`. Adds four new warn-tier detectors to measure remaining migration debt without blocking delivery: `src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, and `primitive-override-drift-on-form-controls`. To keep the badge-span promotion clean, migrates the final four client badge-like spans to shared `Badge` primitives in `ClientHeader`, `ClientOnboardingQuestionnaire`, `BrandTab`, and `StrategyPageImprovementsSection`. Regenerates automated rule docs and synchronizes registry/enforcement documentation for the new tier/status state.
+
+**Agency value:** Converts another set of high-confidence style guarantees into CI-enforced invariants while keeping larger migration debt visible and trackable as advisories.
+
+**Client value:** Improves visual consistency on live client surfaces by replacing last-mile hand-rolled badge chrome with canonical primitives and tighter token enforcement.
+
+**Mutual:** Keeps the parity ratchet sustainable: zero-hit rules get promoted, noisy categories stay advisory with metrics, and governance docs stay aligned with real enforcement state.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `src/components/client/ClientHeader.tsx`; `src/components/client/ClientOnboardingQuestionnaire.tsx`; `src/components/client/BrandTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

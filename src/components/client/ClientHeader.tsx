@@ -2,7 +2,7 @@ import React from 'react';
 import { Lock, Sun, Moon, Calendar, LogOut } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
-import { Button, FormInput, Icon, IconButton } from '../ui';
+import { Badge, Button, FormInput, Icon, IconButton } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 
@@ -211,8 +211,26 @@ export function ClientHeader({
                 }`}>
                 <Icon as={TabIcon} size="md" /> {t.label}
                 {t.locked && <Icon as={Lock} size="sm" className="ml-0.5 text-[var(--brand-text-muted)]" />}
-                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-[var(--teal)] text-[var(--button-primary-text)] flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
+                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && (
+                  <Badge
+                    label={`${pendingApprovals + pendingReviews + unreadTeamNotes}`}
+                    tone="teal"
+                    variant="solid"
+                    shape="pill"
+                    size="sm"
+                    className="ml-1 min-w-[20px] justify-center leading-tight"
+                  />
+                )}
+                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && (
+                  <Badge
+                    label={`${contentPlanSummary.reviewCells}`}
+                    tone="blue"
+                    variant="solid"
+                    shape="pill"
+                    size="sm"
+                    className="ml-1 min-w-[20px] justify-center leading-tight"
+                  />
+                )}
                 {!t.locked && tabHasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-400/60" title="Data available" />}
               </Button>
             );
