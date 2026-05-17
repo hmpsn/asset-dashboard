@@ -3,26 +3,12 @@ import {
   MessageSquare, Plus, Loader2, Send,
   CheckCircle2, X, Paperclip, FileText, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
-import type { ClientRequest, RequestCategory, RequestNote } from './types';
-import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard, FormInput, FormSelect, FormTextarea } from '../ui';
+import type { ClientRequest, RequestCategory } from './types';
+import { toClientRequestStatus } from '../../../shared/types/requests';
+import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard, StatusBadge, FormInput, FormSelect, FormTextarea } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
-
-function clientStatusLabel(status: string, notes: Pick<RequestNote, 'author'>[]): string {
-  // Priority: resolved > team_replied > in_progress > awaiting_team
-  // (matches toClientRequestStatus in shared/types/requests.ts)
-  if (status === 'completed' || status === 'closed') return 'Resolved';
-  const lastNote = notes[notes.length - 1];
-  if (lastNote?.author === 'team') return 'Team replied';
-  switch (status) {
-    case 'new':
-    case 'in_review':   return 'Awaiting team';
-    case 'in_progress': return 'In progress';
-    case 'on_hold':     return 'In progress';
-    default:            return 'Awaiting team';
-  }
-}
 
 interface RequestsTabProps {
   workspaceId: string;
@@ -210,18 +196,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
         <div className="space-y-3">
           {[...requests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
             const isExpanded = expandedRequest === req.id;
-            // Group by client-visible status
-            const statusColors: Record<string, string> = {
-              // Awaiting team
-              new:         'bg-blue-500/10 border-blue-500/30 text-accent-info',
-              in_review:   'bg-blue-500/10 border-blue-500/30 text-accent-info',
-              // In progress
-              in_progress: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
-              on_hold:     'bg-teal-500/10 border-teal-500/30 text-accent-brand',
-              // Resolved
-              completed:   'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-              closed:      'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-            };
+            const clientStatus = toClientRequestStatus(req.status, req.notes);
             const catLabels: Record<string, string> = {
               bug: 'Bug', content: 'Content', design: 'Design',
               seo: 'SEO', feature: 'Feature', other: 'Other',
@@ -238,9 +213,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="t-body font-medium text-[var(--brand-text)] truncate">{req.title}</span>
-                        <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
-                          {clientStatusLabel(req.status, req.notes)}
-                        </span>
+                        <StatusBadge domain="request" status={clientStatus} variant="soft" />
                       </div>
                       {req.status === 'on_hold' && req.notes.some(n => n.author === 'team' && n.content?.toLowerCase().includes('on hold')) && (
                         <span className="t-caption-sm text-[var(--brand-text-muted)] block mt-0.5">

@@ -127,7 +127,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | Title `.t-h2 text-[var(--brand-text-bright)]`; subtitle `.t-caption-sm text-[var(--brand-text-muted)]` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
-| **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, schema, matrix, integration, job, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
+| **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
@@ -212,7 +212,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Clicks metric | `text-blue-400` | Blue = data metric |
 | Sessions metric | `text-blue-400` | Blue = data metric |
 | Approval batch "applied" badge | `bg-blue-500/10 text-blue-400` | Info state |
-| Request status "new" badge | `bg-blue-500/10 text-blue-400` | Info state |
+| Request status badge | `StatusBadge domain="request"` (`teal` awaiting/team-replied, `amber` in progress, `emerald` resolved) | Canonical request lifecycle semantics |
 | Informational intent badge | `text-blue-400 bg-blue-500/10` | Intent = info |
 | Full Post service badge | `bg-teal-500/10 text-teal-300` | Brand accent (was blue, fixed) |
 | Page type badge | `bg-teal-500/10 text-teal-400` | Brand accent |

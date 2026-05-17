@@ -59,8 +59,11 @@ from the `CHECKS` array.
   to error after sustained zero-hit verification and added
   `status-semantic-mapping-drift` as a new warn-tier advisory detector with
   file-level reporting.
+- Wave 16 ratchet (2026-05-17) migrated remaining local status tone maps to
+  `StatusBadge` domain mappings (`request` + `job`) and promoted
+  `status-semantic-mapping-drift` to error after advisory backlog reached zero.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
-  `status-semantic-mapping-drift`,
+  none.
 
 ## Escape hatch
 
