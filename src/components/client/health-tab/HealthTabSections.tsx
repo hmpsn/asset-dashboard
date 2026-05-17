@@ -145,7 +145,7 @@ export function HealthScoreSummarySection({ auditDetail, shell }: ScoreSummaryPr
   return (
     <SectionCard>
       <div className="flex items-center gap-4">
-        <div className={`t-stat-lg ${scoreColorClass(score)}`}>{score}</div>
+        <div className={`t-h1 ${scoreColorClass(score)}`}>{score}</div>
         <div className="flex-1">
           <div className="t-ui font-medium text-[var(--brand-text-bright)]">Your site's health</div>
           <div className="t-body text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
@@ -462,7 +462,7 @@ export function HealthTopFixesSection({ auditDetail, liveDomain, workspaceId, sh
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {errors > 0 && <Badge label={`${errors}E`} tone="red" />}
                     {warnings > 0 && <Badge label={`${warnings}W`} tone="amber" />}
-                    <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
+                    <div className={`t-page font-semibold ${scoreColorClass(page.score)}`}>{page.score}</div>
                     <ChevronDown
                       className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                     />
@@ -707,7 +707,7 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {errors > 0 && <Badge label={`${errors} err`} tone="red" />}
                       {warnings > 0 && <Badge label={`${warnings} warn`} tone="amber" />}
-                      <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
+                      <div className={`t-page font-semibold ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </ClickableRow>

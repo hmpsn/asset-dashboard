@@ -136,7 +136,7 @@ export function StrategyKeywordDrawer({
                 {drawerRow.currentPosition != null && (
                   <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Current rank</div>
-                    <div className={`t-stat-sm font-semibold ${
+                    <div className={`t-page font-semibold ${
                       drawerRow.currentPosition <= 10 ? 'text-emerald-400' :
                       drawerRow.currentPosition <= 30 ? 'text-amber-400' :
                       'text-[var(--brand-text)]'
@@ -150,7 +150,7 @@ export function StrategyKeywordDrawer({
                 {drawerRow.impressions != null && drawerRow.impressions > 0 && (
                   <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Monthly impressions</div>
-                    <div className="t-stat-sm font-semibold text-blue-400">
+                    <div className="t-page font-semibold text-blue-400">
                       {drawerRow.impressions >= 1000 ? `${(drawerRow.impressions / 1000).toFixed(1)}k` : drawerRow.impressions}
                     </div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">via Google Search</div>

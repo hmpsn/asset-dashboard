@@ -6025,3 +6025,29 @@ Bug hardening included:
 **Mutual:** Complements the styleguide ratchet by adding delivery-path integrity gates, not just code-style enforcement.
 
 **Files:** `scripts/report-staging-merge-integrity.ts`; `data/staging-merge-integrity-exceptions.json`; `package.json`; `.github/workflows/ci.yml`; `.github/workflows/pr-check-nightly.yml`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 439. Styleguide Parity Ratchet Wave 18 (Typography Hierarchy Advisory Kickoff)
+**What it does:** Starts typography hierarchy ratcheting with a new warn-tier rule, `muted-text-two-tier-only`, in `pr-check`. The detector flags likely muted-tier drift where body/caption-level copy uses dim text semantics (including `BodyText tone="dim"` and `.t-body`/`.t-page`/`.t-caption*` with `text-[var(--brand-text-dim)]`) and supports explicit local hatches via `// muted-tier-ok`. In parallel, `scripts/report-style-drift.ts` now reports a file-level advisory metric (`mutedTextTierViolationCount` + top files) so cleanup can be assigned by ownership slice before any promotion to blocking.
+
+**Agency value:** Creates an objective signal for one of the highest-visibility “styleguide feels cleaner than app” problems without introducing immediate CI friction.
+
+**Client value:** Improves readability and hierarchy consistency over time by reducing over-dimmed copy in live surfaces.
+
+**Mutual:** Continues the ratchet pattern: advisory instrumentation first, targeted cleanup second, and promotion to error only after sustained zero-hit evidence.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 440. Styleguide Parity Ratchet Wave 19 (Focus/Z-Index/Stat Advisory Activation)
+**What it does:** Activates three additional Wave 17 planned directives as warn-tier advisory checks with fixture coverage and drift-report visibility: `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal`. `scripts/pr-check.ts` now detects (1) `focus:outline-none` usage lacking any explicit `focus-visible` ring/outline fallback, (2) raw numeric `zIndex` / `z-index` literals that bypass z-layer tokens, and (3) direct `.t-stat*` usage in component shells that are not using `StatCard`, `CompactStatBar`, or `Stat` primitives. `scripts/report-style-drift.ts` now emits file-level advisory counts for these three categories so cleanup waves can be assigned by ownership slice and tracked as measurable debt. `tests/pr-check.test.ts` adds trigger/negative/hatch fixtures for each new detector.
+
+**Agency value:** Expands parity instrumentation into three recurring drift classes before they harden into widespread visual inconsistency.
+
+**Client value:** Improves keyboard-focus clarity, overlay stacking consistency, and metric-surface uniformity over time by spotlighting violations early.
+
+**Mutual:** Preserves ratchet discipline by converting planned contracts into measured advisories with tests before any warn→error promotion.
+
+**Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

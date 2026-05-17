@@ -98,7 +98,7 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
                   label: `${collection.collectionName} (${collection.itemCount})`,
                 })),
               ]}
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)]"
               aria-label="Filter CMS collection"
             />
           )}

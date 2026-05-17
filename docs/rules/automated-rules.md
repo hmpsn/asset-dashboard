@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **131** — 120 error, 11 warn.
+Total rules: **135** — 120 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -154,6 +154,10 @@ advisory but tracked.
 | 9 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
 | 10 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | warn | custom | `*.ts, *.tsx` | `// page-slug-url-ok` | Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches. |
 | 11 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
+| 12 | muted-text-two-tier-only | warn | custom | `src/components/` | — | Type hierarchy drift often comes from overusing dim text on primary copy, reducing contrast and making live surfaces feel noisier/less legible than styleguide specimens. |
+| 13 | raw-z-index-inline-literal | warn | custom | `src/` | — | Inline numeric z-index values drift from the canonical token scale and make stacking behavior unpredictable across overlays, toasts, and modals. |
+| 14 | focus-visible-ring-contract | warn | custom | `src/components/` | — | Removing default focus outlines without an explicit focus-visible fallback risks keyboard-invisible controls and drifts from the styleguide focus ring contract. |
+| 15 | stat-primitive-bypass-signal | warn | custom | `src/components/` | — | Direct t-stat typography usage in feature shells often re-implements StatCard/CompactStatBar chrome and drifts from canonical spacing, labels, and responsive behavior. |
 
 ---
 

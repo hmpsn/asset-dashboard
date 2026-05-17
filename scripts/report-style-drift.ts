@@ -68,6 +68,14 @@ type StyleDriftReport = {
     blueActionSemanticDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'blue-action-semantic-drift' }>;
     statusSemanticMappingDriftCount: number;
     statusSemanticMappingDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'status-semantic-mapping-drift' }>;
+    mutedTextTierViolationCount: number;
+    mutedTextTierViolationFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'muted-text-two-tier-only' }>;
+    rawZIndexInlineLiteralCount: number;
+    rawZIndexInlineLiteralFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'raw-z-index-inline-literal' }>;
+    focusVisibleRingDriftCount: number;
+    focusVisibleRingDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'focus-visible-ring-contract' }>;
+    statPrimitiveBypassSignalCount: number;
+    statPrimitiveBypassSignalFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'stat-primitive-bypass-signal' }>;
     allowlistedRawButtonFiles: string[];
   };
 };
@@ -421,6 +429,196 @@ function extractStatusSemanticMappingSignals(
   };
 }
 
+function extractMutedTextTierSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'muted-text-two-tier-only' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'muted-text-two-tier-only' }>();
+  const eligibleTagRe = /<(p|span|div|li|small|BodyText)\b/;
+  const bodyLikeTypeRe = /\b(?:t-body|t-page|t-caption|t-caption-sm|t-ui)\b/;
+  const dimToneRe = /\btext-\[var\(--brand-text-dim\)\]/;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      if (!eligibleTagRe.test(lines[index])) continue;
+
+      const tagLines: string[] = [];
+      for (let offset = index; offset < Math.min(lines.length, index + 10); offset += 1) {
+        tagLines.push(lines[offset]);
+        if (/\/?>/.test(lines[offset])) break;
+      }
+      const tagText = tagLines.join(' ');
+      if (hasLocalHatch(lines, index, 'muted-tier-ok')) continue;
+
+      if (/<BodyText\b/.test(tagText)) {
+        if (/\btone\s*=\s*["']dim["']/.test(tagText)) fileCount += 1;
+        continue;
+      }
+
+      if (!/\bclassName\s*=/.test(tagText)) continue;
+      if (!bodyLikeTypeRe.test(tagText)) continue;
+      if (/\b(?:t-label|t-micro)\b/.test(tagText)) continue;
+      if (!dimToneRe.test(tagText)) continue;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'muted-text-two-tier-only' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractRawZIndexInlineLiteralSignals(
+  sourceFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'raw-z-index-inline-literal' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'raw-z-index-inline-literal' }>();
+  const jsLiteralRe = /\bzIndex\s*:\s*(\d+)\b/;
+  const cssLiteralRe = /\bz-index\s*:\s*(\d+)\b/;
+
+  for (const file of sourceFiles) {
+    if (!file.startsWith(path.join(ROOT, 'src'))) continue;
+    if (!/\.(ts|tsx|css)$/.test(file)) continue;
+    if (file.endsWith(path.join('src', 'tokens.css'))) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const lines = readFileSync(file, 'utf8').split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (!jsLiteralRe.test(line) && !cssLiteralRe.test(line)) continue;
+      if (hasLocalHatch(lines, index, 'z-index-ok')) continue;
+      if (/z-index\s*:\s*var\(/.test(line) || /zIndex\s*:\s*['"`]?var\(/.test(line)) continue;
+      if (/--z-/.test(line)) continue;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'raw-z-index-inline-literal' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractFocusVisibleRingSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'focus-visible-ring-contract' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'focus-visible-ring-contract' }>();
+  const outlineNoneRe = /\bfocus:outline-none\b/;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const lines = readFileSync(file, 'utf8').split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      if (!outlineNoneRe.test(lines[index])) continue;
+      if (hasLocalHatch(lines, index, 'focus-ring-ok')) continue;
+      const start = Math.max(0, index - 5);
+      const end = Math.min(lines.length, index + 7);
+      const windowText = lines.slice(start, end).join(' ');
+      if (!/\bclassName\s*=/.test(windowText)) continue;
+      if (/\bfocus-visible:(?:ring|outline)-/.test(windowText)) continue;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'focus-visible-ring-contract' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractStatPrimitiveBypassSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'stat-primitive-bypass-signal' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'stat-primitive-bypass-signal' }>();
+  const statClassRe = /\bt-stat(?:-lg|-sm)?\b/;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const src = readFileSync(file, 'utf8');
+    if (/<(?:StatCard|CompactStatBar|Stat)\b/.test(src)) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const lines = src.split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      if (!statClassRe.test(lines[index])) continue;
+      if (!/\bclassName\b/.test(lines[index])) continue;
+      if (hasLocalHatch(lines, index, 'stat-primitive-ok')) continue;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'stat-primitive-bypass-signal' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
 function extractRawButtonMetrics(
   componentFiles: string[],
   allowlistedRawButtonFiles: Set<string>,
@@ -607,6 +805,10 @@ function buildMetrics(exceptionsPath: string): {
   const nestedCardSignals = extractNestedCardDensitySignals(componentFiles);
   const blueActionSignals = extractBlueActionSemanticSignals(componentFiles);
   const statusSemanticSignals = extractStatusSemanticMappingSignals(componentFiles);
+  const mutedTextTierSignals = extractMutedTextTierSignals(componentFiles);
+  const rawZIndexSignals = extractRawZIndexInlineLiteralSignals(sourceFiles);
+  const focusVisibleRingSignals = extractFocusVisibleRingSignals(componentFiles);
+  const statPrimitiveBypassSignals = extractStatPrimitiveBypassSignals(componentFiles);
   const staticStyleguideDetail = extractStaticStyleguideDetail();
 
   let rawTypographyBypass = 0;
@@ -658,6 +860,14 @@ function buildMetrics(exceptionsPath: string): {
       blueActionSemanticDriftFiles: blueActionSignals.files,
       statusSemanticMappingDriftCount: statusSemanticSignals.total,
       statusSemanticMappingDriftFiles: statusSemanticSignals.files,
+      mutedTextTierViolationCount: mutedTextTierSignals.total,
+      mutedTextTierViolationFiles: mutedTextTierSignals.files,
+      rawZIndexInlineLiteralCount: rawZIndexSignals.total,
+      rawZIndexInlineLiteralFiles: rawZIndexSignals.files,
+      focusVisibleRingDriftCount: focusVisibleRingSignals.total,
+      focusVisibleRingDriftFiles: focusVisibleRingSignals.files,
+      statPrimitiveBypassSignalCount: statPrimitiveBypassSignals.total,
+      statPrimitiveBypassSignalFiles: statPrimitiveBypassSignals.files,
       allowlistedRawButtonFiles: [...allowlistedRawButtonFiles].sort(),
     },
   };
@@ -732,6 +942,10 @@ function formatMarkdown(report: StyleDriftReport): string {
     `Nested SectionCard advisory count: ${report.detail.nestedCardDensitySignalCount}`,
     `Blue action semantic advisory count: ${report.detail.blueActionSemanticDriftCount}`,
     `Status semantic mapping advisory count: ${report.detail.statusSemanticMappingDriftCount}`,
+    `Muted text tier advisory count: ${report.detail.mutedTextTierViolationCount}`,
+    `Raw z-index literal advisory count: ${report.detail.rawZIndexInlineLiteralCount}`,
+    `Focus-visible ring advisory count: ${report.detail.focusVisibleRingDriftCount}`,
+    `Stat primitive bypass advisory count: ${report.detail.statPrimitiveBypassSignalCount}`,
     `Exception count: ${report.metrics.exception_count}`,
     '',
     `Regressions: ${report.regressions.length}`,
@@ -768,6 +982,34 @@ function formatMarkdown(report: StyleDriftReport): string {
   if (report.detail.statusSemanticMappingDriftFiles.length > 0) {
     lines.push('', 'Top status-semantic files:');
     report.detail.statusSemanticMappingDriftFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.mutedTextTierViolationFiles.length > 0) {
+    lines.push('', 'Top muted-tier files:');
+    report.detail.mutedTextTierViolationFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.rawZIndexInlineLiteralFiles.length > 0) {
+    lines.push('', 'Top raw z-index literal files:');
+    report.detail.rawZIndexInlineLiteralFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.focusVisibleRingDriftFiles.length > 0) {
+    lines.push('', 'Top focus-visible ring files:');
+    report.detail.focusVisibleRingDriftFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.statPrimitiveBypassSignalFiles.length > 0) {
+    lines.push('', 'Top stat primitive bypass files:');
+    report.detail.statPrimitiveBypassSignalFiles.slice(0, 20).forEach(item => {
       lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
     });
   }

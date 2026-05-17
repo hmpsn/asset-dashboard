@@ -514,7 +514,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 { value: 'date', label: 'Newest' },
                 { value: 'keyword', label: 'Keyword A-Z' },
                 { value: 'difficulty', label: 'Difficulty' },
-              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none cursor-pointer" />
+              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
             </div>
           </div>
         }

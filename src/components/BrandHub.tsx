@@ -381,7 +381,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 setKbDraft(null);
               }
             }}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 resize-y font-mono leading-relaxed"
           />
           <div className="flex items-center gap-2">
             <Button
@@ -519,7 +519,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                           id={`persona-${p.id}-name`}
                           value={personaDraft.name}
                           onChange={value => setPersonaDraft(d => ({ ...d, name: value }))}
-                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                         />
                       </div>
                       <div>
@@ -534,7 +534,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                             { value: 'consideration', label: 'Consideration' },
                             { value: 'decision', label: 'Decision' },
                           ]}
-                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none cursor-pointer"
+                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer"
                         />
                       </div>
                     </div>
@@ -545,7 +545,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                         value={personaDraft.description}
                         onChange={value => setPersonaDraft(d => ({ ...d, description: value }))}
                         placeholder="Who is this person?"
-                        className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                        className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-2">
@@ -556,7 +556,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                           value={personaDraft.painPoints}
                           onChange={value => setPersonaDraft(d => ({ ...d, painPoints: value }))}
                           rows={3}
-                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 resize-none"
                         />
                       </div>
                       <div>
@@ -566,7 +566,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                           value={personaDraft.goals}
                           onChange={value => setPersonaDraft(d => ({ ...d, goals: value }))}
                           rows={3}
-                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 resize-none"
                         />
                       </div>
                       <div>
@@ -576,7 +576,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                           value={personaDraft.objections}
                           onChange={value => setPersonaDraft(d => ({ ...d, objections: value }))}
                           rows={3}
-                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                          className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 resize-none"
                         />
                       </div>
                     </div>
@@ -587,7 +587,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                         value={personaDraft.preferredContentFormat}
                         onChange={value => setPersonaDraft(d => ({ ...d, preferredContentFormat: value }))}
                         placeholder="e.g. how-to guides, case studies, comparison articles"
-                        className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                        className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                       />
                     </div>
                     <Button

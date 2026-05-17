@@ -401,7 +401,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                     toast('Logo URL saved');
                   }
                 }}
-                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500" />
+                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500" />
               {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded-[var(--radius-sm)]" />}
             </div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">

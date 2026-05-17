@@ -133,7 +133,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                   { value: 'feature', label: 'New Feature' },
                   { value: 'other', label: 'Other' },
                 ]}
-                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
               />
             </div>
             <div>
@@ -303,7 +303,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                           <FormInput value={expandedRequest === req.id ? reqNoteInput : ''} onChange={setReqNoteInput}
                             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendReqNote(req.id)}
                             placeholder="Add a note or reply..."
-                            className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" disabled={sendingNote} />
+                            className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500" disabled={sendingNote} />
                           <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                             onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
                           <IconButton icon={Paperclip} label="Attach file" variant="solid" onClick={() => noteFileRef.current?.click()} />

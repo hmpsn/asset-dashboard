@@ -314,7 +314,7 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
                 max={20}
                 value={batchSize}
                 onChange={value => setBatchSize(Math.max(1, Math.min(20, Number(value))))}
-                className="w-20 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text-bright)] text-center focus:outline-none focus:border-teal-500"
+                className="w-20 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text-bright)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
                 aria-label="Pages per batch"
               />
               <span className="t-caption text-[var(--brand-text-muted)]">pages per batch</span>

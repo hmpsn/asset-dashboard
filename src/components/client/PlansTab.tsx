@@ -159,7 +159,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="pt-2">
                 <h3 className={`t-ui font-semibold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
-                  <span className={`t-stat ${plan.color}`}>{plan.price}</span>
+                  <span className={`t-h1 ${plan.color}`}>{plan.price}</span>
                   {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5 mb-4">{plan.tagline}</p>
@@ -236,7 +236,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <Icon as={FileText} size="md" className="text-accent-brand" />
                     <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Content Brief</span>
                   </div>
-                  <span className="t-stat-sm text-accent-brand">{fmtPrice(briefPrice)}</span>
+                  <span className="t-page font-semibold text-accent-brand">{fmtPrice(briefPrice)}</span>
                 </div>
                 <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
               </div>
@@ -248,7 +248,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <Icon as={Sparkles} size="md" className="text-accent-brand" />
                     <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Full Blog Post</span>
                   </div>
-                  <span className="t-stat-sm text-accent-brand">{fmtPrice(fullPostPrice)}</span>
+                  <span className="t-page font-semibold text-accent-brand">{fmtPrice(fullPostPrice)}</span>
                 </div>
                 <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
               </div>
@@ -293,7 +293,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="t-stat-sm text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-page font-semibold text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
                 </div>
               </div>
               {/* Progress */}
@@ -316,7 +316,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   <h4 className="t-page font-semibold text-[var(--brand-text-bright)]">{plan.displayName}</h4>
                   <p className="t-body text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
-                    <span className="t-stat text-accent-brand">${plan.priceUsd}</span>
+                    <span className="t-h2 text-accent-brand">${plan.priceUsd}</span>
                     <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
                   </div>
                   <Button

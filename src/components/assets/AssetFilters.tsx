@@ -52,7 +52,7 @@ export function AssetFilters({
               { value: 'cms-missing-alt', label: 'CMS Missing Alt' },
             ] : []),
           ]}
-          className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm focus:outline-none cursor-pointer"
+          className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer"
         />
         <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
       </div>
@@ -66,7 +66,7 @@ export function AssetFilters({
             { value: 'fileName', label: 'Name' },
             { value: 'fileSize', label: 'Size' },
           ]}
-          className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm focus:outline-none cursor-pointer"
+          className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer"
         />
         <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
       </div>

@@ -113,7 +113,7 @@ export function PricingConfirmationModal({
               {displayPrice != null && (
                 <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <div>
-                    <div className="t-stat tracking-tight text-accent-brand">{fmt(displayPrice)}</div>
+                    <div className="t-h2 tracking-tight text-accent-brand">{fmt(displayPrice)}</div>
                     <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
                   </div>
                   <div className="w-9 h-9 rounded-[var(--radius-lg)] flex items-center justify-center bg-teal-500/10">

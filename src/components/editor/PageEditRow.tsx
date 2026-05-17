@@ -296,7 +296,7 @@ export function PageEditRow({
               value={edit.seoTitle}
               onChange={value => onUpdateField(page.id, 'seoTitle', value)}
               placeholder="Enter SEO title..."
-              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)]"
             />
             {variations?.field === 'title' && variations.options.length > 1 && (
               <div className="mt-1.5 space-y-1">
@@ -345,7 +345,7 @@ export function PageEditRow({
               onChange={value => onUpdateField(page.id, 'seoDescription', value)}
               placeholder="Enter meta description..."
               rows={2}
-              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
+              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-[var(--brand-border-hover)] resize-none"
             />
             {variations?.field === 'description' && variations.options.length > 1 && (
               <div className="mt-1.5 space-y-1">

@@ -240,14 +240,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               { label: 'Resolved', value: counts.completed, cls: 'text-accent-success' },
             ].map(s => (
               <div key={s.label} className="text-center">
-                <div className={cn('t-stat', s.cls)}>{s.value}</div>
+                <div className={cn('t-h2', s.cls)}>{s.value}</div>
                 <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">{s.label}</div>
               </div>
             ))}
           </div>
           {counts.total > 0 && (
             <div className="text-right">
-              <div className="t-stat-sm text-accent-success">
+              <div className="t-page font-semibold text-accent-success">
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Complete</div>

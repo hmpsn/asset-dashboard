@@ -233,7 +233,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
                   updateLocalPost({ title: value });
                   scheduleTitleSave(value);
                 }}
-                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
               />
             </label>
             <label className="block">
@@ -245,7 +245,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
                   scheduleMetaSave(value);
                 }}
                 rows={3}
-                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
+                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 resize-y"
               />
             </label>
             <div className="flex items-center gap-2">
@@ -347,7 +347,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
                     updateLocalSection(section.index, { heading: value });
                     scheduleSectionHeadingSave(value);
                   }}
-                  className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+                  className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
                 />
               </label>
               <RichTextEditor

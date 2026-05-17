@@ -88,7 +88,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               }
             }}
             placeholder="e.g. synergy, leverage"
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
           <Button
             type="button"
@@ -207,7 +207,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               }
             }}
             placeholder="e.g. Never condescending"
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
           <Button
             type="button"
@@ -257,7 +257,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
               }
             }}
             placeholder="e.g. Starting every sentence with 'We'"
-            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-2 focus:ring-teal-500/40"
           />
           <Button
             type="button"

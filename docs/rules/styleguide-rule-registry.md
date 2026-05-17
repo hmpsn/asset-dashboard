@@ -53,6 +53,24 @@ backlog contracts (warn/manual) before detector rollout:
 - `chart-semantic-hue-contract` (manual)
 - `chart-missing-data-gap-contract` (manual)
 
+## Wave 18 Kickoff (2026-05-17)
+
+- `muted-text-two-tier-only` moved from `planned` to `advisory` with
+  warn-tier `pr-check` detection, hatch support (`// muted-tier-ok`), and
+  style-drift file-level reporting.
+
+## Wave 19 Kickoff (2026-05-17)
+
+- `focus-visible-ring-contract` moved from `planned` to `advisory` with
+  warn-tier `pr-check` detection, hatch support (`// focus-ring-ok`), and
+  style-drift file-level reporting.
+- `raw-z-index-inline-literal` moved from `planned` to `advisory` with
+  warn-tier `pr-check` detection, hatch support (`// z-index-ok`), and
+  style-drift file-level reporting.
+- `stat-primitive-bypass-signal` moved from `planned` to `advisory` with
+  warn-tier `pr-check` detection, hatch support (`// stat-primitive-ok`),
+  and style-drift file-level reporting.
+
 ## Promotion Contract
 
 Before promoting any `warn` to `error`:

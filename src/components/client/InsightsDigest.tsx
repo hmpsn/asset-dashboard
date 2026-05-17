@@ -660,7 +660,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
         <div key={i} className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2">
           <div>
             <div className="t-label text-[var(--brand-text-muted)]">{m.label}</div>
-            <span className={`t-stat-sm ${m.color}`}>{m.value}</span>
+            <span className={`t-page font-semibold ${m.color}`}>{m.value}</span>
           </div>
           {m.change != null && m.change !== 0 && (
             <span className={`t-caption font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok ${

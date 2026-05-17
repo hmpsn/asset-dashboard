@@ -167,7 +167,7 @@ export function SchemaInitialPageTypePicker({
               value={pageTypes[page.id] || 'auto'}
               onChange={pageType => onPageTypeSelect(page.id, pageType)}
               options={SCHEMA_PAGE_TYPE_OPTIONS}
-              className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 cursor-pointer"
+              className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 cursor-pointer"
             />
             <Button
               onClick={() => onGenerateSinglePage(page.id)}
@@ -269,7 +269,7 @@ export function SchemaCmsFieldMappingPanel({
                         label: `${field.displayName || field.slug} (${field.type})`,
                       })),
                     ]}
-                    className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 disabled:opacity-50"
+                    className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500 disabled:opacity-50"
                   />
                 </label>
               );

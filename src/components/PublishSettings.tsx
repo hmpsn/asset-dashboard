@@ -190,7 +190,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
                   { value: '', label: 'Select a collection...' },
                   ...collections.map(c => ({ value: c.id, label: `${c.displayName} (${c.slug})` })),
                 ]}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
               />
               <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -236,7 +236,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
                       { value: '', label: required ? 'Select field...' : '(none)' },
                       ...fields.map(f => ({ value: f.slug, label: `${f.displayName} (${f.type})` })),
                     ]}
-                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
                   />
                   <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>

@@ -367,7 +367,7 @@ export function SiteHealthCard({
       ) : (
         <div className="space-y-2 t-body">
           <div className="flex items-baseline gap-2">
-            <span className="t-stat font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
+            <span className="t-h2 font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
             <span className="text-[var(--brand-text-muted)] t-caption">/ 100</span>
             {data.scoreDelta != null && (
               <span

@@ -4690,6 +4690,10 @@ describe('Meta: customCheck rule name registry', () => {
     'nested-card-density-signal',
     'blue-action-semantic-drift',
     'status-semantic-mapping-drift',
+    'muted-text-two-tier-only',
+    'raw-z-index-inline-literal',
+    'focus-visible-ring-contract',
+    'stat-primitive-bypass-signal',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -7437,6 +7441,191 @@ describe('Rule: status-semantic-mapping-drift', () => {
         'export function Foo({ status }: { status: string }) {',
         '  const statusColor = status === "ok" ? "emerald" : "red"; // status-semantic-ok: HTTP status code badge map',
         '  return <span className={statusColor}>{status}</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: muted-text-two-tier-only', () => {
+  const RULE = 'muted-text-two-tier-only';
+
+  it('flags body/caption typography rendered with dim text tier', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-body text-[var(--brand-text-dim)]">Important supporting copy</p>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('body/caption');
+  });
+
+  it('flags BodyText tone="dim" usage', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        "import { BodyText } from '../ui/typography';",
+        'export function Foo() {',
+        '  return <BodyText tone="dim">Supporting copy</BodyText>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('BodyText tone="dim"');
+  });
+
+  it('respects muted-tier-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-muted-tier', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-caption text-[var(--brand-text-dim)]">Timestamp</p>; // muted-tier-ok: intentionally tertiary metadata',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: raw-z-index-inline-literal', () => {
+  const RULE = 'raw-z-index-inline-literal';
+
+  it('flags inline zIndex numeric literals', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <div style={{ zIndex: 999 }}>Overlay</div>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('raw z-index literal');
+  });
+
+  it('flags CSS z-index numeric literals', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/probe.css'),
+      lines(
+        '.overlay {',
+        '  z-index: 1200;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects z-index-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <div style={{ zIndex: 999 }}>Overlay</div>; // z-index-ok: third-party embed overlay stack',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag var(--z-*) token usage', () => {
+    const file = write(
+      uniqPath('rule-raw-zindex', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        "  return <div style={{ zIndex: 'var(--z-modal)' }}>Overlay</div>;",
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: focus-visible-ring-contract', () => {
+  const RULE = 'focus-visible-ring-contract';
+
+  it('flags className with focus:outline-none and no focus-visible fallback', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus:border-teal-500" />;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('focus:outline-none');
+  });
+
+  it('passes when focus-visible ring classes exist', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects focus-ring-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-focus-ring', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <input className="px-3 py-2 focus:outline-none focus:border-teal-500" />; // focus-ring-ok: browser-native focus handled by host app shell',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: stat-primitive-bypass-signal', () => {
+  const RULE = 'stat-primitive-bypass-signal';
+
+  it('flags t-stat usage in files without stat primitives', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-stat text-[var(--brand-text-bright)]">45</p>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('t-stat typography');
+  });
+
+  it('does not flag files using StatCard', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        "import { StatCard } from '../ui';",
+        'export function Foo() {',
+        '  return <StatCard label="Clicks" value="45" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects stat-primitive-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-stat-bypass', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <p className="t-stat text-[var(--brand-text-bright)]">45</p>; // stat-primitive-ok: inline sparkline annotation shell',
         '}',
       ),
     );

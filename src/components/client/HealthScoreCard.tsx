@@ -23,7 +23,7 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
         <MetricRing score={rounded} size={100} />
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-baseline gap-2">
-            <span className={`t-stat-lg ${scoreColorClass(rounded)}`}>
+            <span className={`t-h1 ${scoreColorClass(rounded)}`}>
               {rounded}
             </span>
             <span className="t-body text-[var(--brand-text-muted)]">/ 100</span>

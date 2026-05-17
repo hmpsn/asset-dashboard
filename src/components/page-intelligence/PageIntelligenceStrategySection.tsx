@@ -53,7 +53,7 @@ export function PageIntelligenceStrategySection({
             type="text"
             value={editDraft.primary}
             onChange={value => onEditDraftChange({ ...editDraft, primary: value })}
-            className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
           />
         </div>
         <div>
@@ -62,7 +62,7 @@ export function PageIntelligenceStrategySection({
             type="text"
             value={editDraft.secondary}
             onChange={value => onEditDraftChange({ ...editDraft, secondary: value })}
-            className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
           />
         </div>
         <div className="flex gap-2">
