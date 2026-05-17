@@ -66,6 +66,8 @@ type StyleDriftReport = {
     nestedCardDensityFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'nested-card-density-signal' }>;
     blueActionSemanticDriftCount: number;
     blueActionSemanticDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'blue-action-semantic-drift' }>;
+    statusSemanticMappingDriftCount: number;
+    statusSemanticMappingDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'status-semantic-mapping-drift' }>;
     allowlistedRawButtonFiles: string[];
   };
 };
@@ -352,6 +354,73 @@ function extractBlueActionSemanticSignals(
   };
 }
 
+function extractStatusSemanticMappingSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'status-semantic-mapping-drift' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'status-semantic-mapping-drift' }>();
+  const statusMapDefRe = /\bconst\s+(statusColors?|statusMap)\s*[:=]/;
+  const statusTernaryRe = /\bconst\s+statusColor\s*=\s*.*\bstatus\b.*[?:]/;
+  const statusBadgeFnRe = /\bconst\s+statusBadge\s*=\s*\(/;
+  const statusToneTokenRe = /\b(?:bg|text|border)-(?:amber|red|orange|emerald|teal|blue|zinc)-[0-9]+|\btext-accent-(?:danger|warning|success|brand|info)\b/;
+  const statusToneLiteralRe = /['"`](?:red|amber|orange|emerald|teal|blue|zinc)['"`]/;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    const flagged = new Set<number>();
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const windowText = lines.slice(index, Math.min(lines.length, index + 24)).join(' ');
+
+      if (statusMapDefRe.test(line)) {
+        if (hasLocalHatch(lines, index, 'status-semantic-ok')) continue;
+        if (/<StatusBadge\b/.test(windowText)) continue;
+        if (!statusToneTokenRe.test(windowText) && !statusToneLiteralRe.test(windowText)) continue;
+        flagged.add(index + 1);
+        continue;
+      }
+
+      if (statusTernaryRe.test(line)) {
+        if (hasLocalHatch(lines, index, 'status-semantic-ok')) continue;
+        if (/statusCfg\?\.color/.test(line)) continue;
+        if (!statusToneLiteralRe.test(windowText)) continue;
+        flagged.add(index + 1);
+        continue;
+      }
+
+      if (statusBadgeFnRe.test(line)) {
+        if (hasLocalHatch(lines, index, 'status-semantic-ok')) continue;
+        if (/<StatusBadge\b/.test(windowText)) continue;
+        if (!/(<Badge\b|<span\b)/.test(windowText)) continue;
+        flagged.add(index + 1);
+      }
+    }
+
+    if (flagged.size > 0) {
+      const count = flagged.size;
+      total += count;
+      fileCounts.set(rel, { count, domain, category: 'status-semantic-mapping-drift' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
 function extractRawButtonMetrics(
   componentFiles: string[],
   allowlistedRawButtonFiles: Set<string>,
@@ -537,6 +606,7 @@ function buildMetrics(exceptionsPath: string): {
   const duplicateHeadingSignals = extractDuplicateHeadingSignals(componentFiles);
   const nestedCardSignals = extractNestedCardDensitySignals(componentFiles);
   const blueActionSignals = extractBlueActionSemanticSignals(componentFiles);
+  const statusSemanticSignals = extractStatusSemanticMappingSignals(componentFiles);
   const staticStyleguideDetail = extractStaticStyleguideDetail();
 
   let rawTypographyBypass = 0;
@@ -586,6 +656,8 @@ function buildMetrics(exceptionsPath: string): {
       nestedCardDensityFiles: nestedCardSignals.files,
       blueActionSemanticDriftCount: blueActionSignals.total,
       blueActionSemanticDriftFiles: blueActionSignals.files,
+      statusSemanticMappingDriftCount: statusSemanticSignals.total,
+      statusSemanticMappingDriftFiles: statusSemanticSignals.files,
       allowlistedRawButtonFiles: [...allowlistedRawButtonFiles].sort(),
     },
   };
@@ -659,6 +731,7 @@ function formatMarkdown(report: StyleDriftReport): string {
     `Duplicate heading advisory count: ${report.detail.duplicateHeadingSignalCount}`,
     `Nested SectionCard advisory count: ${report.detail.nestedCardDensitySignalCount}`,
     `Blue action semantic advisory count: ${report.detail.blueActionSemanticDriftCount}`,
+    `Status semantic mapping advisory count: ${report.detail.statusSemanticMappingDriftCount}`,
     `Exception count: ${report.metrics.exception_count}`,
     '',
     `Regressions: ${report.regressions.length}`,
@@ -688,6 +761,13 @@ function formatMarkdown(report: StyleDriftReport): string {
   if (report.detail.blueActionSemanticDriftFiles.length > 0) {
     lines.push('', 'Top blue-action files:');
     report.detail.blueActionSemanticDriftFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.statusSemanticMappingDriftFiles.length > 0) {
+    lines.push('', 'Top status-semantic files:');
+    report.detail.statusSemanticMappingDriftFiles.slice(0, 20).forEach(item => {
       lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
     });
   }

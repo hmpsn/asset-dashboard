@@ -5973,3 +5973,16 @@ Bug hardening included:
 **Mutual:** Completes another ratchet step with objective evidence (zero-hit metrics + fixtures), reducing advisory noise and tightening parity governance for future waves.
 
 **Files:** `scripts/pr-check.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 436. Styleguide Parity Ratchet Wave 15 (Token Promotion + Status Semantics Detector)
+**What it does:** Promotes `src-index-css-no-token-declarations` from warn-tier to error-tier after sustained zero-hit verification, hardening token-authority enforcement so `src/index.css` remains import/utilities-only. Adds a new warn-tier detector, `status-semantic-mapping-drift`, to surface local per-component status tone maps and hand-rolled status badge functions that bypass centralized `StatusBadge` domain semantics. The same detector logic is mirrored into `scripts/report-style-drift.ts` with file-level advisory breakdowns (`statusSemanticMappingDriftCount` + top files) so cleanup can be routed by ownership slice. Added fixture coverage in `tests/pr-check.test.ts` for trigger, negative (`StatusBadge` usage), and hatch (`// status-semantic-ok`) behavior.
+
+**Agency value:** Locks one more deterministic zero-backlog invariant as blocking CI while creating a focused signal for remaining status-semantic drift hotspots.
+
+**Client value:** Moves live surfaces closer to styleguide consistency by steering lifecycle/status UI toward shared semantic mappings instead of ad hoc local color logic.
+
+**Mutual:** Continues the ratchet pattern: promote what’s clean, instrument what’s still noisy, and keep docs + machine registry in sync in the same PR.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
