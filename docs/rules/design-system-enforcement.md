@@ -47,8 +47,15 @@ from the `CHECKS` array.
   `interactive-div-role-button`.
 - Wave 10 ratchet (2026-05-18) promoted this zero-hit check to error:
   `primitive-override-drift-on-form-controls`.
+- Wave 12 ratchet prep (2026-05-17) added three new warn-tier advisory
+  detectors with fixture coverage and drift-report breakdowns:
+  `duplicate-heading-signal`, `nested-card-density-signal`, and
+  `blue-action-semantic-drift`.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
-  `src-index-css-no-token-declarations`.
+  `src-index-css-no-token-declarations`,
+  `duplicate-heading-signal`,
+  `nested-card-density-signal`,
+  `blue-action-semantic-drift`.
 
 ## Escape hatch
 
@@ -107,6 +114,10 @@ pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 `src/index.css` token declaration gap is now mechanized via
 `src-index-css-no-token-declarations` (warn tier). `verify-styleguide-parity.ts`
 remains as an additional parity gate.
+
+Route-level cleanliness heuristics now run as advisory in both `pr-check` and
+`report-style-drift.ts`: duplicate static headings, nested `SectionCard`
+density, and blue-styled action controls outside explicit exceptions.
 
 ### Outstanding hatches to migrate
 

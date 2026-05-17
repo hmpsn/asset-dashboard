@@ -5484,6 +5484,172 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'duplicate-heading-signal',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential duplicate heading text detected in one file. Collapse repeated headings where possible; hatch intentional repeats with // duplicate-heading-ok.',
+    rationale:
+      'Styleguide parity favors concise section structure. Repeated heading text often indicates migration churn where two layout branches render the same section titles.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const headingRe = /<h([1-6])\b[^>]*>([^<]{4,})<\/h\1>/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const headingHits = new Map<string, Array<{ line: number; text: string }>>();
+        let match: RegExpExecArray | null;
+
+        while ((match = headingRe.exec(src)) !== null) {
+          const raw = match[2]
+            .replace(/&amp;/g, '&')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (raw.length < 6) continue;
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          if (hasHatch(lines, line - 1, 'duplicate-heading-ok')) continue;
+          const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          if (!normalized) continue;
+          if (!headingHits.has(normalized)) headingHits.set(normalized, []);
+          headingHits.get(normalized)!.push({ line, text: raw });
+        }
+
+        for (const matches of headingHits.values()) {
+          if (matches.length < 2) continue;
+          const exemplar = matches[0]?.text ?? 'heading';
+          for (let i = 1; i < matches.length; i += 1) {
+            hits.push({
+              file,
+              line: matches[i].line,
+              text: `duplicate heading "${exemplar}" appears ${matches.length}x in file`,
+            });
+          }
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'nested-card-density-signal',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential SectionCard nesting detected. Prefer section bands/layout wrappers over card-inside-card density; hatch intentional cases with // nested-card-ok.',
+    rationale:
+      'Nested cards tend to create crowded surfaces and spacing drift compared with styleguide specimens.',
+    claudeMdRef: '#frontend-guidance',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardTagRe = /<\/?SectionCard\b[^>]*>/g;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const stack: number[] = [];
+        let match: RegExpExecArray | null;
+
+        while ((match = cardTagRe.exec(src)) !== null) {
+          const token = match[0];
+          const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+          if (token.startsWith('</SectionCard')) {
+            if (stack.length > 0) stack.pop();
+            continue;
+          }
+
+          const selfClosing = /\/>$/.test(token);
+          if (stack.length > 0 && !hasHatch(lines, line - 1, 'nested-card-ok')) {
+            const outerLine = stack[stack.length - 1];
+            hits.push({
+              file,
+              line,
+              text: `SectionCard nested inside SectionCard opened at line ${outerLine}`,
+            });
+          }
+          if (!selfClosing) {
+            stack.push(line);
+          }
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'blue-action-semantic-drift',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential blue-styled action control detected. Actions should use teal semantics unless intentionally data/info-only. Hatch intentional cases with // blue-action-ok.',
+    rationale:
+      'Four Laws of Color reserve blue for read-only data semantics. Blue-styled actions often blur action-vs-data hierarchy.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const actionableStartRe = /<(Button|IconButton|button|a)\b/;
+      const blueStyleRe = /\b(?:bg|text|border)-blue-[0-9]+|\b(?:bg|text|border)-blue-[0-9]+\/[0-9]+|\btext-accent-info\b/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        for (let index = 0; index < lines.length; index += 1) {
+          const startMatch = lines[index].match(actionableStartRe);
+          if (!startMatch) continue;
+
+          const tagLines: string[] = [];
+          for (let offset = index; offset < Math.min(lines.length, index + 12); offset += 1) {
+            tagLines.push(lines[offset]);
+            if (/\/?>/.test(lines[offset])) break;
+          }
+          const tagText = tagLines.join(' ');
+          if (!/\bclassName\s*=/.test(tagText)) continue;
+          if (!blueStyleRe.test(tagText)) continue;
+          if (hasHatch(lines, index, 'blue-action-ok')) continue;
+
+          if (startMatch[1] === 'a' && !/\bhref\s*=|\bonClick\s*=/.test(tagText)) continue;
+
+          hits.push({
+            file,
+            line: index + 1,
+            text: `${startMatch[1]} uses blue action styling`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
 
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;

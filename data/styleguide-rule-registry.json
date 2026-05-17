@@ -269,12 +269,12 @@
       "intent": "Flag likely duplicate section/page headings introduced by migration churn.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "manual",
-      "hatch": null,
-      "fixtureRequirement": "report-only evidence and visual QA",
+      "enforcementLevel": "warn",
+      "hatch": "// duplicate-heading-ok",
+      "fixtureRequirement": "tests/pr-check.test.ts + report-style-drift file breakdown before promotion",
       "metricKey": "duplicate_heading_signal_count",
       "owner": "client + admin-editor",
-      "status": "manual-review"
+      "status": "advisory"
     },
     {
       "id": "nested-card-density-signal",
@@ -282,12 +282,12 @@
       "intent": "Flag repeated card-inside-card surface density drift.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "manual",
-      "hatch": null,
-      "fixtureRequirement": "report-only evidence and visual QA",
+      "enforcementLevel": "warn",
+      "hatch": "// nested-card-ok",
+      "fixtureRequirement": "tests/pr-check.test.ts + report-style-drift file breakdown before promotion",
       "metricKey": "nested_card_density_signal_count",
       "owner": "client + admin-editor",
-      "status": "manual-review"
+      "status": "advisory"
     },
     {
       "id": "blue-action-semantic-drift",
@@ -295,12 +295,12 @@
       "intent": "Flag action controls using data-blue semantics outside approved exceptions.",
       "scope": "src/components/**",
       "detectability": "heuristic",
-      "enforcementLevel": "manual",
+      "enforcementLevel": "warn",
       "hatch": "// blue-action-ok",
-      "fixtureRequirement": "visual QA and targeted fixtures before warn tier",
+      "fixtureRequirement": "tests/pr-check.test.ts + report-style-drift file breakdown before promotion",
       "metricKey": "blue_action_semantic_drift_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "manual-review"
+      "status": "advisory"
     }
   ]
 }

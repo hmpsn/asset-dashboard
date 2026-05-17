@@ -60,6 +60,12 @@ type StyleDriftReport = {
     staticStyleguideRadiusLiteralCount: number;
     badgeLikeSpanTotalCount: number;
     badgeLikeSpanFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'badge-like-span' }>;
+    duplicateHeadingSignalCount: number;
+    duplicateHeadingFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'duplicate-heading-signal' }>;
+    nestedCardDensitySignalCount: number;
+    nestedCardDensityFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'nested-card-density-signal' }>;
+    blueActionSemanticDriftCount: number;
+    blueActionSemanticDriftFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'blue-action-semantic-drift' }>;
     allowlistedRawButtonFiles: string[];
   };
 };
@@ -180,6 +186,170 @@ function loadBaseline(baselinePath: string): StyleBaselineFile | null {
 
 function countRegexMatches(content: string, regex: RegExp): number {
   return [...content.matchAll(regex)].length;
+}
+
+function hasLocalHatch(lines: string[], lineIndex: number, hatch: string): boolean {
+  if (lines[lineIndex]?.includes(hatch)) return true;
+  if (lineIndex > 0 && lines[lineIndex - 1]?.includes(hatch)) return true;
+  return false;
+}
+
+function extractDuplicateHeadingSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'duplicate-heading-signal' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'duplicate-heading-signal' }>();
+  const headingRe = /<h([1-6])\b[^>]*>([^<]{4,})<\/h\1>/g;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    const buckets = new Map<string, Array<{ line: number; text: string }>>();
+    let match: RegExpExecArray | null;
+
+    while ((match = headingRe.exec(src)) !== null) {
+      const raw = match[2]
+        .replace(/&amp;/g, '&')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (raw.length < 6) continue;
+      const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+      if (hasLocalHatch(lines, line - 1, 'duplicate-heading-ok')) continue;
+      const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!normalized) continue;
+      if (!buckets.has(normalized)) buckets.set(normalized, []);
+      buckets.get(normalized)!.push({ line, text: raw });
+    }
+
+    let fileCount = 0;
+    for (const values of buckets.values()) {
+      if (values.length < 2) continue;
+      fileCount += values.length - 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'duplicate-heading-signal' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractNestedCardDensitySignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'nested-card-density-signal' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'nested-card-density-signal' }>();
+  const cardTagRe = /<\/?SectionCard\b[^>]*>/g;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    const stack: number[] = [];
+    let fileCount = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = cardTagRe.exec(src)) !== null) {
+      const token = match[0];
+      const line = (src.slice(0, match.index).match(/\n/g) ?? []).length + 1;
+      if (token.startsWith('</SectionCard')) {
+        if (stack.length > 0) stack.pop();
+        continue;
+      }
+      const selfClosing = /\/>$/.test(token);
+      if (stack.length > 0 && !hasLocalHatch(lines, line - 1, 'nested-card-ok')) {
+        fileCount += 1;
+      }
+      if (!selfClosing) stack.push(line);
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'nested-card-density-signal' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractBlueActionSemanticSignals(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'blue-action-semantic-drift' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'blue-action-semantic-drift' }>();
+  const actionableStartRe = /<(Button|IconButton|button|a)\b/;
+  const blueStyleRe = /\b(?:bg|text|border)-blue-[0-9]+|\b(?:bg|text|border)-blue-[0-9]+\/[0-9]+|\btext-accent-info\b/;
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const startMatch = lines[index].match(actionableStartRe);
+      if (!startMatch) continue;
+
+      const tagLines: string[] = [];
+      for (let offset = index; offset < Math.min(lines.length, index + 12); offset += 1) {
+        tagLines.push(lines[offset]);
+        if (/\/?>/.test(lines[offset])) break;
+      }
+      const tagText = tagLines.join(' ');
+      if (!/\bclassName\s*=/.test(tagText)) continue;
+      if (!blueStyleRe.test(tagText)) continue;
+      if (hasLocalHatch(lines, index, 'blue-action-ok')) continue;
+      if (startMatch[1] === 'a' && !/\bhref\s*=|\bonClick\s*=/.test(tagText)) continue;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      total += fileCount;
+      fileCounts.set(rel, { count: fileCount, domain, category: 'blue-action-semantic-drift' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
 }
 
 function extractRawButtonMetrics(
@@ -364,6 +534,9 @@ function buildMetrics(exceptionsPath: string): {
   const buttonMetrics = extractRawButtonMetrics(componentFiles, allowlistedRawButtonFiles);
   const formControlMetrics = extractRawFormControlMetrics(componentFiles);
   const badgeLikeSpanMetrics = extractBadgeLikeSpanMetrics(componentFiles);
+  const duplicateHeadingSignals = extractDuplicateHeadingSignals(componentFiles);
+  const nestedCardSignals = extractNestedCardDensitySignals(componentFiles);
+  const blueActionSignals = extractBlueActionSemanticSignals(componentFiles);
   const staticStyleguideDetail = extractStaticStyleguideDetail();
 
   let rawTypographyBypass = 0;
@@ -407,6 +580,12 @@ function buildMetrics(exceptionsPath: string): {
       staticStyleguideRadiusLiteralCount: staticStyleguideDetail.radiusLiteralCount,
       badgeLikeSpanTotalCount: badgeLikeSpanMetrics.total,
       badgeLikeSpanFiles: badgeLikeSpanMetrics.files,
+      duplicateHeadingSignalCount: duplicateHeadingSignals.total,
+      duplicateHeadingFiles: duplicateHeadingSignals.files,
+      nestedCardDensitySignalCount: nestedCardSignals.total,
+      nestedCardDensityFiles: nestedCardSignals.files,
+      blueActionSemanticDriftCount: blueActionSignals.total,
+      blueActionSemanticDriftFiles: blueActionSignals.files,
       allowlistedRawButtonFiles: [...allowlistedRawButtonFiles].sort(),
     },
   };
@@ -477,6 +656,9 @@ function formatMarkdown(report: StyleDriftReport): string {
     `Client purple advisory count: ${report.detail.clientPurpleCount}`,
     `Static styleguide advisory: inlineNote=${report.detail.staticStyleguideInlineNoteCount}, radiusLiteral=${report.detail.staticStyleguideRadiusLiteralCount}`,
     `Badge-like span advisory count: ${report.detail.badgeLikeSpanTotalCount}`,
+    `Duplicate heading advisory count: ${report.detail.duplicateHeadingSignalCount}`,
+    `Nested SectionCard advisory count: ${report.detail.nestedCardDensitySignalCount}`,
+    `Blue action semantic advisory count: ${report.detail.blueActionSemanticDriftCount}`,
     `Exception count: ${report.metrics.exception_count}`,
     '',
     `Regressions: ${report.regressions.length}`,
@@ -485,6 +667,27 @@ function formatMarkdown(report: StyleDriftReport): string {
   if (report.detail.badgeLikeSpanFiles.length > 0) {
     lines.push('', 'Top badge-like span files:');
     report.detail.badgeLikeSpanFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.duplicateHeadingFiles.length > 0) {
+    lines.push('', 'Top duplicate-heading files:');
+    report.detail.duplicateHeadingFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.nestedCardDensityFiles.length > 0) {
+    lines.push('', 'Top nested-card files:');
+    report.detail.nestedCardDensityFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  if (report.detail.blueActionSemanticDriftFiles.length > 0) {
+    lines.push('', 'Top blue-action files:');
+    report.detail.blueActionSemanticDriftFiles.slice(0, 20).forEach(item => {
       lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
     });
   }

@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **127** — 115 error, 12 warn.
+Total rules: **130** — 115 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -150,6 +150,9 @@ advisory but tracked.
 | 10 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | warn | custom | `*.ts, *.tsx` | `// page-slug-url-ok` | Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches. |
 | 11 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
 | 12 | src-index-css-no-token-declarations | warn | custom | `src/index.css` | — | Token authority requires one canonical declaration source. Local declarations in src/index.css silently fork theme values from src/tokens.css. |
+| 13 | duplicate-heading-signal | warn | custom | `src/components/` | — | Styleguide parity favors concise section structure. Repeated heading text often indicates migration churn where two layout branches render the same section titles. |
+| 14 | nested-card-density-signal | warn | custom | `src/components/` | — | Nested cards tend to create crowded surfaces and spacing drift compared with styleguide specimens. |
+| 15 | blue-action-semantic-drift | warn | custom | `src/components/` | — | Four Laws of Color reserve blue for read-only data semantics. Blue-styled actions often blur action-vs-data hierarchy. |
 
 ---
 

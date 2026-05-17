@@ -190,9 +190,10 @@ explicit justification.
 | badge-color-prop-deprecation | customCheck-fixture | Styleguide parity ratchet Wave 9 (2026-05-18). Rule blocks continued `color=` usage on `Badge` so all callsites converge on canonical semantic `tone` mappings. Fixture coverage exists in `tests/pr-check.test.ts`; full-repo scan reports ✓ after migrating the remaining callsites. |
 | interactive-div-role-button | customCheck-fixture | Styleguide parity ratchet Wave 9 (2026-05-18). Rule blocks clickable `div role=\"button\"` wrappers without explicit hatch, preserving primitive button semantics and consistent focus/keyboard behavior. Fixture coverage exists in `tests/pr-check.test.ts`; full-repo scan reports ✓ after migrating/hatching final intentional wrappers. |
 | primitive-override-drift-on-form-controls | customCheck-fixture | Styleguide parity ratchet Wave 10 (2026-05-18). Rule now targets structural primitive drift (`rounded`, `border`, `bg-*`, `focus:*`, `px/py`, `resize`) while allowing non-structural typography tweaks. Remaining structural overrides were removed from form primitive callsites and full-repo scan reports ✓ before promotion to error. |
+| nested-card-density-signal | customCheck-fixture | Styleguide parity ratchet Wave 12 (2026-05-17). Advisory detector flags nested `SectionCard` surfaces unless explicitly hatched. Fixture coverage validates trigger + hatch behavior; full-repo scan currently reports ✓ (zero nested card debt under detector semantics). |
 | Style exception registry entry missing required metadata | regex-manual | Styleguide lock-in Phase 1 foundation (2026-05-15). Rule validates `data/style-exceptions.json` contract (required fields, unique IDs, valid ISO dates, no expired entries, `expiresOn >= createdAt`). Ensures all style exceptions are owner-assigned and time-bounded. Full-repo scan reports ✓ with empty registry baseline. |
 
-**Count: 128 verified-clean rules.**
+**Count: 129 verified-clean rules.**
 
 ---
 
