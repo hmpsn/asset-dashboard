@@ -273,7 +273,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                             {item.pageType}
                           </span>
                         )}
-                        <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
+                        <Badge label={item.status} tone={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
                           <span className="flex items-center gap-0.5 t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-teal-500/10 text-accent-brand border border-teal-500/20">
                             <Icon as={Layers} size="sm" /> Content Plan

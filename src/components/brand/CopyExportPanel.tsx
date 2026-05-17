@@ -230,7 +230,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                       {option.label}
                     </span>
                     {isDisabled && option.disabledReason && (
-                      <Badge label={option.disabledReason} color="zinc" />
+                      <Badge label={option.disabledReason} tone="zinc" />
                     )}
                   </div>
                   <p

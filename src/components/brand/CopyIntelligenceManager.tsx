@@ -231,7 +231,7 @@ function PatternGroup({ type, patterns, workspaceId }: PatternGroupProps) {
         <span className="t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wide">
           {config.label}
         </span>
-        <Badge label={String(patterns.length)} color={config.badgeColor} />
+        <Badge label={String(patterns.length)} tone={config.badgeColor} />
       </div>
       <div className="space-y-1">
         {patterns.map((p) => (
@@ -264,7 +264,7 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
       title="Ready to Promote"
       titleIcon={<Icon as={Star} size="md" className="text-amber-400" />}
       titleExtra={
-        <Badge label={`${promotable.length} pattern${promotable.length === 1 ? '' : 's'}`} color="amber" />
+        <Badge label={`${promotable.length} pattern${promotable.length === 1 ? '' : 's'}`} tone="amber" />
       }
     >
       <p className="t-caption text-[var(--brand-text-muted)] mb-3">
@@ -281,7 +281,7 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[var(--brand-text)] truncate">{p.pattern}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge label={config.label} color={config.badgeColor} />
+                  <Badge label={config.label} tone={config.badgeColor} />
                   <span className="t-caption text-[var(--brand-text-muted)]">×{p.frequency}</span>
                 </div>
               </div>
@@ -371,7 +371,7 @@ function CopyIntelligenceManagerInner({ workspaceId }: Props) {
         titleExtra={
           <Badge
             label={`${totalActive} active`}
-            color="teal"
+            tone="teal"
           />
         }
       >

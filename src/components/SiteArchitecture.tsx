@@ -139,7 +139,7 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
           </span>
         )}
 
-        <Badge label={badge.label} color={badge.color} />
+        <Badge label={badge.label} tone={badge.color} />
 
         {cov && (
           cov.hasSchema ? (
@@ -352,13 +352,13 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         <SectionCard
           title="Architecture Gaps"
           titleIcon={<AlertTriangle className="w-4 h-4 text-amber-400" />}
-          titleExtra={<Badge label={`${data.gaps.length}`} color="amber" />}
+          titleExtra={<Badge label={`${data.gaps.length}`} tone="amber" />}
           noPadding
         >
           <div className="divide-y divide-[var(--brand-border)]/50">
             {data.gaps.map((gap, i) => (
               <div key={i} className="flex items-start gap-3 px-4 py-3">
-                <Badge label={gap.priority} color={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
+                <Badge label={gap.priority} tone={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-[var(--brand-text-bright)] font-mono">{gap.suggestedPath}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
@@ -375,7 +375,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         <SectionCard
           title="Orphan Pages"
           titleIcon={<AlertTriangle className="w-4 h-4 text-red-400" />}
-          titleExtra={<Badge label={`${data.orphanPaths.length}`} color="red" />}
+          titleExtra={<Badge label={`${data.orphanPaths.length}`} tone="red" />}
         >
           <div className="space-y-1">
             {data.orphanPaths.map(p => (
@@ -449,7 +449,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           <SectionCard
             title="Schema Priority Queue"
             titleIcon={<Zap className="w-4 h-4 text-amber-400" />}
-            titleExtra={<Badge label={`${coverage.priorityQueue.length}`} color="amber" />}
+            titleExtra={<Badge label={`${coverage.priorityQueue.length}`} tone="amber" />}
             noPadding
           >
             <div className="max-h-[280px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
@@ -463,7 +463,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                       <Icon as={XCircle} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     )}
                     <span className="text-xs text-[var(--brand-text-bright)] truncate flex-1" title={p.path}>{p.name}</span>
-                    <Badge label={pb.label} color={pb.color} />
+                    <Badge label={pb.label} tone={pb.color} />
                     {p.isOrphan && (
                       <span className="t-caption-sm text-red-400" title="Orphan page — no inbound links">orphan</span>
                     )}

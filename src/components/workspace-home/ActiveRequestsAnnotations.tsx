@@ -56,7 +56,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
                     <div className="t-caption text-[var(--brand-text-bright)] truncate">{req.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
                   </div>
-                  <Badge label={req.status} color={statusColor} />
+                  <Badge label={req.status} tone={statusColor} />
                 </div>
               );
             })}

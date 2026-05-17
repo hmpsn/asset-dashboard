@@ -89,7 +89,7 @@ export function CellDetailPanel({
         {/* Status */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--brand-text-muted)]">Status:</span>
-          <Badge label={`${statusCfg.icon} ${statusCfg.label}`} color={statusCfg.color} />
+          <Badge label={`${statusCfg.icon} ${statusCfg.label}`} tone={statusCfg.color} />
         </div>
 
         {/* URL */}
@@ -178,7 +178,7 @@ export function CellDetailPanel({
                   <div className="flex items-center gap-2 flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)]">
                     <span>{c.volume}/mo</span>
                     <span>KD {c.difficulty}</span>
-                    <Badge label={c.source === 'pattern' ? 'Pattern' : c.source === 'semrush_related' ? 'SEMRush' : 'AI'} color={c.source === 'pattern' ? 'zinc' : c.source === 'semrush_related' ? 'blue' : 'teal'} />
+                    <Badge label={c.source === 'pattern' ? 'Pattern' : c.source === 'semrush_related' ? 'SEMRush' : 'AI'} tone={c.source === 'pattern' ? 'zinc' : c.source === 'semrush_related' ? 'blue' : 'teal'} />
                   </div>
                 </div>
               ))}
@@ -192,7 +192,7 @@ export function CellDetailPanel({
             <span className="t-caption text-[var(--brand-text-muted)] font-medium">Expected Schema</span>
             <div className="flex items-center gap-1 flex-wrap">
               {cell.expectedSchemaTypes.map(t => (
-                <Badge key={t} label={t} color="blue" />
+                <Badge key={t} label={t} tone="blue" />
               ))}
             </div>
           </div>

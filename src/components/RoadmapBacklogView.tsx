@@ -135,7 +135,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <Badge label={pb.label} color={pb.color} />
+                    <Badge label={pb.label} tone={pb.color} />
                   </td>
                   <td className="px-3 py-2.5 text-[var(--brand-text)] capitalize">
                     {item.status.replace('_', ' ')}

@@ -338,7 +338,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                     variant="ghost"
                     className={isSelected ? 'text-teal-400 hover:text-teal-300' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}
                   />
-                  <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') || cfg.text.includes('brand') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : cfg.text.includes('emerald') ? 'emerald' : cfg.text.includes('red') ? 'red' : 'zinc'} />
+                  <Badge label={`${cfg.icon} ${cfg.label}`} tone={cfg.text.includes('zinc') || cfg.text.includes('brand') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : cfg.text.includes('emerald') ? 'emerald' : cfg.text.includes('red') ? 'red' : 'zinc'} />
                   <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{cell.customKeyword ?? cell.targetKeyword}</span>
                   {cell.keywordValidation && (
                     <div className="flex items-center gap-2 flex-shrink-0">

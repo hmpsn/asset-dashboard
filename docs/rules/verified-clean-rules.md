@@ -187,9 +187,11 @@ explicit justification.
 | styleguide-typography-extra-class-drift | customCheck-fixture | Styleguide parity advisory detector wave (2026-05-17). Rule flags `.t-*` classes in `public/styleguide.css` that do not exist in `src/index.css`, preventing static-only typography aliases from drifting. Fixture coverage validates extra-class trigger and canonical-only negative; full-repo scan reports ✓. |
 | global-token-declaration-outside-canonical-token-files | customCheck-fixture | Styleguide parity advisory detector wave (2026-05-17). Rule flags `--*` token declarations in non-canonical CSS files; only `src/tokens.css` and `public/tokens.css` are allowed declaration sites. Fixture coverage validates rogue declaration trigger and canonical-file negative; full-repo scan reports ✓. |
 | Raw CTA class literal outside Button/IconButton | regex-shell | Styleguide lock-in Phase 1 foundation (2026-05-15). Rule blocks hand-rolled CTA class stacks (`bg-teal-*`, `text-white`, transition/button literals) outside shared `Button`/`IconButton` primitives. Pattern invocation and shell execution were validated; full-repo scan reports ✓ after Wave 2/3/4 primitive migration sweeps. |
+| badge-color-prop-deprecation | customCheck-fixture | Styleguide parity ratchet Wave 9 (2026-05-18). Rule blocks continued `color=` usage on `Badge` so all callsites converge on canonical semantic `tone` mappings. Fixture coverage exists in `tests/pr-check.test.ts`; full-repo scan reports ✓ after migrating the remaining callsites. |
+| interactive-div-role-button | customCheck-fixture | Styleguide parity ratchet Wave 9 (2026-05-18). Rule blocks clickable `div role=\"button\"` wrappers without explicit hatch, preserving primitive button semantics and consistent focus/keyboard behavior. Fixture coverage exists in `tests/pr-check.test.ts`; full-repo scan reports ✓ after migrating/hatching final intentional wrappers. |
 | Style exception registry entry missing required metadata | regex-manual | Styleguide lock-in Phase 1 foundation (2026-05-15). Rule validates `data/style-exceptions.json` contract (required fields, unique IDs, valid ISO dates, no expired entries, `expiresOn >= createdAt`). Ensures all style exceptions are owner-assigned and time-bounded. Full-repo scan reports ✓ with empty registry baseline. |
 
-**Count: 125 verified-clean rules.**
+**Count: 127 verified-clean rules.**
 
 ---
 

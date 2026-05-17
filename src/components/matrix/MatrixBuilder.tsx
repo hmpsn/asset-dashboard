@@ -61,7 +61,7 @@ function TemplateCard({ template, isSelected, onSelect }: { template: ContentTem
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{template.name}</span>
-        <Badge label={template.pageType.replace(/-/g, ' ')} color="teal" />
+        <Badge label={template.pageType.replace(/-/g, ' ')} tone="teal" />
       </div>
       {template.description && (
         <p className="text-xs text-[var(--brand-text)] mb-3">{template.description}</p>

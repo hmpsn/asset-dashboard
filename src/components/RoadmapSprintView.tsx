@@ -94,7 +94,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                         >
                           {item.title}
                         </span>
-                        <Badge label={pb.label} color={pb.color} />
+                        <Badge label={pb.label} tone={pb.color} />
                         {featureName && <FeatureChip>{featureName}</FeatureChip>}
                         {item.tags?.map(tag => (
                           <TagChip key={tag}>{tag}</TagChip>

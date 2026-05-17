@@ -71,7 +71,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     <SectionCard
       title="Intelligence Signals"
       titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
-      titleExtra={<Badge label={`${signals.length}`} color="teal" />}
+      titleExtra={<Badge label={`${signals.length}`} tone="teal" />}
     >
       <div className="space-y-2">
         {signals.slice(0, 10).map(signal => {
@@ -90,7 +90,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
                   </span>
                   <Badge
                     label={badgeLabelMap[signal.type]}
-                    color={badgeColorMap[signal.type]}
+                    tone={badgeColorMap[signal.type]}
                   />
                 </div>
                 <p className="t-caption text-[var(--brand-text)] mt-0.5">{signal.detail}</p>

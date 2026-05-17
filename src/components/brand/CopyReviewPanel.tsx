@@ -131,9 +131,9 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
       titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
       titleExtra={
         <div className="flex items-center gap-1.5">
-          <Badge label={statusConfig.label} color={statusConfig.color} />
-          {hasErrors && <Badge label="Has errors" color="red" />}
-          {hasFlags && !hasErrors && <Badge label="Warnings" color="amber" />}
+          <Badge label={statusConfig.label} tone={statusConfig.color} />
+          {hasErrors && <Badge label="Has errors" tone="red" />}
+          {hasFlags && !hasErrors && <Badge label="Warnings" tone="amber" />}
         </div>
       }
       action={

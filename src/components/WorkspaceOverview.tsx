@@ -115,7 +115,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                   <ItemIcon className={cn('w-3.5 h-3.5 flex-shrink-0', item.color)} />
                   <span className="t-caption text-[var(--brand-text-bright)] flex-1">{item.label}</span>
-                  <Badge label={item.value} color="zinc" />
+                  <Badge label={item.value} tone="zinc" />
                 </div>
               );
             })}
@@ -162,7 +162,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <span className="t-micro text-[var(--brand-text-muted)] ml-2">{u.email}</span>
                     </div>
                     <span className="t-micro text-[var(--brand-text-muted)] flex-shrink-0">{wsNames[wsId] || wsId}</span>
-                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'emerald'} />
+                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} tone={u.role === 'admin' ? 'blue' : 'emerald'} />
                   </div>
                 ))
               )}

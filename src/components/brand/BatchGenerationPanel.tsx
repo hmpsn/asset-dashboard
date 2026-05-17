@@ -65,8 +65,8 @@ function EntryRow({ entry, workspaceId, selected, onToggle }: EntryRowProps) {
       />
       <span className="flex-1 text-sm text-[var(--brand-text)] truncate">{entry.name}</span>
       <div className="flex items-center gap-1.5 shrink-0">
-        <Badge label={pageTypeLabel} color="zinc" />
-        <Badge label={statusConfig.label} color={statusConfig.color} />
+        <Badge label={pageTypeLabel} tone="zinc" />
+        <Badge label={statusConfig.label} tone={statusConfig.color} />
       </div>
     </ClickableRow>
   );

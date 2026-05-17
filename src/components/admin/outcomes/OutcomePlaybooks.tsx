@@ -21,7 +21,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
     <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <h3 className="t-ui text-[var(--brand-text-bright)] capitalize">{playbook.name}</h3>
-        <Badge label={`${playbook.confidence} confidence`} color={confidenceColor(playbook.confidence)} />
+        <Badge label={`${playbook.confidence} confidence`} tone={confidenceColor(playbook.confidence)} />
       </div>
 
       {/* Action sequence */}

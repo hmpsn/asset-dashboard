@@ -117,7 +117,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                       className="text-[var(--brand-text-muted)] flex-shrink-0"
                     />
                     <span className="t-body text-[var(--brand-text-bright)]">{d.weekOf}</span>
-                    <Badge label={d.status} color={statusColor(d.status)} />
+                    <Badge label={d.status} tone={statusColor(d.status)} />
                     <span className="t-caption text-[var(--brand-text-muted)]">
                       {d.stories.length} {d.stories.length === 1 ? 'story' : 'stories'}
                     </span>
@@ -134,7 +134,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                       return (
                       <div key={s.id} className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge label={cat.label} color={cat.color} />
+                          <Badge label={cat.label} tone={cat.color} />
                           {s.isHeadline && (
                             <Icon as={Star} size="sm" className="text-accent-brand" aria-label="Headline story" />
                           )}

@@ -144,9 +144,9 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       {/* Attention flag */}
       <td className="py-3 px-4">
         {ws.attentionNeeded ? (
-          <Badge label="Review" color="amber" />
+          <Badge label="Review" tone="amber" />
         ) : (
-          <Badge label="On track" color="emerald" />
+          <Badge label="On track" tone="emerald" />
         )}
       </td>
     </tr>

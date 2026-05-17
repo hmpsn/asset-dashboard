@@ -5353,7 +5353,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'badge-color-prop-deprecation',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: [
@@ -5394,7 +5394,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'interactive-div-role-button',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/'],
