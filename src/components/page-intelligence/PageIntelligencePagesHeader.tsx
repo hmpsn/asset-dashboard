@@ -181,7 +181,7 @@ export function PageIntelligencePagesHeader({
             value={search}
             onChange={onSearchChange}
             placeholder="Search pages, keywords..."
-            className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-8 pr-3 t-caption-sm placeholder:text-[var(--brand-text-muted)]"
           />
         </div>
         <div className="flex items-center gap-1">

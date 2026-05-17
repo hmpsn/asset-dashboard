@@ -153,7 +153,7 @@ export function ClientHeader({
                         value={customStartDraft}
                         onChange={setCustomStartDraft}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full t-caption"
                       />
                     </label>
                     <label className="block">
@@ -162,7 +162,7 @@ export function ClientHeader({
                         value={customEndDraft}
                         onChange={setCustomEndDraft}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full t-caption"
                       />
                     </label>
                   </div>

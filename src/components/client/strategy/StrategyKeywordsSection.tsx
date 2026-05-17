@@ -92,7 +92,7 @@ export function StrategyKeywordsSection({
               onChange={setNewTrackedKeyword}
               placeholder="Search or add a keyword..."
               disabled={addingKeyword}
-              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
+              className="flex-1 t-caption-sm placeholder:text-[var(--brand-text-muted)] transition-colors"
               maxLength={120}
             />
             <Button

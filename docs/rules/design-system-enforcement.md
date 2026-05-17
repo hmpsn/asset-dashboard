@@ -45,8 +45,10 @@ from the `CHECKS` array.
 - Wave 9 ratchet (2026-05-18) promoted these zero-hit checks to error:
   `badge-color-prop-deprecation` and
   `interactive-div-role-button`.
-- Current advisory backlog is warn-tier and intentionally non-blocking:
+- Wave 10 ratchet (2026-05-18) promoted this zero-hit check to error:
   `primitive-override-drift-on-form-controls`.
+- Current advisory backlog is warn-tier and intentionally non-blocking:
+  `src-index-css-no-token-declarations`.
 
 ## Escape hatch
 

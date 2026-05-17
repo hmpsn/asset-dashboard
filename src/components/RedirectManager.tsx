@@ -386,7 +386,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                 placeholder="Add a note for your client (optional)"
                 value={note}
                 onChange={setNote}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full t-caption placeholder:text-[var(--brand-text-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           )}
@@ -402,7 +402,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                         type="text"
                         value={editDraft}
                         onChange={setEditDraft}
-                        className="flex-1 px-2 py-1 bg-[var(--surface-2)] border border-teal-500/50 rounded-[var(--radius-sm)] t-caption text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-teal-400"
+                        className="flex-1 t-caption"
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
                       />
@@ -470,7 +470,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             value={search}
             onChange={setSearch}
             placeholder="Filter pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 t-caption"
           />
         </div>
       </div>

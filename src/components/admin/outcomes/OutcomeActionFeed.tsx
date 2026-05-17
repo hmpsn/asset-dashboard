@@ -189,14 +189,14 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
           value={typeFilter}
           onChange={setTypeFilter}
           options={ACTION_TYPE_OPTIONS}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          className="t-caption-sm transition-colors"
           aria-label="Filter by action type"
         />
         <FormSelect
           value={scoreFilter}
           onChange={setScoreFilter}
           options={SCORE_OPTIONS}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          className="t-caption-sm transition-colors"
           aria-label="Filter by score"
         />
         {(typeFilter || scoreFilter) && (

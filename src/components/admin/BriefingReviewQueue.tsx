@@ -201,7 +201,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
           <FormInput
             value={skipNote}
             onChange={setSkipNote}
-            className="w-full px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-1)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50"
+            className="w-full t-body"
             placeholder="e.g. quiet week, low confidence in stories"
             autoFocus
           />

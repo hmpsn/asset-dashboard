@@ -70,7 +70,7 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
                 onChange={setFlagComment}
                 placeholder="Describe what needs to change..."
                 rows={2}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full t-caption transition-colors"
               />
               <div className="flex items-center gap-2">
                 <Button

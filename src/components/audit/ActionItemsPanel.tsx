@@ -122,7 +122,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newTitle}
             onChange={setNewTitle}
             placeholder="What needs to be done?"
-            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full t-body"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
@@ -130,7 +130,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newDesc}
             onChange={setNewDesc}
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full t-body"
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-1">

@@ -200,7 +200,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             value={search}
             onChange={setSearch}
             placeholder="Search by title or keyword..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full pl-9 pr-3"
           />
           {search && (
             <IconButton onClick={() => setSearch('')} icon={X} label="Clear search" variant="ghost" size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]" />

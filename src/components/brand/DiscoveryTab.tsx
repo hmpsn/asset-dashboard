@@ -363,7 +363,7 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
               value={filename}
               onChange={setFilename}
               placeholder="e.g. Sales call transcript"
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+              className="w-full placeholder:text-[var(--brand-text-muted)]"
             />
           </div>
 
@@ -387,7 +387,7 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
             onChange={setRawContent}
             placeholder="Paste transcript, brand document, competitor copy, or any text to analyze..."
             rows={8}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none"
+            className="w-full placeholder:text-[var(--brand-text-muted)]"
           />
         </div>
 

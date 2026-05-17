@@ -63,7 +63,7 @@ export function LoginScreen({ onLogin }: Props) {
                     placeholder="Enter password"
                     autoComplete="current-password"
                     autoFocus
-                    className="pl-10 pr-4 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--brand-text)]"
+                    className="pl-10 pr-4"
                   />
                 </div>
               </FormField>

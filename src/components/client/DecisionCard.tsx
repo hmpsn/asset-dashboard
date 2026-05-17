@@ -70,7 +70,7 @@ export function DecisionCard({
                   value={flagNote}
                   onChange={setFlagNote}
                   placeholder="Add a note for your team…"
-                  className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
+                  className="flex-1 t-caption placeholder:text-[var(--brand-text-muted)] outline-none"
                 />
                 <Button size="sm" variant="primary" onClick={handleSubmitFlag}>
                   Send

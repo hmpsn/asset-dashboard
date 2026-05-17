@@ -104,7 +104,7 @@ export function CmsEditorShellPanels({
                   value={approvalNote}
                   onChange={setApprovalNote}
                   placeholder="Add a note for your client (optional)"
-                  className="w-56 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/50 focus:outline-none"
+                  className="w-56"
                 />
               )}
               <Button
@@ -175,7 +175,7 @@ export function CmsEditorShellPanels({
             value={search}
             onChange={onSearchChange}
             placeholder="Search items..."
-            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full pl-9 pr-3"
           />
         </div>
       )}

@@ -152,7 +152,7 @@ export function SchemaInitialPageTypePicker({
           value={pageSearch}
           onChange={onPageSearchChange}
           placeholder="Filter pages..."
-          className="px-3 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] w-48 focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="t-caption w-48"
         />
       </div>
       {showTypeGuide && <SchemaPageTypeGuide />}

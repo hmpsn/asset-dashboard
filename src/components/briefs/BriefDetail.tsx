@@ -84,7 +84,7 @@ export function BriefDetail({
             value={regenFeedback}
             onChange={setRegenFeedback}
             placeholder="e.g. 'Make it more commercial', 'Add a comparison table section', 'Target a different audience'..."
-            className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]"
+            className="w-full min-h-[60px]"
             rows={2}
           />
           <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ export function BriefDetail({
         <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.executiveSummary || ''} commitOnBlur onCommit={value => { if (value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]" rows={3} />
+            <FormTextarea value={brief.executiveSummary || ''} commitOnBlur onCommit={value => { if (value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed min-h-[60px]" rows={3} />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{brief.executiveSummary}</div>
           )}
@@ -119,7 +119,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
           {editingBrief === brief.id ? (
-            <FormInput type="text" value={brief.suggestedTitle || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: value }); }} className="w-full text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
+            <FormInput type="text" value={brief.suggestedTitle || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: value }); }} className="w-full text-xs text-teal-400" />
           ) : (
             <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedTitle}</div>
           )}
@@ -145,7 +145,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.suggestedMetaDesc || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+            <FormTextarea value={brief.suggestedMetaDesc || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: value }); }} className="w-full text-xs text-[var(--brand-text-bright)]" rows={2} />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedMetaDesc}</div>
           )}
@@ -175,7 +175,7 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
           {editingBrief === brief.id ? (
-            <FormInput type="number" value={brief.wordCountTarget} commitOnBlur onCommit={value => { const v = parseInt(value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400 bg-transparent border-b border-[var(--brand-border)] focus:border-blue-400 focus:outline-none py-0.5" />
+            <FormInput type="number" value={brief.wordCountTarget} commitOnBlur onCommit={value => { const v = parseInt(value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400" />
           ) : (
             <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
           )}
@@ -183,7 +183,7 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
           {editingBrief === brief.id ? (
-            <FormInput type="text" value={brief.intent || ''} commitOnBlur onCommit={value => { if (value !== brief.intent) onSaveBriefField(brief.id, { intent: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
+            <FormInput type="text" value={brief.intent || ''} commitOnBlur onCommit={value => { if (value !== brief.intent) onSaveBriefField(brief.id, { intent: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium" />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{brief.intent}</div>
           )}
@@ -192,7 +192,7 @@ export function BriefDetail({
           <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
             {editingBrief === brief.id ? (
-              <FormSelect value={brief.contentFormat} onChange={value => onSaveBriefField(brief.id, { contentFormat: value })} options={['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => ({ value: f, label: f }))} className="w-full text-xs text-amber-400 capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 cursor-pointer" />
+              <FormSelect value={brief.contentFormat} onChange={value => onSaveBriefField(brief.id, { contentFormat: value })} options={['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => ({ value: f, label: f }))} className="w-full text-xs text-amber-400 capitalize font-medium cursor-pointer" />
             ) : (
               <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
             )}
@@ -219,7 +219,7 @@ export function BriefDetail({
         <div>
           <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.audience || ''} commitOnBlur onCommit={value => { if (value !== brief.audience) onSaveBriefField(brief.id, { audience: value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+            <FormTextarea value={brief.audience || ''} commitOnBlur onCommit={value => { if (value !== brief.audience) onSaveBriefField(brief.id, { audience: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.audience}</div>
           )}
@@ -228,7 +228,7 @@ export function BriefDetail({
           <div>
             <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
             {editingBrief === brief.id ? (
-              <FormTextarea value={brief.toneAndStyle || ''} commitOnBlur onCommit={value => { if (value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+              <FormTextarea value={brief.toneAndStyle || ''} commitOnBlur onCommit={value => { if (value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
             ) : (
               <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.toneAndStyle}</div>
             )}
@@ -348,7 +348,7 @@ export function BriefDetail({
                 value={outlineRegenFeedback}
                 onChange={setOutlineRegenFeedback}
                 placeholder="Optional: describe what you'd like changed (e.g., 'Add a comparison section', 'Make it more practical')..."
-                className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y"
+                className="w-full"
                 rows={2}
               />
               <div className="flex items-center gap-2">
@@ -379,10 +379,10 @@ export function BriefDetail({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">H2:</span>
-                      <FormInput type="text" value={section.heading || ''} commitOnBlur onCommit={value => { if (value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
-                      <FormInput type="number" value={section.wordCount || ''} placeholder="words" commitOnBlur onCommit={value => { const v = parseInt(value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 text-right" />
+                      <FormInput type="text" value={section.heading || ''} commitOnBlur onCommit={value => { if (value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)]" />
+                      <FormInput type="number" value={section.wordCount || ''} placeholder="words" commitOnBlur onCommit={value => { const v = parseInt(value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] text-right" />
                     </div>
-                    <FormTextarea value={section.notes || ''} commitOnBlur onCommit={value => { if (value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed bg-[var(--surface-2)]/50 border border-[var(--brand-border)] rounded-[var(--radius-sm)] px-2 py-1.5 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
+                    <FormTextarea value={section.notes || ''} commitOnBlur onCommit={value => { if (value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed" rows={2} />
                   </div>
                 ) : (
                   <>
@@ -410,7 +410,7 @@ export function BriefDetail({
             <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
               <Badge label={i === 0 ? 'Primary' : 'Secondary'} tone={i === 0 ? 'teal' : 'zinc'} className="flex-shrink-0" />
               {editingBrief === brief.id ? (
-                <FormInput type="text" value={cta || ''} commitOnBlur onCommit={value => { if (value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)] bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
+                <FormInput type="text" value={cta || ''} commitOnBlur onCommit={value => { if (value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)]" />
               ) : cta}
             </div>
           ))}</div>
@@ -422,7 +422,7 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.competitorInsights || ''} commitOnBlur onCommit={value => { if (value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y leading-relaxed" rows={3} />
+            <FormTextarea value={brief.competitorInsights || ''} commitOnBlur onCommit={value => { if (value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: value }); }} className="w-full text-xs text-[var(--brand-text)] leading-relaxed" rows={3} />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{brief.competitorInsights}</div>
           )}

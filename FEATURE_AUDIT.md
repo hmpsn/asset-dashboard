@@ -5921,3 +5921,16 @@ Bug hardening included:
 **Mutual:** Keeps the parity ratchet sustainable: zero-hit rules get promoted, noisy categories stay advisory with metrics, and governance docs stay aligned with real enforcement state.
 
 **Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `src/components/client/ClientHeader.tsx`; `src/components/client/ClientOnboardingQuestionnaire.tsx`; `src/components/client/BrandTab.tsx`; `src/components/client/strategy/StrategyPageImprovementsSection.tsx`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 432. Styleguide Parity Ratchet Wave 10 (Form Primitive Override Promotion)
+**What it does:** Clears remaining structural override drift on shared form primitives and promotes `primitive-override-drift-on-form-controls` from advisory to blocking enforcement. The sweep removes hand-rolled structural classes (`rounded*`, `border*`, `bg-*`, `focus:*`, `px/py`, `resize-*`) from `FormInput`, `FormTextarea`, and `FormSelect` call sites across client/admin/editor surfaces while preserving layout/behavior classes. The detector contract in `scripts/pr-check.ts` is tightened to structural overrides only, fixture/docs/registry state is synchronized, and the rule is ratcheted to `error` after the backlog reaches zero.
+
+**Agency value:** Locks one of the highest-volume drift vectors behind deterministic CI enforcement so future form work stays primitive-first by default.
+
+**Client value:** Improves consistency of form controls across the live product so typography, spacing, and focus treatment align with styleguide primitives.
+
+**Mutual:** Advances the phased parity ratchet with measurable debt burn-down and a clean advisory-to-error promotion path.
+
+**Files:** `scripts/pr-check.ts`; `src/components/**` (form primitive callsites); `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

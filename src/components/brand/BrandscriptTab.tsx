@@ -58,7 +58,7 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
             value={name}
             onChange={setName}
             placeholder="e.g. StoryBrand 2024"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+            className="w-full"
             autoFocus
           />
         </div>
@@ -148,7 +148,7 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
             value={name}
             onChange={setName}
             placeholder="e.g. Imported v1"
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
+            className="w-full"
           />
         </div>
 
@@ -160,7 +160,7 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
             onChange={setRawText}
             placeholder="Paste your brandscript content here..."
             rows={8}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none font-mono"
+            className="w-full"
           />
         </div>
 
@@ -275,7 +275,7 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
             onChange={setContent}
             rows={5}
             placeholder="Enter section content..."
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-y"
+            className="w-full"
           />
           <div className="flex justify-end">
             <Button

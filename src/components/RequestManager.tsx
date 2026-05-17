@@ -287,7 +287,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="flex-1 min-w-[140px] max-w-[240px] relative ml-auto">
           <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <FormInput value={searchQuery} onChange={setSearchQuery} placeholder="Search requests..."
-            className="w-full pl-7 pr-3 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]" />
+            className="w-full pl-7 pr-3 t-caption" />
         </div>
       </div>
 

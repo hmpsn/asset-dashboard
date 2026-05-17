@@ -495,7 +495,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 value={briefSearch}
                 onChange={setBriefSearch}
                 placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
+                className="w-48 pl-8 pr-7 t-caption-sm"
               />
               {briefSearch && (
                 <IconButton

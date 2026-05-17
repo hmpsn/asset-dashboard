@@ -373,7 +373,7 @@ export function InboxTab({
                                 onChange={setFlagComment}
                                 placeholder="Describe what you'd like changed..."
                                 rows={2}
-                                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                                className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                               />
                               <div className="flex items-center gap-2">
                                 <Button size="sm" variant="primary" disabled={flagSubmitting || !flagComment.trim()} onClick={() => handleFlagCell(cell)}>
@@ -626,7 +626,7 @@ export function InboxTab({
                                   value={changeRequestNote}
                                   onChange={setChangeRequestNote}
                                   placeholder="Add a note for your team…"
-                                  className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
+                                  className="flex-1 t-caption placeholder:text-[var(--brand-text-muted)] outline-none"
                                 />
                                 <Button size="sm" variant="primary" disabled={!changeRequestNote.trim()} onClick={() => respondToClientAction(action.id, 'changes_requested', changeRequestNote.trim()).catch(() => {})}>
                                   Send
@@ -700,7 +700,7 @@ export function InboxTab({
                                 onChange={setFlagComment}
                                 placeholder="Describe what you'd like changed..."
                                 rows={2}
-                                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
+                                className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
                               />
                               <div className="flex items-center gap-2">
                                 <Button

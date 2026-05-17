@@ -34,7 +34,7 @@ export function PagePicker({
             value={pageSearch}
             onChange={onPageSearchChange}
             placeholder="Search pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 t-caption"
             autoFocus
           />
         </div>
@@ -106,7 +106,7 @@ export function InitialPagePicker({
             value={pageSearch}
             onChange={onPageSearchChange}
             placeholder="Search pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 t-caption"
             autoFocus
           />
         </div>

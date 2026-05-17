@@ -159,7 +159,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 value={newNotes}
                 onChange={setNewNotes}
                 placeholder="Any preferences, instructions, or context..."
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text-bright)] h-20 resize-none"
+                className="w-full t-caption-sm h-20"
               />
             </div>
 

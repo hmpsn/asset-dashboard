@@ -29,7 +29,7 @@ export function StrategyDeclineKeywordModal({
           value={declineReasonText}
           onChange={setDeclineReasonText}
           placeholder="e.g., We don't offer this service, too competitive, not our target audience..."
-          className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-body text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none h-20"
+          className="w-full t-body placeholder:text-[var(--brand-text-muted)] h-20"
           autoFocus
         />
       </Modal.Body>

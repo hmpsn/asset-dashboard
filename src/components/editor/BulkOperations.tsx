@@ -137,7 +137,7 @@ export function BulkOperations({
               value={patternText}
               onChange={onSetPatternText}
               placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
-              className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+              className="flex-1"
               autoFocus
             />
             <Button

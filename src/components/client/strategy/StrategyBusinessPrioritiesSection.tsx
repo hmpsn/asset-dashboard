@@ -114,7 +114,7 @@ export function StrategyBusinessPrioritiesSection({
                   { value: 'competitive', label: 'Competitive' },
                   { value: 'other', label: 'Other' },
                 ]}
-                className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2 py-1.5 t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                className="t-caption-sm"
               />
               <FormInput
                 value={newPriority}

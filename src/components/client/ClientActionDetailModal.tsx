@@ -264,7 +264,7 @@ export function ClientActionDetailModal({
               onChange={setChangeNote}
               placeholder="Describe what needs to change…"
               aria-label="Describe what needs to change"
-              className="flex-1 min-w-[200px] px-3 py-2 rounded-[var(--radius-md)] t-body bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
+              className="flex-1 min-w-[200px] t-body placeholder:text-[var(--brand-text-muted)] outline-none"
             />
             <Button variant="primary" disabled={submitting || !changeNote.trim()} onClick={() => onRequestChanges(changeNote.trim())}>
               {submitting ? 'Sending…' : 'Send feedback'}
