@@ -160,7 +160,7 @@ export function ReviewChecklist({
                       <ul className="mt-1 space-y-1">
                         {evidenceToShow.topResults.map(result => (
                           <li key={`${result.position}-${result.url}`} className="t-caption-sm text-[var(--brand-text-muted)]">
-                            <a href={result.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-blue-300 hover:text-blue-200">
+                            <a href={result.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-teal-300 hover:text-teal-200">
                               <span className="shrink-0">#{result.position}</span>
                               <span className="truncate">{result.title}</span>
                               <Icon as={ExternalLink} size="xs" className="shrink-0" />

@@ -45,6 +45,8 @@
 3. **Emerald for success.** `scoreColorClass()` returns `text-emerald-400` for score ≥80; `scoreColor()` hex is `#34d399` (emerald-400). Never `text-green-400` for success/score indicators — green and emerald are distinct hues, emerald is canonical.
 4. **Purple for admin AI only.** The admin chatbot (`AdminChat.tsx`) and admin-only AI features (`SeoAudit.tsx` "Flag for Client") use purple to visually distinguish admin intelligence from client-facing teal UI. Purple never appears in any client-facing view.
 
+Action-link nuance: links that initiate user actions (review, open-tool, perform/fix flows) use teal hover/active states; blue link treatment is reserved for informational/data navigation only.
+
 ### Primary Palette
 
 | Role | Dark Mode | Light Mode | Tailwind | Usage |

@@ -297,7 +297,7 @@ export function BriefDetail({
               <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                 <div className="flex items-center gap-2">
                   <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">#{result.position}</span>
-                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 truncate">{result.title}</a>
+                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-400 hover:text-teal-300 truncate">{result.title}</a>
                 </div>
               </div>
             ))}

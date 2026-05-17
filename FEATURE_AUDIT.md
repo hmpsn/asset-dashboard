@@ -5947,3 +5947,16 @@ Bug hardening included:
 **Mutual:** Keeps delivery velocity high by measuring these rules in advisory mode first, while building the data and fixture confidence needed for later ratchet-to-error promotions.
 
 **Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 434. Styleguide Parity Ratchet Wave 13 (Advisory Debt Burn-Down)
+**What it does:** Clears the active advisory backlog introduced in Wave 12. Blue-styled actionable controls were migrated to teal semantics in `AssetAudit`, `assets/AssetCard`, `SearchDetail`, `briefs/BriefDetail`, and `post-editor/ReviewChecklist`, aligning interaction color behavior with the Four Laws of Color. Intentional duplicate heading detections caused by feature-flagged parallel layouts and repeated dynamic-title patterns were explicitly documented using `duplicate-heading-ok` hatches in `InboxTab`, `LandingPage`, and `PostEditor`. Post-change `verify:style-drift` now reports `duplicateHeadingSignalCount=0`, `nestedCardDensitySignalCount=0`, and `blueActionSemanticDriftCount=0`.
+
+**Agency value:** Removes the remaining high-signal advisory noise so future parity regressions are easier to spot and ratchet promotions can proceed with cleaner evidence.
+
+**Client value:** Makes live surfaces feel closer to the styleguide by tightening interaction color semantics and reducing heading duplication artifacts across migrated views.
+
+**Mutual:** Advances the phased parity program from “measuring drift” to “driving drift to zero,” preparing the next promotion wave with objective zero-backlog metrics.
+
+**Files:** `src/components/AssetAudit.tsx`; `src/components/assets/AssetCard.tsx`; `src/components/SearchDetail.tsx`; `src/components/briefs/BriefDetail.tsx`; `src/components/post-editor/ReviewChecklist.tsx`; `src/components/client/InboxTab.tsx`; `src/components/LandingPage.tsx`; `src/components/PostEditor.tsx`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
