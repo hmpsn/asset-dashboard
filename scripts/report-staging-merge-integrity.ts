@@ -96,6 +96,24 @@ function run(cmd: string, args: string[]): string {
   });
 }
 
+function isShallowRepository(): boolean {
+  try {
+    return run('git', ['rev-parse', '--is-shallow-repository']).trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function ensureFullHistoryForIntegrityChecks(): void {
+  // CI commonly checks out with fetch-depth=1. Without unshallowing, older
+  // merged PR commits may appear "missing" locally and false-fail integrity checks.
+  if (isShallowRepository()) {
+    run('git', ['fetch', 'origin', '--quiet', '--unshallow']);
+  } else {
+    run('git', ['fetch', 'origin', '--quiet']);
+  }
+}
+
 function gitMergeBaseIsAncestor(commit: string, targetRef: string): boolean {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', commit, targetRef], {
@@ -154,8 +172,8 @@ function main(): void {
     throw new Error(`Invalid --since-days: ${String(args.get('--since-days'))}`);
   }
 
-  // Ensure we have up-to-date staging ancestry locally.
-  run('git', ['fetch', 'origin', '--quiet']);
+  // Ensure we have enough history locally for ancestry checks.
+  ensureFullHistoryForIntegrityChecks();
 
   const cutoff = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
   const prList = JSON.parse(
