@@ -663,7 +663,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
             <span className={`t-stat-sm ${m.color}`}>{m.value}</span>
           </div>
           {m.change != null && m.change !== 0 && (
-            <span className={`t-caption font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${
+            <span className={`t-caption font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok ${
               m.change > 0 ? 'bg-emerald-500/10 text-accent-success' : 'bg-red-500/10 text-accent-danger'
             }`}>
               {m.changeLabel || pct(m.change)}

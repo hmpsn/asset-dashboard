@@ -6,7 +6,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { Button, ClickableRow, ErrorState, Icon, NextStepsCard, ProgressIndicator } from '../ui';
+import { Button, ClickableRow, ErrorState, FormInput, Icon, NextStepsCard, ProgressIndicator } from '../ui';
 import type { FixQueueItem } from './pageIntelligenceData';
 import type { BulkProgress, SortBy, SortDir } from './pageIntelligenceTypes';
 
@@ -176,10 +176,10 @@ export function PageIntelligencePagesHeader({
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Icon as={SearchIcon} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={event => onSearchChange(event.target.value)}
+            onChange={onSearchChange}
             placeholder="Search pages, keywords..."
             className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
           />

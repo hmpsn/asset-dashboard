@@ -8,13 +8,15 @@ export interface CheckboxProps {
   onChange: (checked: boolean) => void;
   label: string;
   disabled?: boolean;
+  /** When true, the label text is visually hidden but still accessible. */
+  srOnlyLabel?: boolean;
   className?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  function Checkbox({ checked, onChange, label, disabled, className }, ref) {
+  function Checkbox({ checked, onChange, label, disabled, srOnlyLabel, className }, ref) {
     const id = useId();
 
     return (
@@ -68,7 +70,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         </span>
 
         {/* Label text */}
-        <span className="text-sm text-[var(--brand-text)]">{label}</span>
+        <span className={cn('text-sm text-[var(--brand-text)]', srOnlyLabel && 'sr-only')}>{label}</span>
       </label>
     );
   }

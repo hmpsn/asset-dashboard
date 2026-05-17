@@ -9,7 +9,7 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
-import { SectionCard, Icon, Modal, Button, IconButton } from './ui';
+import { SectionCard, Icon, Modal, Button, IconButton, FormInput } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
@@ -360,7 +360,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
-              <input value={titleBuffer} onChange={e => setTitleBuffer(e.target.value)} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
+              <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none" />
               <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
               <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTitle(false)} />
             </div>
@@ -382,7 +382,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Hash} size="sm" />{post.targetKeyword}</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={FileText} size="sm" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
             {post.unificationStatus && post.unificationStatus !== 'pending' && (
-              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border font-medium flex items-center gap-1 ${
+              <span title={post.unificationNote || ''} className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok border font-medium flex items-center gap-1 ${
                 post.unificationStatus === 'success' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
                 post.unificationStatus === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
                 'text-[var(--brand-text)] bg-[var(--surface-3)]/10 border-[var(--brand-border)]'

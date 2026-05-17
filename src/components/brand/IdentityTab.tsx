@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Check, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, FormInput } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -161,11 +161,11 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
             <label htmlFor={`refine-${deliverableType}`} className="sr-only">
               Refine direction for {label}
             </label>
-            <input
+            <FormInput
               id={`refine-${deliverableType}`}
               type="text"
               value={refineInput}
-              onChange={e => setRefineInput(e.target.value)}
+              onChange={setRefineInput}
               disabled={isLoading}
               placeholder="Refinement direction..."
               className="flex-1 min-w-0 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"

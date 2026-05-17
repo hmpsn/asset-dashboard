@@ -30,7 +30,7 @@ export function Performance({ siteId, workspaceId }: { siteId: string; workspace
         onChange={id => setTab(id as PerfTab)}
       />
       {tab === 'weight' && <PageWeight siteId={siteId} workspaceId={workspaceId} />}
-      {tab === 'speed' && <PageSpeedPanel siteId={siteId} workspaceId={workspaceId} />}
+      {tab === 'speed' && <PageSpeedPanel siteId={siteId} workspaceId={workspaceId} showHeader={false} />}
     </div>
   );
 }

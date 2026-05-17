@@ -11,7 +11,7 @@ import {
   Upload,
   Wand2,
 } from 'lucide-react';
-import { Button, CharacterCounter, ClickableRow, Icon, IconButton, SectionCard, SerpPreview, SocialPreview } from '../ui';
+import { Badge, Button, CharacterCounter, Checkbox, ClickableRow, FormInput, FormTextarea, Icon, IconButton, SectionCard, SerpPreview, SocialPreview, type BadgeTone } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
 import type { PageEditState } from '../../hooks/usePageEditStates';
@@ -23,6 +23,13 @@ import {
   type CmsCollection,
 } from './cmsEditorModel';
 import type { ItemVariations } from './useCmsEditorAiWorkflow';
+
+const APPROVAL_STATUS_TONES: Record<string, BadgeTone> = {
+  pending: 'amber',
+  approved: 'emerald',
+  rejected: 'red',
+  applied: 'blue',
+};
 
 interface CmsEditorCollectionsProps {
   collections: CmsCollection[];
@@ -117,45 +124,35 @@ export function CmsEditorCollections({
             >
               <div className="flex items-center gap-2 flex-wrap">
                 {workspaceId && filteredItemIds.length > 0 && (
-                  <input
-                    type="checkbox"
-                    checked={allInCollSelected}
-                    onChange={e => { e.stopPropagation(); toggleSelectAllInCollection(filteredItemIds); }}
-                    onClick={e => e.stopPropagation()}
-                    className="w-3.5 h-3.5 rounded border-[var(--brand-border)] text-teal-500 focus:ring-teal-500 bg-[var(--surface-3)] flex-shrink-0 cursor-pointer"
-                    title={allInCollSelected ? 'Deselect all in collection' : `Select all ${filteredItemIds.length} items`}
-                  />
+                  <span onClick={e => e.stopPropagation()} title={allInCollSelected ? 'Deselect all in collection' : `Select all ${filteredItemIds.length} items`}>
+                    <Checkbox
+                      checked={allInCollSelected}
+                      onChange={() => toggleSelectAllInCollection(filteredItemIds)}
+                      label={allInCollSelected ? 'Deselect all in collection' : `Select all ${filteredItemIds.length} items`}
+                      className="[&_span:last-child]:sr-only"
+                    />
+                  </span>
                 )}
                 <Icon as={isExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />
                 <span className="text-sm font-medium text-[var(--brand-text-bright)]">{coll.collectionName}</span>
-                <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
+                <Badge label={`/${coll.collectionSlug}`} tone="zinc" variant="soft" shape="sm" size="sm" />
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{coll.total} items</span>
                 {extraSeoFields.length > 0 && (
-                  <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
-                    {extraSeoFields.map(f => f.displayName).join(', ')}
-                  </span>
+                  <Badge label={extraSeoFields.map(f => f.displayName).join(', ')} tone="teal" variant="soft" shape="sm" size="sm" />
                 )}
                 {missingNames > 0 && (
-                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
-                    {missingNames} missing names
-                  </span>
+                  <Badge label={`${missingNames} missing names`} tone="red" variant="outline" shape="sm" size="sm" />
                 )}
                 {missingTitles > 0 && (
-                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
-                    {missingTitles} missing SEO titles
-                  </span>
+                  <Badge label={`${missingTitles} missing SEO titles`} tone="amber" variant="outline" shape="sm" size="sm" />
                 )}
                 {missingDescs > 0 && (
-                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
-                    {missingDescs} missing meta desc
-                  </span>
+                  <Badge label={`${missingDescs} missing meta desc`} tone="red" variant="outline" shape="sm" size="sm" />
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedInColl > 0 && (
-                  <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
-                    {selectedInColl} selected
-                  </span>
+                  <Badge label={`${selectedInColl} selected`} tone="teal" variant="soft" shape="sm" size="sm" />
                 )}
                 {collSavedIds.length > 0 && (
                   <span
@@ -196,13 +193,14 @@ export function CmsEditorCollections({
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           {workspaceId && (
-                            <input
-                              type="checkbox"
-                              checked={approvalSelected.has(item.id)}
-                              onChange={e => { e.stopPropagation(); toggleApprovalItem(item.id); }}
-                              onClick={e => e.stopPropagation()}
-                              className="w-3.5 h-3.5 rounded border-[var(--brand-border)] text-teal-500 focus:ring-teal-500 bg-[var(--surface-3)] flex-shrink-0 cursor-pointer"
-                            />
+                            <span onClick={e => e.stopPropagation()}>
+                              <Checkbox
+                                checked={approvalSelected.has(item.id)}
+                                onChange={() => toggleApprovalItem(item.id)}
+                                label={`Select ${itemName || 'item'}`}
+                                className="[&_span:last-child]:sr-only"
+                              />
+                            </span>
                           )}
                           <Icon as={isItemExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                           <span className={`text-xs truncate ${hasName ? 'text-[var(--brand-text-bright)]' : 'text-red-400/80 italic'}`}>{itemName || '(untitled)'}</span>
@@ -210,9 +208,9 @@ export function CmsEditorCollections({
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <StatusBadge status={getState(item.id)?.status} />
-                          {!hasSeoTitle && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">No title</span>}
-                          {!hasSeoDesc && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">No desc</span>}
-                          {isDirty && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
+                          {!hasSeoTitle && <Badge label="No title" tone="amber" variant="outline" shape="sm" size="sm" />}
+                          {!hasSeoDesc && <Badge label="No desc" tone="red" variant="outline" shape="sm" size="sm" />}
+                          {isDirty && <Badge label="Unsaved" tone="blue" variant="outline" shape="sm" size="sm" />}
                           {isSaved && !isDirty && <Icon as={Check} size="sm" className="text-emerald-400" />}
                           {error && <Icon as={AlertCircle} size="sm" className="text-red-400/80" />}
                           <Button
@@ -246,10 +244,10 @@ export function CmsEditorCollections({
                                 />
                               </div>
                             </div>
-                            <input
+                            <FormInput
                               type="text"
                               value={edits[item.id]?.name || ''}
-                              onChange={e => updateField(item.id, 'name', e.target.value)}
+                              onChange={value => updateField(item.id, 'name', value)}
                               className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                             {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
@@ -275,10 +273,10 @@ export function CmsEditorCollections({
 
                           <div>
                             <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-1 block">Slug</label>
-                            <input
+                            <FormInput
                               type="text"
                               value={edits[item.id]?.slug || ''}
-                              onChange={e => updateField(item.id, 'slug', e.target.value)}
+                              onChange={value => updateField(item.id, 'slug', value)}
                               className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                           </div>
@@ -306,16 +304,16 @@ export function CmsEditorCollections({
                                   </div>
                                 </div>
                                 {isTitle ? (
-                                  <input
+                                  <FormInput
                                     type="text"
                                     value={val}
-                                    onChange={e => updateField(item.id, field.slug, e.target.value)}
+                                    onChange={value => updateField(item.id, field.slug, value)}
                                     className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                                   />
                                 ) : (
-                                  <textarea
+                                  <FormTextarea
                                     value={val}
-                                    onChange={e => updateField(item.id, field.slug, e.target.value)}
+                                    onChange={value => updateField(item.id, field.slug, value)}
                                     rows={3}
                                     className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
                                   />
@@ -377,12 +375,12 @@ export function CmsEditorCollections({
                                       >
                                         <div className="flex items-center gap-2 mb-1">
                                           <span className="text-[var(--brand-text-muted)] font-bold">{variationIndex + 1}.</span>
-                                          <span className="t-caption-sm px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Title</span>
+                                          <Badge label="Title" tone="blue" variant="soft" shape="sm" size="sm" />
                                           <span className="flex-1">{titleVariation}</span>
                                           <CharacterCounter current={titleVariation.length} max={60} size="sm" />
                                         </div>
                                         <div className="flex items-center gap-2 ml-4">
-                                          <span className="t-caption-sm px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Desc</span>
+                                          <Badge label="Desc" tone="blue" variant="soft" shape="sm" size="sm" />
                                           <span className="flex-1 text-[var(--brand-text)]">{descVariation}</span>
                                           <CharacterCounter current={descVariation.length} max={160} size="sm" />
                                         </div>
@@ -414,19 +412,13 @@ export function CmsEditorCollections({
                             const itemApprovals = itemApprovalMap.get(item.id);
                             if (!itemApprovals || itemApprovals.length === 0) return null;
                             const latest = itemApprovals[0];
-                            const statusColors: Record<string, string> = {
-                              pending: 'text-amber-400/80 bg-amber-500/8 border-amber-500/20',
-                              approved: 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20',
-                              rejected: 'text-red-400/80 bg-red-500/8 border-red-500/20',
-                              applied: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-                            };
                             return (
                               <div className="mt-3 space-y-2">
                                 <div className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/50">
                                   <div className="flex items-center gap-2 mb-1.5">
                                     <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
                                     <span className="t-caption-sm font-medium text-[var(--brand-text)]">Latest: {latest.batchName}</span>
-                                    <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
+                                    <Badge label={latest.status} tone={APPROVAL_STATUS_TONES[latest.status] ?? 'zinc'} variant="outline" shape="sm" size="sm" />
                                     <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-center gap-2 t-caption-sm">
@@ -454,7 +446,7 @@ export function CmsEditorCollections({
                                           <div key={approval.id} className="px-2.5 py-1.5 rounded bg-[var(--surface-3)]/30 t-caption-sm">
                                             <div className="flex items-center gap-2 mb-0.5">
                                               <span className="text-[var(--brand-text-muted)]">{approval.batchName}</span>
-                                              <span className={`t-caption-sm px-1 py-0.5 rounded border ${statusColors[approval.status] || ''}`}>{approval.status}</span>
+                                              <Badge label={approval.status} tone={APPROVAL_STATUS_TONES[approval.status] ?? 'zinc'} variant="outline" shape="sm" size="sm" />
                                               <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(approval.updatedAt).toLocaleDateString()}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">

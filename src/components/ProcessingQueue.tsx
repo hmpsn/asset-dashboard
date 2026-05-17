@@ -1,5 +1,5 @@
 import { Loader2, CheckCircle2, AlertCircle, Sparkles, Upload, Copy } from 'lucide-react';
-import { EmptyState, Icon, IconButton, cn } from './ui';
+import { Badge, EmptyState, Icon, IconButton, cn } from './ui';
 
 export interface QueueItem {
   id: string;
@@ -61,14 +61,11 @@ export function ProcessingQueue({ items }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{item.fileName}</span>
-                <span className={cn(
-                  't-caption-sm uppercase tracking-wider px-1.5 py-0.5 rounded font-medium',
-                  item.type === 'meta'
-                    ? 'bg-amber-500/10 text-amber-400'
-                    : 'bg-blue-500/10 text-blue-400',
-                )}>
-                  {item.type}
-                </span>
+                <Badge
+                  label={item.type}
+                  tone={item.type === 'meta' ? 'amber' : 'blue'}
+                  className="uppercase tracking-wider"
+                />
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={cn('text-xs', config.color)}>{config.label}</span>

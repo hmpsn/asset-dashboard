@@ -146,7 +146,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   const titleIcon = <Icon as={Inbox} size="md" className="text-[var(--brand-text-muted)]" />;
 
   const newBadge = newSignals.length > 0 ? (
-    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 text-accent-warning border border-amber-500/20">
+    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/10 text-accent-warning border border-amber-500/20">
       {newSignals.length} new
     </span>
   ) : undefined;

@@ -56,7 +56,7 @@ interface ChartBlockData {
   valueFormat?: 'number' | 'percent';
 }
 
-const BAR_COLORS = [CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.purple, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.orange, '#14b8a6']; // chart-hex-ok — #14b8a6 is teal-500 for extra series variety
+const BAR_COLORS = [CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.orange, CHART_SERIES_COLORS.cyan];
 
 export function ChartBlock({ data }: { data: ChartBlockData }) {
   const max = Math.max(...data.data.map(d => d.value), 1);
@@ -185,7 +185,7 @@ export function SparklineBlock({ data }: { data: SparklineBlockData }) {
   const max = Math.max(...vals), min = Math.min(...vals), range = max - min || 1;
   const w = 80, h = 24;
   const points = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / range) * (h - 4) - 2}`).join(' ');
-  const color = data.color || '#2dd4bf';
+  const color = data.color || CHART_SERIES_COLORS.blue;
   return (
     <span className="inline-flex items-center gap-1.5 align-middle">
       {data.label && <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.label}</span>}

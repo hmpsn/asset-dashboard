@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 import { FeatureFlagSettings } from './FeatureFlagSettings';
-import { Button, Icon, IconButton } from './ui';
+import { Button, FormInput, Icon, IconButton } from './ui';
 import { get, post, patch, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
@@ -146,7 +146,7 @@ export function SettingsPanel() {
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
-              <span className="t-caption-sm font-medium text-accent-success bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Connected</span>
+              <span className="t-caption-sm font-medium text-accent-success bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)] badge-span-ok">Connected</span>
               <IconButton
                 onClick={disconnectGoogle}
                 icon={LogOut}
@@ -161,7 +161,7 @@ export function SettingsPanel() {
               Connect Google
             </Button>
           ) : (
-            <span className="t-caption-sm text-accent-warning bg-amber-500/8 px-2 py-1 rounded-[var(--radius-pill)]">Not configured</span>
+            <span className="t-caption-sm text-accent-warning bg-amber-500/8 px-2 py-1 rounded-[var(--radius-pill)] badge-span-ok">Not configured</span>
           )}
         </div>
 
@@ -445,10 +445,10 @@ export function SettingsPanel() {
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="flex gap-2">
-            <input
+            <FormInput
               type="url"
               value={bookingUrl}
-              onChange={e => setBookingUrl(e.target.value)}
+              onChange={setBookingUrl}
               placeholder="https://cal.com/yourname or https://calendly.com/yourname"
               className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
             />

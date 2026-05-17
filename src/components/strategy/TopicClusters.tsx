@@ -67,7 +67,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             {cluster.gap.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {cluster.gap.slice(0, 5).map((kw, ki) => (
-                  <span key={ki} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                  <span key={ki} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     {kw}
                   </span>
                 ))}

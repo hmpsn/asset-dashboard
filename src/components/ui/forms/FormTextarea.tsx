@@ -5,9 +5,12 @@ import { useFormField } from './FormField';
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface FormTextareaProps
-  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
+  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
+  /** Buffer edits locally and call onCommit on blur. Useful for editor fields. */
+  commitOnBlur?: boolean;
+  onCommit?: (value: string) => void;
   rows?: number;
   maxLength?: number;
   placeholder?: string;
@@ -20,11 +23,28 @@ export const FormTextarea = React.forwardRef<
   HTMLTextAreaElement,
   FormTextareaProps
 >(function FormTextarea(
-  { value, onChange, rows = 4, maxLength, placeholder, className, id, ...rest },
+  {
+    value,
+    onChange,
+    commitOnBlur = false,
+    onCommit,
+    rows = 4,
+    maxLength,
+    placeholder,
+    className,
+    id,
+    onBlur,
+    ...rest
+  },
   ref
 ) {
   const { hasError, isValid, inputId, descriptionId } = useFormField();
   const resolvedId = id ?? (inputId || undefined);
+  const [draft, setDraft] = React.useState(value);
+
+  React.useEffect(() => {
+    setDraft(value);
+  }, [value]);
 
   const borderClass = hasError
     ? 'border-red-500/50'
@@ -32,7 +52,8 @@ export const FormTextarea = React.forwardRef<
       ? 'border-emerald-500/50'
     : 'border-[var(--brand-border)] focus:border-[var(--brand-mint)]';
 
-  const charCount = value.length;
+  const currentValue = commitOnBlur ? draft : value;
+  const charCount = currentValue.length;
   const nearLimit = maxLength !== undefined && charCount >= maxLength * 0.9;
 
   return (
@@ -40,8 +61,20 @@ export const FormTextarea = React.forwardRef<
       <textarea
         ref={ref}
         id={resolvedId}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={currentValue}
+        onChange={(e) => {
+          if (commitOnBlur) {
+            setDraft(e.target.value);
+          } else {
+            onChange?.(e.target.value);
+          }
+        }}
+        onBlur={(e) => {
+          if (commitOnBlur) {
+            onCommit?.(draft);
+          }
+          onBlur?.(e);
+        }}
         rows={rows}
         maxLength={maxLength}
         placeholder={placeholder}

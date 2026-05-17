@@ -48,12 +48,12 @@ export function SeoEditorHeaderActions({
           <span className="font-medium text-[var(--brand-text-bright)]">{pagesCount}</span> pages
         </div>
         {missingTitles > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/8 border border-amber-500/30 text-accent-warning">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/8 border border-amber-500/30 text-accent-warning">
             {missingTitles} missing SEO titles
           </span>
         )}
         {missingDescs > 0 && (
-          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-red-500/8 border border-red-500/30 text-accent-danger">
+          <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-red-500/8 border border-red-500/30 text-accent-danger">
             {missingDescs} missing meta descriptions
           </span>
         )}

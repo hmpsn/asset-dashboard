@@ -169,12 +169,12 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
       {/* Progress bar */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-[var(--brand-text)]">{progressPercent}% complete</span>
-          <span className="t-caption text-[var(--brand-text-muted)]">{completedCount}/{matrix.cells.length} pages</span>
+          <span className="t-caption-sm text-[var(--brand-text)]">{progressPercent}% complete</span>
+          <span className="badge-span-ok t-caption text-[var(--brand-text-muted)]">{completedCount}/{matrix.cells.length} pages</span>
         </div>
         <div className="w-full h-2 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
+            className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -192,7 +192,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
             >
               <Filter className="w-3 h-3" /> Filter
-              {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
+              {filterStatus !== 'all' && <span className="badge-span-ok w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
             </Button>
             {showFilter && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
@@ -262,7 +262,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                     {[
                       { key: 'optimize' as const, label: 'Optimize Keywords', icon: Sparkles },
                       { key: 'generate_briefs' as const, label: 'Generate Briefs', icon: FileText },
-                      { key: 'send_review' as const, label: 'Send for Review', icon: Send }, // send-for-review-anti-pattern-ok: matrix component predates Admin Send Convention
+                      { key: 'send_review' as const, label: 'Send to client', icon: Send },
                       { key: 'export_csv' as const, label: 'Export CSV', icon: Download },
                       { key: 'export_docx' as const, label: 'Export Word Doc', icon: FileDown },
                     ].map(action => (

@@ -5,7 +5,7 @@ import {
   Minimize2, RefreshCw, ChevronDown, Download, X, Copy, CopyCheck, MessageSquareWarning,
 } from 'lucide-react';
 import { get, post, del } from '../api/client';
-import { Button, ClickableRow, Icon, IconButton, cn } from './ui';
+import { Button, ClickableRow, FormInput, FormSelect, Icon, IconButton, cn } from './ui';
 
 interface AuditIssue {
   assetId: string;
@@ -391,24 +391,25 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand-text-muted)]" />
-            <input
+            <FormInput
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={setSearch}
               placeholder="Search issues by name or page..."
               className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
             />
           </div>
           <div className="relative">
-            <select
+            <FormSelect
               value={sort}
-              onChange={e => setSort(e.target.value as SortField)}
+              onChange={value => setSort(value as SortField)}
+              options={[
+                { value: 'issues', label: 'Most Issues' },
+                { value: 'size', label: 'Largest' },
+                { value: 'name', label: 'Name' },
+              ]}
               className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none cursor-pointer"
-            >
-              <option value="issues">Most Issues</option>
-              <option value="size">Largest</option>
-              <option value="name">Name</option>
-            </select>
+            />
             <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
           </div>
         </div>

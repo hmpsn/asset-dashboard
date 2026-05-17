@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { patch, post, del, getSafe, postForm } from '../api/client';
-import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
+import { Icon, Button, IconButton, ClickableRow, FormInput, FormSelect, cn } from './ui';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
@@ -266,24 +266,27 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="flex items-center gap-1.5">
           <Icon as={Filter} size="sm" className="text-[var(--brand-text-muted)]" />
         </div>
-        <select value={wsFilter} onChange={e => setWsFilter(e.target.value)}
-          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
-          <option value="all">All Workspaces</option>
-          {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as RequestStatus | 'all')}
-          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
-          <option value="all">All Statuses</option>
-          {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value as RequestCategory | 'all')}
-          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
-          <option value="all">All Categories</option>
-          {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <FormSelect
+          value={wsFilter}
+          onChange={setWsFilter}
+          options={[{ value: 'all', label: 'All Workspaces' }, ...workspaces.map(w => ({ value: w.id, label: w.name }))]}
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] text-[var(--brand-text-bright)]"
+        />
+        <FormSelect
+          value={statusFilter}
+          onChange={value => setStatusFilter(value as RequestStatus | 'all')}
+          options={[{ value: 'all', label: 'All Statuses' }, ...STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label }))]}
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] text-[var(--brand-text-bright)]"
+        />
+        <FormSelect
+          value={catFilter}
+          onChange={value => setCatFilter(value as RequestCategory | 'all')}
+          options={[{ value: 'all', label: 'All Categories' }, ...Object.entries(CAT_LABELS).map(([value, label]) => ({ value, label }))]}
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] text-[var(--brand-text-bright)]"
+        />
         <div className="flex-1 min-w-[140px] max-w-[240px] relative ml-auto">
           <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search requests..."
+          <FormInput value={searchQuery} onChange={setSearchQuery} placeholder="Search requests..."
             className="w-full pl-7 pr-3 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]" />
         </div>
       </div>
@@ -426,24 +429,30 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     <div className="px-5 py-3 flex items-center gap-3 flex-wrap border-b border-[var(--brand-border)]">
                       <div>
                         <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Status</label>
-                        <select value={req.status} onChange={e => updateRequest(req.id, { status: e.target.value })}
-                          className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
-                          {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
+                        <FormSelect
+                          value={req.status}
+                          onChange={value => updateRequest(req.id, { status: value })}
+                          options={STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
+                          className="px-2 py-1 rounded t-caption text-[var(--brand-text-bright)] bg-[var(--surface-1)]"
+                        />
                       </div>
                       <div>
                         <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Priority</label>
-                        <select value={req.priority} onChange={e => updateRequest(req.id, { priority: e.target.value })}
-                          className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
-                          {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                        </select>
+                        <FormSelect
+                          value={req.priority}
+                          onChange={value => updateRequest(req.id, { priority: value })}
+                          options={PRIORITY_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
+                          className="px-2 py-1 rounded t-caption text-[var(--brand-text-bright)] bg-[var(--surface-1)]"
+                        />
                       </div>
                       <div>
                         <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Category</label>
-                        <select value={req.category} onChange={e => updateRequest(req.id, { category: e.target.value })}
-                          className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
-                          {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
+                        <FormSelect
+                          value={req.category}
+                          onChange={value => updateRequest(req.id, { category: value })}
+                          options={Object.entries(CAT_LABELS).map(([value, label]) => ({ value, label }))}
+                          className="px-2 py-1 rounded t-caption text-[var(--brand-text-bright)] bg-[var(--surface-1)]"
+                        />
                       </div>
                       <IconButton onClick={() => deleteReq(req.id)} icon={Trash2} label="Delete request" variant="danger" size="sm"
                         className="ml-auto" />
@@ -515,7 +524,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         </div>
                       )}
                       <div className="flex gap-2">
-                        <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
+                        <FormInput value={expandedId === req.id ? noteInput : ''} onChange={setNoteInput}
                           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendNote(req.id)}
                           placeholder="Send a note to the client..."
                           className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]"

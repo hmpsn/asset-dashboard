@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Flag, Plus, Trash2, Loader2 } from 'lucide-react';
 import { annotations as annotationsApi } from '../api/misc';
-import { EmptyState, Icon, Button, ClickableRow, IconButton } from './ui';
+import { EmptyState, FormInput, Icon, Button, ClickableRow, IconButton } from './ui';
 import { cn } from '../lib/utils';
 import { CHART_SERIES_COLORS } from './ui/constants';
 
@@ -68,7 +68,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
-            <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
+            <FormInput type="date" value={newAnn.date} onChange={value => setNewAnn(p => ({ ...p, date: value }))}
               className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
           </div>
           <div>
@@ -90,12 +90,12 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
         </div>
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Label *</label>
-          <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
+          <FormInput type="text" value={newAnn.label} onChange={value => setNewAnn(p => ({ ...p, label: value }))} placeholder="e.g. Launched new landing pages"
             className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Description (optional)</label>
-          <input type="text" value={newAnn.description} onChange={e => setNewAnn(p => ({ ...p, description: e.target.value }))} placeholder="Additional details..."
+          <FormInput type="text" value={newAnn.description} onChange={value => setNewAnn(p => ({ ...p, description: value }))} placeholder="Additional details..."
             className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <Button

@@ -84,7 +84,7 @@ export function StrategyPageImprovementsSection({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-amber-500/20">{totalPageImprovements}</span>
+            <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] badge-span-ok border border-amber-500/20">{totalPageImprovements}</span>
             <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('optimize-existing') ? '' : '-rotate-90'}`} />
           </div>
         </Button>

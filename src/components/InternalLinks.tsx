@@ -4,7 +4,7 @@ import {
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
   AlertTriangle, Copy, Check, LayoutList, List, Send,
 } from 'lucide-react';
-import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow } from './ui';
+import { PageHeader, StatCard, Icon, Button, IconButton, ClickableRow, FormInput, FormTextarea } from './ui';
 import { webflow } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 
@@ -215,13 +215,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {/* Send to Client Note */}
       {workspaceId && data.suggestions.length > 0 && !sentToClient && (
-        <textarea
+        <FormTextarea
           rows={2}
           disabled={sendingToClient}
           maxLength={2000}
           placeholder="Add a note for your client (optional)"
           value={note}
-          onChange={e => setNote(e.target.value)}
+          onChange={setNote}
           className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
         />
       )}
@@ -289,10 +289,10 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex-1 relative">
           <Icon as={SearchIcon} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder="Filter by page or anchor text..."
             className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />

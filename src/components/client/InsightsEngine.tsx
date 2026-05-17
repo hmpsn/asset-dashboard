@@ -443,12 +443,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 {effortBadge.label}
                               </span>
                               {rec.status === 'in_progress' && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-accent-brand">
                                   In Progress
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
                                   <Icon as={CheckCircle2} size="sm" /> Done
                                 </span>
                               )}
@@ -562,7 +562,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                       Let Us Fix This — {fmt(rec.productPrice)}
                                     </Button>
                                   ) : inCart ? (
-                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] badge-span-ok t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                                       <Icon as={ShoppingCart} size="sm" />
                                       In Cart
                                     </span>

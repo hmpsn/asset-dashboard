@@ -3,7 +3,7 @@ import {
   CreditCard, Eye, EyeOff, Save, Trash2, Loader2,
   CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
-import { SectionCard, Badge, Button, Icon, IconButton } from './ui';
+import { SectionCard, Badge, Button, FormInput, Icon, IconButton } from './ui';
 import { useToast } from '../hooks/useToast';
 import { stripe } from '../api';
 
@@ -217,10 +217,10 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Secret Key {config?.hasSecretKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type={showSecretKey ? 'text' : 'password'}
                     value={secretKey}
-                    onChange={e => setSecretKey(e.target.value)}
+                    onChange={setSecretKey}
                     placeholder={config?.hasSecretKey ? '••••••••••••••••' : 'sk_test_... or sk_live_...'}
                     className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
                   />
@@ -240,10 +240,10 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type={showWebhookSecret ? 'text' : 'password'}
                     value={webhookSecret}
-                    onChange={e => setWebhookSecret(e.target.value)}
+                    onChange={setWebhookSecret}
                     placeholder={config?.hasWebhookSecret ? '••••••••••••••••' : 'whsec_...'}
                     className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
                   />
@@ -263,10 +263,10 @@ export function StripeSettings() {
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <input
+                  <FormInput
                     type="text"
                     value={publishableKey}
-                    onChange={e => setPublishableKey(e.target.value)}
+                    onChange={setPublishableKey}
                     placeholder={config?.hasPublishableKey ? config.publishableKey.slice(0, 12) + '...' : 'pk_test_... or pk_live_...'}
                     className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono"
                   />
@@ -354,19 +354,19 @@ export function StripeSettings() {
                         </span>
                         <div className="flex items-center w-16 flex-shrink-0">
                           <span className="t-caption-sm text-[var(--brand-text-muted)]">$</span>
-                          <input
+                          <FormInput
                             type="number"
                             value={product.priceUsd}
-                            onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
+                            onChange={value => updateProduct(idx, { priceUsd: Math.max(0, Number(value)) })}
                             disabled={!product.enabled}
                             className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           {product.recurring && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-0.5">/mo</span>}
                         </div>
-                        <input
+                        <FormInput
                           type="text"
                           value={product.stripePriceId}
-                          onChange={e => updateProduct(idx, { stripePriceId: e.target.value.trim() })}
+                          onChange={value => updateProduct(idx, { stripePriceId: value.trim() })}
                           placeholder="price_..."
                           disabled={!product.enabled}
                           className="flex-1 px-2 py-1 rounded t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"

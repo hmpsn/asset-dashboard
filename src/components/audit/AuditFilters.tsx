@@ -5,7 +5,7 @@
 import {
   Search as SearchIcon, Share2, FileText, RefreshCw, CheckCircle, XCircle,
 } from 'lucide-react';
-import { Icon, Button, cn } from '../ui';
+import { Icon, Button, FormInput, cn } from '../ui';
 import type { SeoAuditResult, CheckCategory } from './types';
 import { CATEGORY_CONFIG } from './types';
 
@@ -41,10 +41,10 @@ export function AuditToolbar({
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Icon as={SearchIcon} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={e => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
             placeholder="Search pages or issues..."
             className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
           />

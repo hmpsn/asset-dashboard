@@ -4,7 +4,7 @@ import {
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader } from './ui';
+import { EmptyState, SectionCard, Icon, Button, IconButton, PageHeader, FormInput } from './ui';
 import { cn } from '../lib/utils';
 import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
 
@@ -340,10 +340,10 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Add keyword */}
       <div className="flex items-center gap-2">
-        <input
+        <FormInput
           type="text"
           value={newKeyword}
-          onChange={e => setNewKeyword(e.target.value)}
+          onChange={setNewKeyword}
           placeholder="Add keyword to track..."
           className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]"
           onKeyDown={e => e.key === 'Enter' && !adding && addKeyword()}

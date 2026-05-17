@@ -1,5 +1,5 @@
 import type { PageEditSummary } from '../../hooks/usePageEditStates';
-import { StatusBadge, cn } from '../ui';
+import { StatusBadge, StatCard } from '../ui';
 import { KNOWN_TARGET_FIELDS } from './fieldTargets';
 import type { SchemaPageSuggestion } from './schemaSuggesterTypes';
 
@@ -55,26 +55,23 @@ export function SchemaResultsSummary({ pages, stats }: SchemaResultsSummaryProps
     <>
       <div id="schema-suggestions-list" />
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Pages</div>
-          <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{pages.length}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">{stats.totalTypes} @graph types total</div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
-          <div className={cn('text-2xl font-bold', stats.pagesWithErrors > 0 ? 'text-accent-warning' : 'text-accent-success')}>{pages.length - stats.pagesWithErrors}/{pages.length}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">
-            {stats.pagesWithErrors > 0 ? `${stats.pagesWithErrors} with errors` : stats.pagesWithWarnings > 0 ? `${stats.pagesWithWarnings} with warnings` : 'all passing'}
-            {stats.fixesAvailable > 0 && (
-              <> &middot; {stats.fixesAvailable} fix{stats.fixesAvailable === 1 ? '' : 'es'} available</>
-            )}
-          </div>
-        </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>
-          <div className="text-2xl font-bold text-accent-success">{stats.pagesWithExisting}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">pages already have JSON-LD</div>
-        </div>
+        <StatCard
+          label="Pages"
+          value={pages.length}
+          sub={`${stats.totalTypes} @graph types total`}
+        />
+        <StatCard
+          label="Validated"
+          value={`${pages.length - stats.pagesWithErrors}/${pages.length}`}
+          valueColor={stats.pagesWithErrors > 0 ? 'text-accent-warning' : 'text-accent-success'}
+          sub={`${stats.pagesWithErrors > 0 ? `${stats.pagesWithErrors} with errors` : stats.pagesWithWarnings > 0 ? `${stats.pagesWithWarnings} with warnings` : 'all passing'}${stats.fixesAvailable > 0 ? ` · ${stats.fixesAvailable} fix${stats.fixesAvailable === 1 ? '' : 'es'} available` : ''}`}
+        />
+        <StatCard
+          label="Existing Schemas"
+          value={stats.pagesWithExisting}
+          valueColor="text-accent-success"
+          sub="pages already have JSON-LD"
+        />
       </div>
     </>
   );

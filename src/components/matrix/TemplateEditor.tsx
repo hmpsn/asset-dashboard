@@ -3,7 +3,7 @@ import {
   ArrowLeft, Plus, X, GripVertical, ChevronDown, ChevronUp,
   Eye, Save, FileText, Variable, Link2, Search, Type,
 } from 'lucide-react';
-import { SectionCard, Badge, Button, IconButton, ClickableRow } from '../ui';
+import { SectionCard, Badge, Button, IconButton, ClickableRow, FormInput, FormSelect, FormTextarea } from '../ui';
 import type { ContentTemplate, TemplateVariable, TemplateSection } from './types';
 import { MOCK_TEMPLATE } from './mockData';
 
@@ -120,10 +120,10 @@ function SectionItem({
         <div className="px-3 pb-3 space-y-2 border-t border-[var(--brand-border)]">
           <div className="pt-2">
             <label className="t-caption text-[var(--brand-text-muted)] font-medium">Heading Template</label>
-            <input
+            <FormInput
               type="text"
               value={section.headingTemplate}
-              onChange={e => onUpdate({ headingTemplate: e.target.value })}
+              onChange={value => onUpdate({ headingTemplate: value })}
               placeholder="e.g. {service} in {city}"
               className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
@@ -133,9 +133,9 @@ function SectionItem({
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] font-medium">Guidance</label>
-            <textarea
+            <FormTextarea
               value={section.guidance}
-              onChange={e => onUpdate({ guidance: e.target.value })}
+              onChange={value => onUpdate({ guidance: value })}
               placeholder="AI guidance for this section..."
               rows={2}
               className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
@@ -144,20 +144,20 @@ function SectionItem({
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <label className="t-caption text-[var(--brand-text-muted)] font-medium">Word Count Target</label>
-              <input
+              <FormInput
                 type="number"
                 value={section.wordCountTarget}
-                onChange={e => onUpdate({ wordCountTarget: parseInt(e.target.value) || 0 })}
+                onChange={value => onUpdate({ wordCountTarget: parseInt(value) || 0 })}
                 min={0}
                 className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
             <div className="flex-1">
               <label className="t-caption text-[var(--brand-text-muted)] font-medium">CMS Field Slug</label>
-              <input
+              <FormInput
                 type="text"
                 value={section.cmsFieldSlug ?? ''}
-                onChange={e => onUpdate({ cmsFieldSlug: e.target.value || undefined })}
+                onChange={value => onUpdate({ cmsFieldSlug: value || undefined })}
                 placeholder="hero_content"
                 className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
@@ -318,35 +318,35 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
         <div className="space-y-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] font-medium">Template Name</label>
-            <input
+            <FormInput
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={setName}
               placeholder="e.g. Service \u00d7 Location Page"
               className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] font-medium">Description</label>
-            <input
+            <FormInput
               type="text"
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={setDescription}
               placeholder="What is this template for?"
               className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] font-medium">Page Type</label>
-            <select
+            <FormSelect
               value={pageType}
-              onChange={e => setPageType(e.target.value as ContentTemplate['pageType'])}
+              onChange={value => setPageType(value as ContentTemplate['pageType'])}
+              options={PAGE_TYPES.map(pt => ({
+                value: pt,
+                label: pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+              }))}
               className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
-            >
-              {PAGE_TYPES.map(pt => (
-                <option key={pt} value={pt}>{pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
       </SectionCard>
@@ -364,28 +364,28 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               <div className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <input
+                    <FormInput
                       type="text"
                       value={newVarName}
-                      onChange={e => setNewVarName(e.target.value)}
+                      onChange={setNewVarName}
                       placeholder="Variable name (e.g. city)"
                       className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                   <div className="flex-1">
-                    <input
+                    <FormInput
                       type="text"
                       value={newVarLabel}
-                      onChange={e => setNewVarLabel(e.target.value)}
+                      onChange={setNewVarLabel}
                       placeholder="Display label (e.g. City)"
                       className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
-                <input
+                <FormInput
                   type="text"
                   value={newVarDesc}
-                  onChange={e => setNewVarDesc(e.target.value)}
+                  onChange={setNewVarDesc}
                   placeholder="Description (optional)"
                   className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
@@ -414,10 +414,10 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Link2 className="w-3 h-3" /> URL Pattern
                 </label>
-                <input
+                <FormInput
                   type="text"
                   value={urlPattern}
-                  onChange={e => setUrlPattern(e.target.value)}
+                  onChange={setUrlPattern}
                   placeholder="/services/{city}/{service}"
                   className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
@@ -429,10 +429,10 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Search className="w-3 h-3" /> Keyword Pattern
                 </label>
-                <input
+                <FormInput
                   type="text"
                   value={keywordPattern}
-                  onChange={e => setKeywordPattern(e.target.value)}
+                  onChange={setKeywordPattern}
                   placeholder="{service} in {city}"
                   className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
@@ -444,9 +444,9 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Type className="w-3 h-3" /> Tone & Style
                 </label>
-                <textarea
+                <FormTextarea
                   value={toneAndStyle}
-                  onChange={e => setToneAndStyle(e.target.value)}
+                  onChange={setToneAndStyle}
                   placeholder="Optional brand voice override..."
                   rows={2}
                   className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"

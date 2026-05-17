@@ -8,7 +8,7 @@ import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
 import { PublishSettings } from './PublishSettings';
-import { SectionCard, Icon, Button, IconButton } from './ui';
+import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 
@@ -151,10 +151,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       <div>
         {editingName ? (
           <div className="flex items-center gap-2">
-            <input
+            <FormInput
               autoFocus
               value={nameDraft}
-              onChange={e => setNameDraft(e.target.value)}
+              onChange={setNameDraft}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   (async () => {

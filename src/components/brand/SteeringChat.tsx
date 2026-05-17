@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { Icon, Button, cn } from '../ui';
+import { Icon, Button, cn, FormInput } from '../ui';
 
 export interface SteeringChatProps {
   content: string;
@@ -104,12 +104,12 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
             <label htmlFor="steering-direction" className="sr-only">
               Refinement direction
             </label>
-            <input
+            <FormInput
               ref={inputRef}
               id="steering-direction"
               type="text"
               value={direction}
-              onChange={e => setDirection(e.target.value)}
+              onChange={setDirection}
               disabled={refining}
               placeholder='e.g. "Make it more conversational"'
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -28,7 +28,7 @@ interface SectionCardProps {
   staggerIndex?: number;
   /**
    * Visual variant.
-   * - `'default'` — solid `bg-[var(--surface-2)]` with the brand asymmetric `10px 24px 10px 24px` border-radius.
+   * - `'default'` — solid `bg-[var(--surface-2)]` with the brand asymmetric `--radius-signature-lg` border-radius.
    *   Use for top-level page sections (the canonical look).
    * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-[var(--radius-lg)]`.
    *   Use as a wrapper around dense tables / row lists where the asymmetric corners would clash
@@ -52,8 +52,7 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
   const interactiveClasses = interactive ? 'hover:border-[var(--brand-border-hover)] hover:border-l-teal-500/40 cursor-pointer' : '';
   const containerStyle = isSubtle
     ? staggerStyle
-    : { borderRadius: '10px 24px 10px 24px', ...staggerStyle };
-  const headerStyle = isSubtle ? undefined : { borderRadius: '10px 24px 0 0' };
+    : { borderRadius: 'var(--radius-signature-lg)', ...staggerStyle };
 
   return (
     <div
@@ -61,7 +60,7 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
       style={containerStyle}
     >
       {hasHeader && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]" style={headerStyle}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2 min-w-0">
             {titleIcon}
             <span className="t-body font-semibold text-[var(--brand-text-bright)]">{title}</span>

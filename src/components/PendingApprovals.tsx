@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
-import { Button, Icon, IconButton, cn } from './ui';
+import { Button, Icon, IconButton, StatusBadge, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { ApprovalBatch } from '../../shared/types/approvals';
@@ -73,11 +73,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   };
 
   const statusBadge = (status: string) => {
-    if (status === 'applied') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Applied</span>;
-    if (status === 'approved') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
-    if (status === 'partial') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
-    if (status === 'rejected') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-medium">Rejected</span>;
-    return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
+    return <StatusBadge status={status} domain="approval" fallback="neutral" />;
   };
 
   return (

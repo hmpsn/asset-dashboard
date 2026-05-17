@@ -51,6 +51,15 @@ type StyleDriftReport = {
     rawButtonAdminCount: number;
     rawButtonClientCount: number;
     rawButtonTotalCount: number;
+    rawFormControlAdminCount: number;
+    rawFormControlClientCount: number;
+    rawFormControlTotalCount: number;
+    rawFormControlFiles: Array<{ file: string; count: number; domain: 'admin' | 'client' }>;
+    clientPurpleCount: number;
+    staticStyleguideInlineNoteCount: number;
+    staticStyleguideRadiusLiteralCount: number;
+    badgeLikeSpanTotalCount: number;
+    badgeLikeSpanFiles: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'badge-like-span' }>;
     allowlistedRawButtonFiles: string[];
   };
 };
@@ -208,6 +217,134 @@ function extractRawButtonMetrics(
   return { total, admin, client, nonPrimitiveActionCount };
 }
 
+function extractRawFormControlMetrics(
+  componentFiles: string[],
+): {
+  total: number;
+  admin: number;
+  client: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client' }>;
+} {
+  let total = 0;
+  let admin = 0;
+  let client = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client' }>();
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/forms/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+
+    let fileCount = 0;
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const rawControlMatch = line.match(/<(input|select|textarea)\b/);
+      if (!rawControlMatch) continue;
+      const tagWindow = lines.slice(index, Math.min(lines.length, index + 8)).join(' ');
+      if (/<input\b[^>]*type\s*=\s*["'](?:hidden|file|color)["']/.test(tagWindow)) continue;
+      total += 1;
+      fileCount += 1;
+      if (domain === 'client') client += 1;
+      else admin += 1;
+    }
+    if (fileCount > 0) {
+      fileCounts.set(rel, { count: fileCount, domain });
+    }
+  }
+
+  return {
+    total,
+    admin,
+    client,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function countClientPurple(componentFiles: string[]): number {
+  let count = 0;
+  const purpleRe = /\b(?:purple|violet)-[0-9]|var\(--purple\)|#(?:a78bfa|7c3aed|8b5cf6)\b|rgba?\(\s*(?:124\s*,\s*58\s*,\s*237|167\s*,\s*139\s*,\s*250)/gi;
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    const rel = toRepoRel(file);
+    if (!rel.startsWith('src/components/client/')) continue;
+    count += countRegexMatches(readFileSync(file, 'utf8'), purpleRe);
+  }
+  return count;
+}
+
+function extractBadgeLikeSpanMetrics(
+  componentFiles: string[],
+): {
+  total: number;
+  files: Array<{ file: string; count: number; domain: 'admin' | 'client'; category: 'badge-like-span' }>;
+} {
+  let total = 0;
+  const fileCounts = new Map<string, { count: number; domain: 'admin' | 'client'; category: 'badge-like-span' }>();
+
+  for (const file of componentFiles) {
+    if (!file.endsWith('.tsx')) continue;
+    if (file.includes('/src/components/ui/')) continue;
+
+    const rel = toRepoRel(file);
+    const domain: 'admin' | 'client' = rel.startsWith('src/components/client/') ? 'client' : 'admin';
+    const src = readFileSync(file, 'utf8');
+    const lines = src.split('\n');
+    let fileCount = 0;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      if (!/<span\b/.test(lines[index])) continue;
+
+      const tagLines = [];
+      for (let offset = index; offset < Math.min(lines.length, index + 8); offset += 1) {
+        tagLines.push(lines[offset]);
+        if (/>/.test(lines[offset])) break;
+      }
+
+      const tagText = tagLines.join(' ');
+      if (!/^\s*<span\b/.test(tagText)) continue;
+      if (!/rounded-\[var\(--radius-(?:sm|pill|md)\)\]/.test(tagText)) continue;
+      if (!/\bpx-/.test(tagText)) continue;
+      if (!/\b(?:bg|text|border)-(?:teal|blue|emerald|amber|red|orange|zinc)-/.test(tagText)) continue;
+      if (/badge-span-ok/.test(tagText)) continue;
+      total += 1;
+      fileCount += 1;
+    }
+
+    if (fileCount > 0) {
+      fileCounts.set(rel, { count: fileCount, domain, category: 'badge-like-span' });
+    }
+  }
+
+  return {
+    total,
+    files: [...fileCounts.entries()]
+      .map(([file, info]) => ({ file, ...info }))
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file)),
+  };
+}
+
+function extractStaticStyleguideDetail(): {
+  inlineNoteCount: number;
+  radiusLiteralCount: number;
+} {
+  const htmlPath = path.join(ROOT, 'public/styleguide.html');
+  if (!existsSync(htmlPath)) return { inlineNoteCount: 0, radiusLiteralCount: 0 };
+  const src = readFileSync(htmlPath, 'utf8');
+  const inlineNoteCount = src
+    .split('\n')
+    .filter(line => /class="[^"]*(?:muted|dv-caption|dd-note|ar-note)[^"]*"/.test(line))
+    .filter(line => /style="[^"]*(?:font-size|margin-top|line-height|padding)/.test(line))
+    .length;
+  const radiusLiteralCount = countRegexMatches(src, /\b(?:[0-9]+px\s+){1,3}[0-9]+px\b|rounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/g);
+  return { inlineNoteCount, radiusLiteralCount };
+}
+
 function buildMetrics(exceptionsPath: string): {
   metrics: StyleMetrics;
   detail: StyleDriftReport['detail'];
@@ -225,6 +362,9 @@ function buildMetrics(exceptionsPath: string): {
   );
 
   const buttonMetrics = extractRawButtonMetrics(componentFiles, allowlistedRawButtonFiles);
+  const formControlMetrics = extractRawFormControlMetrics(componentFiles);
+  const badgeLikeSpanMetrics = extractBadgeLikeSpanMetrics(componentFiles);
+  const staticStyleguideDetail = extractStaticStyleguideDetail();
 
   let rawTypographyBypass = 0;
   let rawRadiusLiteral = 0;
@@ -258,6 +398,15 @@ function buildMetrics(exceptionsPath: string): {
       rawButtonAdminCount: buttonMetrics.admin,
       rawButtonClientCount: buttonMetrics.client,
       rawButtonTotalCount: buttonMetrics.total,
+      rawFormControlAdminCount: formControlMetrics.admin,
+      rawFormControlClientCount: formControlMetrics.client,
+      rawFormControlTotalCount: formControlMetrics.total,
+      rawFormControlFiles: formControlMetrics.files,
+      clientPurpleCount: countClientPurple(componentFiles),
+      staticStyleguideInlineNoteCount: staticStyleguideDetail.inlineNoteCount,
+      staticStyleguideRadiusLiteralCount: staticStyleguideDetail.radiusLiteralCount,
+      badgeLikeSpanTotalCount: badgeLikeSpanMetrics.total,
+      badgeLikeSpanFiles: badgeLikeSpanMetrics.files,
       allowlistedRawButtonFiles: [...allowlistedRawButtonFiles].sort(),
     },
   };
@@ -314,10 +463,31 @@ function formatMarkdown(report: StyleDriftReport): string {
   lines.push(
     '',
     `Raw button breakdown: admin=${report.detail.rawButtonAdminCount}, client=${report.detail.rawButtonClientCount}, total=${report.detail.rawButtonTotalCount}`,
+    `Raw form control advisory: admin=${report.detail.rawFormControlAdminCount}, client=${report.detail.rawFormControlClientCount}, total=${report.detail.rawFormControlTotalCount}`,
+  );
+
+  if (report.detail.rawFormControlFiles.length > 0) {
+    lines.push('', 'Top raw form control files:');
+    report.detail.rawFormControlFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
+
+  lines.push(
+    `Client purple advisory count: ${report.detail.clientPurpleCount}`,
+    `Static styleguide advisory: inlineNote=${report.detail.staticStyleguideInlineNoteCount}, radiusLiteral=${report.detail.staticStyleguideRadiusLiteralCount}`,
+    `Badge-like span advisory count: ${report.detail.badgeLikeSpanTotalCount}`,
     `Exception count: ${report.metrics.exception_count}`,
     '',
     `Regressions: ${report.regressions.length}`,
   );
+
+  if (report.detail.badgeLikeSpanFiles.length > 0) {
+    lines.push('', 'Top badge-like span files:');
+    report.detail.badgeLikeSpanFiles.slice(0, 20).forEach(item => {
+      lines.push(`- ${item.file}: ${item.count} (${item.domain})`);
+    });
+  }
 
   report.regressions.forEach(regression => {
     lines.push(`- ${regression.metric}: ${regression.baseline} -> ${regression.current} (+${regression.delta})`);

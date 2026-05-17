@@ -3,7 +3,7 @@
  * Extracted from SchemaSuggester.tsx page picker rendering.
  */
 import { Search } from 'lucide-react';
-import { Button, ClickableRow, Icon } from '../ui';
+import { Button, ClickableRow, FormInput, Icon } from '../ui';
 
 export interface PagePickerProps {
   availablePages: Array<{ id: string; title: string; slug: string }>;
@@ -29,10 +29,10 @@ export function PagePicker({
       <div className="px-3 py-2 border-b border-[var(--brand-border)]">
         <div className="relative">
           <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={pageSearch}
-            onChange={e => onPageSearchChange(e.target.value)}
+            onChange={onPageSearchChange}
             placeholder="Search pages..."
             className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
             autoFocus
@@ -101,10 +101,10 @@ export function InitialPagePicker({
       <div className="px-3 py-2 border-b border-[var(--brand-border)]">
         <div className="relative">
           <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={pageSearch}
-            onChange={e => onPageSearchChange(e.target.value)}
+            onChange={onPageSearchChange}
             placeholder="Search pages..."
             className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
             autoFocus

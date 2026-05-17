@@ -5,7 +5,7 @@ import {
   Check, Edit3, X, TrendingUp, Download, ExternalLink,
   BarChart3, MousePointerClick, Eye, ArrowUpRight,
 } from 'lucide-react';
-import { TierGate, type Tier, Icon, Button, IconButton, ClickableRow, PageHeader, SectionCard } from '../ui';
+import { TierGate, type Tier, Icon, Button, IconButton, ClickableRow, PageHeader, SectionCard, FormInput, FormTextarea, Badge, StatusBadge } from '../ui';
 import type { ClientContentRequest } from './types';
 import { getDisplayStatus } from './types';
 import { clientPath } from '../../routes';
@@ -169,9 +169,9 @@ export function ContentTab({
     {showTopicForm && (
       <SectionCard title="Suggest a Content Topic" className="border-teal-500/20">
         <div className="space-y-3">
-        <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
-        <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
-        <textarea value={newTopicNotes} onChange={e => setNewTopicNotes(e.target.value)} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
+        <FormInput type="text" value={newTopicName} onChange={setNewTopicName} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
+        <FormInput type="text" value={newTopicKeyword} onChange={setNewTopicKeyword} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
+        <FormTextarea value={newTopicNotes} onChange={setNewTopicNotes} placeholder="Any notes or context for this topic... (optional)" rows={2} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">What would you like?</div>
           <div className="flex items-center gap-2">
@@ -257,22 +257,29 @@ export function ContentTab({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="t-body font-semibold text-[var(--brand-text)]">{req.topic}</span>
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border font-medium ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-teal-500/10 text-accent-brand border-teal-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]'}`}>
-                      {(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
-                    </span>
+                    <Badge
+                      label={(req.serviceType || 'brief_only') === 'full_post' ? '✦ Full Post' : 'Brief'}
+                      tone={(req.serviceType || 'brief_only') === 'full_post' ? 'teal' : 'zinc'}
+                      variant="outline"
+                    />
                     {req.pageType && req.pageType !== 'blog' && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{req.pageType}</span>
+                      <Badge label={req.pageType} tone="teal" variant="outline" className="capitalize" />
                     )}
-                    {req.upgradedAt && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-accent-success border border-emerald-500/20 font-medium">Upgraded</span>}
+                    {req.upgradedAt && <Badge label="Upgraded" tone="emerald" variant="outline" />}
                   </div>
                   <div className="t-caption text-accent-brand mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {req.source === 'client' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20">You submitted</span>}
-                  {req.status === 'pending_payment' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 text-accent-warning border border-amber-500/20 animate-pulse">Awaiting Payment</span>}
-                  {req.status === 'changes_requested' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-orange-500/10 text-accent-orange border border-orange-500/20">Changes Requested</span>}
-                  {req.status === 'client_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
-                  {req.status === 'post_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                  {req.source === 'client' && <Badge label="You submitted" tone="teal" variant="outline" />}
+                  {req.status === 'pending_payment' && (
+                    <StatusBadge status={req.status} domain="content" variant="outline" className="animate-pulse" />
+                  )}
+                  {req.status === 'changes_requested' && (
+                    <StatusBadge status={req.status} domain="content" variant="outline" />
+                  )}
+                  {(req.status === 'client_review' || req.status === 'post_review') && (
+                    <StatusBadge status={req.status} domain="content" variant="outline" className="animate-pulse" />
+                  )}
                   {isExpanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
                 </div>
               </div>
@@ -285,7 +292,7 @@ export function ContentTab({
                     <div key={step} className="flex items-center flex-1">
                       <div className="flex flex-col items-center flex-1">
                         <div className={`w-full h-1.5 rounded-[var(--radius-pill)] ${isComplete ? (isCurrent ? (req.status === 'pending_payment' ? 'bg-amber-400' : req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-[var(--surface-3)]'}`} />
-                        <span className={`t-caption-sm mt-1 ${isCurrent ? (req.status === 'pending_payment' ? 'text-accent-warning font-medium' : req.status === 'changes_requested' ? 'text-accent-orange font-medium' : 'text-accent-brand font-medium') : isComplete ? 'text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-faint)]'}`}>{stepLabels[i]}</span>
+                        <div className={`t-caption-sm mt-1 ${isCurrent ? (req.status === 'pending_payment' ? 'text-accent-warning font-medium' : req.status === 'changes_requested' ? 'text-accent-orange font-medium' : 'text-accent-brand font-medium') : isComplete ? 'text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-faint)]'}`}>{stepLabels[i]}</div>
                       </div>
                     </div>
                   );
@@ -375,7 +382,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Calls to Action</div>
                           <div className="space-y-1">{brief.ctaRecommendations.map((cta: string, i: number) => (
                             <div key={i} className="t-body text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
-                              <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
+                              <Badge label={i === 0 ? 'Primary' : 'Secondary'} tone={i === 0 ? 'teal' : 'zinc'} className="flex-shrink-0" />{cta}
                             </div>
                           ))}</div>
                         </div>
@@ -391,11 +398,11 @@ export function ContentTab({
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center justify-between">
                                 <div className="t-body font-medium text-[var(--brand-text-bright)]">H2: {s.heading}</div>
-                                {s.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.wordCount} words</span>}
+                                {s.wordCount && <Badge label={`${s.wordCount} words`} tone="zinc" />}
                               </div>
                               <div className="t-body text-[var(--brand-text-muted)] mt-1.5 leading-relaxed">{s.notes}</div>
                               {s.keywords && s.keywords.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand">{kw}</span>)}</div>
+                                <div className="flex flex-wrap gap-1 mt-2">{s.keywords.map((kw: string, j: number) => <Badge key={j} label={kw} tone="teal" />)}</div>
                               )}
                             </div>
                           ))}
@@ -411,7 +418,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Keywords to Include</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.secondaryKeywords.map((kw: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{kw}</span>
+                              <Badge key={i} label={kw} tone="zinc" shape="pill" />
                             ))}
                           </div>
                         </div>
@@ -421,7 +428,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Topics to Reference</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.topicalEntities.map((entity: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">{entity}</span>
+                              <Badge key={i} label={entity} tone="teal" variant="outline" shape="pill" />
                             ))}
                           </div>
                         </div>
@@ -455,7 +462,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Internal Links to Include</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.internalLinkSuggestions.map((link: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-accent-info">/{link}</span>
+                              <Badge key={i} label={`/${link}`} tone="blue" />
                             ))}
                           </div>
                         </div>
@@ -505,7 +512,7 @@ export function ContentTab({
                           {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                             <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">{schema.type}</span>
+                                <Badge label={schema.type} tone="blue" variant="outline" />
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{schema.notes}</div>
                             </div>
@@ -647,7 +654,7 @@ export function ContentTab({
                 {feedbackReqId === req.id && (
                   <div className="bg-orange-500/5 border border-orange-500/20 rounded-[var(--radius-lg)] p-4 space-y-3">
                     <div className="t-caption text-accent-orange font-medium">What changes would you like?</div>
-                    <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
+                    <FormTextarea value={feedbackText} onChange={setFeedbackText} placeholder="Describe what you'd like changed..." rows={3} className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] resize-none" />
                     <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
@@ -666,7 +673,7 @@ export function ContentTab({
                 {declineReqId === req.id && (
                   <div className="bg-red-500/5 border border-red-500/20 rounded-[var(--radius-lg)] p-4 space-y-3">
                     <div className="t-caption text-accent-danger font-medium">Why are you declining? (optional)</div>
-                    <input type="text" value={declineReason} onChange={e => setDeclineReason(e.target.value)} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
+                    <FormInput type="text" value={declineReason} onChange={setDeclineReason} placeholder="e.g. Not relevant to our current goals" className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" />
                     <div className="flex items-center gap-2">
                       <Button variant="danger" onClick={() => declineTopic(req.id)}>Confirm Decline</Button>
                       <Button variant="ghost" onClick={() => setDeclineReqId(null)}>Cancel</Button>
@@ -702,7 +709,7 @@ export function ContentTab({
                 {/* Add comment */}
                 {!['delivered', 'published', 'declined'].includes(req.status) && (
                   <div className="flex items-center gap-2">
-                    <input type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={e => setContentComment(e.target.value)} placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
+                    <FormInput type="text" value={expandedContentReq === req.id ? contentComment : ''} onChange={setContentComment} placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)]" onKeyDown={e => { if (e.key === 'Enter') addContentComment(req.id); }} />
                     <IconButton
                       icon={Send}
                       label="Send comment"

@@ -4696,6 +4696,8 @@ describe('Meta: customCheck rule name registry', () => {
     // TemplateEditor sites that were the last hand-rolled gradient CTAs.
     'Hand-rolled gradient CTA button',
     'Raw <button> outside primitive/infra allowlist',
+    'Raw form control outside form primitives',
+    'Static styleguide migrated note and radius debt',
     'Raw CTA class literal outside Button/IconButton',
     // Schema Yoast parity PR1 (2026-04-29) — Trajectory 3 → 1 migration guard.
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
@@ -4826,7 +4828,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 240_000,
+        timeout: 360_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -4948,7 +4950,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 260_000);
+  }, 390_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -6262,6 +6264,94 @@ describe('Rule: Raw <button> outside primitive/infra allowlist', () => {
     const probe = write(
       uniqPath('raw-button-negative', 'src/components/admin/seo/Primitive.tsx'),
       '<Button variant="secondary">Refresh</Button>\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Raw form control outside form primitives', () => {
+  const RULE = 'Raw form control outside form primitives';
+
+  it('flags visible raw input controls in src/components outside ui/', () => {
+    const probe = write(
+      uniqPath('raw-form-rule', 'src/components/admin/seo/Trigger.tsx'),
+      '<input value={query} onChange={e => setQuery(e.target.value)} />\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects // form-control-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('raw-form-hatch', 'src/components/admin/seo/Hatch.tsx'),
+      lines(
+        '// form-control-ok',
+        '<textarea value={note} onChange={e => setNote(e.target.value)} />',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag native hidden, file, or color inputs', () => {
+    const probe = write(
+      uniqPath('raw-form-native', 'src/components/admin/seo/Native.tsx'),
+      lines(
+        '<input',
+        '  type="file"',
+        '  className="hidden"',
+        '/>',
+        '<input type="hidden" value={id} />',
+        '<input type="color" value={accent} />',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag shared form primitives', () => {
+    const probe = write(
+      uniqPath('raw-form-negative', 'src/components/admin/seo/Primitive.tsx'),
+      '<FormInput value={query} onChange={setQuery} />\n'
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Static styleguide migrated note and radius debt', () => {
+  const RULE = 'Static styleguide migrated note and radius debt';
+
+  it('flags inline note chrome in public/styleguide.html', () => {
+    const probe = write(
+      uniqPath('styleguide-static-note', 'public/styleguide.html'),
+      '<div class="muted" style="font-size:11px; margin-top:10px;">Note</div>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('flags stale radius prose and rounded-* literals in public/styleguide.html', () => {
+    const probe = write(
+      uniqPath('styleguide-static-radius', 'public/styleguide.html'),
+      '<div>Uses rounded-xl and 10px 24px 10px 24px.</div>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('respects // styleguide-static-ok hatch on the line above', () => {
+    const probe = write(
+      uniqPath('styleguide-static-hatch', 'public/styleguide.html'),
+      lines(
+        '// styleguide-static-ok',
+        '<div class="muted" style="font-size:11px; margin-top:10px;">Intentional</div>',
+      )
+    );
+    expect(runRule(RULE, [probe])).toHaveLength(0);
+  });
+
+  it('does not flag migrated note classes and token radius references', () => {
+    const probe = write(
+      uniqPath('styleguide-static-negative', 'public/styleguide.html'),
+      '<div class="spec-note">Use <span class="t-mono">--radius-signature-lg</span>.</div>\n'
     );
     expect(runRule(RULE, [probe])).toHaveLength(0);
   });

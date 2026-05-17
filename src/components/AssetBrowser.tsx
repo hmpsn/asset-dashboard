@@ -8,7 +8,7 @@ import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
-import { Button, EmptyState, Icon, IconButton } from './ui';
+import { Button, Checkbox, EmptyState, Icon, IconButton } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -675,11 +675,11 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         {/* Header */}
         <div className="grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 text-xs text-[var(--brand-text-muted)] font-medium">
           <div>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={selected.size === filtered.length && filtered.length > 0}
               onChange={selectAll}
-              className="rounded"
+              label="Select all assets"
+              srOnlyLabel
             />
           </div>
           <div></div>

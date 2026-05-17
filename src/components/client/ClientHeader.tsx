@@ -2,7 +2,7 @@ import React from 'react';
 import { Lock, Sun, Moon, Calendar, LogOut } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
-import { Button, Icon, IconButton } from '../ui';
+import { Button, FormInput, Icon, IconButton } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 
@@ -67,6 +67,15 @@ export function ClientHeader({
   hasAnyData,
   effectiveTier,
 }: ClientHeaderProps) {
+  const [customStartDraft, setCustomStartDraft] = React.useState(customDateRange?.startDate || MODULE_DEFAULT_START);
+  const [customEndDraft, setCustomEndDraft] = React.useState(customDateRange?.endDate || MODULE_TODAY);
+
+  React.useEffect(() => {
+    if (!showDatePicker) return;
+    setCustomStartDraft(customDateRange?.startDate || MODULE_DEFAULT_START);
+    setCustomEndDraft(customDateRange?.endDate || MODULE_TODAY);
+  }, [customDateRange, showDatePicker]);
+
   return (
     <header className="border-b border-[var(--brand-border)]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -77,7 +86,7 @@ export function ClientHeader({
             <div className="flex items-center gap-2">
               <h1 className="t-h2 text-[var(--brand-text-bright)] truncate">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
-                <span className="px-2 py-0.5 t-label rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
+                <span className="px-2 py-0.5 t-label rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/15 text-accent-warning border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                 </span>
               )}
@@ -140,16 +149,18 @@ export function ClientHeader({
                   <div className="space-y-2">
                     <label className="block">
                       <span className="t-label text-[var(--brand-text-muted)]">Start date</span>
-                      <input type="date" ref={customStartRef}
-                        defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
+                      <FormInput type="date" ref={customStartRef}
+                        value={customStartDraft}
+                        onChange={setCustomStartDraft}
                         max={MODULE_TODAY}
                         className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
                       />
                     </label>
                     <label className="block">
                       <span className="t-label text-[var(--brand-text-muted)]">End date</span>
-                      <input type="date" ref={customEndRef}
-                        defaultValue={customDateRange?.endDate || MODULE_TODAY}
+                      <FormInput type="date" ref={customEndRef}
+                        value={customEndDraft}
+                        onChange={setCustomEndDraft}
                         max={MODULE_TODAY}
                         className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
                       />
@@ -162,8 +173,8 @@ export function ClientHeader({
                       Cancel
                     </Button>
                     <Button onClick={() => {
-                      const s = customStartRef.current?.value;
-                      const e = customEndRef.current?.value;
+                      const s = customStartDraft;
+                      const e = customEndDraft;
                       if (s && e && s <= e) applyCustomRange(s, e, ws);
                     }} size="sm" className="flex-1">
                       Apply

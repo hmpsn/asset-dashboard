@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { voice } from '../../../api/brand-engine';
 import type { VoiceGuardrails } from '../../../../shared/types/brand-engine';
-import { Button, IconButton } from '../../ui';
+import { Button, IconButton, FormInput } from '../../ui';
 import { useToast } from '../../Toast';
 import {
   appendUniqueListValue,
@@ -59,7 +59,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
           {gr.forbiddenWords.map(word => (
             <span
               key={word}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 rounded-[var(--radius-md)] t-caption"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 rounded-[var(--radius-md)] badge-span-ok t-caption"
             >
               {word}
               <IconButton
@@ -76,11 +76,11 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
         </div>
         <div className="flex gap-2">
           <label htmlFor="gr-forbidden-word" className="sr-only">New forbidden word</label>
-          <input
+          <FormInput
             id="gr-forbidden-word"
             type="text"
             value={newForbidden}
-            onChange={e => setNewForbidden(e.target.value)}
+            onChange={setNewForbidden}
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -127,22 +127,22 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
         <div className="flex items-center gap-2">
           <div className="space-y-1 flex-1">
             <label htmlFor="gr-term-use" className="t-caption text-[var(--brand-text-muted)]">Use</label>
-            <input
+            <FormInput
               id="gr-term-use"
               type="text"
               value={newTermUse}
-              onChange={e => setNewTermUse(e.target.value)}
+              onChange={setNewTermUse}
               placeholder="e.g. clients"
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
             />
           </div>
           <div className="space-y-1 flex-1">
             <label htmlFor="gr-term-instead-of" className="t-caption text-[var(--brand-text-muted)]">Instead of</label>
-            <input
+            <FormInput
               id="gr-term-instead-of"
               type="text"
               value={newTermInsteadOf}
-              onChange={e => setNewTermInsteadOf(e.target.value)}
+              onChange={setNewTermInsteadOf}
               placeholder="e.g. customers"
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
             />
@@ -195,11 +195,11 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
         </div>
         <div className="flex gap-2">
           <label htmlFor="gr-tone-boundary" className="sr-only">New tone boundary</label>
-          <input
+          <FormInput
             id="gr-tone-boundary"
             type="text"
             value={newToneBoundary}
-            onChange={e => setNewToneBoundary(e.target.value)}
+            onChange={setNewToneBoundary}
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -228,7 +228,7 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
           {gr.antiPatterns.map(pattern => (
             <span
               key={pattern}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-[var(--radius-md)] t-caption"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-[var(--radius-md)] badge-span-ok t-caption"
             >
               {pattern}
               <IconButton
@@ -245,11 +245,11 @@ export function GuardrailsSection({ workspaceId, guardrails, onChanged }: Guardr
         </div>
         <div className="flex gap-2">
           <label htmlFor="gr-anti-pattern" className="sr-only">New anti-pattern</label>
-          <input
+          <FormInput
             id="gr-anti-pattern"
             type="text"
             value={newAntiPattern}
-            onChange={e => setNewAntiPattern(e.target.value)}
+            onChange={setNewAntiPattern}
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();

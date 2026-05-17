@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal } from 'lucide-react';
-import { cn, Icon, ConfirmDialog, Button, IconButton, ClickableRow } from './ui';
+import { cn, Icon, ConfirmDialog, Button, IconButton, ClickableRow, FormInput } from './ui';
 import { webflow } from '../api';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 
@@ -199,11 +199,11 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                       </p>
                       <div className="flex gap-1.5 mb-2">
                         <div className="relative flex-1">
-                          <input
+                          <FormInput
                             ref={tokenInputRef}
                             type={showToken ? 'text' : 'password'}
                             value={linkToken}
-                            onChange={(e) => setLinkToken(e.target.value)}
+                            onChange={setLinkToken}
                             onKeyDown={(e) => e.key === 'Enter' && fetchSitesForToken(linkToken)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="Paste API token..."
@@ -264,10 +264,10 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
           <div className="p-2 border-t border-[var(--brand-border)]">
             {creating ? (
               <div className="flex gap-2">
-                <input
+                <FormInput
                   type="text"
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  onChange={setNewName}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder="Workspace name..."
                   autoFocus

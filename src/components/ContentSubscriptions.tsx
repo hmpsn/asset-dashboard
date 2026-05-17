@@ -4,7 +4,7 @@ import {
   PauseCircle, AlertTriangle, FileText, Settings2,
 } from 'lucide-react';
 import { contentSubscriptions } from '../api/misc';
-import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button, IconButton, ClickableRow } from './ui';
+import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button, IconButton, ClickableRow, FormSelect, FormTextarea } from './ui';
 import type { ContentSubscription, ContentSubPlan } from '../../shared/types/content';
 import { CONTENT_SUB_PLANS } from '../../shared/types/content';
 
@@ -140,23 +140,24 @@ export function ContentSubscriptions({ workspaceId }: Props) {
             {/* Topic source */}
             <div>
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1.5">Topic Source</label>
-              <select
+              <FormSelect
                 value={newSource}
-                onChange={e => setNewSource(e.target.value as typeof newSource)}
+                onChange={value => setNewSource(value as typeof newSource)}
+                options={[
+                  { value: 'strategy_gaps', label: 'Strategy Gaps (auto from keyword strategy)' },
+                  { value: 'ai_recommended', label: 'AI Recommended (AI picks topics)' },
+                  { value: 'manual', label: 'Manual (you assign topics)' },
+                ]}
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text-bright)]"
-              >
-                <option value="strategy_gaps">Strategy Gaps (auto from keyword strategy)</option>
-                <option value="ai_recommended">AI Recommended (AI picks topics)</option>
-                <option value="manual">Manual (you assign topics)</option>
-              </select>
+              />
             </div>
 
             {/* Notes */}
             <div>
               <label className="t-caption-sm text-[var(--brand-text)] block mb-1.5">Notes (optional)</label>
-              <textarea
+              <FormTextarea
                 value={newNotes}
-                onChange={e => setNewNotes(e.target.value)}
+                onChange={setNewNotes}
                 placeholder="Any preferences, instructions, or context..."
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text-bright)] h-20 resize-none"
               />

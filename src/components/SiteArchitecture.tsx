@@ -4,7 +4,7 @@ import {
   AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
   Zap, Link2,
 } from 'lucide-react';
-import { SectionCard, StatCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow } from './ui';
+import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
@@ -398,11 +398,11 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         >
           {/* Filters */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--brand-border)]">
-            <input
+            <FormInput
               type="text"
               placeholder="Search pages…"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
             />
             <div className="flex items-center gap-1">

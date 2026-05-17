@@ -5,9 +5,12 @@ import { useFormField } from './FormField';
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface FormInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
-  value: string;
-  onChange: (value: string) => void;
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  value: string | number;
+  onChange?: (value: string) => void;
+  /** Buffer edits locally and call onCommit on blur. Useful for editor cells. */
+  commitOnBlur?: boolean;
+  onCommit?: (value: string) => void;
   type?: string;
   placeholder?: string;
   className?: string;
@@ -17,11 +20,28 @@ export interface FormInputProps
 
 export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
   function FormInput(
-    { value, onChange, type = 'text', placeholder, className, id, ...rest },
+    {
+      value,
+      onChange,
+      commitOnBlur = false,
+      onCommit,
+      type = 'text',
+      placeholder,
+      className,
+      id,
+      onBlur,
+      ...rest
+    },
     ref
   ) {
     const { hasError, isValid, inputId, descriptionId } = useFormField();
     const resolvedId = id ?? (inputId || undefined);
+    const stringValue = String(value ?? '');
+    const [draft, setDraft] = React.useState(stringValue);
+
+    React.useEffect(() => {
+      setDraft(stringValue);
+    }, [stringValue]);
 
     const borderClass = hasError
       ? 'border-red-500/50'
@@ -34,8 +54,20 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         ref={ref}
         id={resolvedId}
         type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={commitOnBlur ? draft : stringValue}
+        onChange={(e) => {
+          if (commitOnBlur) {
+            setDraft(e.target.value);
+          } else {
+            onChange?.(e.target.value);
+          }
+        }}
+        onBlur={(e) => {
+          if (commitOnBlur) {
+            onCommit?.(draft);
+          }
+          onBlur?.(e);
+        }}
         placeholder={placeholder}
         aria-invalid={hasError || undefined}
         aria-describedby={descriptionId || undefined}

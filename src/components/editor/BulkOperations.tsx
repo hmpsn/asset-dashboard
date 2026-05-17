@@ -5,7 +5,7 @@
 import {
   Loader2, Sparkles, Check, X, Type, ArrowRight, Eye, CheckSquare, Square,
 } from 'lucide-react';
-import { SectionCard, Icon, Button, IconButton } from '../ui';
+import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect } from '../ui';
 import type { SeoBulkMode, SeoEditorPage } from './seoEditorTypes';
 
 export interface BulkOperationsProps {
@@ -114,26 +114,28 @@ export function BulkOperations({
         >
           <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <select
+            <FormSelect
               value={bulkField}
-              onChange={e => onSetBulkField(e.target.value as 'title' | 'description')}
+              onChange={value => onSetBulkField(value as 'title' | 'description')}
+              options={[
+                { value: 'title', label: 'SEO Title' },
+                { value: 'description', label: 'Meta Description' },
+              ]}
               className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
-            >
-              <option value="title">SEO Title</option>
-              <option value="description">Meta Description</option>
-            </select>
-            <select
+            />
+            <FormSelect
               value={patternAction}
-              onChange={e => onSetPatternAction(e.target.value as 'append' | 'prepend')}
+              onChange={value => onSetPatternAction(value as 'append' | 'prepend')}
+              options={[
+                { value: 'append', label: 'Append' },
+                { value: 'prepend', label: 'Prepend' },
+              ]}
               className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
-            >
-              <option value="append">Append</option>
-              <option value="prepend">Prepend</option>
-            </select>
-            <input
+            />
+            <FormInput
               type="text"
               value={patternText}
-              onChange={e => onSetPatternText(e.target.value)}
+              onChange={onSetPatternText}
               placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
               className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
               autoFocus
@@ -208,15 +210,15 @@ export function BulkOperations({
 
       {/* Bulk operation progress */}
       {bulkMode === 'rewriting' && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-[var(--radius-lg)]">
+          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
           <div className="flex-1">
-            <div className="text-sm text-teal-300">
+            <div className="t-caption text-blue-300">
               {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
             </div>
             {bulkProgress.total > 0 && (
               <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
-                <div className="h-full bg-teal-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
+                <div className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
               </div>
             )}
           </div>

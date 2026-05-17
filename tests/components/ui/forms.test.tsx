@@ -134,6 +134,25 @@ describe('FormInput', () => {
     expect(onChange).toHaveBeenCalledWith('test');
   });
 
+  it('buffers changes and commits on blur', () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    const { container } = render(
+      <FormInput value="draft" onChange={onChange} commitOnBlur onCommit={onCommit} />
+    );
+    const input = container.querySelector('input')!;
+    fireEvent.change(input, { target: { value: 'final' } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('final');
+    fireEvent.blur(input);
+    expect(onCommit).toHaveBeenCalledWith('final');
+  });
+
+  it('renders numeric values as strings', () => {
+    const { container } = render(<FormInput value={42} onChange={vi.fn()} />);
+    expect(container.querySelector('input')?.value).toBe('42');
+  });
+
   it('appends className', () => {
     const { container } = render(
       <FormInput value="" onChange={vi.fn()} className="custom-class" />
@@ -209,6 +228,20 @@ describe('FormTextarea', () => {
     const { container } = render(<FormTextarea value="" onChange={onChange} />);
     fireEvent.change(container.querySelector('textarea')!, { target: { value: 'new text' } });
     expect(onChange).toHaveBeenCalledWith('new text');
+  });
+
+  it('buffers textarea changes and commits on blur', () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    const { container } = render(
+      <FormTextarea value="draft" onChange={onChange} commitOnBlur onCommit={onCommit} />
+    );
+    const textarea = container.querySelector('textarea')!;
+    fireEvent.change(textarea, { target: { value: 'final' } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('final');
+    fireEvent.blur(textarea);
+    expect(onCommit).toHaveBeenCalledWith('final');
   });
 
   it('shows character counter when maxLength is set', () => {

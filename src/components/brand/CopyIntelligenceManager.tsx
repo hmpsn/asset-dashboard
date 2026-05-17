@@ -20,7 +20,7 @@ import {
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
 import { queryKeys } from '../../lib/queryKeys';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, IconButton, Toggle, Button, cn } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, IconButton, Toggle, Button, cn, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../../../shared/types/copy-pipeline';
 
@@ -150,11 +150,11 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
       {/* Pattern text — inline edit */}
       <div className="flex-1 min-w-0">
         {isEditing ? (
-          <input
+          <FormInput
             ref={inputRef}
             type="text"
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={setEditValue}
             onBlur={handleEditCommit}
             onKeyDown={handleKeyDown}
             disabled={isSaving}

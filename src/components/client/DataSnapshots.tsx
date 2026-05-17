@@ -192,7 +192,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Visitors</div>
           <div className="flex items-center gap-1.5">
-            <span className="t-stat-sm text-accent-brand">{formatNum(overview.totalUsers)}</span>
+            <span className="t-stat-sm text-accent-info">{formatNum(overview.totalUsers)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.users} />}
           </div>
         </div>
@@ -216,7 +216,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       {trend.length > 3 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Visitor trend</div>
-          <MiniSparkline data={trend.map(t => t.users)} color={CHART_SERIES_COLORS.teal} />
+          <MiniSparkline data={trend.map(t => t.users)} color={CHART_SERIES_COLORS.blue} />
         </div>
       )}
 

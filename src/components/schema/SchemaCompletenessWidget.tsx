@@ -94,7 +94,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
       {/* Progress bar */}
       <div className="h-2 w-full rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden mb-4">
         <div
-          className="h-full bg-emerald-500 transition-all duration-300"
+          className="h-full bg-blue-500 transition-all duration-300"
           style={{ width: `${completenessPct}%` }}
           role="progressbar"
           aria-label="Schema profile completeness"

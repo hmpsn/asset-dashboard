@@ -10,7 +10,7 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { ClickableRow, Icon } from './ui';
+import { ClickableRow, FormInput, Icon } from './ui';
 
 interface PaletteItem {
   id: string;
@@ -330,10 +330,10 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--brand-border)]">
           <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-          <input
+          <FormInput
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             onKeyDown={handleKeyDown}
             placeholder="Search tools, workspaces, actions..."
             className="flex-1 bg-transparent t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] outline-none"

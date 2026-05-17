@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, Check, FileText, Layers, Tag,
   Eye, Sparkles, X,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader, EmptyState, Button, IconButton } from '../ui';
+import { SectionCard, Badge, PageHeader, EmptyState, Button, IconButton, FormInput } from '../ui';
 import type { ContentTemplate, ContentMatrix, MatrixDimension, MatrixCell } from './types';
 
 interface MatrixBuilderProps {
@@ -101,7 +101,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
   return (
     <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] min-h-[42px] focus-within:border-teal-500/40 transition-colors">
       {values.map(val => (
-        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
+        <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
           <IconButton
             onClick={() => onChange(values.filter(v => v !== val))}
@@ -114,10 +114,10 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
           />
         </span>
       ))}
-      <input
+      <FormInput
         type="text"
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={setInput}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={values.length === 0 ? placeholder : 'Add more...'}
@@ -324,10 +324,10 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                       <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{varLabel}</p>
                       <p className="t-caption-sm font-mono text-[var(--brand-text-muted)] truncate">{cell.plannedUrl}</p>
                     </div>
-                    <input
+                    <FormInput
                       type="text"
                       value={cellKeywordOverrides[cell.id] ?? cell.targetKeyword}
-                      onChange={e => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: e.target.value }))}
+                      onChange={value => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: value }))}
                       className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
@@ -343,10 +343,10 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
           <div className="space-y-4">
             <div>
               <label className="t-caption text-[var(--brand-text-muted)] font-medium">Matrix Name</label>
-              <input
+              <FormInput
                 type="text"
                 value={matrixName}
-                onChange={e => setMatrixName(e.target.value)}
+                onChange={setMatrixName}
                 placeholder="e.g. Houston Area Service Pages"
                 className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />

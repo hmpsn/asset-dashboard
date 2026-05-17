@@ -213,7 +213,7 @@ export function Sidebar({
                   <span className="t-caption-sm text-[var(--brand-text-muted)] font-semibold tracking-widest uppercase flex-1 text-left">{group.label}</span>
                   <ChevronRight className={`w-3 h-3 text-[var(--brand-text-dim)] transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
                   {isCollapsed && groupBadgeCount > 0 && (
-                    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
+                    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
                       {groupBadgeCount}
                     </span>
                   )}
@@ -245,7 +245,7 @@ export function Sidebar({
                     />
                       <span className="truncate">{item.label}</span>
                       {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
-                        <span className="ml-auto t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
+                        <span className="ml-auto t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
                           {pendingContentRequests}
                         </span>
                       )}

@@ -143,10 +143,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           <SectionCard
             title={`Online Now · ${totalOnline}`}
             titleIcon={
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-[var(--radius-pill)] h-3 w-3 bg-emerald-500" />
-              </span>
+              <div className="relative flex h-3 w-3">
+                <div className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                <div className="relative inline-flex rounded-[var(--radius-pill)] h-3 w-3 bg-emerald-500" />
+              </div>
             }
             noPadding
           >
@@ -199,18 +199,24 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-bold bg-red-500 text-white shadow-lg">
-                    <Icon as={Bell} size="sm" /> {ws.requests.new} new
-                  </div>
+                  <Badge
+                    label={`${ws.requests.new} new`}
+                    tone="red"
+                    variant="solid"
+                    shape="pill"
+                    size="md"
+                    icon={Bell}
+                    className="absolute -top-2 -right-2 shadow-lg"
+                  />
                 )}
 
                 {/* Online users banner */}
                 {onlineUsers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-emerald-500/10 border-b border-emerald-500/20">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-[var(--radius-pill)] h-2.5 w-2.5 bg-emerald-500" />
-                    </span>
+                    <div className="relative flex h-2.5 w-2.5">
+                      <div className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                      <div className="relative inline-flex rounded-[var(--radius-pill)] h-2.5 w-2.5 bg-emerald-500" />
+                    </div>
                     <span className="t-caption-sm font-semibold text-accent-success">
                       {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
                     </span>
@@ -222,23 +228,24 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   <div className="flex items-center gap-2 min-w-0">
                     <h3 className="t-caption font-semibold truncate group-hover:text-accent-brand transition-colors text-[var(--brand-text-bright)]">{ws.name}</h3>
                     {isAtRisk && (
-                      <span className={cn(
-                        'flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border',
-                        (ws.churnSignals?.critical || 0) > 0
-                          ? 'bg-red-500/15 text-accent-danger border-red-500/20'
-                          : 'bg-amber-500/15 text-accent-warning border-amber-500/20'
-                      )}>
-                        <Icon as={Flag} size="sm" />
-                        At Risk
-                      </span>
+                      <Badge
+                        label="At Risk"
+                        tone={(ws.churnSignals?.critical || 0) > 0 ? 'red' : 'amber'}
+                        variant="outline"
+                        icon={Flag}
+                        className="flex-shrink-0 font-bold"
+                      />
                     )}
                     {ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
-                        Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
-                      </span>
+                      <Badge
+                        label={`Trial${ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}`}
+                        tone="amber"
+                        variant="outline"
+                        className="flex-shrink-0 font-bold"
+                      />
                     )}
                     {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border bg-teal-500/15 text-accent-brand border-teal-500/20">{ws.tier}</span>
+                      <Badge label={ws.tier} tone="teal" variant="outline" className="flex-shrink-0 font-bold" />
                     )}
                   </div>
                   <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
@@ -338,11 +345,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <div>
                         <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">SEO Status</div>
                         <div className="flex flex-wrap gap-1">
-                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-accent-warning">{ws.pageStates!.issueDetected} issues</span>}
-                          {(ws.pageStates?.inReview || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.inReview} in review</span>}
-                          {(ws.pageStates?.approved || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success">{ws.pageStates!.approved} approved</span>}
-                          {(ws.pageStates?.rejected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-accent-danger">{ws.pageStates!.rejected} rejected</span>}
-                          {(ws.pageStates?.live || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.live} live</span>}
+                          {(ws.pageStates?.issueDetected || 0) > 0 && <Badge label={`${ws.pageStates!.issueDetected} issues`} tone="amber" variant="outline" />}
+                          {(ws.pageStates?.inReview || 0) > 0 && <Badge label={`${ws.pageStates!.inReview} in review`} tone="teal" variant="outline" />}
+                          {(ws.pageStates?.approved || 0) > 0 && <Badge label={`${ws.pageStates!.approved} approved`} tone="emerald" variant="outline" />}
+                          {(ws.pageStates?.rejected || 0) > 0 && <Badge label={`${ws.pageStates!.rejected} rejected`} tone="red" variant="outline" />}
+                          {(ws.pageStates?.live || 0) > 0 && <Badge label={`${ws.pageStates!.live} live`} tone="teal" variant="outline" />}
                         </div>
                       </div>
                     </>

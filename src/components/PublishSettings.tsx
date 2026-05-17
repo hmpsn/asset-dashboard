@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Save, Sparkles, Globe, ChevronDown, Check, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard, Button, Icon } from './ui';
+import { SectionCard, Button, FormSelect, Icon } from './ui';
 import { get, post } from '../api/client';
 
 interface CollectionInfo {
@@ -168,7 +168,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
       title="Webflow CMS Publish Target"
       titleIcon={<Icon as={Globe} size="md" className="text-teal-400" />}
       action={publishTarget ? (
-        <span className="flex items-center gap-1 t-caption-sm text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-[var(--radius-md)]">
+        <span className="flex items-center gap-1 t-caption-sm text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-[var(--radius-md)] badge-span-ok">
           <Icon as={Check} size="sm" /> Configured
         </span>
       ) : undefined}
@@ -183,16 +183,15 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
             </div>
           ) : (
             <div className="relative">
-              <select
+              <FormSelect
                 value={selectedCollection}
-                onChange={e => handleCollectionChange(e.target.value)}
+                onChange={handleCollectionChange}
+                options={[
+                  { value: '', label: 'Select a collection...' },
+                  ...collections.map(c => ({ value: c.id, label: `${c.displayName} (${c.slug})` })),
+                ]}
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
-              >
-                <option value="">Select a collection...</option>
-                {collections.map(c => (
-                  <option key={c.id} value={c.id}>{c.displayName} ({c.slug})</option>
-                ))}
-              </select>
+              />
               <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
@@ -230,16 +229,15 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
                   <span className="block t-caption-sm text-[var(--brand-text-muted)]">{hint}</span>
                 </div>
                 <div className="relative flex-1">
-                  <select
+                  <FormSelect
                     value={(fieldMap as unknown as Record<string, string | undefined>)[key] || ''}
-                    onChange={e => updateField(key, e.target.value)}
+                    onChange={value => updateField(key, value)}
+                    options={[
+                      { value: '', label: required ? 'Select field...' : '(none)' },
+                      ...fields.map(f => ({ value: f.slug, label: `${f.displayName} (${f.type})` })),
+                    ]}
                     className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
-                  >
-                    <option value="">{required ? 'Select field...' : '(none)'}</option>
-                    {fields.map(f => (
-                      <option key={f.slug} value={f.slug}>{f.displayName} ({f.type})</option>
-                    ))}
-                  </select>
+                  />
                   <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>

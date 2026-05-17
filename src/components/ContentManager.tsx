@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EmptyState, MetricRing, Icon, PageHeader, Button, IconButton } from './ui';
+import { Badge, EmptyState, MetricRing, Icon, PageHeader, Button, IconButton, FormInput } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -31,12 +31,12 @@ interface PostSummary {
 type SortField = 'date' | 'title' | 'status' | 'words';
 type StatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved' | 'error';
 
-const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string }> = {
-  generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20' },
-  error: { icon: AlertTriangle, color: 'text-accent-danger', label: 'Failed', bg: 'bg-red-500/10 border-red-500/20' },
-  draft: { icon: PenLine, color: 'text-accent-info', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20' },
-  review: { icon: Eye, color: 'text-accent-cyan', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20' },
-  approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string; tone: 'amber' | 'red' | 'blue' | 'teal' | 'emerald' }> = {
+  generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20', tone: 'amber' },
+  error: { icon: AlertTriangle, color: 'text-accent-danger', label: 'Failed', bg: 'bg-red-500/10 border-red-500/20', tone: 'red' },
+  draft: { icon: PenLine, color: 'text-accent-info', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20', tone: 'blue' },
+  review: { icon: Eye, color: 'text-accent-cyan', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20', tone: 'teal' },
+  approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20', tone: 'emerald' },
 };
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
@@ -196,9 +196,9 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
           <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder="Search by title or keyword..."
             className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
@@ -310,10 +310,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
                   {/* Right: status + actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] border font-medium ${cfg.bg} ${cfg.color}`}>
-                      <Icon as={PostStatusIcon} size="sm" className={isGenerating ? 'animate-spin' : ''} />
-                      {cfg.label}
-                    </span>
+                    <Badge
+                      label={cfg.label}
+                      tone={cfg.tone}
+                      variant="outline"
+                      size="md"
+                      icon={PostStatusIcon}
+                      className={isGenerating ? '[&_svg]:animate-spin' : undefined}
+                    />
 
                     {/* Status progression buttons */}
                     {!isGenerating && (
@@ -362,9 +366,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {/* Publish to Webflow */}
                     {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
                       post.publishedAt ? (
-                        <span className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success font-medium">
-                          <Icon as={Check} size="sm" /> Published
-                        </span>
+                        <Badge label="Published" tone="emerald" variant="outline" size="md" icon={Check} />
                       ) : (
                         <Button
                           onClick={() => publishPost(post.id)}

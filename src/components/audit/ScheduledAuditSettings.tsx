@@ -5,7 +5,7 @@ import { put } from '../../api/client';
 import { useAuditSchedule } from '../../hooks/admin';
 import type { AuditSchedule } from '../../hooks/admin/useAdminSeo';
 import { queryKeys } from '../../lib/queryKeys';
-import { Icon, SectionCard, Button } from '../ui';
+import { FormSelect, Icon, SectionCard, Button } from '../ui';
 
 interface ScheduledAuditSettingsProps {
   workspaceId: string;
@@ -71,29 +71,31 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Run Every</label>
-              <select
-                value={scheduleInterval}
-                onChange={e => setScheduleInterval(Number(e.target.value))}
+              <FormSelect
+                value={String(scheduleInterval)}
+                onChange={value => setScheduleInterval(Number(value))}
+                options={[
+                  { value: '1', label: 'Daily' },
+                  { value: '7', label: 'Weekly' },
+                  { value: '14', label: 'Every 2 Weeks' },
+                  { value: '30', label: 'Monthly' },
+                ]}
                 className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)]"
-              >
-                <option value={1}>Daily</option>
-                <option value={7}>Weekly</option>
-                <option value={14}>Every 2 Weeks</option>
-                <option value={30}>Monthly</option>
-              </select>
+              />
             </div>
             <div>
               <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Alert on Score Drop &gt;</label>
-              <select
-                value={scheduleThreshold}
-                onChange={e => setScheduleThreshold(Number(e.target.value))}
+              <FormSelect
+                value={String(scheduleThreshold)}
+                onChange={value => setScheduleThreshold(Number(value))}
+                options={[
+                  { value: '3', label: '3 points' },
+                  { value: '5', label: '5 points' },
+                  { value: '10', label: '10 points' },
+                  { value: '15', label: '15 points' },
+                ]}
                 className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)]"
-              >
-                <option value={3}>3 points</option>
-                <option value={5}>5 points</option>
-                <option value={10}>10 points</option>
-                <option value={15}>15 points</option>
-              </select>
+              />
             </div>
           </div>
           <div className="flex items-center gap-2">

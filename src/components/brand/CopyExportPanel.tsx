@@ -8,7 +8,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useExportCopy } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, EmptyState, Icon, Button, cn } from '../ui';
+import { SectionCard, Badge, EmptyState, Icon, Button, cn, FormSelect } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { ExportFormat, ExportScope } from '../../../shared/types/copy-pipeline';
 import type { BlueprintEntry } from '../../../shared/types/page-strategy';
@@ -359,22 +359,20 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
             >
               Choose entry
             </label>
-            <select
+            <FormSelect
               id="single-entry-select"
               value={singleEntryId}
-              onChange={e => setSingleEntryId(e.target.value)}
+              onChange={setSingleEntryId}
+              options={[
+                { value: '', label: 'Select an entry…' },
+                ...exportableEntries.map(entry => ({
+                  value: entry.id,
+                  label: `${entry.name} — ${entry.primaryKeyword}`,
+                })),
+              ]}
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 appearance-none cursor-pointer"
               aria-label="Select entry to export"
-            >
-              <option value="" disabled>
-                Select an entry…
-              </option>
-              {exportableEntries.map(entry => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name} — {entry.primaryKeyword}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         )}
       </SectionCard>

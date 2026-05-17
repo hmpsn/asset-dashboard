@@ -8,7 +8,7 @@
  */
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Database } from 'lucide-react';
-import { Icon, cn, Button } from '../ui';
+import { Checkbox, Icon, cn, Button } from '../ui';
 import type { CmsCollectionImageInfo } from '../../../shared/types/cms-images';
 
 /** Patterns that indicate a meta/OG/preview image field (not a content field) */
@@ -118,12 +118,12 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
               <div key={coll.collectionId} className="space-y-1">
                 {/* Collection header row */}
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allChecked}
                     ref={el => { if (el) el.indeterminate = !allChecked && someChecked; }}
-                    onChange={e => toggleCollection(coll, e.target.checked)}
-                    className="rounded accent-teal-500 shrink-0"
+                    onChange={checked => toggleCollection(coll, checked)}
+                    label={`Select ${coll.collectionName}`}
+                    className="shrink-0 [&_span:last-child]:sr-only"
                   />
                   <Button
                     onClick={() => toggleExpanded(coll.collectionId)}
@@ -145,11 +145,11 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
                       const isMeta = isMetaField(field.slug, field.displayName);
                       return (
                         <label key={key} className="flex items-center gap-2 cursor-pointer group">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedFields.has(key)}
                             onChange={() => toggleField(key)}
-                            className="rounded accent-teal-500 shrink-0"
+                            label={field.displayName}
+                            className="shrink-0 [&_span:last-child]:sr-only"
                           />
                           <span className={cn(
                             'text-xs transition-colors group-hover:text-[var(--brand-text-bright)]',

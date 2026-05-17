@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
-import { MetricRing, MetricRingSvg, Button, IconButton } from './ui';
+import { MetricRing, MetricRingSvg, Button, FormInput, IconButton } from './ui';
 import { salesReport as salesReportApi } from '../api/misc';
 
 interface SalesIssue {
@@ -152,10 +152,10 @@ export function SalesReport() {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand-text-muted)]" />
-              <input
+              <FormInput
                 type="text"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={setUrl}
                 onKeyDown={(e) => e.key === 'Enter' && !loading && runReport()}
                 placeholder="Enter website URL (e.g. swishsmiles.com)"
                 className="w-full pl-10 pr-4 py-3 rounded-[var(--radius-lg)] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]"
@@ -395,7 +395,7 @@ export function SalesReport() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {page.issues.filter(i => i.severity === 'error').length > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-red-500/15 text-red-400">
+                    <span className="text-xs px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-red-500/15 text-red-400">
                       {page.issues.filter(i => i.severity === 'error').length}
                     </span>
                   )}

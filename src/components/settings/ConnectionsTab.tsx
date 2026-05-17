@@ -3,7 +3,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink, Server, AlertTriangle, Clock3,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
-import { SectionCard, Icon, Button, IconButton } from '../ui';
+import { Badge, SectionCard, Icon, Button, IconButton, FormInput, type BadgeTone } from '../ui';
 import { useIntegrationHealth } from '../../hooks/admin/useIntegrationHealth';
 import type { IntegrationHealthItem } from '../../../shared/types/integration-health';
 
@@ -47,17 +47,17 @@ export function ConnectionsTab({
     setDomainEditing(false);
   };
 
-  const stateBadgeClass = (item: IntegrationHealthItem) => {
-    if (item.state === 'configured') return 'bg-emerald-500/10 text-emerald-400';
-    if (item.state === 'degraded') return 'bg-amber-500/10 text-amber-400';
-    return 'bg-red-500/10 text-red-400';
+  const stateBadgeTone = (item: IntegrationHealthItem): BadgeTone => {
+    if (item.state === 'configured') return 'emerald';
+    if (item.state === 'degraded') return 'amber';
+    return 'red';
   };
 
-  const quotaBadgeClass = (item: IntegrationHealthItem) => {
-    if (item.quotaStatus === 'ok') return 'bg-emerald-500/10 text-emerald-400';
-    if (item.quotaStatus === 'warning') return 'bg-amber-500/10 text-amber-400';
-    if (item.quotaStatus === 'critical') return 'bg-red-500/10 text-red-400';
-    return 'bg-blue-500/10 text-blue-400';
+  const quotaBadgeTone = (item: IntegrationHealthItem): BadgeTone => {
+    if (item.quotaStatus === 'ok') return 'emerald';
+    if (item.quotaStatus === 'warning') return 'amber';
+    if (item.quotaStatus === 'critical') return 'red';
+    return 'blue';
   };
 
   const formatDate = (value: string | null) => {
@@ -80,13 +80,9 @@ export function ConnectionsTab({
             <p className="t-caption text-[var(--brand-text-muted)]">Linked via workspace dropdown</p>
           </div>
           {webflowSiteId ? (
-            <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)] flex items-center gap-1">
-              <Icon as={Check} size="xs" /> {webflowSiteName}
-            </span>
+            <Badge label={webflowSiteName ?? 'Connected'} tone="emerald" variant="soft" shape="pill" size="md" icon={Check} />
           ) : (
-            <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-2 py-1 rounded-[var(--radius-pill)] flex items-center gap-1">
-              <Icon as={Unplug} size="xs" /> Not linked
-            </span>
+            <Badge label="Not linked" tone="zinc" variant="soft" shape="pill" size="md" icon={Unplug} />
           )}
         </div>
         {webflowSiteId && (
@@ -95,10 +91,10 @@ export function ConnectionsTab({
             <span className="t-caption font-medium text-[var(--brand-text)] whitespace-nowrap">Live Domain</span>
             {domainEditing ? (
               <div className="flex items-center gap-2 flex-1">
-                <input
+                <FormInput
                   type="text"
                   value={domainDraft}
-                  onChange={e => setDomainDraft(e.target.value)}
+                  onChange={setDomainDraft}
                   onKeyDown={e => e.key === 'Enter' && handleDomainSave()}
                   placeholder="www.example.com"
                   className="flex-1 px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
@@ -145,7 +141,7 @@ export function ConnectionsTab({
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
-              <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Connected</span>
+              <Badge label="Connected" tone="emerald" variant="soft" shape="pill" size="md" />
               <IconButton
                 onClick={disconnectGoogle}
                 icon={LogOut}
@@ -159,7 +155,7 @@ export function ConnectionsTab({
               Connect
             </Button>
           ) : (
-            <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Not configured</span>
+            <Badge label="Not configured" tone="amber" variant="soft" shape="pill" size="md" />
           )}
         </div>
       </SectionCard>
@@ -218,9 +214,9 @@ export function ConnectionsTab({
           </div>
           {integrationHealth && (
             <div className="flex items-center gap-1.5">
-              <span className="t-caption-sm px-2 py-1 rounded-[var(--radius-pill)] bg-emerald-500/10 text-emerald-400">{integrationHealth.summary.healthy} healthy</span>
-              <span className="t-caption-sm px-2 py-1 rounded-[var(--radius-pill)] bg-amber-500/10 text-amber-400">{integrationHealth.summary.degraded} degraded</span>
-              <span className="t-caption-sm px-2 py-1 rounded-[var(--radius-pill)] bg-red-500/10 text-red-400">{integrationHealth.summary.missing} missing</span>
+              <Badge label={`${integrationHealth.summary.healthy} healthy`} tone="emerald" variant="soft" shape="pill" size="md" />
+              <Badge label={`${integrationHealth.summary.degraded} degraded`} tone="amber" variant="soft" shape="pill" size="md" />
+              <Badge label={`${integrationHealth.summary.missing} missing`} tone="red" variant="soft" shape="pill" size="md" />
             </div>
           )}
         </div>
@@ -245,8 +241,8 @@ export function ConnectionsTab({
               <div key={item.key} className="px-5 py-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{item.label}</span>
-                  <span className={`t-caption-sm px-2 py-1 rounded-[var(--radius-pill)] ${stateBadgeClass(item)}`}>{item.state}</span>
-                  <span className={`t-caption-sm px-2 py-1 rounded-[var(--radius-pill)] ${quotaBadgeClass(item)}`}>quota {item.quotaStatus}</span>
+                  <Badge label={item.state} tone={stateBadgeTone(item)} variant="soft" shape="pill" size="md" />
+                  <Badge label={`quota ${item.quotaStatus}`} tone={quotaBadgeTone(item)} variant="soft" shape="pill" size="md" />
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <p className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">

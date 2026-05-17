@@ -81,7 +81,6 @@ export function OnboardingWizard({
         {step === 'welcome' && (
           <>
             <div className="relative px-6 pt-4 pb-6 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.08), transparent)' }}>
-              <div className="absolute -top-20 -right-20 w-48 h-48 rounded-[var(--radius-pill)] blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
               <div className="relative text-center">
                 <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
                   <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
@@ -91,7 +90,7 @@ export function OnboardingWizard({
                 {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
                   <span className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
                   {isTrial && trialDaysRemaining != null && (
-                    <span className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] bg-amber-500/15 border border-amber-500/30 text-accent-warning font-medium">
+                    <span className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/15 border border-amber-500/30 text-accent-warning font-medium">
                       {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
                     </span>
                   )}

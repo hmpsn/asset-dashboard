@@ -6,7 +6,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton } from './ui';
+import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -446,10 +446,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
                   </Button>
                 </div>
-                <input
+                <FormInput
                   type="text"
                   value={competitors}
-                  onChange={e => setCompetitors(e.target.value)}
+                  onChange={setCompetitors}
                   placeholder="e.g. competitor1.com, competitor2.com"
                   className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
                 />
@@ -506,9 +506,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </Button>
               {contextOpen && (
                 <div className="space-y-1.5">
-                  <textarea
+                  <FormTextarea
                     value={businessContext}
-                    onChange={e => setBusinessContext(e.target.value)}
+                    onChange={setBusinessContext}
                     placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
                     rows={3}
                     className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
@@ -603,20 +603,24 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 {notRankingCount > 0 && <div className="bg-[var(--surface-3)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500 inline-block" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500 inline-block" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500 inline-block" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60 inline-block" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></div>
+                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></div>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
                   <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Search Intent Mix</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <span key={intent} className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(intent)}`}>
-                        {intent} ({count})
-                      </span>
+                      <Badge
+                        key={intent}
+                        label={`${intent} (${count})`}
+                        tone={intent === 'commercial' ? 'blue' : intent === 'informational' ? 'emerald' : intent === 'transactional' ? 'amber' : intent === 'navigational' ? 'teal' : 'zinc'}
+                        variant="outline"
+                        shape="pill"
+                      />
                     ))}
                   </div>
                 </div>
@@ -678,8 +682,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
                 const tracked = trackedKeywords.has(kw);
                 return (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded t-caption-sm text-accent-brand">
-                    {kw}
+                  <div key={i} className="inline-flex items-center gap-1.5 t-caption-sm text-accent-brand">
+                    <Badge label={kw} tone="teal" />
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
                         {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
@@ -695,7 +699,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       variant="ghost"
                       className={`ml-0.5 ${tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
                     />
-                  </span>
+                  </div>
                 );
               })}
             </div>
@@ -713,7 +717,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
-                    <span className="w-4 h-4 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 t-caption-sm text-accent-brand font-bold">{i + 1}</span>
+                    <Badge label={`${i + 1}`} tone="teal" variant="outline" shape="pill" className="flex-shrink-0 mt-0.5 font-bold" />
                     {opp}
                   </div>
                 ))}

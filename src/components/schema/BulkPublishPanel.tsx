@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Send, Upload } from 'lucide-react';
-import { Icon, Button } from '../ui';
+import { FormTextarea, Icon, Button } from '../ui';
 import type { WholeSiteSchemaGraphValidationResult } from '../../../shared/types/schema-validation';
 
 export interface BulkPublishPanelProps {
@@ -87,9 +87,9 @@ export function BulkPublishPanel({
         {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
       </Button>
       {!sentToClient && (
-        <textarea
+        <FormTextarea
           value={note}
-          onChange={e => setNote(e.target.value)}
+          onChange={setNote}
           disabled={sendingToClient}
           maxLength={2000}
           placeholder="Add a note for your client (optional)"

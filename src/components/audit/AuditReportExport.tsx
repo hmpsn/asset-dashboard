@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx to keep the orchestrator lean.
  */
 import { FileText, Download, X } from 'lucide-react';
-import { Modal, Button, IconButton } from '../ui';
+import { Modal, Button, FormTextarea, IconButton } from '../ui';
 import type { SeoAuditResult } from './types';
 
 // ── Pure helpers ────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
             title="SEO Report"
           />
         ) : (
-          <textarea
+          <FormTextarea
             readOnly
             value={getCSV(data)}
             className="w-full h-full p-4 bg-[var(--surface-1)] text-[var(--brand-text)] t-mono resize-none focus:outline-none"

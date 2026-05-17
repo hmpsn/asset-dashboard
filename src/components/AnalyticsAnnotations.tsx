@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Flag, Plus, Trash2, Pencil, Loader2, Check, X } from 'lucide-react';
-import { EmptyState, Icon, Button, IconButton } from './ui';
+import { EmptyState, Icon, Button, IconButton, FormInput, FormSelect } from './ui';
 import { cn } from '../lib/utils';
 import {
   useAnalyticsAnnotations,
@@ -93,20 +93,22 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
-            <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
+            <FormInput type="date" value={newAnn.date} onChange={value => setNewAnn(p => ({ ...p, date: value }))}
               className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Category</label>
-            <select value={newAnn.category} onChange={e => setNewAnn(p => ({ ...p, category: e.target.value as Category }))}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]">
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            <FormSelect
+              value={newAnn.category}
+              onChange={value => setNewAnn(p => ({ ...p, category: value as Category }))}
+              options={CATEGORIES.map(c => ({ value: c.id, label: c.label }))}
+              className="w-full px-3 py-2 bg-[var(--surface-1)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]"
+            />
           </div>
         </div>
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Label *</label>
-          <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
+          <FormInput type="text" value={newAnn.label} onChange={value => setNewAnn(p => ({ ...p, label: value }))} placeholder="e.g. Launched new landing pages"
             className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <Button
@@ -158,13 +160,15 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
             <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] border border-[var(--brand-border)] group hover:border-[var(--brand-border-hover)] transition-colors rounded-[var(--radius-signature)]">
               {editId === ann.id ? (
                 <>
-                  <input type="date" value={editDraft.date} onChange={e => setEditDraft(p => ({ ...p, date: e.target.value }))}
+                  <FormInput type="date" value={editDraft.date} onChange={value => setEditDraft(p => ({ ...p, date: value }))}
                     className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] flex-shrink-0" />
-                  <select value={editDraft.category} onChange={e => setEditDraft(p => ({ ...p, category: e.target.value as Category }))}
-                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] flex-shrink-0">
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                  </select>
-                  <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
+                  <FormSelect
+                    value={editDraft.category}
+                    onChange={value => setEditDraft(p => ({ ...p, category: value as Category }))}
+                    options={CATEGORIES.map(c => ({ value: c.id, label: c.label }))}
+                    className="px-2 py-1 bg-[var(--surface-1)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] flex-shrink-0"
+                  />
+                  <FormInput type="text" value={editDraft.label} onChange={value => setEditDraft(p => ({ ...p, label: value }))}
                     className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
                   <IconButton
                     type="button"

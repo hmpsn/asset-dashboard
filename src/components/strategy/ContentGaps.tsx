@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon } from '../ui';
+import { Badge, Button, Icon, StatusBadge } from '../ui';
 import { FileText, Sparkles, BarChart3, Eye, Swords, ArrowUpRight, MessageCircleQuestion } from 'lucide-react';
 import { TrendBadge } from '../ui/TrendBadge';
 import { adminPath } from '../../routes';
@@ -25,6 +25,15 @@ interface ContentGap {
 
 const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-emerald-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+const intentTone = (intent?: string): 'blue' | 'emerald' | 'amber' | 'teal' | 'zinc' => {
+  switch (intent) {
+    case 'commercial': return 'blue';
+    case 'informational': return 'emerald';
+    case 'transactional': return 'amber';
+    case 'navigational': return 'teal';
+    default: return 'zinc';
+  }
+};
 
 
 export interface ContentGapsProps {
@@ -33,7 +42,7 @@ export interface ContentGapsProps {
   intentColor: (intent?: string) => string;
 }
 
-export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGapsProps) {
+export function ContentGaps({ contentGaps, workspaceId }: ContentGapsProps) {
   const navigate = useNavigate();
 
   // Sort by opportunity score (server-computed), falling back to volume then priority
@@ -56,20 +65,17 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
         {sorted.map((gap, i) => {
-          const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-[var(--brand-text)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
           return (
             <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
               <div className="flex items-center justify-between">
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">{gap.topic}{gap.opportunityScore != null && (
-                  <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-blue-400">
-                    {gap.opportunityScore}/100
-                  </span>
+                  <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
                 )}</span>
                 <div className="flex items-center gap-2">
-                  <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
-                  <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${prioColor}`}>{gap.priority}</span>
+                  <Badge label={gap.intent} tone={intentTone(gap.intent)} variant="outline" shape="pill" className="uppercase" />
+                  <StatusBadge status={gap.priority} domain="priority" />
                   {gap.suggestedPageType && gap.suggestedPageType !== 'blog' && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{gap.suggestedPageType}</span>
+                    <Badge label={gap.suggestedPageType} tone="teal" variant="outline" className="capitalize" />
                   )}
                 </div>
               </div>
@@ -137,24 +143,16 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {gap.serpFeatures.includes('featured_snippet') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        ⬜ Snippet
-                      </span>
+                      <Badge label="Snippet" tone="blue" variant="outline" />
                     )}
                     {gap.serpFeatures.includes('people_also_ask') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        ❓ PAA
-                      </span>
+                      <Badge label="PAA" tone="blue" variant="outline" />
                     )}
                     {gap.serpFeatures.includes('video') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        ▶ Video
-                      </span>
+                      <Badge label="Video" tone="blue" variant="outline" />
                     )}
                     {gap.serpFeatures.includes('local_pack') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        📍 Local
-                      </span>
+                      <Badge label="Local" tone="blue" variant="outline" />
                     )}
                   </div>
                 )}

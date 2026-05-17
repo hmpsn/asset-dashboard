@@ -7,7 +7,7 @@ import {
   useSkipBriefing,
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
-import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, ClickableRow, Modal } from '../ui';
+import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, ClickableRow, FormInput, Modal } from '../ui';
 import type { BriefingCategory, BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
 function statusColor(s: BriefingDraftStatus): 'teal' | 'emerald' | 'zinc' {
@@ -198,9 +198,9 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
           <p className="t-body text-[var(--brand-text)] mb-4">
             Skipped briefings are not published to the client. This is terminal — the briefing for this week cannot be un-skipped. Note your reason:
           </p>
-          <input
+          <FormInput
             value={skipNote}
-            onChange={e => setSkipNote(e.target.value)}
+            onChange={setSkipNote}
             className="w-full px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-1)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50"
             placeholder="e.g. quiet week, low confidence in stories"
             autoFocus

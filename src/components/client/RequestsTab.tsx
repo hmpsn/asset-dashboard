@@ -4,7 +4,7 @@ import {
   CheckCircle2, X, Paperclip, FileText, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import type { ClientRequest, RequestCategory, RequestNote } from './types';
-import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard } from '../ui';
+import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard, FormInput, FormSelect, FormTextarea } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
@@ -116,39 +116,43 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           {!clientUser && (
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Your Name</label>
-            <input value={newReqName} onChange={e => setNewReqName(e.target.value)}
+            <FormInput value={newReqName} onChange={setNewReqName}
               placeholder="So we know who to follow up with..."
               className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
           </div>
           )}
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Title</label>
-            <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
+            <FormInput value={newReqTitle} onChange={setNewReqTitle}
               placeholder="Brief summary of your request..."
               className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
           </div>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Description</label>
-            <textarea value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} rows={3}
+            <FormTextarea value={newReqDesc} onChange={setNewReqDesc} rows={3}
               placeholder="Describe what you need in detail..."
               className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Category</label>
-              <select value={newReqCategory} onChange={e => setNewReqCategory(e.target.value as RequestCategory)}
-                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500">
-                <option value="content">Content Update</option>
-                <option value="design">Design Change</option>
-                <option value="bug">Bug Report</option>
-                <option value="seo">SEO</option>
-                <option value="feature">New Feature</option>
-                <option value="other">Other</option>
-              </select>
+              <FormSelect
+                value={newReqCategory}
+                onChange={value => setNewReqCategory(value as RequestCategory)}
+                options={[
+                  { value: 'content', label: 'Content Update' },
+                  { value: 'design', label: 'Design Change' },
+                  { value: 'bug', label: 'Bug Report' },
+                  { value: 'seo', label: 'SEO' },
+                  { value: 'feature', label: 'New Feature' },
+                  { value: 'other', label: 'Other' },
+                ]}
+                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+              />
             </div>
             <div>
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Related Page URL <span className="text-[var(--brand-text-muted)]">(optional)</span></label>
-              <input value={newReqPage} onChange={e => setNewReqPage(e.target.value)}
+              <FormInput value={newReqPage} onChange={setNewReqPage}
                 placeholder="/about or full URL..."
                 className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
             </div>
@@ -323,7 +327,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                           </div>
                         )}
                         <div className="flex gap-2">
-                          <input value={expandedRequest === req.id ? reqNoteInput : ''} onChange={e => setReqNoteInput(e.target.value)}
+                          <FormInput value={expandedRequest === req.id ? reqNoteInput : ''} onChange={setReqNoteInput}
                             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendReqNote(req.id)}
                             placeholder="Add a note or reply..."
                             className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" disabled={sendingNote} />

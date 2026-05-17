@@ -5,7 +5,7 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Link as LinkIcon, Bold, Italic, Heading2, Heading3 } from 'lucide-react';
-import { Button, IconButton } from '../ui';
+import { Button, FormInput, IconButton } from '../ui';
 
 export interface RichTextEditorProps {
   initialValue: string;
@@ -72,11 +72,11 @@ export function RichTextEditor({ initialValue, onChange, className, variant = 'a
     <>
       {showLinkInput ? (
         <div className="flex items-center gap-1 px-1">
-          <input
+          <FormInput
             ref={linkInputRef}
             type="url"
             value={linkUrl}
-            onChange={e => setLinkUrl(e.target.value)}
+            onChange={setLinkUrl}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
               if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl(''); }

@@ -5,7 +5,7 @@
 import {
   FileText, ExternalLink, Check, X, Minimize2, Sparkles, Wand2, Database,
 } from 'lucide-react';
-import { Icon, Button, IconButton, cn } from '../ui';
+import { Icon, Button, Checkbox, FormInput, IconButton, cn } from '../ui';
 import type { CmsImageUsage } from '../../../shared/types/cms-images';
 
 interface Asset {
@@ -72,11 +72,11 @@ export function AssetCard({
       )}
     >
       <div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selected}
           onChange={() => onToggleSelect(asset.id)}
-          className="rounded"
+          label={`Select ${asset.displayName || asset.originalFileName || 'asset'}`}
+          className="[&_span:last-child]:sr-only"
         />
       </div>
 
@@ -98,10 +98,10 @@ export function AssetCard({
       <div className="truncate text-[var(--brand-text)] flex items-center gap-1 min-w-0">
         {renamingId ? (
           <div className="flex items-center gap-1 w-full">
-            <input
+            <FormInput
               type="text"
               value={renameDraft}
-              onChange={e => onRenameDraftChange(e.target.value)}
+              onChange={onRenameDraftChange}
               onKeyDown={e => e.key === 'Enter' && onSaveRename(asset.id)}
               className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-3)] border border-teal-600 rounded text-xs focus:outline-none"
               autoFocus
@@ -170,10 +170,10 @@ export function AssetCard({
       <div className="truncate">
         {editingAlt ? (
           <div className="flex items-center gap-1">
-            <input
+            <FormInput
               type="text"
               value={altDraft}
-              onChange={e => onAltDraftChange(e.target.value)}
+              onChange={onAltDraftChange}
               onKeyDown={e => e.key === 'Enter' && onSaveAlt(asset.id)}
               className="flex-1 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded text-xs focus:outline-none"
               autoFocus

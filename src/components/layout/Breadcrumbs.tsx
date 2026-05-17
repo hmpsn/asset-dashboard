@@ -118,7 +118,7 @@ export function Breadcrumbs({
             className={`relative rounded-[var(--radius-lg)] ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
           >
             {pendingContentRequests > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 t-micro font-bold px-1 py-0 rounded-[var(--radius-pill)] bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
+              <span className="absolute -top-0.5 -right-0.5 t-micro font-bold px-1 py-0 rounded-[var(--radius-pill)] badge-span-ok bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
                 {pendingContentRequests}
               </span>
             )}
