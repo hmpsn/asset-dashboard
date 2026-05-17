@@ -5895,3 +5895,16 @@ Bug hardening included:
 **Mutual:** Aligns docs, enforcement, and roadmap notes around one contract so parallel cleanup waves can coordinate on shared rule IDs and ownership.
 
 **Files:** `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/styleguide-lockdown-contract.md`; `docs/rules/design-system-enforcement.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 430. Styleguide Parity Advisory Detector Wave (Wave 6)
+**What it does:** Adds three advisory (warn-tier) `pr-check` detectors to catch token/typography drift before promotion to blocking errors: (1) `styleguide-css-must-import-public-tokens` ensures `public/styleguide.css` includes `@import url('/tokens.css')`; (2) `styleguide-typography-extra-class-drift` flags extra static-styleguide `.t-*` classes not present in `src/index.css`; and (3) `global-token-declaration-outside-canonical-token-files` flags `--*` token declarations outside `src/tokens.css` and the `public/tokens.css` mirror. Added fixture coverage in `tests/pr-check.test.ts` and synchronized design-system docs/registry statuses to mark these checks as active advisories.
+
+**Agency value:** Catches subtle styleguide parity regressions early without blocking delivery while signal quality is proven.
+
+**Client value:** Reduces the chance that the styleguide stays clean while live surfaces silently drift on typography or token source contracts.
+
+**Mutual:** Advances the ratchet strategy by moving high-confidence directives from “planned” to measurable advisory enforcement with tests.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

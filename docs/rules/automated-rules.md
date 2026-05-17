@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **119** — 107 error, 12 warn.
+Total rules: **122** — 107 error, 15 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -142,6 +142,9 @@ advisory but tracked.
 | 10 | Raw pageSlug prefixed as URL — normalize via Page Address helpers | warn | custom | `*.ts, *.tsx` | `// page-slug-url-ok` | Nested Webflow pages need canonical paths for outcome tracking, GSC baselines, audit joins, and live-page fetches. |
 | 11 | Background generation in high-churn routes must be allowlisted | warn | custom | `server/routes/` | `// background-generation-ok` | Anonymous post-response generation promises drift away from TaskPanel visibility, cancellation, activity, and cache invalidation. |
 | 12 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
+| 13 | styleguide-css-must-import-public-tokens | warn | custom | `public/styleguide.css` | — | Token parity requires static styleguide CSS to import public/tokens.css. A missing import silently decouples styleguide rendering from canonical token values. |
+| 14 | styleguide-typography-extra-class-drift | warn | custom | `public/styleguide.css vs src/index.css` | — | The styleguide must not invent extra typography utilities. Extra .t-* classes in static specimens reintroduce drift despite parity for shared class names. |
+| 15 | global-token-declaration-outside-canonical-token-files | warn | custom | `*.css` | — | Token authority requires one canonical declaration file plus the public build mirror. Declarations elsewhere create hidden drift and theme inconsistencies. |
 
 ---
 
