@@ -1,5 +1,5 @@
 import { Loader2, Sparkles } from 'lucide-react';
-import { Icon, Button } from '../ui';
+import { FormInput, Icon, Button } from '../ui';
 
 interface SeoEditorTableControlsProps {
   workspaceId?: string;
@@ -33,8 +33,8 @@ export function SeoEditorTableControls({
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-              <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-[var(--radius-lg)]">
+              <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
               <span className="t-caption-sm text-[var(--brand-text-bright)]">
                 Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...
               </span>
@@ -64,7 +64,7 @@ export function SeoEditorTableControls({
             </Button>
           )}
           {analyzedPagesCount > 0 && !bulkAnalyzeProgress && (
-            <span className="t-caption-sm text-accent-success">
+            <span className="t-caption-sm text-blue-400">
               {analyzedPagesCount}/{totalPages} pages have analysis on file
             </span>
           )}
@@ -80,10 +80,10 @@ export function SeoEditorTableControls({
       </div>
 
       {showSearch && (
-        <input
+        <FormInput
           type="text"
           value={search}
-          onChange={e => onSearchChange(e.target.value)}
+          onChange={onSearchChange}
           placeholder="Search pages..."
           className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
         />

@@ -1,5 +1,5 @@
 import { ThumbsDown } from 'lucide-react';
-import { Button } from '../../ui';
+import { Button, FormTextarea } from '../../ui';
 import { Modal } from '../../ui/overlay/Modal';
 
 interface StrategyDeclineKeywordModalProps {
@@ -25,9 +25,9 @@ export function StrategyDeclineKeywordModal({
           <span className="text-accent-danger font-medium">&ldquo;{keyword}&rdquo;</span> will be excluded from future strategy recommendations.
         </p>
         <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Why isn't this keyword relevant? <span className="text-[var(--brand-text-muted)]">(optional)</span></label>
-        <textarea
+        <FormTextarea
           value={declineReasonText}
-          onChange={e => setDeclineReasonText(e.target.value)}
+          onChange={setDeclineReasonText}
           placeholder="e.g., We don't offer this service, too competitive, not our target audience..."
           className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-body text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none h-20"
           autoFocus

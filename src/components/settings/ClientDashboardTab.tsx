@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
-import { SectionCard, Icon, Button, IconButton } from '../ui';
+import { SectionCard, Icon, Button, IconButton, FormInput, FormSelect, Checkbox } from '../ui';
 import { CHART_SERIES_COLORS } from '../ui/constants';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
@@ -229,7 +229,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   // Sync clientEmail when ws loads asynchronously
   useEffect(() => { if (ws?.clientEmail !== undefined) setClientEmail(ws.clientEmail || ''); }, [ws?.clientEmail]);
 
-  const inputClass = 'bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500';
+  const inputClass = 'bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption';
 
   if (!webflowSiteId) {
     return (
@@ -277,7 +277,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
           <div className="flex items-center gap-2">
             {ws?.hasPassword ? (
               <>
-                <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)] flex items-center gap-1">
+                <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)] badge-span-ok flex items-center gap-1">
                   <Icon as={Lock} size="xs" /> Password Protected
                 </span>
                 <Button
@@ -312,7 +312,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
           </div>
           {editingPassword && (
             <div className="flex items-center gap-2">
-              <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+              <FormInput type="text" value={newPassword} onChange={setNewPassword}
                 placeholder="Enter new password" autoFocus
                 onKeyDown={e => e.key === 'Enter' && newPassword.trim() && savePassword()}
                 className={`flex-1 ${inputClass}`} />
@@ -334,7 +334,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Client Notification Email</div>
             <p className="t-caption-sm mb-2 text-[var(--brand-text-muted)]">We'll email this address when you respond to requests or change status.</p>
             <div className="flex items-center gap-2">
-              <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
+              <FormInput type="email" value={clientEmail} onChange={setClientEmail}
                 placeholder="client@company.com"
                 className={`flex-1 ${inputClass}`} />
               <Button onClick={async () => {
@@ -375,26 +375,30 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="t-caption-sm font-medium mb-1 text-[var(--brand-text-muted)]">Name</div>
-                  <input value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Jane Smith"
+                  <FormInput value={newUserName} onChange={setNewUserName} placeholder="Jane Smith"
                     className={`w-full ${inputClass}`} />
                 </div>
                 <div>
                   <div className="t-caption-sm font-medium mb-1 text-[var(--brand-text-muted)]">Email</div>
-                  <input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="jane@company.com" type="email"
+                  <FormInput value={newUserEmail} onChange={setNewUserEmail} placeholder="jane@company.com" type="email"
                     className={`w-full ${inputClass}`} />
                 </div>
                 <div>
                   <div className="t-caption-sm font-medium mb-1 text-[var(--brand-text-muted)]">Password</div>
-                  <input value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="Temporary password" type="text"
+                  <FormInput value={newUserPassword} onChange={setNewUserPassword} placeholder="Temporary password" type="text"
                     className={`w-full ${inputClass}`} />
                 </div>
                 <div>
                   <div className="t-caption-sm font-medium mb-1 text-[var(--brand-text-muted)]">Role</div>
-                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as 'client_owner' | 'client_member')}
-                    className={`w-full ${inputClass}`}>
-                    <option value="client_member">Member</option>
-                    <option value="client_owner">Owner</option>
-                  </select>
+                  <FormSelect
+                    value={newUserRole}
+                    onChange={value => setNewUserRole(value as 'client_owner' | 'client_member')}
+                    options={[
+                      { value: 'client_member', label: 'Member' },
+                      { value: 'client_owner', label: 'Owner' },
+                    ]}
+                    className={`w-full ${inputClass}`}
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-1">
@@ -441,9 +445,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                     {/* Info */}
                     {editingUserId === user.id ? (
                       <div className="flex-1 flex items-center gap-2 min-w-0">
-                        <input value={editUserName} onChange={e => setEditUserName(e.target.value)} placeholder="Name"
+                        <FormInput value={editUserName} onChange={setEditUserName} placeholder="Name"
                           className={`flex-1 ${inputClass} py-1.5`} />
-                        <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email"
+                        <FormInput value={editUserEmail} onChange={setEditUserEmail} placeholder="Email"
                           className={`flex-1 ${inputClass} py-1.5`} />
                         <IconButton onClick={() => saveEditUser(user.id)} icon={Check} label="Save user edits" size="sm" variant="ghost" className="text-emerald-400 hover:text-emerald-300" />
                         <IconButton onClick={() => setEditingUserId(null)} icon={X} label="Cancel user edits" size="sm" variant="ghost" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]" />
@@ -452,7 +456,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{user.name}</span>
-                          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${user.role === 'client_owner' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>
+                          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium ${user.role === 'client_owner' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>
                             {user.role === 'client_owner' ? 'Owner' : 'Member'}
                           </span>
                         </div>
@@ -479,7 +483,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   {resetPasswordUserId === user.id && (
                     <div className="px-4 pb-3 flex items-center gap-2">
                       <Icon as={KeyRound} size="xs" className="text-[var(--brand-text-muted)] shrink-0" />
-                      <input value={resetPasswordValue} onChange={e => setResetPasswordValue(e.target.value)}
+                      <FormInput value={resetPasswordValue} onChange={setResetPasswordValue}
                         placeholder="New password" type="text" autoFocus
                         onKeyDown={e => e.key === 'Enter' && resetPasswordValue.trim() && resetClientPassword(user.id)}
                         className={`flex-1 ${inputClass} py-1.5`} />
@@ -548,7 +552,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Full Post:</span>
                   <span className="t-caption font-semibold text-blue-400">${ws.contentPricing.fullPostPrice}</span>
                 </div>
-                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+                <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
               </>
             ) : (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">No pricing set — clients will see "Pricing confirmed after submission"</span>
@@ -564,7 +568,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Content Brief Price</div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 t-caption text-[var(--brand-text-muted)]">$</span>
-                  <input type="number" min={0} value={pricingBrief || ''} onChange={e => setPricingBrief(Number(e.target.value))}
+                  <FormInput type="number" min={0} value={pricingBrief || ''} onChange={value => setPricingBrief(Number(value))}
                     placeholder="150"
                     className={`w-full ${inputClass} pl-7`} />
                 </div>
@@ -573,7 +577,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Full Blog Post Price</div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 t-caption text-[var(--brand-text-muted)]">$</span>
-                  <input type="number" min={0} value={pricingFull || ''} onChange={e => setPricingFull(Number(e.target.value))}
+                  <FormInput type="number" min={0} value={pricingFull || ''} onChange={value => setPricingFull(Number(value))}
                     placeholder="500"
                     className={`w-full ${inputClass} pl-7`} />
                 </div>
@@ -581,14 +585,18 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
             <div>
               <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Currency</div>
-              <select value={pricingCurrency} onChange={e => setPricingCurrency(e.target.value)}
-                className={inputClass}>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="GBP">GBP (£)</option>
-                <option value="CAD">CAD (C$)</option>
-                <option value="AUD">AUD (A$)</option>
-              </select>
+              <FormSelect
+                value={pricingCurrency}
+                onChange={setPricingCurrency}
+                options={[
+                  { value: 'USD', label: 'USD ($)' },
+                  { value: 'EUR', label: 'EUR (€)' },
+                  { value: 'GBP', label: 'GBP (£)' },
+                  { value: 'CAD', label: 'CAD (C$)' },
+                  { value: 'AUD', label: 'AUD (A$)' },
+                ]}
+                className={inputClass}
+              />
             </div>
             <div className="pt-2 flex items-center gap-3 border-t border-[var(--brand-border)]">
               <Button
@@ -722,7 +730,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                             <div className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] p-2 mt-1">
                               <div className="flex items-center gap-1.5 mb-2">
                                 <Icon as={Search} size="xs" className="text-[var(--brand-text-muted)]" />
-                                <input value={groupPageSearch} onChange={e => setGroupPageSearch(e.target.value)}
+                                <FormInput value={groupPageSearch} onChange={setGroupPageSearch}
                                   placeholder="Filter pages..."
                                   className="flex-1 bg-transparent t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none" />
                                 {(g.allowedPages || []).length > 0 && (
@@ -742,8 +750,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                                   .map(p => {
                                     const checked = (g.allowedPages || []).some(ap => p.path.includes(ap));
                                     return (
-                                      <label key={p.path} className="flex items-center gap-1.5 px-1 py-0.5 rounded-[var(--radius-sm)] hover:bg-[var(--brand-border-hover)]/30 cursor-pointer">
-                                        <input type="checkbox" checked={checked}
+                                      <div key={p.path} className="flex items-center gap-1.5 px-1 py-0.5 rounded-[var(--radius-sm)] hover:bg-[var(--brand-border-hover)]/30">
+                                        <Checkbox
+                                          checked={checked}
                                           onChange={() => {
                                             setLocalGroups(prev => prev.map(gr => {
                                               if (gr.id !== g.id) return gr;
@@ -754,9 +763,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                                               return { ...gr, allowedPages: next.length > 0 ? next : undefined };
                                             }));
                                           }}
-                                          className="w-3 h-3 rounded-[var(--radius-sm)] border-[var(--brand-border)] bg-[var(--surface-3)] text-teal-500 focus:ring-0 focus:ring-offset-0 accent-teal-500" />
-                                        <span className="t-caption-sm text-[var(--brand-text)] truncate">{p.path}</span>
-                                      </label>
+                                          label={p.path}
+                                          className="min-w-0 [&>span:last-child]:truncate [&>span:last-child]:t-caption-sm"
+                                        />
+                                      </div>
                                     );
                                   })}
                                 {ga4Pages.filter(p => !groupPageSearch || p.path.toLowerCase().includes(groupPageSearch.toLowerCase())).length === 0 && (
@@ -771,7 +781,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                   ))}
                   <div className="flex items-center gap-2 mt-2">
                     <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-6 h-6 rounded-[var(--radius-sm)] cursor-pointer bg-transparent border-0" />
-                    <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="New group name..."
+                    <FormInput value={newGroupName} onChange={setNewGroupName} placeholder="New group name..."
                       onKeyDown={e => e.key === 'Enter' && addGroup()}
                       className={`flex-1 ${inputClass} py-1.5`} />
                     <Button onClick={addGroup} disabled={!newGroupName.trim()} icon={Plus} size="sm" className="px-2.5 py-1.5">
@@ -801,7 +811,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                         <div className="flex-1 min-w-0">
                           {isEditing ? (
                             <div className="flex items-center gap-1.5">
-                              <input autoFocus value={editingDisplayName} onChange={e => setEditingDisplayName(e.target.value)}
+                              <FormInput autoFocus value={editingDisplayName} onChange={setEditingDisplayName}
                                 onKeyDown={e => { if (e.key === 'Enter') updateDisplayName(ev.eventName, editingDisplayName); if (e.key === 'Escape') setEditingEventName(null); }}
                                 className={`flex-1 ${inputClass} py-1`} />
                               <IconButton onClick={() => updateDisplayName(ev.eventName, editingDisplayName)} icon={Check} label="Save event display name" size="sm" variant="ghost" className="text-emerald-400 hover:text-emerald-300" />
@@ -817,11 +827,15 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                           )}
                         </div>
                         {localGroups.length > 0 && (
-                          <select value={evGroup || ''} onChange={e => assignGroup(ev.eventName, e.target.value || undefined)}
-                            className={`${inputClass} py-1 max-w-[100px]`}>
-                            <option value="">No group</option>
-                            {localGroups.sort((a, b) => a.order - b.order).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                          </select>
+                          <FormSelect
+                            value={evGroup || ''}
+                            onChange={value => assignGroup(ev.eventName, value || undefined)}
+                            options={[
+                              { value: '', label: 'No group' },
+                              ...localGroups.sort((a, b) => a.order - b.order).map(g => ({ value: g.id, label: g.name })),
+                            ]}
+                            className={`${inputClass} py-1 max-w-[100px]`}
+                          />
                         )}
                         <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums shrink-0">{ev.eventCount.toLocaleString()}</span>
                         <IconButton

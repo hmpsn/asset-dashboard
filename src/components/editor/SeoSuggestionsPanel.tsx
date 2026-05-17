@@ -83,7 +83,7 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
             {descSuggestions.length > 0 && ` · ${descSuggestions.length} description${descSuggestions.length !== 1 ? 's' : ''}`}
           </span>
           {readyToApply > 0 && (
-            <span className="px-2 py-0.5 t-caption-sm font-medium bg-teal-500/20 text-teal-300 rounded-[var(--radius-pill)]">
+            <span className="px-2 py-0.5 t-caption-sm font-medium bg-teal-500/20 text-teal-300 rounded-[var(--radius-pill)] badge-span-ok">
               {readyToApply} selected
             </span>
           )}
@@ -148,7 +148,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
             {s.pageTitle}
           </span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">/{s.pageSlug}</span>
-          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
+          <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
             {fieldLabel}
           </span>
         </div>

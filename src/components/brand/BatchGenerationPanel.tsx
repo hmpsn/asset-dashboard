@@ -12,7 +12,7 @@ import {
   useBatchJob,
   useCopyStatus,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, ClickableRow, cn, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
 import type { BatchMode, BatchJob } from '../../../shared/types/copy-pipeline';
@@ -322,13 +322,13 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
               <label htmlFor="batch-size-input" className="text-sm text-[var(--brand-text)] shrink-0">
                 Batch size
               </label>
-              <input
+              <FormInput
                 id="batch-size-input"
                 type="number"
                 min={1}
                 max={20}
                 value={batchSize}
-                onChange={e => setBatchSize(Math.max(1, Math.min(20, Number(e.target.value))))}
+                onChange={value => setBatchSize(Math.max(1, Math.min(20, Number(value))))}
                 className="w-20 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text-bright)] text-center focus:outline-none focus:border-teal-500"
                 aria-label="Pages per batch"
               />

@@ -17,7 +17,7 @@ import {
   Minus,
   Share2,
 } from 'lucide-react';
-import { Button, ClickableRow, Icon, IconButton, SectionCard } from '../../ui';
+import { Badge, Button, ClickableRow, FormInput, Icon, IconButton, SectionCard } from '../../ui';
 import { scoreColorClass, themeColor } from '../../ui/constants';
 import { ScoreHistoryChart } from '../helpers';
 import { toLiveUrl } from '../utils';
@@ -252,12 +252,12 @@ export function HealthPageSpeedSection({ auditDetail }: { auditDetail: AuditDeta
           : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)]/30';
   const assessBadge = (assessment: CwvStrategyResult['assessment']) =>
     assessment === 'good'
-      ? { text: 'Passed', cls: 'bg-emerald-500/15 text-accent-success border-emerald-500/30' }
+      ? { text: 'Passed', tone: 'emerald' as const }
       : assessment === 'needs-improvement'
-        ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-accent-warning border-amber-500/30' }
+        ? { text: 'Needs Work', tone: 'amber' as const }
         : assessment === 'poor'
-          ? { text: 'Failed', cls: 'bg-red-500/15 text-accent-danger border-red-500/30' }
-          : { text: 'No Data', cls: 'bg-[var(--surface-3)]/50 text-[var(--brand-text-muted)] border-[var(--brand-border)]/30' };
+          ? { text: 'Failed', tone: 'red' as const }
+          : { text: 'No Data', tone: 'zinc' as const };
 
   const renderStrategy = (label: string, strategy: CwvStrategyResult) => {
     const badge = assessBadge(strategy.assessment);
@@ -265,9 +265,7 @@ export function HealthPageSpeedSection({ auditDetail }: { auditDetail: AuditDeta
       <div key={label} className="flex-1 min-w-[200px]">
         <div className="flex items-center justify-between mb-2">
           <span className="t-caption font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
-          <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${badge.cls}`}>
-            {badge.text}
-          </span>
+          <Badge label={badge.text} tone={badge.tone} variant="outline" />
         </div>
         <div className="space-y-1.5">
           {[
@@ -462,16 +460,8 @@ export function HealthTopFixesSection({ auditDetail, liveDomain, workspaceId, sh
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {errors > 0 && (
-                      <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">
-                        {errors}E
-                      </span>
-                    )}
-                    {warnings > 0 && (
-                      <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">
-                        {warnings}W
-                      </span>
-                    )}
+                    {errors > 0 && <Badge label={`${errors}E`} tone="red" />}
+                    {warnings > 0 && <Badge label={`${warnings}W`} tone="amber" />}
                     <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                     <ChevronDown
                       className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`}
@@ -691,10 +681,10 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
             </Button>
           )}
           {shell.viewMode === 'by-page' && (
-            <input
+            <FormInput
               type="text"
               value={shell.auditSearch}
-              onChange={(e) => shell.setAuditSearch(e.target.value)}
+              onChange={shell.setAuditSearch}
               placeholder="Search pages..."
               className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-[var(--brand-border-strong)] w-40"
             />
@@ -715,8 +705,8 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {errors > 0 && <span className="t-caption-sm text-accent-danger bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{errors} err</span>}
-                      {warnings > 0 && <span className="t-caption-sm text-accent-warning bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">{warnings} warn</span>}
+                      {errors > 0 && <Badge label={`${errors} err`} tone="red" />}
+                      {warnings > 0 && <Badge label={`${warnings} warn`} tone="amber" />}
                       <div className={`t-stat-sm ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
@@ -808,9 +798,11 @@ export function HealthAllPagesSection({ auditDetail, liveDomain, shell, workspac
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-sm)] ${sc.bg} border ${sc.border} ${sc.text}`}>
-                            {group.pages.length}
-                          </span>
+                          <Badge
+                            label={String(group.pages.length)}
+                            tone={group.severity === 'error' ? 'red' : group.severity === 'warning' ? 'amber' : 'blue'}
+                            variant="outline"
+                          />
                           <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         </div>
                       </ClickableRow>

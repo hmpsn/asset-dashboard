@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, PageHeader, Button } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow, Button } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -78,7 +78,7 @@ export function SearchTab({
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
 
   return (<>
-    <PageHeader title="Search Performance" subtitle={`${overview.dateRange.start} — ${overview.dateRange.end}`} className="mb-2" />
+    <p className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
 
     {/* AI-style takeaway */}
     <SectionCard variant="subtle" noPadding>
@@ -91,7 +91,7 @@ export function SearchTab({
     {/* Compact metrics bar */}
     <CompactStatBar items={[
       { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-accent-info', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
-      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-accent-brand', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
+      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-accent-info', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
       { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-accent-success', sub: searchComparison ? `${searchComparison.change.ctr > 0 ? '+' : ''}${searchComparison.change.ctr}pp` : undefined, subColor: searchComparison ? (searchComparison.change.ctr >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
       { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-accent-warning', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
     ]} />

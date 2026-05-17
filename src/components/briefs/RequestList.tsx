@@ -4,7 +4,7 @@ import {
   Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { SectionCard, Icon, Button } from '../ui';
+import { SectionCard, Icon, Button, FormInput, FormTextarea } from '../ui';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../../shared/types/content';
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
@@ -237,8 +237,8 @@ export function RequestList({
                 {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
                   <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
                     <div className="flex items-center gap-1.5 mb-1"><Icon as={Link2} size="md" className="text-emerald-400" /><span className="t-caption-sm uppercase tracking-wider text-emerald-400 font-medium">Attach Deliverable</span></div>
-                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
-                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
+                    <FormInput type="url" value={deliveryUrl} onChange={onSetDeliveryUrl} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
+                    <FormTextarea value={deliveryNotes} onChange={onSetDeliveryNotes} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
                     <div className="flex items-center gap-2">
                       <Button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-emerald-600/20 border border-emerald-500/30 t-caption-sm font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors"><Icon as={Check} size="sm" /> Mark Delivered</Button>
                       <Button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</Button>

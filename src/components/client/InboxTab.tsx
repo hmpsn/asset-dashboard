@@ -4,7 +4,7 @@ import {
   Inbox, Flag, ExternalLink, Check, Shield,
   ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { Button, EmptyState, Icon } from '../ui';
+import { Badge, Button, EmptyState, FormInput, FormTextarea, Icon, StatusBadge } from '../ui';
 import { ApprovalBatchCard } from './ApprovalBatchCard';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
@@ -286,9 +286,7 @@ export function InboxTab({
               <div className="flex items-center gap-2">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Decisions</h3>
                 {decisionsCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
-                    {decisionsCount} pending
-                  </span>
+                  <Badge label={`${decisionsCount} pending`} tone="amber" variant="outline" shape="pill" />
                 )}
               </div>
 
@@ -339,13 +337,11 @@ export function InboxTab({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
-                                <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
-                                  isFlagged
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
-                                    : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
-                                }`}>
-                                  {isFlagged ? 'Flagged' : 'Needs Review'}
-                                </span>
+                                <Badge
+                                  label={isFlagged ? 'Flagged' : 'Needs Review'}
+                                  tone={isFlagged ? 'amber' : 'teal'}
+                                  variant="outline"
+                                />
                               </div>
                               <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
                                 <span>{cell.matrixName}</span>
@@ -372,9 +368,9 @@ export function InboxTab({
                           </div>
                           {isFlagging && (
                             <div className="mt-3 space-y-2">
-                              <textarea
+                              <FormTextarea
                                 value={flagComment}
-                                onChange={e => setFlagComment(e.target.value)}
+                                onChange={setFlagComment}
                                 placeholder="Describe what you'd like changed..."
                                 rows={2}
                                 className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
@@ -417,9 +413,7 @@ export function InboxTab({
                         <Icon as={Shield} size="sm" className="text-accent-brand" />
                         <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
                         {schemaPlanPending && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
-                            Awaiting review
-                          </span>
+                          <Badge label="Awaiting review" tone="amber" variant="outline" />
                         )}
                       </div>
                       <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
@@ -449,9 +443,7 @@ export function InboxTab({
               <div className="flex items-center gap-2">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Reviews</h3>
                 {reviewsCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-blue-500/15 text-accent-info border border-blue-500/30">
-                    {reviewsCount} needs review
-                  </span>
+                  <Badge label={`${reviewsCount} needs review`} tone="blue" variant="outline" shape="pill" />
                 )}
               </div>
 
@@ -464,7 +456,7 @@ export function InboxTab({
                         <Icon as={Shield} size="sm" className="text-accent-brand" />
                         <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
                         {schemaPlanPending && (
-                          <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/30">Ready for review</span>
+                          <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
                         )}
                       </div>
                       <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
@@ -518,9 +510,7 @@ export function InboxTab({
               <div className="flex items-center gap-2">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Conversations</h3>
                 {conversationsCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-teal-500/15 text-accent-brand border border-teal-500/30">
-                    {conversationsCount} active
-                  </span>
+                  <Badge label={`${conversationsCount} active`} tone="teal" variant="outline" shape="pill" />
                 )}
               </div>
               <RequestsTab
@@ -560,16 +550,12 @@ export function InboxTab({
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-                          {action.sourceType.replace(/_/g, ' ')}
-                        </span>
-                        <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
-                          action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
-                          action.status === 'changes_requested' ? 'bg-amber-500/15 text-accent-warning border-amber-500/30' :
-                          'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
-                        }`}>
-                          {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
-                        </span>
+                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        {action.status === 'approved' || action.status === 'changes_requested' ? (
+                          <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
+                        ) : (
+                          <Badge label="Completed" tone="zinc" variant="outline" shape="pill" />
+                        )}
                       </div>
                       <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
                     </div>
@@ -601,9 +587,7 @@ export function InboxTab({
               <div className="flex items-center gap-2">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Needs Action &amp; Requests</h3>
                 {hasNeedsAction && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-amber-500/15 text-accent-warning border border-amber-500/30">
-                    {pendingClientActions.length + requestReplies + planReviewCount} pending
-                  </span>
+                  <Badge label={`${pendingClientActions.length + requestReplies + planReviewCount} pending`} tone="amber" variant="outline" shape="pill" />
                 )}
               </div>
 
@@ -616,9 +600,7 @@ export function InboxTab({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-                              {action.sourceType.replace(/_/g, ' ')}
-                            </span>
+                            <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
                             {action.priority === 'high' && (
                               <span className="t-caption-sm font-medium text-accent-warning">High priority</span>
                             )}
@@ -639,10 +621,10 @@ export function InboxTab({
                               </Button>
                             ) : (
                               <div className="flex items-center gap-2 flex-1">
-                                <input
+                                <FormInput
                                   type="text"
                                   value={changeRequestNote}
-                                  onChange={e => setChangeRequestNote(e.target.value)}
+                                  onChange={setChangeRequestNote}
                                   placeholder="Add a note for your team…"
                                   className="flex-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"
                                 />
@@ -682,13 +664,11 @@ export function InboxTab({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
-                                <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${
-                                  isFlagged
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-accent-warning'
-                                    : 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
-                                }`}>
-                                  {isFlagged ? 'Flagged' : 'Needs Review'}
-                                </span>
+                                <Badge
+                                  label={isFlagged ? 'Flagged' : 'Needs Review'}
+                                  tone={isFlagged ? 'amber' : 'teal'}
+                                  variant="outline"
+                                />
                               </div>
                               <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
                                 <span>{cell.matrixName}</span>
@@ -715,9 +695,9 @@ export function InboxTab({
                           </div>
                           {isFlagging && (
                             <div className="mt-3 space-y-2">
-                              <textarea
+                              <FormTextarea
                                 value={flagComment}
-                                onChange={e => setFlagComment(e.target.value)}
+                                onChange={setFlagComment}
                                 placeholder="Describe what you'd like changed..."
                                 rows={2}
                                 className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
@@ -782,9 +762,7 @@ export function InboxTab({
               >
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO Changes</h3>
                 {hasPendingSeoChanges && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-teal-500/15 text-accent-brand border border-teal-500/30">
-                    {(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending
-                  </span>
+                  <Badge label={`${(pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)} pending`} tone="teal" variant="outline" shape="pill" />
                 )}
                 {!hasPendingSeoChanges && (
                   <span className="t-caption text-[var(--brand-text-muted)]">Nothing pending</span>
@@ -818,7 +796,7 @@ export function InboxTab({
                             <Icon as={Shield} size="sm" className="text-accent-brand" />
                             <span className="t-caption-sm font-medium text-accent-brand">Schema Strategy</span>
                             {schemaPlanPending && (
-                              <span className="t-caption-sm font-medium px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/30">Ready for review</span>
+                              <StatusBadge status={schemaPlan.status} domain="schema" variant="outline" shape="pill" />
                             )}
                           </div>
                           <h4 className="t-ui font-medium text-[var(--brand-text-bright)]">
@@ -849,9 +827,7 @@ export function InboxTab({
               <div className="flex items-center gap-2">
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Content</h3>
                 {(contentReviews + copyReviewCount) > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-medium bg-blue-500/15 text-accent-info border border-blue-500/30">
-                    {contentReviews + copyReviewCount} needs review
-                  </span>
+                  <Badge label={`${contentReviews + copyReviewCount} needs review`} tone="blue" variant="outline" shape="pill" />
                 )}
               </div>
 
@@ -904,16 +880,12 @@ export function InboxTab({
                   {completedClientActions.map(action => (
                     <div key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 opacity-70">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] capitalize">
-                          {action.sourceType.replace(/_/g, ' ')}
-                        </span>
-                        <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] border font-medium ${
-                          action.status === 'approved' ? 'bg-emerald-500/15 text-accent-success border-emerald-500/30' :
-                          action.status === 'changes_requested' ? 'bg-amber-500/15 text-accent-warning border-amber-500/30' :
-                          'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]'
-                        }`}>
-                          {action.status === 'approved' ? 'Approved' : action.status === 'changes_requested' ? 'Changes requested' : 'Completed'}
-                        </span>
+                        <Badge label={action.sourceType.replace(/_/g, ' ')} tone="zinc" variant="outline" shape="pill" className="capitalize" />
+                        {action.status === 'approved' || action.status === 'changes_requested' ? (
+                          <StatusBadge status={action.status} domain="client-action" variant="outline" shape="pill" />
+                        ) : (
+                          <Badge label="Completed" tone="zinc" variant="outline" shape="pill" />
+                        )}
                       </div>
                       <h4 className="t-ui font-medium text-[var(--brand-text)]">{action.title}</h4>
                     </div>

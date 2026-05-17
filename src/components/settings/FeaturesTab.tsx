@@ -4,7 +4,7 @@ import {
   Users, Shield, SlidersHorizontal, Brain, CreditCard,
 } from 'lucide-react';
 import { post } from '../../api/client';
-import { SectionCard, Icon, Button } from '../ui';
+import { Badge, SectionCard, Icon, Button, Checkbox, FormInput } from '../ui';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 
 interface WorkspaceData {
@@ -73,13 +73,14 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Workspace Tier</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Controls which features the client can access</p>
           </div>
-          <span className={`t-caption-sm font-semibold uppercase tracking-wider px-2.5 py-1 rounded-[var(--radius-pill)] border ${
-            (ws?.tier || 'free') === 'premium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-              : (ws?.tier || 'free') === 'growth' ? 'text-teal-400 bg-teal-500/10 border-teal-500/20'
-              : 'text-[var(--brand-text)] bg-[var(--surface-3)] border-[var(--brand-border)]'
-          }`}>
-            {ws?.tier || 'free'}
-          </span>
+          <Badge
+            label={ws?.tier || 'free'}
+            tone={(ws?.tier || 'free') === 'premium' ? 'amber' : (ws?.tier || 'free') === 'growth' ? 'teal' : 'zinc'}
+            variant="outline"
+            shape="pill"
+            size="md"
+            className="font-semibold uppercase tracking-wider"
+          />
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -147,7 +148,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.clientPortalEnabled !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.clientPortalEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -172,7 +173,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.billingMode === 'external' ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.billingMode === 'external' ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -196,7 +197,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.seoClientView ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.seoClientView ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -220,7 +221,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.analyticsClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -244,7 +245,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.siteIntelligenceClientView !== false ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.siteIntelligenceClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -284,7 +285,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                   ws?.onboardingEnabled ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
                 } px-0 py-0 min-w-0`}>
-                <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+                <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                   ws?.onboardingEnabled ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
               </Button>
@@ -323,7 +324,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               className={`relative inline-flex h-5 w-9 items-center rounded-[var(--radius-pill)] transition-colors ${
                 ws?.autoReports ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
               } px-0 py-0 min-w-0`}>
-              <span className={`inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
+              <span className={`badge-span-ok inline-block h-3.5 w-3.5 rounded-[var(--radius-pill)] bg-white transition-transform ${
                 ws?.autoReports ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </Button>
@@ -388,10 +389,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Logo URL</div>
             <div className="flex items-center gap-2">
-              <input type="url" value={logoUrlDraft}
+              <FormInput type="url" value={logoUrlDraft}
                 data-schema-deeplink="brandLogoUrl"
                 placeholder="https://example.com/logo.svg"
-                onChange={e => setLogoUrlDraft(e.target.value)}
+                onChange={setLogoUrlDraft}
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
                   if (val !== (ws?.brandLogoUrl || '')) {
@@ -436,18 +437,14 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
       <SectionCard title="Site capabilities">
         <div className="space-y-3">
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Tell schema what your live site supports.</p>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              data-schema-deeplink="siteHasSearch"
+          <div className="flex items-start gap-3">
+            <div data-schema-deeplink="siteHasSearch" className="mt-0.5">
+              <Checkbox
               // Controlled — reads current ws state on every render so the box
               // reflects the loaded value even if FeaturesTab mounts before ws
               // resolves (e.g. via deep-link). (Devin Review BUG-0002 round 3.)
               checked={!!ws?.siteHasSearch}
-              onChange={async (e) => {
-                // Capture sync value before await — currentTarget access after
-                // await is implementation-defined in React's synthetic event lifecycle.
-                const nextChecked = e.currentTarget.checked;
+              onChange={async (nextChecked) => {
                 try {
                   await patchWorkspace({ siteHasSearch: nextChecked });
                   toast(nextChecked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
@@ -457,15 +454,17 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   throw err;
                 }
               }}
-              className="mt-0.5"
+              label="My site has a working search endpoint"
+              className="[&>span:last-child]:sr-only"
             />
+            </div>
             <span>
               <span className="t-body font-medium text-[var(--brand-text)]">My site has a working search endpoint</span>
               <span className="block t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                 When enabled, schema generation emits <code className="t-mono text-[var(--brand-text)]">WebSite.potentialAction</code> (sitelinks SearchAction) so Google can offer in-SERP search. Your site must actually expose <code className="t-mono">https://yoursite.com/?s=&#123;query&#125;</code> or equivalent — verify this works before enabling.
               </span>
             </span>
-          </label>
+          </div>
         </div>
       </SectionCard>
 

@@ -1,7 +1,7 @@
 import {
   Sparkles, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react';
-import { AIContextIndicator, Icon, Button } from '../ui';
+import { AIContextIndicator, Icon, Button, FormInput, FormSelect, FormTextarea } from '../ui';
 import type { BriefTemplateCrossrefMatch } from '../../../shared/types/content';
 
 export interface BriefGeneratorProps {
@@ -49,10 +49,10 @@ export function BriefGenerator({
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Target Keyword *</label>
-            <input
+            <FormInput
               type="text"
               value={keyword}
-              onChange={e => onKeywordChange(e.target.value)}
+              onChange={onKeywordChange}
               placeholder="e.g. dental implants near me"
               className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
               onKeyDown={e => e.key === 'Enter' && !generating && onGenerate()}
@@ -60,20 +60,21 @@ export function BriefGenerator({
           </div>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Page Type</label>
-            <select
+            <FormSelect
               value={pageType}
-              onChange={e => onPageTypeChange(e.target.value)}
+              onChange={onPageTypeChange}
+              options={[
+                { value: '', label: 'Auto-detect' },
+                { value: 'blog', label: 'Blog Post' },
+                { value: 'landing', label: 'Landing Page' },
+                { value: 'service', label: 'Service Page' },
+                { value: 'location', label: 'Location Page' },
+                { value: 'product', label: 'Product Page' },
+                { value: 'pillar', label: 'Pillar Page' },
+                { value: 'resource', label: 'Resource / Guide' },
+              ]}
               className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none cursor-pointer"
-            >
-              <option value="">Auto-detect</option>
-              <option value="blog">Blog Post</option>
-              <option value="landing">Landing Page</option>
-              <option value="service">Service Page</option>
-              <option value="location">Location Page</option>
-              <option value="product">Product Page</option>
-              <option value="pillar">Pillar Page</option>
-              <option value="resource">Resource / Guide</option>
-            </select>
+            />
           </div>
         </div>
         {templateCrossref && (
@@ -88,10 +89,10 @@ export function BriefGenerator({
         )}
         <div>
           <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Business Context (optional)</label>
-          <input
+          <FormInput
             type="text"
             value={businessCtx}
-            onChange={e => onBusinessCtxChange(e.target.value)}
+            onChange={onBusinessCtxChange}
             placeholder="e.g. Local dental practice in Austin, TX specializing in cosmetic dentistry"
             className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)]"
           />
@@ -115,9 +116,9 @@ export function BriefGenerator({
               <Icon as={ExternalLink} size="sm" className="mr-1" />
               Reference URLs (competitor/inspiration pages — one per line)
             </label>
-            <textarea
+            <FormTextarea
               value={refUrls}
-              onChange={e => onRefUrlsChange(e.target.value)}
+              onChange={onRefUrlsChange}
               placeholder={"https://competitor.com/their-great-article\nhttps://example.com/inspiring-content"}
               rows={3}
               className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none font-mono"

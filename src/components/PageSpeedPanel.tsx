@@ -57,6 +57,7 @@ interface SiteSpeedResult {
 interface Props {
   siteId: string;
   workspaceId?: string;
+  showHeader?: boolean;
 }
 
 function scoreColor(score: number): string {
@@ -120,7 +121,7 @@ interface WebflowPage {
   publishedPath?: string | null;
 }
 
-export function PageSpeedPanel({ siteId, workspaceId }: Props) {
+export function PageSpeedPanel({ siteId, workspaceId, showHeader = true }: Props) {
   const [data, setData] = useState<SiteSpeedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
@@ -221,13 +222,13 @@ export function PageSpeedPanel({ siteId, workspaceId }: Props) {
     });
   };
 
-  const pageHeader = (
+  const pageHeader = showHeader ? (
     <PageHeader
       title="Page Speed"
       subtitle="Core Web Vitals and performance diagnostics."
       icon={<Icon as={Gauge} size="lg" className="text-accent-brand" />}
     />
-  );
+  ) : null;
 
   // Single result view (re-uses same VitalCard / opportunity / diagnostic rendering)
   const renderSingleResult = (result: PageSpeedResult) => (

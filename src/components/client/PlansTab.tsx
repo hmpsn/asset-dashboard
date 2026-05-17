@@ -280,7 +280,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium ${
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium ${
                       subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-accent-success' :
                       subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-accent-danger' :
                       'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
@@ -300,7 +300,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="mt-3">
                 <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
+                    className="h-full bg-blue-500 rounded-[var(--radius-pill)] transition-all"
                     style={{ width: `${Math.min(100, (subData.subscription.postsDeliveredThisPeriod / subData.subscription.postsPerMonth) * 100)}%` }}
                   />
                 </div>

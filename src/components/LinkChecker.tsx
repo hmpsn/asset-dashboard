@@ -4,7 +4,7 @@ import {
   RefreshCw, Link2Off, Check, Download,
 } from 'lucide-react';
 import { get, getOptional } from '../api/client';
-import { Icon, cn, Button } from './ui';
+import { FormSelect, Icon, cn, Button } from './ui';
 
 interface DeadLink {
   url: string;
@@ -111,16 +111,15 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
         {domains && (
           <div className="flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">Crawl domain:</span>
-            <select
+            <FormSelect
               value={selectedDomain}
-              onChange={e => setSelectedDomain(e.target.value)}
+              onChange={setSelectedDomain}
+              options={[
+                { value: domains.staging, label: `${domains.staging.replace('https://', '')} (staging)` },
+                ...domains.customDomains.map(d => ({ value: d, label: `${d.replace('https://', '')} (live)` })),
+              ]}
               className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
-            >
-              <option value={domains.staging}>{domains.staging.replace('https://', '')} (staging)</option>
-              {domains.customDomains.map(d => (
-                <option key={d} value={d}>{d.replace('https://', '')} (live)</option>
-              ))}
-            </select>
+            />
           </div>
         )}
         <Button
@@ -271,7 +270,7 @@ export function LinkChecker({ siteId, workspaceId }: Props) {
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{link.statusText}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border', link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text)]')}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok border', link.type === 'internal' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text)]')}>
                   {link.type}
                 </span>
                 <span className={cn('t-caption font-mono font-bold', tab === 'dead' ? 'text-red-400' : 'text-amber-400')}>

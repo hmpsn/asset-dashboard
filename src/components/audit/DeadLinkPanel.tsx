@@ -4,7 +4,7 @@ import { Link2Off, Download, ArrowRight, Wrench, Plus, X } from 'lucide-react';
 import { redirects as redirectsApi } from '../../api/misc';
 import { adminPath, type Page } from '../../routes';
 import type { DeadLinkItem } from './types';
-import { Button, Icon, IconButton, SectionCard, cn } from '../ui';
+import { Button, FormInput, Icon, IconButton, SectionCard, cn } from '../ui';
 
 interface DeadLinkPanelProps {
   deadLinkDetails: DeadLinkItem[];
@@ -153,10 +153,10 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
               {isFormOpen && (
                 <div className="px-3 py-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)] flex items-center gap-2">
                   <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  <input
+                  <FormInput
                     type="text"
                     value={redirectFormTo}
-                    onChange={e => setRedirectFormTo(e.target.value)}
+                    onChange={setRedirectFormTo}
                     onKeyDown={e => {
                       if (e.key === 'Enter') saveRedirect(link.url);
                       if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); }

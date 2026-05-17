@@ -7,7 +7,7 @@ import {
 import { brandscripts } from '../../api/brand-engine';
 import { ApiError } from '../../api/client';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, ClickableRow, IconButton, cn, ConfirmDialog } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, ClickableRow, IconButton, cn, ConfirmDialog, FormInput, FormSelect, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -53,10 +53,10 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1">
           <label htmlFor="bs-name" className="t-caption text-[var(--brand-text-muted)]">Name</label>
-          <input
+          <FormInput
             id="bs-name"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={setName}
             placeholder="e.g. StoryBrand 2024"
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
             autoFocus
@@ -65,17 +65,16 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
 
         <div className="space-y-1">
           <label htmlFor="bs-framework" className="t-caption text-[var(--brand-text-muted)]">Framework (optional)</label>
-          <select
+          <FormSelect
             id="bs-framework"
             value={frameworkType}
-            onChange={e => setFrameworkType(e.target.value)}
+            onChange={setFrameworkType}
+            options={[
+              { value: '', label: 'Custom (blank)' },
+              ...templates.map(t => ({ value: t.id, label: t.name })),
+            ]}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-600"
-          >
-            <option value="">Custom (blank)</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+          />
         </div>
 
         <div className="flex items-center gap-3 pt-1">
@@ -144,10 +143,10 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
 
         <div className="space-y-1">
           <label htmlFor="import-name" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
-          <input
+          <FormInput
             id="import-name"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={setName}
             placeholder="e.g. Imported v1"
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
           />
@@ -155,10 +154,10 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
 
         <div className="space-y-1">
           <label htmlFor="import-raw-text" className="t-caption text-[var(--brand-text-muted)]">Raw text</label>
-          <textarea
+          <FormTextarea
             id="import-raw-text"
             value={rawText}
-            onChange={e => setRawText(e.target.value)}
+            onChange={setRawText}
             placeholder="Paste your brandscript content here..."
             rows={8}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none font-mono"
@@ -271,9 +270,9 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
           {section.purpose && (
             <p className="t-caption text-[var(--brand-text-muted)] pt-3 italic">{section.purpose}</p>
           )}
-          <textarea
+          <FormTextarea
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={setContent}
             rows={5}
             placeholder="Enter section content..."
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-y"

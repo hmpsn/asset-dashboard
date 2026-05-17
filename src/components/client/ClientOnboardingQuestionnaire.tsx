@@ -4,7 +4,7 @@ import {
   Target,
 } from 'lucide-react';
 import { STUDIO_NAME } from '../../constants';
-import { Icon, Button, cn } from '../ui';
+import { Icon, Button, FormInput, FormTextarea, cn } from '../ui';
 
 // ── Step types ──
 
@@ -217,44 +217,44 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Business Name</label>
-                <input type="text" value={business.businessName} onChange={e => setBusiness({ ...business, businessName: e.target.value })}
+                <FormInput type="text" value={business.businessName} onChange={value => setBusiness({ ...business, businessName: value })}
                   className={inputCls} placeholder="e.g. Smith Family Dental" />
               </div>
 
               <div>
                 <label className={labelCls}>Industry</label>
-                <input type="text" value={business.industry} onChange={e => setBusiness({ ...business, industry: e.target.value })}
+                <FormInput type="text" value={business.industry} onChange={value => setBusiness({ ...business, industry: value })}
                   className={inputCls} placeholder="e.g. Dental, SaaS, Real Estate, E-commerce" />
               </div>
 
               <div>
                 <label className={labelCls}>What does your business do?</label>
-                <textarea rows={3} value={business.description} onChange={e => setBusiness({ ...business, description: e.target.value })}
+                <FormTextarea rows={3} value={business.description} onChange={value => setBusiness({ ...business, description: value })}
                   className={textareaCls} placeholder="Describe your business in a few sentences — what problem do you solve and for whom?" />
               </div>
 
               <div>
                 <label className={labelCls}>Key Services / Products</label>
-                <textarea rows={2} value={business.services} onChange={e => setBusiness({ ...business, services: e.target.value })}
+                <FormTextarea rows={2} value={business.services} onChange={value => setBusiness({ ...business, services: value })}
                   className={textareaCls} placeholder="List your main services or products, one per line" />
                 <p className={hintCls}>These will be woven into content naturally.</p>
               </div>
 
               <div>
                 <label className={labelCls}>Service Locations (if applicable)</label>
-                <input type="text" value={business.locations} onChange={e => setBusiness({ ...business, locations: e.target.value })}
+                <FormInput type="text" value={business.locations} onChange={value => setBusiness({ ...business, locations: value })}
                   className={inputCls} placeholder="e.g. Austin TX, Denver CO, nationwide" />
               </div>
 
               <div>
                 <label className={labelCls}>What makes you different from competitors?</label>
-                <textarea rows={2} value={business.differentiators} onChange={e => setBusiness({ ...business, differentiators: e.target.value })}
+                <FormTextarea rows={2} value={business.differentiators} onChange={value => setBusiness({ ...business, differentiators: value })}
                   className={textareaCls} placeholder="Unique selling points, specializations, awards, years in business, etc." />
               </div>
 
               <div>
                 <label className={labelCls}>Website URL</label>
-                <input type="text" value={business.website} onChange={e => setBusiness({ ...business, website: e.target.value })}
+                <FormInput type="text" value={business.website} onChange={value => setBusiness({ ...business, website: value })}
                   className={inputCls} placeholder="https://yourwebsite.com" />
               </div>
             </div>
@@ -271,26 +271,26 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Who is your primary customer?</label>
-                <textarea rows={2} value={audience.primaryAudience} onChange={e => setAudience({ ...audience, primaryAudience: e.target.value })}
+                <FormTextarea rows={2} value={audience.primaryAudience} onChange={value => setAudience({ ...audience, primaryAudience: value })}
                   className={textareaCls} placeholder="e.g. Small business owners aged 30-55 looking for affordable accounting software" />
               </div>
 
               <div>
                 <label className={labelCls}>What pain points do they have?</label>
-                <textarea rows={3} value={audience.painPoints} onChange={e => setAudience({ ...audience, painPoints: e.target.value })}
+                <FormTextarea rows={3} value={audience.painPoints} onChange={value => setAudience({ ...audience, painPoints: value })}
                   className={textareaCls} placeholder="What problems, frustrations, or challenges bring them to you? One per line is great." />
                 <p className={hintCls}>Content briefs will address these directly.</p>
               </div>
 
               <div>
                 <label className={labelCls}>What goals are they trying to achieve?</label>
-                <textarea rows={2} value={audience.goals} onChange={e => setAudience({ ...audience, goals: e.target.value })}
+                <FormTextarea rows={2} value={audience.goals} onChange={value => setAudience({ ...audience, goals: value })}
                   className={textareaCls} placeholder="What outcomes do they want? What does success look like for them?" />
               </div>
 
               <div>
                 <label className={labelCls}>Common objections or hesitations</label>
-                <textarea rows={2} value={audience.objections} onChange={e => setAudience({ ...audience, objections: e.target.value })}
+                <FormTextarea rows={2} value={audience.objections} onChange={value => setAudience({ ...audience, objections: value })}
                   className={textareaCls} placeholder="What holds them back from buying? Price, trust, complexity, time?" />
               </div>
 
@@ -314,7 +314,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Secondary audience (optional)</label>
-                <textarea rows={2} value={audience.secondaryAudience} onChange={e => setAudience({ ...audience, secondaryAudience: e.target.value })}
+                <FormTextarea rows={2} value={audience.secondaryAudience} onChange={value => setAudience({ ...audience, secondaryAudience: value })}
                   className={textareaCls} placeholder="Any other audience segments you want to reach?" />
               </div>
             </div>
@@ -349,13 +349,13 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Describe your ideal tone in your own words (optional)</label>
-                <textarea rows={2} value={brand.tone} onChange={e => setBrand({ ...brand, tone: e.target.value })}
+                <FormTextarea rows={2} value={brand.tone} onChange={value => setBrand({ ...brand, tone: value })}
                   className={textareaCls} placeholder="e.g. Warm and approachable but still expert. We use simple language, never jargon." />
               </div>
 
               <div>
                 <label className={labelCls}>Words or phrases to avoid</label>
-                <input type="text" value={brand.avoidWords} onChange={e => setBrand({ ...brand, avoidWords: e.target.value })}
+                <FormInput type="text" value={brand.avoidWords} onChange={value => setBrand({ ...brand, avoidWords: value })}
                   className={inputCls} placeholder="e.g. cheap, synergy, leverage, cutting-edge" />
                 <p className={hintCls}>Comma-separated. The AI will never use these.</p>
               </div>
@@ -380,7 +380,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Links to content you admire (optional)</label>
-                <textarea rows={2} value={brand.existingExamples} onChange={e => setBrand({ ...brand, existingExamples: e.target.value })}
+                <FormTextarea rows={2} value={brand.existingExamples} onChange={value => setBrand({ ...brand, existingExamples: value })}
                   className={textareaCls} placeholder="URLs of blog posts or pages with a tone/style you'd like to emulate, one per line" />
               </div>
             </div>
@@ -397,25 +397,25 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Who are your main competitors?</label>
-                <textarea rows={3} value={competitors.competitors} onChange={e => setCompetitors({ ...competitors, competitors: e.target.value })}
+                <FormTextarea rows={3} value={competitors.competitors} onChange={value => setCompetitors({ ...competitors, competitors: value })}
                   className={textareaCls} placeholder="List competitor names and/or their websites, one per line" />
               </div>
 
               <div>
                 <label className={labelCls}>What do they do better than you (content-wise)?</label>
-                <textarea rows={2} value={competitors.whatTheyDoBetter} onChange={e => setCompetitors({ ...competitors, whatTheyDoBetter: e.target.value })}
+                <FormTextarea rows={2} value={competitors.whatTheyDoBetter} onChange={value => setCompetitors({ ...competitors, whatTheyDoBetter: value })}
                   className={textareaCls} placeholder="e.g. They have better blog content, rank higher for key terms, have more case studies" />
               </div>
 
               <div>
                 <label className={labelCls}>What do you do better?</label>
-                <textarea rows={2} value={competitors.whatYouDoBetter} onChange={e => setCompetitors({ ...competitors, whatYouDoBetter: e.target.value })}
+                <FormTextarea rows={2} value={competitors.whatYouDoBetter} onChange={value => setCompetitors({ ...competitors, whatYouDoBetter: value })}
                   className={textareaCls} placeholder="e.g. Better customer service, more experience, niche specialization, better pricing" />
               </div>
 
               <div>
                 <label className={labelCls}>Reference URLs (content you want to beat)</label>
-                <textarea rows={2} value={competitors.referenceUrls} onChange={e => setCompetitors({ ...competitors, referenceUrls: e.target.value })}
+                <FormTextarea rows={2} value={competitors.referenceUrls} onChange={value => setCompetitors({ ...competitors, referenceUrls: value })}
                   className={textareaCls} placeholder="Specific competitor pages or articles you want to outrank, one per line" />
                 <p className={hintCls}>We&apos;ll analyze these when generating briefs.</p>
               </div>

@@ -8,7 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { X, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, FormInput } from '../ui';
 import type {
   ClientAction,
   InternalLinkPayload,
@@ -258,10 +258,10 @@ export function ClientActionDetailModal({
           </>
         ) : (
           <>
-            <input
+            <FormInput
               type="text"
               value={changeNote}
-              onChange={e => setChangeNote(e.target.value)}
+              onChange={setChangeNote}
               placeholder="Describe what needs to change…"
               aria-label="Describe what needs to change"
               className="flex-1 min-w-[200px] px-3 py-2 rounded-[var(--radius-md)] t-body bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50"

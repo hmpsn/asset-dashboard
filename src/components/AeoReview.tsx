@@ -8,7 +8,7 @@ import {
   FileText, User, Calendar, Quote, ListChecks, LayoutList, Table2,
   BookOpen, EyeOff, RefreshCw, Send, Check,
 } from 'lucide-react';
-import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, ClickableRow } from './ui';
+import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button, ClickableRow, FormTextarea } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import type { AeoChangeType, AeoEffort, AeoPageReview, AeoSiteReview } from '../../shared/types/aeo';
@@ -421,13 +421,13 @@ export function AeoReview({ workspaceId }: Props) {
                         </Button>
                       </div>
                       {!sentPages.has(page.pageUrl) && (
-                        <textarea
+                        <FormTextarea
                           rows={2}
                           disabled={sendingPage === page.pageUrl}
                           maxLength={2000}
                           placeholder="Add a note for your client (optional)"
                           value={pageNotes[page.pageUrl] ?? ''}
-                          onChange={e => setPageNotes(prev => ({ ...prev, [page.pageUrl]: e.target.value }))}
+                          onChange={value => setPageNotes(prev => ({ ...prev, [page.pageUrl]: value }))}
                           className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       )}
@@ -455,7 +455,7 @@ export function AeoReview({ workspaceId }: Props) {
                                 <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{typeCfg.label}</span>
                                 <span className="t-caption-sm text-[var(--brand-text-muted)]">· {change.location}</span>
                                 {change.requiresSourceResearch && (
-                                  <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/20 text-accent-warning">
+                                  <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-amber-500/10 border border-amber-500/20 text-accent-warning">
                                     research needed
                                   </span>
                                 )}

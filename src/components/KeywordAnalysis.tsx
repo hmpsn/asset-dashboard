@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, ClickableRow, PageHeader } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, Icon, Button, ClickableRow, FormInput, PageHeader } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 import { resolvePagePath } from '../lib/pathUtils';
@@ -254,10 +254,10 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       {/* Search */}
       <div className="relative">
         <Icon as={SearchIcon} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-        <input
+        <FormInput
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={setSearch}
           placeholder="Search pages..."
           className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-border-hover)]"
         />
@@ -290,7 +290,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.title}</span>
                     {page.source === 'cms' && (
-                      <span className="t-micro px-1 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/15 text-accent-brand border border-teal-500/20 shrink-0">CMS</span>
+                      <span className="t-micro px-1 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/15 text-accent-brand border border-teal-500/20 shrink-0">CMS</span>
                     )}
                   </div>
                   <div className="text-xs text-[var(--brand-text-muted)] truncate">/{page.slug}</div>

@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { Briefcase, ChevronDown, Plus, X } from 'lucide-react';
-import { Button, Icon, IconButton, SectionCard } from '../../ui';
+import { Button, FormInput, FormSelect, Icon, IconButton, SectionCard } from '../../ui';
 import type { StrategyBusinessPriority } from './useStrategyBusinessPriorities';
 
 interface StrategyBusinessPrioritiesSectionProps {
@@ -103,21 +103,22 @@ export function StrategyBusinessPrioritiesSection({
             )}
 
             <div className="flex items-center gap-2">
-              <select
+              <FormSelect
                 value={newPriorityCategory}
-                onChange={e => setNewPriorityCategory(e.target.value)}
+                onChange={setNewPriorityCategory}
+                options={[
+                  { value: 'growth', label: 'Growth' },
+                  { value: 'brand', label: 'Brand' },
+                  { value: 'product', label: 'Product' },
+                  { value: 'audience', label: 'Audience' },
+                  { value: 'competitive', label: 'Competitive' },
+                  { value: 'other', label: 'Other' },
+                ]}
                 className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2 py-1.5 t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
-              >
-                <option value="growth">Growth</option>
-                <option value="brand">Brand</option>
-                <option value="product">Product</option>
-                <option value="audience">Audience</option>
-                <option value="competitive">Competitive</option>
-                <option value="other">Other</option>
-              </select>
-              <input
+              />
+              <FormInput
                 value={newPriority}
-                onChange={e => setNewPriority(e.target.value)}
+                onChange={setNewPriority}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && newPriority.trim()) {
                     addPriority();

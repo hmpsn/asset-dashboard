@@ -3,7 +3,7 @@ import {
   Loader2, BarChart3, ChevronDown, ChevronRight, Search, Images, ArrowRight, Layers,
 } from 'lucide-react';
 import { pageWeight as pageWeightApi } from '../api/seo';
-import { EmptyState, Icon, Button, ClickableRow } from './ui';
+import { EmptyState, Icon, Button, ClickableRow, FormInput, FormSelect } from './ui';
 
 interface PageAsset {
   id: string;
@@ -184,25 +184,26 @@ function PageWeight({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-            <input
+            <FormInput
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={setSearch}
               placeholder="Search pages or assets..."
               className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-border-hover)]"
             />
           </div>
           <div className="relative">
-            <select
+            <FormSelect
               value={filter}
-              onChange={e => setFilter(e.target.value as typeof filter)}
+              onChange={value => setFilter(value as typeof filter)}
+              options={[
+                { value: 'all', label: 'All Sources' },
+                { value: 'page', label: 'Pages Only' },
+                { value: 'cms', label: 'CMS Only' },
+                { value: 'css', label: 'CSS Only' },
+              ]}
               className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm focus:outline-none cursor-pointer"
-            >
-              <option value="all">All Sources</option>
-              <option value="page">Pages Only</option>
-              <option value="cms">CMS Only</option>
-              <option value="css">CSS Only</option>
-            </select>
+            />
             <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
           </div>
           <Button variant="secondary" size="sm" onClick={runAnalysis}>

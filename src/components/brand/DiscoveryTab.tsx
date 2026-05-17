@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, IconButton, cn, ConfirmDialog } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, IconButton, cn, ConfirmDialog, FormInput, FormSelect, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
@@ -358,10 +358,10 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label htmlFor="paste-filename" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
-            <input
+            <FormInput
               id="paste-filename"
               value={filename}
-              onChange={e => setFilename(e.target.value)}
+              onChange={setFilename}
               placeholder="e.g. Sales call transcript"
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
             />
@@ -369,25 +369,22 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
 
           <div className="space-y-1">
             <label htmlFor="paste-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
-            <select
+            <FormSelect
               id="paste-source-type"
               value={sourceType}
-              onChange={e => setSourceType(e.target.value as SourceType)}
+              onChange={value => setSourceType(value as SourceType)}
+              options={SOURCE_TYPE_OPTIONS}
               className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
-            >
-              {SOURCE_TYPE_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
         <div className="space-y-1">
           <label htmlFor="paste-content" className="t-caption text-[var(--brand-text-muted)]">Content</label>
-          <textarea
+          <FormTextarea
             id="paste-content"
             value={rawContent}
-            onChange={e => setRawContent(e.target.value)}
+            onChange={setRawContent}
             placeholder="Paste transcript, brand document, competitor copy, or any text to analyze..."
             rows={8}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none"
@@ -482,16 +479,13 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
         {/* Source type selector */}
         <div className="space-y-1">
           <label htmlFor="upload-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
-          <select
+          <FormSelect
             id="upload-source-type"
             value={sourceType}
-            onChange={e => setSourceType(e.target.value as SourceType)}
+            onChange={value => setSourceType(value as SourceType)}
+            options={SOURCE_TYPE_OPTIONS}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
-          >
-            {SOURCE_TYPE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Drop zone */}

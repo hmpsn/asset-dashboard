@@ -7,7 +7,7 @@ import {
 import { Plus, X } from 'lucide-react';
 import type { Annotation } from '../../hooks/admin/useAnalyticsAnnotations';
 import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle, CHART_SERIES_COLORS } from '../ui/constants';
-import { Button, IconButton } from '../ui';
+import { Button, FormInput, FormSelect, IconButton } from '../ui';
 
 // ── Category colors (matches AnalyticsAnnotations badges) ──
 const ANNOTATION_COLORS: Record<string, string> = {
@@ -242,25 +242,26 @@ function CreatePopover({
           className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5"
         />
       </div>
-      <input
+      <FormInput
         type="text"
         placeholder="e.g. Launched new pages"
         value={label}
-        onChange={e => setLabel(e.target.value)}
+        onChange={setLabel}
         onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose(); }}
         autoFocus
         className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] mb-2"
       />
-      <select
+      <FormSelect
         value={category}
-        onChange={e => setCategory(e.target.value as Category)}
+        onChange={value => setCategory(value as Category)}
+        options={[
+          { value: 'site_change', label: 'Site Change' },
+          { value: 'algorithm_update', label: 'Algorithm' },
+          { value: 'campaign', label: 'Campaign' },
+          { value: 'other', label: 'Other' },
+        ]}
         className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] mb-2"
-      >
-        <option value="site_change">Site Change</option>
-        <option value="algorithm_update">Algorithm</option>
-        <option value="campaign">Campaign</option>
-        <option value="other">Other</option>
-      </select>
+      />
       <Button variant="primary" size="sm" icon={Plus} disabled={!label.trim()} onClick={handleSave} className="w-full justify-center">
         Add
       </Button>

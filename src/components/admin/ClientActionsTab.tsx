@@ -17,7 +17,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { ErrorState } from '../ui/ErrorState.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { Button, Icon } from '../ui/index.js';
+import { Badge, Button, Icon, type BadgeTone } from '../ui/index.js';
 import { clientActions } from '../../api/clientActions.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import type { ClientAction, ClientActionStatus } from '../../../shared/types/client-actions.js';
@@ -33,20 +33,20 @@ const SOURCE_TYPE_LABELS: Record<ClientAction['sourceType'], string> = {
   content_decay: 'Content Decay',
 };
 
-const STATUS_COLORS: Record<ClientActionStatus, string> = {
-  pending: 'bg-blue-500/10 text-accent-info border-blue-500/20',
-  approved: 'bg-amber-500/10 text-accent-warning border-amber-500/20',
-  changes_requested: 'bg-orange-500/10 text-accent-orange border-orange-500/20',
-  completed: 'bg-emerald-500/10 text-accent-success border-emerald-500/20',
-  archived: 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]',
-};
-
 const STATUS_LABELS: Record<ClientActionStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   changes_requested: 'Changes Requested',
   completed: 'Completed',
   archived: 'Archived',
+};
+
+const STATUS_TONES: Record<ClientActionStatus, BadgeTone> = {
+  pending: 'blue',
+  approved: 'amber',
+  changes_requested: 'orange',
+  completed: 'emerald',
+  archived: 'zinc',
 };
 
 function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId: string }) {
@@ -61,7 +61,6 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
     onError: () => toast('Failed to mark action complete', 'error'),
   });
 
-  const statusBadgeClass = STATUS_COLORS[action.status] ?? STATUS_COLORS.pending;
   const formattedDate = new Date(action.updatedAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -82,9 +81,7 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
             <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate flex-1">
               {action.title}
             </span>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium border ${statusBadgeClass} shrink-0`}>
-              {STATUS_LABELS[action.status]}
-            </span>
+            <Badge label={STATUS_LABELS[action.status]} tone={STATUS_TONES[action.status]} variant="outline" shape="sm" size="sm" className="shrink-0" />
           </div>
 
           {/* Source type + date */}
@@ -111,9 +108,7 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
               different badge so admins know no manual step is required. */}
           {action.status === 'approved' && action.sourceType !== 'content_decay' && (
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium bg-amber-500/10 text-accent-warning border border-amber-500/20">
-                Awaiting implementation
-              </span>
+              <Badge label="Awaiting implementation" tone="amber" variant="outline" shape="sm" size="sm" />
               <Button
                 onClick={() => markComplete.mutate()}
                 disabled={markComplete.isPending}
@@ -127,9 +122,7 @@ function ActionCard({ action, workspaceId }: { action: ClientAction; workspaceId
           )}
           {action.status === 'approved' && action.sourceType === 'content_decay' && (
             <div className="mt-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] t-caption font-medium bg-blue-500/10 text-accent-info border border-blue-500/20">
-                Brief generating automatically
-              </span>
+              <Badge label="Brief generating automatically" tone="blue" variant="outline" shape="sm" size="sm" />
             </div>
           )}
         </div>
@@ -153,9 +146,7 @@ export function ClientActionsTab({ workspaceId }: Props) {
 
   // Badge showing how many actions are awaiting implementation
   const awaitingBadge = approvedItems.length > 0 ? (
-    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 text-accent-warning border border-amber-500/20">
-      {approvedItems.length} awaiting
-    </span>
+    <Badge label={`${approvedItems.length} awaiting`} tone="amber" variant="outline" shape="pill" size="sm" className="font-bold" />
   ) : undefined;
 
   if (isLoading) {

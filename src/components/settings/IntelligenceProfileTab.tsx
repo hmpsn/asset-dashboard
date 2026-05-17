@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrainCircuit, Save, Sparkles } from 'lucide-react';
 import { put, post } from '../../api/client';
-import { SectionCard, Icon, Button } from '../ui';
+import { SectionCard, Icon, Button, FormInput, FormTextarea } from '../ui';
 
 interface IntelligenceProfile {
   industry?: string;
@@ -110,11 +110,11 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
           {/* Industry */}
           <div>
             <label className={labelClass}>Industry</label>
-            <input
+            <FormInput
               className={fieldClass}
               placeholder="e.g. dental practice, B2B SaaS, ecommerce"
               value={industry}
-              onChange={e => setIndustry(e.target.value)}
+              onChange={setIndustry}
             />
           </div>
 
@@ -122,24 +122,24 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
           <div>
             <label className={labelClass}>Goals</label>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Enter goals separated by commas (e.g. increase organic traffic, generate more leads)</p>
-            <textarea
+            <FormTextarea
               className={`${fieldClass} resize-none`}
               rows={3}
               placeholder="increase organic traffic, generate more leads, improve local SEO rankings"
               value={goalsText}
-              onChange={e => setGoalsText(e.target.value)}
+              onChange={setGoalsText}
             />
           </div>
 
           {/* Target Audience */}
           <div>
             <label className={labelClass}>Target Audience</label>
-            <textarea
+            <FormTextarea
               className={`${fieldClass} resize-none`}
               rows={3}
               placeholder="Describe your ideal client or customer"
               value={targetAudience}
-              onChange={e => setTargetAudience(e.target.value)}
+              onChange={setTargetAudience}
             />
           </div>
 

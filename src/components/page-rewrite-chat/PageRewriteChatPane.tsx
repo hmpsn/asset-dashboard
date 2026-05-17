@@ -2,7 +2,7 @@ import { Check, Copy, Loader2, Send, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { extractRewriteOnly } from '../../lib/rewriteResponse';
 import { RenderMarkdown } from '../client/helpers';
-import { Icon, Button, IconButton } from '../ui';
+import { Icon, Button, FormTextarea, IconButton } from '../ui';
 import { QUICK_PROMPTS, type ChatMessage, type PageData } from './pageRewriteChatModel';
 
 interface PageRewriteChatPaneProps {
@@ -157,10 +157,10 @@ export function PageRewriteChatPane({
 
       <div className="flex-shrink-0 border-t border-[var(--brand-border)] px-4 py-3 bg-[var(--surface-2)]/50">
         <div className="flex items-end gap-2">
-          <textarea
+          <FormTextarea
             ref={inputRef}
             value={input}
-            onChange={e => onInputChange(e.target.value)}
+            onChange={onInputChange}
             onKeyDown={onInputKeyDown}
             placeholder={pageData ? 'Ask me to rewrite a section, optimize headings, add FAQs...' : 'Load a page first, or ask a general rewriting question...'}
             className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"

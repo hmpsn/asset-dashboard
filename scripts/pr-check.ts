@@ -4631,6 +4631,75 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'Raw form control outside form primitives',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    excludeLines: ['// form-control-ok'],
+    message:
+      'Use FormInput/FormSelect/FormTextarea/Checkbox/Toggle instead of visible raw input/select/textarea controls. ' +
+      'Native hidden/file/color inputs are allowed.',
+    severity: 'error',
+    rationale:
+      'Visible raw form controls bypass the shared focus ring, radius, typography, validation, and accessibility contract.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        if (file.includes('/src/components/ui/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          if (!/<(?:input|select|textarea)\b/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// form-control-ok')) continue;
+          const tagWindow = lines.slice(i, Math.min(lines.length, i + 8)).join(' ');
+          if (/<input\b[^>]*type\s*=\s*["'](?:hidden|file|color)["']/.test(tagWindow)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Static styleguide migrated note and radius debt',
+    pattern: '',
+    fileGlobs: ['styleguide.html'],
+    pathFilter: 'public/',
+    excludeLines: ['// styleguide-static-ok'],
+    message:
+      'Use static styleguide helper classes for note chrome and token names for radius prose/specimens. ' +
+      'Avoid inline note typography/spacing and stale rounded-* or multi-pixel radius literals.',
+    severity: 'error',
+    rationale:
+      'The static styleguide is the visual source of truth; stale note/radius specimens make the migration contract lie.',
+    claudeMdRef: '#token-authority',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('public/styleguide.html') && !file.endsWith('public' + path.sep + 'styleguide.html')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i];
+          if (hasHatch(lines, i, '// styleguide-static-ok')) continue;
+          const hasInlineNoteDebt =
+            /class="[^"]*(?:muted|dv-caption|dd-note|ar-note)[^"]*"/.test(line)
+            && /style="[^"]*(?:font-size|margin-top|line-height|padding)/.test(line);
+          const hasRadiusDebt =
+            /\b(?:[0-9]+px\s+){1,3}[0-9]+px\b|rounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/.test(line);
+          if (hasInlineNoteDebt || hasRadiusDebt) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Action CTAs that inline teal gradient/solid classes drift quickly from
     // Button primitive semantics (focus, disabled, hover, icon sizing).
     name: 'Raw CTA class literal outside Button/IconButton',

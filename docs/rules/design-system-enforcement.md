@@ -5,8 +5,10 @@
 > section below. For pr-check rule authoring, see
 > `docs/rules/pr-check-rule-authoring.md`.
 
-These rules are mechanized in `scripts/pr-check.ts` and enforced on every PR diff.
-All rules are scoped to files changed in the diff (not the full repo) during the Phase 1–3 migration window.
+The active rule list is generated in [automated-rules.md](./automated-rules.md)
+from `scripts/pr-check.ts`; treat that generated file as the live severity table.
+This document explains the design-system contract, ratchet strategy, and manual
+backlog that is not yet safe to fail in CI.
 
 For the active lock-in contract (authority order, invariants, scorecard schema,
 and ratchet gates), see [styleguide-lockdown-contract.md](./styleguide-lockdown-contract.md).
@@ -15,26 +17,20 @@ and ratchet gates), see [styleguide-lockdown-contract.md](./styleguide-lockdown-
 
 ## Active Rules (pr-check)
 
-| Rule | Severity | Pattern | Scope |
-|------|----------|---------|-------|
-| Legacy surface token | warn | `var(--brand-bg-*)` | `*.tsx`, `*.css` |
-| Hand-rolled card div | warn | `bg-zinc-9xx + rounded-xl` | `*.tsx` (excl. `ui/`) |
-| Page component missing PageHeader | warn | customCheck curated list | page components |
-| Hardcoded card radius | warn | `rounded-xl` outside `ui/` | `*.tsx` (excl. `ui/`) |
-| radius-signature-lg exclusivity | **error** | `--radius-signature-lg` | all, excl. SectionCard + styleguide |
-| Non-standard transition duration | warn | duration not 120/180/400ms | `*.tsx`, `*.css` |
-| Purple in client components | error | `purple-` Tailwind class | `src/components/client/` |
-| Forbidden hues (violet/indigo) | error | `violet-` or `indigo-` | `src/components/` |
-| Hardcoded dark hex in inline styles | error | `#0f1219` and related dark hex | `src/` |
-| SVG with hardcoded dark fill/stroke | warn | Dark hex in SVG `fill=` / `stroke=` | `src/` |
-| styleguide-token-parity | warn | Any `--*` token in `styleguide.css` | `public/styleguide.css` |
+Do not maintain a hand-copied rule table here. Run `npm run rules:generate`
+and read [automated-rules.md](./automated-rules.md) for current names,
+severities, hatches, and scopes. CI fails if the generated document drifts
+from the `CHECKS` array.
 
 ## Migration path
 
-- Phase 1: All rules ship as `warn` (except `radius-signature-lg exclusivity`, `Purple in client`, `Forbidden hues`, and `Hardcoded dark hex` which are `error` immediately).
-- Phase 3f: Rules A, B, D promoted to `error` once all 47 files are migrated.
-- Phase 4+: Rule F promoted to `error` once `--motion-*` tokens land.
-- Phase 3: `styleguide-token-parity` promoted to `error` after parity verified.
+- Error rules lock zero-hit invariants, such as forbidden hues, token parity,
+  raw action primitives, and signature-radius exclusivity.
+- Warning/report-only rules identify known backlog that still needs migration.
+- New drift categories should land as advisory metrics or warnings first unless
+  an audit proves they are already zero-hit and fixture-covered.
+- Promote warnings to errors only after the backlog reaches zero and the rule has
+  tests in `tests/pr-check.test.ts`.
 
 ## Escape hatch
 
@@ -49,33 +45,32 @@ Per-rule hatch comments (preferred over the generic form):
 | Purple in client components | `// purple-ok` (not yet implemented) |
 | Forbidden hues (violet/indigo) | `// hue-ok` (not yet implemented) |
 
-Phase 3 will add hatch support to all new rules as they land.
+See [automated-rules.md](./automated-rules.md) for the current hatch per rule.
 
 ---
 
 ## Phase 5 Migration Window (2026-04-24)
 
-Phase 5 is a Total Unification Sweep. The following rules are **planned for Phase 3**
-(after Phase 2 codemod execution), at which point they will be added to `pr-check.ts`
-as `error`-severity customCheck rules. During Phase 0 and Phase 1, they are manual
-guidelines enforced by code review.
+Phase 5 is a Total Unification Sweep. Several items from the original plan are
+now hard errors in `pr-check`; the remaining items below are still backlog or
+advisory because the repo has known legitimate/native usage that needs a focused
+backfill before CI can fail on it.
 
 | Planned rule | Status | What it blocks |
 |---|---|---|
-| Arbitrary `text-[Npx]` values | planned (Phase 3) | Raw pixel font sizes — use `.t-*` utility class |
-| Raw `text-zinc-*` in components | planned (Phase 3) | Direct zinc text colors — use `var(--brand-text/bright/muted/dim)` |
-| Raw `bg-zinc-*` in components | planned (Phase 3) | Direct zinc backgrounds — use `var(--surface-1/2/3)` |
-| Raw `border-zinc-*` in components | planned (Phase 3) | Direct zinc borders — use `var(--brand-border)` |
-| `rounded-lg` without `var(--radius-*)` | planned (Phase 3) | Literal border-radius class — use `rounded-[var(--radius-lg)]` |
-| Hand-rolled buttons | planned (Phase 3) | Inline `px-* py-* rounded-* bg-* text-*` button patterns — use `<Button>` or `<IconButton>` |
-| Hand-rolled form controls | planned (Phase 3) | Inline `<input>`, `<select>`, `<textarea>` — use `<FormInput>`, `<FormSelect>`, `<FormTextarea>` |
-| `flex items-center gap-*` without layout primitive | planned (Phase 3) | Inline flex layouts — use `<Row>`, `<Stack>`, `<Column>` |
-| `fixed inset-0` modal pattern | planned (Phase 3) | Hand-rolled modals — use `<Modal>` |
-| `rose-` or `pink-` hues | planned (Phase 3) | Non-system hues eliminated in Phase 0; rule catches regressions |
-| `text-green-400` for success/score | planned (Phase 3) | Success color must be `text-emerald-400` (emerald, not green) |
+| Hand-rolled form controls | error | Inline visible `<input>`, `<select>`, `<textarea>` — use `<FormInput>`, `<FormSelect>`, `<FormTextarea>`, `<Checkbox>`, or `<Toggle>`. Native `hidden`, `file`, and `color` inputs are allowed. |
+| Static styleguide inline note chrome | error | Inline note typography/spacing in `public/styleguide.html` — use `.spec-note` / `.sg-note` |
+| Static styleguide radius prose drift | error | Raw or stale pixel radius prose — name `--radius-*` tokens and primitive ownership |
+| Hand-rolled badge-like spans | advisory | Inline rounded status/category/count pills — use `<Badge>` or `<StatusBadge>` |
+| Static styleguide raw controls/specimens | manual review | Static examples may intentionally show raw HTML; label bad examples clearly |
+| `flex items-center gap-*` without layout primitive | manual review | Inline flex layouts — use `<Row>`, `<Stack>`, `<Column>` when the abstraction adds value |
 
-All Phase 3 rules will report `warn` initially and be promoted to `error` after a
-2-sprint stabilization period.
+`scripts/report-style-drift.ts` includes advisory counts for raw form controls,
+client purple, static styleguide debt, and badge-like spans. Raw visible form
+controls and static styleguide note/radius debt are now also enforced by
+`pr-check` after the May 2026 ratchet sweep drove both counts to zero. Badge-like
+spans remain advisory until the shared `Badge`/`StatusBadge` migration reaches
+zero and fixtures cover allowed exceptions.
 
 ---
 

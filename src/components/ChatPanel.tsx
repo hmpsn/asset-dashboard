@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Loader2, MessageSquare } from 'lucide-react';
-import { Button, ClickableRow, Icon } from './ui';
+import { Button, ClickableRow, FormInput, Icon } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { pickPhrase } from '../lib/loadingPhrases';
 import { ServiceInterestCTA } from './client/ServiceInterestCTA';
@@ -209,10 +209,10 @@ export function ChatPanel({
 
       {/* Input bar — pinned at bottom */}
       <div className="px-4 py-3 border-t border-[var(--brand-border)] flex gap-2 flex-shrink-0">
-        <input
+        <FormInput
           type="text"
           value={input}
-          onChange={e => onInputChange(e.target.value)}
+          onChange={onInputChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={`flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none ${a.focusBorder}`}

@@ -4,7 +4,7 @@ import {
   Target,
   AlertTriangle,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier, Icon, PageHeader, Button } from '../ui';
+import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
 import { useBetaMode } from './BetaContext';
@@ -647,12 +647,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   return (
     <div className="space-y-8">
-      {/* Header + Strategy Snapshot */}
-      <PageHeader
-        title="SEO Strategy"
-        subtitle="A focused view of what to create, what to improve, and which keywords guide the strategy."
-      />
-
       {/* Unvalidated strategy note */}
       {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
         <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: 'var(--radius-signature)' }}>

@@ -57,12 +57,32 @@ describe('StatusBadge', () => {
   it('uses smaller text for sm size', () => {
     const { container } = render(<StatusBadge status="approved" size="sm" />);
     const span = container.querySelector('span')!;
-    expect(span.className).toContain('t-micro');
+    expect(span.className).toContain('t-caption-sm');
   });
 
   it('uses larger text for md size', () => {
     const { container } = render(<StatusBadge status="approved" size="md" />);
     const span = container.querySelector('span')!;
-    expect(span.className).toContain('text-xs');
+    expect(span.className).toContain('t-caption');
+  });
+
+  it('renders domain-specific statuses', () => {
+    render(<StatusBadge domain="content" status="changes_requested" />);
+    expect(screen.getByText('Changes Requested')).toBeInTheDocument();
+  });
+
+  it('normalizes domain statuses with hyphens', () => {
+    render(<StatusBadge domain="matrix" status="keyword-validated" />);
+    expect(screen.getByText('Keyword Validated')).toBeInTheDocument();
+  });
+
+  it('hides unknown statuses by default', () => {
+    const { container } = render(<StatusBadge domain="content" status="mystery" />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('renders unknown statuses as neutral with fallback', () => {
+    render(<StatusBadge domain="content" status="mystery_state" fallback="neutral" />);
+    expect(screen.getByText('Mystery State')).toBeInTheDocument();
   });
 });

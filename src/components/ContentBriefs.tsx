@@ -4,7 +4,7 @@ import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
-import { Icon, IconButton, ClickableRow, cn, Button, Modal, PageHeader } from './ui';
+import { Badge, Icon, IconButton, ClickableRow, FormInput, FormSelect, Button, Modal, PageHeader } from './ui';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -415,16 +415,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
           <div className="flex items-center gap-2 mb-1">
             <Icon as={PenLine} size="md" className="text-accent-info" />
             <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
-            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{posts.length}</span>
+            <Badge label={`${posts.length}`} tone="blue" variant="outline" />
           </div>
           <div className="space-y-2">
             {posts.map(post => {
-              const statusColors: Record<string, string> = {
-                generating: 'text-accent-warning bg-amber-500/10 border-amber-500/20',
-                draft: 'text-accent-info bg-blue-500/10 border-blue-500/20',
-                review: 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20',
-                approved: 'text-accent-success bg-emerald-500/10 border-emerald-500/20',
-              };
               return (
                 <ClickableRow
                   key={post.id}
@@ -437,9 +431,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                       <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={cn('t-caption-sm px-1.5 py-0.5 rounded border font-medium', statusColors[post.status] || statusColors.draft)}>
-                        {post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                      </span>
+                      <Badge
+                        label={post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                        tone={post.status === 'generating' ? 'amber' : post.status === 'approved' ? 'emerald' : post.status === 'review' ? 'teal' : 'blue'}
+                        variant="outline"
+                      />
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(post.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
@@ -494,10 +490,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
           <div className="flex items-center gap-2">
             <div className="relative">
               <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
+              <FormInput
                 type="text"
                 value={briefSearch}
-                onChange={e => setBriefSearch(e.target.value)}
+                onChange={setBriefSearch}
                 placeholder="Search briefs..."
                 className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
               />
@@ -514,11 +510,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
             </div>
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
               <Icon as={ArrowUpDown} size="sm" />
-              <select value={briefSort} onChange={e => setBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none cursor-pointer">
-                <option value="date">Newest</option>
-                <option value="keyword">Keyword A-Z</option>
-                <option value="difficulty">Difficulty</option>
-              </select>
+              <FormSelect value={briefSort} onChange={value => setBriefSort(value as 'date' | 'keyword' | 'difficulty')} options={[
+                { value: 'date', label: 'Newest' },
+                { value: 'keyword', label: 'Keyword A-Z' },
+                { value: 'difficulty', label: 'Difficulty' },
+              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none cursor-pointer" />
             </div>
           </div>
         }

@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
-import { Icon, Button } from '../ui';
+import { Icon, Button, FormInput } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { BusinessProfile } from './types';
 
@@ -79,14 +79,6 @@ export function BrandTab({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Page header */}
-      <div>
-        <h2 className="t-h2 text-[var(--brand-text-bright)]">Business Profile</h2>
-        <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
-          Keep your business information up to date. This helps us personalize your SEO strategy.
-        </p>
-      </div>
-
       {/* ── Business Profile Panel (editable) ── */}
       <ErrorBoundary label="Business Profile">
         <SectionCard
@@ -173,20 +165,20 @@ export function BrandTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Phone</label>
-                  <input
+                  <FormInput
                     type="tel"
                     value={form.phone ?? ''}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, phone: value }))}
                     placeholder={industry ? `e.g. +1 (555) 000-0000` : '+1 (555) 000-0000'}
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Business Email</label>
-                  <input
+                  <FormInput
                     type="email"
                     value={form.email ?? ''}
-                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, email: value }))}
                     placeholder="hello@yourbusiness.com"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
@@ -195,10 +187,10 @@ export function BrandTab({
 
               <div>
                 <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Street Address</label>
-                <input
+                <FormInput
                   type="text"
                   value={form.address?.street ?? ''}
-                  onChange={e => updateAddress('street', e.target.value)}
+                  onChange={value => updateAddress('street', value)}
                   placeholder="123 Main St"
                   className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                 />
@@ -207,30 +199,30 @@ export function BrandTab({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="col-span-2">
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">City</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.city ?? ''}
-                    onChange={e => updateAddress('city', e.target.value)}
+                    onChange={value => updateAddress('city', value)}
                     placeholder="City"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">State</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.state ?? ''}
-                    onChange={e => updateAddress('state', e.target.value)}
+                    onChange={value => updateAddress('state', value)}
                     placeholder="CA"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">ZIP</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.zip ?? ''}
-                    onChange={e => updateAddress('zip', e.target.value)}
+                    onChange={value => updateAddress('zip', value)}
                     placeholder="90210"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
@@ -240,20 +232,20 @@ export function BrandTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Country</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.address?.country ?? ''}
-                    onChange={e => updateAddress('country', e.target.value)}
+                    onChange={value => updateAddress('country', value)}
                     placeholder="United States"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />
                 </div>
                 <div>
                   <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Hours</label>
-                  <input
+                  <FormInput
                     type="text"
                     value={form.openingHours ?? ''}
-                    onChange={e => setForm(p => ({ ...p, openingHours: e.target.value }))}
+                    onChange={value => setForm(p => ({ ...p, openingHours: value }))}
                     placeholder="Mon-Fri 9am–5pm"
                     className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] t-body focus:outline-none focus:border-teal-500 transition-colors placeholder:text-[var(--brand-text-faint)]"
                   />

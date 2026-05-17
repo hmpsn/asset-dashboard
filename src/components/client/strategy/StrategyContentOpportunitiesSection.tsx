@@ -1,9 +1,9 @@
 import type { RefObject } from 'react';
 import { BarChart3, Ban, CheckCircle2, ChevronDown, Eye, FileText, Layers, Sparkles, Target, ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming.js';
-import { Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type Tier } from '../../ui';
+import { Badge, Button, ClickableRow, Icon, SectionCard, TierGate, TrendBadge, type BadgeTone, type Tier } from '../../ui';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
-import { fmtNum, intentColor, kdColor } from './strategyKeywordDisplay';
+import { fmtNum, kdColor } from './strategyKeywordDisplay';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];
 type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
@@ -54,17 +54,19 @@ const SERP_FEATURE_LABELS: Record<string, string> = {
 };
 
 function requestStatusLabel(status?: ClientContentRequest['status']) {
-  if (status === 'published') return { icon: CheckCircle2, text: 'Published', tone: 'success' as const };
-  if (status === 'delivered') return { icon: CheckCircle2, text: 'In Production', tone: 'brand' as const };
-  if (status === 'approved' || status === 'in_progress') return { icon: Sparkles, text: 'In Production', tone: 'brand' as const };
-  if (status === 'brief_generated' || status === 'client_review') return { icon: FileText, text: 'Brief Requested', tone: 'warning' as const };
-  return { icon: CheckCircle2, text: 'Brief Ordered', tone: 'warning' as const };
+  if (status === 'published') return { icon: CheckCircle2, text: 'Published', tone: 'emerald' as const };
+  if (status === 'delivered') return { icon: CheckCircle2, text: 'In Production', tone: 'teal' as const };
+  if (status === 'approved' || status === 'in_progress') return { icon: Sparkles, text: 'In Production', tone: 'teal' as const };
+  if (status === 'brief_generated' || status === 'client_review') return { icon: FileText, text: 'Brief Requested', tone: 'amber' as const };
+  return { icon: CheckCircle2, text: 'Brief Ordered', tone: 'amber' as const };
 }
 
-function requestStatusClass(tone: 'success' | 'brand' | 'warning') {
-  if (tone === 'success') return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
-  if (tone === 'brand') return 'text-accent-brand bg-teal-500/10 border-teal-500/20';
-  return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+function intentTone(intent?: string): BadgeTone {
+  if (intent === 'informational') return 'blue';
+  if (intent === 'commercial') return 'teal';
+  if (intent === 'transactional') return 'emerald';
+  if (intent === 'navigational') return 'amber';
+  return 'zinc';
 }
 
 function ContentGapCard({
@@ -99,17 +101,15 @@ function ContentGapCard({
         <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
           {gap.topic}
           {gap.opportunityScore != null && (
-            <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
-              {gap.opportunityScore}/100
-            </span>
+            <Badge label={`${gap.opportunityScore}/100`} tone="blue" shape="pill" className="ml-2" />
           )}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {gap.intent && (
-            <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+            <Badge label={gap.intent} tone={intentTone(gap.intent)} variant="outline" shape="pill" className="uppercase" />
           )}
           {pageType !== 'blog' && (
-            <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{pageType}</span>
+            <Badge label={pageType} tone="teal" variant="outline" className="capitalize" />
           )}
         </div>
       </div>
@@ -147,9 +147,7 @@ function ContentGapCard({
             <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] font-medium"><TrendBadge value={0} hideOnZero={false} suffix="" iconOnly />Stable</span>
           )}
           {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => (
-            <span key={feat} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
-              {SERP_FEATURE_LABELS[feat] ?? feat}
-            </span>
+            <Badge key={feat} label={SERP_FEATURE_LABELS[feat] ?? feat} tone="blue" variant="outline" />
           ))}
           {gap.competitorProof && (
             <span className="t-caption-sm text-accent-warning font-medium">{gap.competitorProof}</span>
@@ -215,9 +213,7 @@ function ContentGapCard({
           (() => {
             const status = requestStatusLabel(matchingReq?.status);
             return (
-              <span className={`flex items-center gap-1 t-caption-sm px-2.5 py-1.5 rounded-[var(--radius-lg)] border flex-shrink-0 ${requestStatusClass(status.tone)}`}>
-                <Icon as={status.icon} size="md" /> {status.text}
-              </span>
+              <Badge label={status.text} tone={status.tone} variant="outline" size="md" icon={status.icon} className="flex-shrink-0" />
             );
           })()
         ) : planStatus ? (
@@ -306,7 +302,7 @@ export function StrategyContentOpportunitiesSection({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-teal-500/20">{newContentTopicCount}</span>
+              <Badge label={String(newContentTopicCount)} tone="teal" variant="outline" shape="pill" />
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('new-content') ? '' : '-rotate-90'}`} />
             </div>
           </ClickableRow>

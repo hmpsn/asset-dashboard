@@ -1,6 +1,6 @@
 import { BarChart3, Check, DollarSign, Pencil, Shield, X } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
-import { Button, Icon, IconButton } from '../ui';
+import { Button, FormInput, Icon, IconButton } from '../ui';
 import { SeoCopyPanel } from '../strategy/SeoCopyPanel';
 import { kdColor, kdLabel, positionColor } from './pageIntelligenceDisplay';
 import type { KeywordEditDraft, SeoCopy } from './pageIntelligenceTypes';
@@ -49,19 +49,19 @@ export function PageIntelligenceStrategySection({
       <div className="space-y-2">
         <div>
           <label className="t-label text-[var(--brand-text-muted)] block mb-1">Primary Keyword</label>
-          <input
+          <FormInput
             type="text"
             value={editDraft.primary}
-            onChange={event => onEditDraftChange({ ...editDraft, primary: event.target.value })}
+            onChange={value => onEditDraftChange({ ...editDraft, primary: value })}
             className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />
         </div>
         <div>
           <label className="t-label text-[var(--brand-text-muted)] block mb-1">Secondary Keywords (comma-separated)</label>
-          <input
+          <FormInput
             type="text"
             value={editDraft.secondary}
-            onChange={event => onEditDraftChange({ ...editDraft, secondary: event.target.value })}
+            onChange={value => onEditDraftChange({ ...editDraft, secondary: value })}
             className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />
         </div>

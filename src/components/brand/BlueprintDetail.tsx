@@ -26,7 +26,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar, Icon, Button, IconButton, cn, ConfirmDialog } from '../ui/index';
+import { TabBar, Icon, Button, IconButton, cn, ConfirmDialog, FormInput, FormSelect } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -153,7 +153,7 @@ function EntryCard({
 
         {/* Primary keyword badge */}
         {entry.primaryKeyword && (
-          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded-[var(--radius-sm)] font-medium">
+          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded-[var(--radius-sm)] badge-span-ok font-medium">
             <Icon as={Tag} size="sm" />
             {entry.primaryKeyword}
           </span>
@@ -588,10 +588,10 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                     <label htmlFor="new-entry-name" className="t-caption text-[var(--brand-text)]">
                       Page name
                     </label>
-                    <input
+                    <FormInput
                       id="new-entry-name"
                       value={newEntryName}
-                      onChange={e => setNewEntryName(e.target.value)}
+                      onChange={setNewEntryName}
                       placeholder="e.g. Home, Services, About Us"
                       className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
@@ -602,19 +602,14 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                     <label htmlFor="new-entry-type" className="t-caption text-[var(--brand-text)]">
                       Page type
                     </label>
-                    <select
+                    <FormSelect
                       id="new-entry-type"
                       value={newEntryType}
-                      onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
+                      onChange={value => setNewEntryType(value as BlueprintPageType)}
+                      options={Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
                       className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
-                    >
-                      {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button, ClickableRow, Icon, IconButton } from './ui';
+import { Button, ClickableRow, FormInput, Icon, IconButton } from './ui';
 import { Search, X, ChevronDown } from 'lucide-react';
 
 interface Option {
@@ -75,10 +75,10 @@ export default function SearchableSelect({
         <div className="absolute z-[var(--z-modal)] mt-1 w-full min-w-[200px] bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] shadow-xl overflow-hidden">
           <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--brand-border)]">
             <Icon as={Search} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
-            <input
+            <FormInput
               ref={inputRef}
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={setSearch}
               placeholder={placeholder}
               className="flex-1 bg-transparent t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none"
             />

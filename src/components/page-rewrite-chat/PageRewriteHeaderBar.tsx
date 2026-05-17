@@ -1,6 +1,6 @@
 import { ArrowLeft, FileText, Loader2, Maximize2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
-import { Button, Icon, IconButton } from '../ui';
+import { Button, FormInput, Icon, IconButton } from '../ui';
 import { normalizePageUrl } from '../../lib/pathUtils';
 import { getIndentLevel, type PageData, type SitemapPage } from './pageRewriteChatModel';
 
@@ -101,7 +101,7 @@ export function PageRewriteHeaderBar({
           <div className="flex flex-col bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] overflow-hidden shadow-xl">
             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--brand-border)]">
               <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-              <input
+              <FormInput
                 ref={comboInputRef}
                 role="combobox"
                 aria-expanded={filteredPages.length > 0}
@@ -109,7 +109,7 @@ export function PageRewriteHeaderBar({
                 aria-label="Search pages or paste a URL"
                 autoFocus
                 value={comboQuery}
-                onChange={e => { onComboQueryChange(e.target.value); onSetComboIdx(0); }}
+                onChange={value => { onComboQueryChange(value); onSetComboIdx(0); }}
                 onKeyDown={onComboKeyDown}
                 placeholder="Search pages or paste a URL…"
                 className="flex-1 bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none"

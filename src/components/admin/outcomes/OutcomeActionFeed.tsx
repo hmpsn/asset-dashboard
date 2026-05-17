@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Activity, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-react';
-import { Button, ClickableRow, SectionCard, Badge, EmptyState, Skeleton } from '../../ui';
+import { Button, ClickableRow, SectionCard, Badge, EmptyState, FormSelect, Skeleton } from '../../ui';
 import { useOutcomeActions } from '../../../hooks/admin/useOutcomes';
 import type { ActionType, TrackedAction } from '../../../../shared/types/outcome-tracking';
 import { ACTION_TYPE_LABELS, formatOutcomeDate } from './outcomeConstants';
@@ -185,26 +185,20 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter className="w-3.5 h-3.5 text-[var(--brand-text-muted)] shrink-0" />
-        <select
+        <FormSelect
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={setTypeFilter}
+          options={ACTION_TYPE_OPTIONS}
           className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by action type"
-        >
-          {ACTION_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-        <select
+        />
+        <FormSelect
           value={scoreFilter}
-          onChange={(e) => setScoreFilter(e.target.value)}
+          onChange={setScoreFilter}
+          options={SCORE_OPTIONS}
           className="bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by score"
-        >
-          {SCORE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        />
         {(typeFilter || scoreFilter) && (
           <Button
             onClick={() => { setTypeFilter(''); setScoreFilter(''); }}

@@ -1,7 +1,7 @@
 // src/components/client/DecisionDetailModal.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { X, Flag } from 'lucide-react';
-import { Button, Icon, IconButton } from '../ui';
+import { Button, FormInput, Icon, IconButton } from '../ui';
 import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 import type { ApprovalBatch, ApprovalItem } from '../../../shared/types/approvals';
 import type { ClientAction, AeoChangePayload, InternalLinkPayload, RedirectProposalPayload } from '../../../shared/types/client-actions';
@@ -70,12 +70,12 @@ function ApprovalItemRow({
             </Button>
           ) : (
             <div className="flex items-center gap-2">
-              <input
+              <FormInput
                 type="text"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={setNote}
                 placeholder="What's your concern? (optional)"
-                className="px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-amber-500/50 w-48"
+                className="px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] outline-none focus:border-teal-500/50 w-48"
                 autoFocus
               />
               <Button

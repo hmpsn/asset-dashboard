@@ -31,7 +31,7 @@ describe('AnalyticsTab', () => {
     expect(screen.getByText('Analytics Coming Soon')).toBeInTheDocument();
   });
 
-  it('renders analytics header and summary lists when overview data exists', () => {
+  it('renders analytics summary lists when overview data exists', () => {
     const overview: GA4Overview = {
       totalUsers: 1200,
       totalSessions: 1800,
@@ -68,7 +68,7 @@ describe('AnalyticsTab', () => {
       />,
     );
 
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    expect(screen.getByText('2026-04-18 — 2026-05-16')).toBeInTheDocument();
     expect(screen.getByText('/services/seo')).toBeInTheDocument();
     expect(screen.getByText('google / organic')).toBeInTheDocument();
   });

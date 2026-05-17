@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
-import { Button, PageHeader, EmptyState, Icon, cn } from './ui';
+import { Button, PageHeader, EmptyState, FormInput, Icon, cn } from './ui';
 import { features as featuresApi } from '../api/platform';
 import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
@@ -124,11 +124,11 @@ export default function FeatureLibrary() {
       <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             placeholder="Search features..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={setSearch}
             className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
           />
         </div>

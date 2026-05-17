@@ -3,7 +3,7 @@ import {
   Loader2, Check, Search, Sparkles, Send,
 } from 'lucide-react';
 import { PendingApprovals } from '../PendingApprovals';
-import { Button, ErrorState, Icon } from '../ui';
+import { Badge, Button, ErrorState, FormInput, Icon } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import type { PageEditSummary } from '../../hooks/usePageEditStates';
 import type { CmsCollection } from './cmsEditorModel';
@@ -77,14 +77,10 @@ export function CmsEditorShellPanels({
         </div>
         <div className="flex items-center gap-2">
           {dirtyCount > 0 && (
-            <span className="t-caption-sm text-amber-400/80 bg-amber-500/8 px-2 py-0.5 rounded">
-              {dirtyCount} unsaved
-            </span>
+            <Badge label={`${dirtyCount} unsaved`} tone="amber" variant="soft" shape="sm" size="sm" />
           )}
           {savedCount > 0 && (
-            <span className="t-caption-sm text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-              {savedCount} saved (draft)
-            </span>
+            <Badge label={`${savedCount} saved (draft)`} tone="emerald" variant="soft" shape="sm" size="sm" />
           )}
           {approvalSelectedCount > 0 && bulkMode === 'idle' && (
             <div className="flex items-center gap-1.5">
@@ -104,9 +100,9 @@ export function CmsEditorShellPanels({
           {workspaceId && (
             <div className="flex items-center gap-1.5">
               {approvalSelectedCount > 0 && (
-                <input
+                <FormInput
                   value={approvalNote}
-                  onChange={event => setApprovalNote(event.target.value)}
+                  onChange={setApprovalNote}
                   placeholder="Add a note for your client (optional)"
                   className="w-56 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/50 focus:outline-none"
                 />
@@ -174,10 +170,10 @@ export function CmsEditorShellPanels({
       {showSearch && (
         <div className="relative">
           <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={event => onSearchChange(event.target.value)}
+            onChange={onSearchChange}
             placeholder="Search items..."
             className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />

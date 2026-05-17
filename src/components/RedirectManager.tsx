@@ -5,7 +5,7 @@ import {
   CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
   Send,
 } from 'lucide-react';
-import { PageHeader, StatCard, Icon, SectionCard, Button, ClickableRow, cn } from './ui';
+import { Badge, PageHeader, StatCard, FormInput, FormTextarea, Icon, SectionCard, Button, ClickableRow, cn } from './ui';
 import { redirects } from '../api/misc';
 import { clientActions } from '../api/clientActions';
 import { themeColor } from './ui/constants';
@@ -209,11 +209,11 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
   };
 
   const statusBadge = (status: number | 'error') => {
-    if (status === 'error') return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-red-500/15 text-red-400">ERR</span>;
-    if (status >= 200 && status < 300) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-emerald-500/15 text-emerald-400">{status}</span>;
-    if (status >= 300 && status < 400) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-amber-500/15 text-amber-400">{status}</span>;
-    if (status >= 400) return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-red-500/15 text-red-400">{status}</span>;
-    return <span className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption font-mono bg-[var(--surface-2)] text-[var(--brand-text)]">{status}</span>;
+    if (status === 'error') return <Badge label="ERR" tone="red" className="font-mono" />;
+    if (status >= 200 && status < 300) return <Badge label={`${status}`} tone="emerald" className="font-mono" />;
+    if (status >= 300 && status < 400) return <Badge label={`${status}`} tone="amber" className="font-mono" />;
+    if (status >= 400) return <Badge label={`${status}`} tone="red" className="font-mono" />;
+    return <Badge label={`${status}`} tone="zinc" className="font-mono" />;
   };
 
   const filteredPages = data?.pageStatuses.filter(p => {
@@ -315,15 +315,11 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                     <span className="t-caption text-[var(--brand-text-bright)] truncate font-mono">{new URL(chain.originalUrl).pathname}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">
-                      {chain.totalHops} hop{chain.totalHops !== 1 ? 's' : ''}
-                    </span>
+                    <Badge label={`${chain.totalHops} hop${chain.totalHops !== 1 ? 's' : ''}`} tone="amber" />
                     {chain.isLoop && (
-                      <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)]">loop</span>
+                      <Badge label="loop" tone="red" />
                     )}
-                    <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)]', chain.type === 'internal' ? 'bg-teal-500/10 text-teal-400' : 'bg-[var(--surface-2)] text-[var(--brand-text)]')}>
-                      {chain.type}
-                    </span>
+                    <Badge label={chain.type} tone={chain.type === 'internal' ? 'teal' : 'zinc'} />
                   </div>
                 </ClickableRow>
                 {isExpanded && (
@@ -383,13 +379,13 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
           </div>
           {acceptedRules.length > 0 && workspaceId && !sentToClient && (
             <div className="px-4 py-3 border-b border-[var(--brand-border)]">
-              <textarea
+              <FormTextarea
                 rows={2}
                 disabled={sendingToClient}
                 maxLength={2000}
                 placeholder="Add a note for your client (optional)"
                 value={note}
-                onChange={e => setNote(e.target.value)}
+                onChange={setNote}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 t-caption text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] resize-none focus:outline-none focus:border-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
@@ -402,10 +398,10 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                   <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   {editingRule === rule.from ? (
                     <div className="flex items-center gap-1.5 flex-1">
-                      <input
+                      <FormInput
                         type="text"
                         value={editDraft}
-                        onChange={e => setEditDraft(e.target.value)}
+                        onChange={setEditDraft}
                         className="flex-1 px-2 py-1 bg-[var(--surface-2)] border border-teal-500/50 rounded-[var(--radius-sm)] t-caption text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-teal-400"
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') updateRuleTo(rule.from, editDraft); if (e.key === 'Escape') { setEditingRule(null); setEditDraft(''); } }}
@@ -469,10 +465,10 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex-1 relative">
           <SearchIcon className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder="Filter pages..."
             className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />
@@ -503,9 +499,10 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
                       <span className="t-caption text-[var(--brand-text-bright)] font-mono truncate block">{page.path}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] truncate block">{page.title}</span>
                     </div>
-                    <span className={cn('t-caption-sm', page.source === 'gsc' ? 'text-amber-400' : page.source === 'cms' ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}>
-                      {page.source === 'gsc' ? 'GSC' : page.source}
-                    </span>
+                    <Badge
+                      label={page.source === 'gsc' ? 'GSC' : page.source}
+                      tone={page.source === 'gsc' ? 'amber' : page.source === 'cms' ? 'teal' : 'zinc'}
+                    />
                     <div className="min-w-0">
                       {page.redirectsTo ? (
                         <a href={page.redirectsTo} target="_blank" rel="noopener noreferrer" className="t-caption-sm text-amber-400 hover:underline truncate block flex items-center gap-0.5">

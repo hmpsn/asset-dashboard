@@ -6,7 +6,7 @@ import type { SiteBlueprint, BlueprintGenerationInput } from '../../../shared/ty
 import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
-import { EmptyState, SectionCard, Icon, Button, ConfirmDialog } from '../ui';
+import { EmptyState, SectionCard, Icon, Button, ConfirmDialog, FormInput } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -105,10 +105,10 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
           <div className="space-y-4">
             <div className="space-y-1">
               <label htmlFor="bp-name" className="t-caption text-[var(--brand-text-muted)]">Name</label>
-              <input
+              <FormInput
                 id="bp-name"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={setName}
                 placeholder="e.g. Main Site Blueprint"
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={isCreating || isGenerating}
@@ -117,10 +117,10 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
 
             <div className="space-y-1">
               <label htmlFor="bp-industry" className="t-caption text-[var(--brand-text-muted)]">Industry Type</label>
-              <input
+              <FormInput
                 id="bp-industry"
                 value={industryType}
-                onChange={e => setIndustryType(e.target.value)}
+                onChange={setIndustryType}
                 placeholder="e.g. SaaS, E-commerce, Agency"
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={isCreating || isGenerating}

@@ -8,7 +8,7 @@ import type { FixContext } from '../App';
 import { useCmsEditor, useSeoEditor } from '../hooks/admin';
 import { pageEditStatesKey } from '../hooks/usePageEditStates';
 import { resolveSeoEditorWriteTargets } from './editor/seoWriteTargetResolver';
-import { Icon, SectionCard, Button } from './ui';
+import { FormInput, FormSelect, Icon, SectionCard, Button } from './ui';
 import { SEO_EDITOR_TARGET_TYPES } from '../../shared/types/seo-editor-write-target';
 import type { SeoEditorTargetType } from '../../shared/types/seo-editor-write-target';
 
@@ -88,27 +88,27 @@ function UnifiedSeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
             </Button>
           ))}
           {resolvedTargets.collectionOptions.length > 0 && sourceFilter !== SEO_EDITOR_TARGET_TYPES.staticPage && (
-            <select
+            <FormSelect
               value={collectionFilter}
-              onChange={event => setCollectionFilter(event.target.value)}
+              onChange={setCollectionFilter}
+              options={[
+                { value: 'all', label: 'All collections' },
+                ...resolvedTargets.collectionOptions.map(collection => ({
+                  value: collection.collectionId,
+                  label: `${collection.collectionName} (${collection.itemCount})`,
+                })),
+              ]}
               className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
               aria-label="Filter CMS collection"
-            >
-              <option value="all">All collections</option>
-              {resolvedTargets.collectionOptions.map(collection => (
-                <option key={collection.collectionId} value={collection.collectionId}>
-                  {collection.collectionName} ({collection.itemCount})
-                </option>
-              ))}
-            </select>
+            />
           )}
         </div>
         <div className="relative">
           <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-          <input
+          <FormInput
             type="text"
             value={search}
-            onChange={event => setSearch(event.target.value)}
+            onChange={setSearch}
             placeholder="Search pages and CMS items..."
             className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />

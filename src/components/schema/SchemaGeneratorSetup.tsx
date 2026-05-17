@@ -5,7 +5,7 @@ import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { SchemaFieldTarget } from '../../../shared/types/site-inventory';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
 import { adminPath } from '../../routes';
-import { Button, Icon, IconButton } from '../ui';
+import { Button, FormInput, FormSelect, Icon, IconButton } from '../ui';
 import type { SchemaMappingCollection, SchemaPageOption } from './schemaSuggesterTypes';
 
 export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -147,10 +147,10 @@ export function SchemaInitialPageTypePicker({
             Guide
           </Button>
         </div>
-        <input
+        <FormInput
           type="text"
           value={pageSearch}
-          onChange={event => onPageSearchChange(event.target.value)}
+          onChange={onPageSearchChange}
           placeholder="Filter pages..."
           className="px-3 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] w-48 focus:outline-none focus:border-[var(--brand-border-hover)]"
         />
@@ -163,18 +163,12 @@ export function SchemaInitialPageTypePicker({
               <div className="t-caption text-[var(--brand-text)] truncate">{page.title}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
             </div>
-            <select
+            <FormSelect
               value={pageTypes[page.id] || 'auto'}
-              onChange={event => {
-                const pageType = event.target.value;
-                onPageTypeSelect(page.id, pageType);
-              }}
+              onChange={pageType => onPageTypeSelect(page.id, pageType)}
+              options={SCHEMA_PAGE_TYPE_OPTIONS}
               className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 cursor-pointer"
-            >
-              {SCHEMA_PAGE_TYPE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+            />
             <Button
               onClick={() => onGenerateSinglePage(page.id)}
               disabled={generatingSingle === page.id}
@@ -264,19 +258,19 @@ export function SchemaCmsFieldMappingPanel({
               return (
                 <label key={target} className="block">
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">{label}</span>
-                  <select
+                  <FormSelect
                     value={selected}
                     disabled={savingCmsMapping === `${collection.collectionId}:${target}`}
-                    onChange={event => onSaveCmsFieldMapping(collection, target, event.target.value)}
+                    onChange={value => onSaveCmsFieldMapping(collection, target, value)}
+                    options={[
+                      { value: '', label: 'Not mapped' },
+                      ...collection.fields.map(field => ({
+                        value: field.slug,
+                        label: `${field.displayName || field.slug} (${field.type})`,
+                      })),
+                    ]}
                     className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 disabled:opacity-50"
-                  >
-                    <option value="">Not mapped</option>
-                    {collection.fields.map(field => (
-                      <option key={field.slug} value={field.slug}>
-                        {field.displayName || field.slug} ({field.type})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
               );
             })}

@@ -72,7 +72,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Notifications</span>
             <div className="flex items-center gap-2">
               {hasItems && (
-                <span className="t-micro font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-red-500/20 text-red-400/80 tabular-nums">
+                <span className="t-micro font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-red-500/20 text-red-400/80 tabular-nums">
                   {items.length}
                 </span>
               )}

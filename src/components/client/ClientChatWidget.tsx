@@ -4,7 +4,7 @@ import {
   Sparkles, Send, MessageSquare, X, Lock, Loader2, Plus,
   Maximize2, Minimize2,
 } from 'lucide-react';
-import { Button, ClickableRow, Icon, IconButton, cn } from '../ui';
+import { Button, ClickableRow, FormInput, Icon, IconButton, cn } from '../ui';
 import { getOptional, getSafe } from '../../api/client';
 import { clientPath } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
@@ -108,7 +108,7 @@ export function ClientChatWidget({
               <Icon as={Sparkles} size="md" className="text-accent-brand" />
               <span className="t-ui font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left
                 </span>
               ) : (
@@ -314,10 +314,10 @@ export function ClientChatWidget({
             </div>
           ) : (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] flex gap-2 flex-shrink-0">
-              <input
+              <FormInput
                 type="text"
                 value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
+                onChange={setChatInput}
                 onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}
                 placeholder="Ask about your site data..."
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"

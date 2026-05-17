@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, ClickableRow, IconButton } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn, PageHeader, Button, ClickableRow, IconButton, Checkbox } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -461,15 +461,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           >
             Run SEO Audit
           </Button>
-          <label className="flex items-center gap-2 t-caption text-[var(--brand-text-muted)] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={!skipLinkCheck}
-              onChange={e => setSkipLinkCheck(!e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-accent-brand focus:ring-teal-500 focus:ring-offset-zinc-900" // raw-zinc-ok
-            />
-            Include dead link scan
-          </label>
+          <Checkbox
+            checked={!skipLinkCheck}
+            onChange={checked => setSkipLinkCheck(!checked)}
+            label="Include dead link scan"
+            className="[&>span:last-child]:t-caption [&>span:last-child]:text-[var(--brand-text-muted)]"
+          />
         </div>
       </div>
     );

@@ -40,7 +40,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
       <h4 className="t-caption-sm font-semibold text-red-300 mb-1 flex items-center gap-1.5">
         <Icon as={Copy} size="md" className="text-red-300" /> Keyword Cannibalization
         {highCount > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-red-500/20 t-caption-sm text-red-400 font-medium">{highCount} critical</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-red-500/20 t-caption-sm text-red-400 font-medium">{highCount} critical</span>
         )}
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Multiple pages competing for the same keyword dilute your ranking power. Consolidate to one canonical page.</p>
@@ -63,7 +63,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
                   {page.position && <span className="text-[var(--brand-text-muted)]">pos #{Math.round(page.position)}</span>}
                   {page.impressions != null && page.impressions > 0 && <span className="text-blue-400">{page.impressions} impr</span>}
                   {page.clicks != null && page.clicks > 0 && <span className="text-teal-400">{page.clicks} clicks</span>}
-                  <span className={`px-1 rounded-[var(--radius-sm)] ${page.source === 'gsc' ? 'bg-blue-500/10 text-blue-400' : 'bg-[var(--surface-3)]/50 text-[var(--brand-text)]'}`}>
+                  <span className={`px-1 rounded-[var(--radius-sm)] badge-span-ok ${page.source === 'gsc' ? 'bg-blue-500/10 text-blue-400' : 'bg-[var(--surface-3)]/50 text-[var(--brand-text)]'}`}>
                     {page.source === 'gsc' ? 'GSC' : 'map'}
                   </span>
                 </div>

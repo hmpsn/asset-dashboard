@@ -51,7 +51,7 @@ export function SchemaReviewModal({ workspaceId, setToast, onClose }: SchemaRevi
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-6 py-6 max-w-4xl mx-auto w-full">
-        <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
+        <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} showHeader={false} />
       </div>
     </div>
   );

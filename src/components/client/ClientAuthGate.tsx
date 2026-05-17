@@ -4,7 +4,7 @@ import { Lock } from 'lucide-react';
 import { post } from '../../api/client';
 import TurnstileWidget from '../TurnstileWidget';
 import { STUDIO_NAME } from '../../constants';
-import { Icon, Button } from '../ui';
+import { Icon, Button, FormInput } from '../ui';
 import type { WorkspaceInfo } from './types';
 
 export interface ClientAuthGateProps {
@@ -210,11 +210,11 @@ export function ClientAuthGate({
                     <p className="t-caption-sm text-[var(--brand-text)] text-center">
                       Enter your email and we'll send you a link to reset your password.
                     </p>
-                    <input
+                    <FormInput
                       type="email"
                       value={forgotEmail}
-                      onChange={(e) => {
-                        setForgotEmail(e.target.value);
+                      onChange={(value) => {
+                        setForgotEmail(value);
                         setAuthError('');
                       }}
                       placeholder="Email address"
@@ -273,22 +273,22 @@ export function ClientAuthGate({
                 ) : (
                   <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text)] text-center">Choose a new password for your account.</p>
-                    <input
+                    <FormInput
                       type="password"
                       value={resetPassword}
-                      onChange={(e) => {
-                        setResetPassword(e.target.value);
+                      onChange={(value) => {
+                        setResetPassword(value);
                         setAuthError('');
                       }}
                       placeholder="New password"
                       autoFocus
                       className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
-                    <input
+                    <FormInput
                       type="password"
                       value={resetConfirm}
-                      onChange={(e) => {
-                        setResetConfirm(e.target.value);
+                      onChange={(value) => {
+                        setResetConfirm(value);
                         setAuthError('');
                       }}
                       placeholder="Confirm new password"
@@ -311,11 +311,11 @@ export function ClientAuthGate({
               // Normal login form
               <form onSubmit={handleClientUserLoginWithTurnstile} className="space-y-3">
                 <div>
-                  <input
+                  <FormInput
                     type="email"
                     value={loginEmail}
-                    onChange={(e) => {
-                      setLoginEmail(e.target.value);
+                    onChange={(value) => {
+                      setLoginEmail(value);
                       setAuthError('');
                     }}
                     placeholder="Email address"
@@ -324,11 +324,11 @@ export function ClientAuthGate({
                   />
                 </div>
                 <div>
-                  <input
+                  <FormInput
                     type="password"
                     value={loginPassword}
-                    onChange={(e) => {
-                      setLoginPassword(e.target.value);
+                    onChange={(value) => {
+                      setLoginPassword(value);
                       setAuthError('');
                     }}
                     placeholder="Password"
@@ -378,11 +378,11 @@ export function ClientAuthGate({
             /* Shared password form */
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <input
+                <FormInput
                   type="password"
                   value={passwordInput}
-                  onChange={(e) => {
-                    setPasswordInput(e.target.value);
+                  onChange={(value) => {
+                    setPasswordInput(value);
                     setAuthError('');
                   }}
                   placeholder="Dashboard password"

@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier, Icon, Button, ClickableRow, SectionCard } from '../ui';
-import { StatusBadge } from '../ui/StatusBadge';
+import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier, Icon, Button, ClickableRow, SectionCard, FormInput, FormTextarea, Badge, StatusBadge } from '../ui';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem, ApprovalPageKeyword } from './types';
 import { patch, post } from '../../api/client';
@@ -173,9 +172,7 @@ export function ApprovalsTab({
           <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (
-          <span className="ml-auto px-2 py-0.5 t-caption-sm font-medium rounded-[var(--radius-pill)] bg-teal-500/20 border border-teal-500/30 text-accent-brand">
-            {pendingApprovals} pending
-          </span>
+          <Badge label={`${pendingApprovals} pending`} tone="teal" variant="outline" shape="pill" className="ml-auto" />
         )}
       </div>
 
@@ -211,11 +208,7 @@ export function ApprovalsTab({
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-[var(--radius-sm)] t-caption-sm font-semibold ${
-                  batchFilter === tab.id ? 'bg-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
-                }`}>
-                  {tab.count}
-                </span>
+                <Badge label={String(tab.count)} tone={batchFilter === tab.id ? 'teal' : 'zinc'} />
               )}
             </Button>
           ))}
@@ -241,10 +234,10 @@ export function ApprovalsTab({
             }
             action={
               <div className="flex items-center gap-2">
-                {batchPending > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{batchPending} pending</span>}
-                {batchApproved > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{batchApproved} approved</span>}
-                {batchApplied > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 border border-blue-500/30 text-accent-info">{batchApplied} applied</span>}
-                {batchRejected > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-red-500/10 border border-red-500/30 text-accent-danger">{batchRejected} rejected</span>}
+                {batchPending > 0 && <Badge label={`${batchPending} pending`} tone="amber" variant="outline" shape="pill" />}
+                {batchApproved > 0 && <Badge label={`${batchApproved} approved`} tone="emerald" variant="outline" shape="pill" />}
+                {batchApplied > 0 && <Badge label={`${batchApplied} applied`} tone="blue" variant="outline" shape="pill" />}
+                {batchRejected > 0 && <Badge label={`${batchRejected} rejected`} tone="red" variant="outline" shape="pill" />}
               </div>
             }
             noPadding
@@ -280,8 +273,8 @@ export function ApprovalsTab({
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">/{first.pageSlug}</span>
                         <StatusBadge status={pageState?.status} />
                         <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>
-                        {pagePending > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{pagePending} pending</span>}
-                        {pageApprovedCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{pageApprovedCount} approved</span>}
+                        {pagePending > 0 && <Badge label={`${pagePending} pending`} tone="amber" variant="outline" />}
+                        {pageApprovedCount > 0 && <Badge label={`${pageApprovedCount} approved`} tone="emerald" variant="outline" />}
                       </ClickableRow>
 
                       {/* Page items (collapsible) */}
@@ -309,13 +302,6 @@ export function ApprovalsTab({
                               : item.field === 'seoTitle' ? 'SEO Title'
                               : item.field === 'seoDescription' ? 'Meta Description'
                               : item.field.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            const statusColors = {
-                              pending: 'bg-amber-500/10 border-amber-500/30 text-accent-warning',
-                              approved: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
-                              rejected: 'bg-red-500/10 border-red-500/30 text-accent-danger',
-                              applied: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
-                            };
-
                             // Parse schema types for preview
                             let schemaTypes: string[] = [];
                             if (isSchema) {
@@ -330,9 +316,9 @@ export function ApprovalsTab({
                               <div key={item.id} className="px-5 py-3 ml-4 border-l-2 border-[var(--brand-border)]">
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">{fieldLabel}</span>
-                                  <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${statusColors[item.status || 'pending']}`}>{item.status || 'pending'}</span>
+                                  <StatusBadge status={item.status || 'pending'} domain="approval" variant="outline" />
                                   {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
-                                    <span key={t} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">{t}</span>
+                                    <Badge key={t} label={t} tone="teal" variant="outline" />
                                   ))}
                                   {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
                                     // item.pageSlug is a bare slug; use suffix fallback for nested pages
@@ -342,13 +328,9 @@ export function ApprovalsTab({
                                     return (
                                       <>
                                         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">targeting:</span>
-                                        <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info font-medium">
-                                          {kw.primaryKeyword}
-                                        </span>
+                                        <Badge label={kw.primaryKeyword} tone="blue" variant="outline" />
                                         {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                          <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/60 border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]">
-                                            {kw2}
-                                          </span>
+                                          <Badge key={kw2} label={kw2} tone="zinc" variant="outline" />
                                         ))}
                                       </>
                                     );
@@ -391,16 +373,16 @@ export function ApprovalsTab({
                                       {isEditing ? (
                                         <div className="space-y-2">
                                           {item.field === 'seoTitle' ? (
-                                            <input
+                                            <FormInput
                                               type="text"
                                               value={editDraft}
-                                              onChange={e => setEditDraft(e.target.value)}
+                                              onChange={setEditDraft}
                                               className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400"
                                             />
                                           ) : (
-                                            <textarea
+                                            <FormTextarea
                                               value={editDraft}
-                                              onChange={e => setEditDraft(e.target.value)}
+                                              onChange={setEditDraft}
                                               rows={2}
                                               className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400 resize-none"
                                             />
@@ -475,9 +457,9 @@ export function ApprovalsTab({
                                 {(item.status === 'pending' || !item.status) && !isEditing && rejectingItem === item.id && effectiveTier !== 'free' && (
                                   <div className="mt-3 space-y-2">
                                     <div className="t-caption-sm text-[var(--brand-text-muted)]">Add an optional note for the agency:</div>
-                                    <textarea
+                                    <FormTextarea
                                       value={rejectDraft}
-                                      onChange={e => setRejectDraft(e.target.value)}
+                                      onChange={setRejectDraft}
                                       rows={2}
                                       placeholder="Reason for rejection (optional)"
                                       className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-red-500/30 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-red-400 resize-none placeholder:text-[var(--brand-text-faint)]"

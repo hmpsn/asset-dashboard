@@ -8,7 +8,7 @@ import {
   CheckCircle, Send, Wrench, X, Pencil,
   MoreVertical, EyeOff, ClipboardList, Layers, FileSearch,
 } from 'lucide-react';
-import { Button, Icon, IconButton, cn } from '../ui';
+import { Button, FormInput, FormTextarea, Icon, IconButton, cn } from '../ui';
 import type { SeoIssue, PageSeoResult } from './types';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, FIX_TAB_LABELS, getFixTab } from './types';
 
@@ -124,9 +124,9 @@ export function AuditIssueRow({
               )}
             </div>
             {isEditing ? (
-              <textarea
+              <FormTextarea
                 value={editedText || issue.suggestedFix}
-                onChange={e => onSetEditedSuggestion(fixKey, e.target.value)}
+                onChange={value => onSetEditedSuggestion(fixKey, value)}
                 onBlur={() => onSetEditingKey(null)}
                 onKeyDown={e => { if (e.key === 'Escape') onSetEditingKey(null); }}
                 className="w-full t-caption-sm text-emerald-300 bg-emerald-950/60 border border-emerald-700/40 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500/50 resize-none"
@@ -150,10 +150,10 @@ export function AuditIssueRow({
         {/* Inline flag-for-client form */}
         {workspaceId && flaggingKey === taskKey && (
           <div className="mt-2 flex items-center gap-2">
-            <input
+            <FormInput
               type="text"
               value={flagNote}
-              onChange={e => onSetFlagNote(e.target.value)}
+              onChange={onSetFlagNote}
               placeholder="Note for client (optional)..."
               className="flex-1 px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-purple-500/50"
               onKeyDown={e => e.key === 'Enter' && onFlagForClient(page, issue, flagNote)}

@@ -5,7 +5,7 @@ import {
   Save, Sparkles, BookOpen, Users, MessageSquare,
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
-import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog } from './ui';
+import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog, FormInput, FormSelect, FormTextarea } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -295,10 +295,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           <p className="t-caption text-[var(--brand-text-muted)]">
             Tone, personality, and writing guidelines — used in ALL AI-generated copy (SEO rewrites, content briefs, blog posts)
           </p>
-          <textarea
+          <FormTextarea
             id="brand-voice-textarea"
             value={brandVoice}
-            onChange={e => setBrandVoice(e.target.value)}
+            onChange={setBrandVoice}
             placeholder="e.g., Professional but approachable. Use active voice. Avoid jargon. Speak directly to the reader. Our tone is confident and helpful, never salesy..."
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2.5 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y font-mono leading-relaxed min-h-[80px]"
             rows={5}
@@ -367,10 +367,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">Business context for AI — services, capabilities, FAQs, industry info</p>
-          <textarea
+          <FormTextarea
             id="knowledge-base-textarea"
             value={kbDraft !== null ? kbDraft : (ws?.knowledgeBase || '')}
-            onChange={(e) => setKbDraft(e.target.value)}
+            onChange={setKbDraft}
             rows={8}
             placeholder={"Example:\n- Industry: Home services (plumbing, HVAC)\n- Location: Denver metro area\n- Key services: Emergency repair, new installations, maintenance plans\n- Differentiators: 24/7 availability, licensed & insured, 15+ years\n- Target audience: Homeowners, property managers\n- Common client questions: pricing, response time, service areas"}
             onBlur={async (e) => {
@@ -454,7 +454,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             {(ws?.personas?.length || 0) > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {ws!.personas!.map(p => (
-                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 text-accent-info border border-blue-500/20">
+                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] badge-span-ok bg-blue-500/10 text-accent-info border border-blue-500/20">
                     {p.name}{p.buyingStage ? ` · ${p.buyingStage}` : ''}
                   </span>
                 ))}
@@ -515,34 +515,35 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label htmlFor={`persona-${p.id}-name`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Name</label>
-                        <input
+                        <FormInput
                           id={`persona-${p.id}-name`}
                           value={personaDraft.name}
-                          onChange={e => setPersonaDraft(d => ({ ...d, name: e.target.value }))}
+                          onChange={value => setPersonaDraft(d => ({ ...d, name: value }))}
                           className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                         />
                       </div>
                       <div>
                         <label htmlFor={`persona-${p.id}-buying-stage`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Buying Stage</label>
-                        <select
+                        <FormSelect
                           id={`persona-${p.id}-buying-stage`}
                           value={personaDraft.buyingStage}
-                          onChange={e => setPersonaDraft(d => ({ ...d, buyingStage: e.target.value }))}
+                          onChange={value => setPersonaDraft(d => ({ ...d, buyingStage: value }))}
+                          options={[
+                            { value: '', label: 'None' },
+                            { value: 'awareness', label: 'Awareness' },
+                            { value: 'consideration', label: 'Consideration' },
+                            { value: 'decision', label: 'Decision' },
+                          ]}
                           className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] focus:outline-none cursor-pointer"
-                        >
-                          <option value="">None</option>
-                          <option value="awareness">Awareness</option>
-                          <option value="consideration">Consideration</option>
-                          <option value="decision">Decision</option>
-                        </select>
+                        />
                       </div>
                     </div>
                     <div>
                       <label htmlFor={`persona-${p.id}-description`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Description</label>
-                      <input
+                      <FormInput
                         id={`persona-${p.id}-description`}
                         value={personaDraft.description}
-                        onChange={e => setPersonaDraft(d => ({ ...d, description: e.target.value }))}
+                        onChange={value => setPersonaDraft(d => ({ ...d, description: value }))}
                         placeholder="Who is this person?"
                         className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       />
@@ -550,30 +551,30 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label htmlFor={`persona-${p.id}-pain-points`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Pain Points (one per line)</label>
-                        <textarea
+                        <FormTextarea
                           id={`persona-${p.id}-pain-points`}
                           value={personaDraft.painPoints}
-                          onChange={e => setPersonaDraft(d => ({ ...d, painPoints: e.target.value }))}
+                          onChange={value => setPersonaDraft(d => ({ ...d, painPoints: value }))}
                           rows={3}
                           className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
                         />
                       </div>
                       <div>
                         <label htmlFor={`persona-${p.id}-goals`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Goals (one per line)</label>
-                        <textarea
+                        <FormTextarea
                           id={`persona-${p.id}-goals`}
                           value={personaDraft.goals}
-                          onChange={e => setPersonaDraft(d => ({ ...d, goals: e.target.value }))}
+                          onChange={value => setPersonaDraft(d => ({ ...d, goals: value }))}
                           rows={3}
                           className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
                         />
                       </div>
                       <div>
                         <label htmlFor={`persona-${p.id}-objections`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Objections (one per line)</label>
-                        <textarea
+                        <FormTextarea
                           id={`persona-${p.id}-objections`}
                           value={personaDraft.objections}
-                          onChange={e => setPersonaDraft(d => ({ ...d, objections: e.target.value }))}
+                          onChange={value => setPersonaDraft(d => ({ ...d, objections: value }))}
                           rows={3}
                           className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
                         />
@@ -581,10 +582,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                     </div>
                     <div>
                       <label htmlFor={`persona-${p.id}-content-format`} className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">Preferred Content Format</label>
-                      <input
+                      <FormInput
                         id={`persona-${p.id}-content-format`}
                         value={personaDraft.preferredContentFormat}
-                        onChange={e => setPersonaDraft(d => ({ ...d, preferredContentFormat: e.target.value }))}
+                        onChange={value => setPersonaDraft(d => ({ ...d, preferredContentFormat: value }))}
                         placeholder="e.g. how-to guides, case studies, comparison articles"
                         className="w-full px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       />

@@ -13,7 +13,8 @@
 
 | Role | Font | Weight | Tracking |
 |------|------|--------|----------|
-| **Body text** | Inter | 450 | -0.01em |
+| **Page/body prose** | Inter | 400 | 0 |
+| **Dense UI body** | DIN Pro | 500 | 0 |
 | **Headings (h1–h6)** | DIN Pro | 600 | -0.02em |
 | **Stat numbers** | DIN Pro | 700 | -0.03em |
 | **Bold text (.font-bold)** | DIN Pro | 700 | inherit |
@@ -40,10 +41,10 @@ Inter loaded from Google Fonts: 300–700.
 | `.t-stat` | DIN Pro | 24px | 700 | 1.1 | tracking -0.025em, tabular-nums | Standard stat card numbers |
 | `.t-stat-sm` | DIN Pro | 18px | 600 | 1.2 | tracking -0.02em, tabular-nums | Compact inline stat numbers |
 | `.t-page` | Inter | 15.5px | 400 | 1.5 | — | Page-level body text |
-| `.t-body` | Inter | 15.5px | 400 | 1.5 | — | Body text, descriptions (replaces boosted `text-sm`) |
+| `.t-body` | DIN Pro | 15.5px | 500 | 1.5 | — | Dense UI body, card titles, compact descriptions (replaces boosted `text-sm`) |
 | `.t-ui` | Inter | 13.5px | 500 | 1.4 | — | UI chrome, nav items, card section headers |
 | `.t-label` | DIN Pro | 11.5px | 500 | 1.4 | tracking 0.06em, uppercase | Uppercase labels, metadata |
-| `.t-caption` | Inter | 13.5px | 400 | 1.4 | — | Secondary captions, timestamps |
+| `.t-caption` | DIN Pro | 13.5px | 500 | 1.4 | — | Secondary UI captions, timestamps |
 | `.t-caption-sm` | Inter | 13.5px | 400 | 1.4 | — | Smallest body text (replaces boosted `text-[11px]`) |
 | `.t-mono` | Fira Code | 12px | 400 | 1.5 | tabular-nums | Code snippets, monospace data |
 | `.t-micro` | Fira Code | 10px | 400 | 1.4 | tracking 0.1em, uppercase, tabular-nums | Timestamps, IDs, monospace badges |
@@ -64,12 +65,12 @@ Phase A boosted `.t-caption-sm`, `.t-caption`, and `.t-body` to match pre-existi
 
 | Token | Value | Tailwind Equivalent | Usage |
 |-------|-------|---------------------|-------|
-| `--radius-sm` | `6px` | `rounded` | Small controls, pills, badges |
+| `--radius-sm` | `4px` | `rounded` | Small controls, pills, badges |
 | `--radius-md` | `8px` | `rounded-md` | Buttons, inputs |
-| `--radius-lg` | `12px` | `rounded-xl` | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
-| `--radius-xl` | `16px` | `rounded-2xl` | Modals, large overlays |
+| `--radius-lg` | `10px` | tokenized utility | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
+| `--radius-xl` | `12px` | tokenized utility | Confirm dialogs, large overlays |
 
-**Brand asymmetric radius:** `SectionCard` default variant uses `10px 24px 10px 24px` (the brand signature). This is intentional and correct. The `--radius-lg` token governs new generic cards; the asymmetric radius is a SectionCard-specific design decision, not a token.
+**Brand asymmetric radius:** `SectionCard` default variant uses `--radius-signature-lg` (`10px 24px 10px 24px`). This is intentional and correct. The `--radius-lg` token governs generic cards and panels; the asymmetric radius belongs to SectionCard/ChartCard-style signature surfaces.
 
 **Rule for new card elements:** use `rounded-[var(--radius-lg)]` not the hardcoded Tailwind class `rounded-xl`. This makes the radius system themeable.
 
@@ -111,7 +112,6 @@ Phase A boosted `.t-caption-sm`, `.t-caption`, and `.t-body` to match pre-existi
 | Teal (brand) | #2dd4bf | #0d9488 | 4.5:1 | Primary accent, active states, CTAs |
 | Blue | #60a5fa | #2563eb | 4.6:1 | Clicks, links, info |
 | Emerald | #34d399 | #047857 | 5.5:1 | Success, good scores (80+) |
-| Green | #4ade80 | #15803d | 5.2:1 | Positive deltas |
 | Amber | #fbbf24 | #b45309 | 5.4:1 | Warnings, medium scores (60-79) |
 | Red | #f87171 | #dc2626 | 4.6:1 | Errors, bad scores (<60) |
 | Orange | #fb923c | #c2410c | 5.2:1 | Attention, urgent |
@@ -299,8 +299,11 @@ For ranked lists (top pages, keywords, sources).
 └────────────┘
 ```
 
-- Standard: `text-[11px] px-1.5 py-0.5 rounded font-medium bg-{color}-500/10 text-{color}-400`
-- Muted: `text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500`
+- Use `<Badge>` for category, metadata, counters, and non-lifecycle pills.
+- Use `<StatusBadge>` for workflow/status/severity/priority states. The default domain is `page-edit`; pass `domain="content"`, `domain="approval"`, `domain="client-action"`, `domain="schema"`, `domain="matrix"`, `domain="integration"`, `domain="job"`, `domain="severity"`, or `domain="priority"` for other lifecycle maps.
+- Tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`. The old `color` prop is supported as a compatibility alias; new code should use `tone`.
+- Variants: `soft` (default), `outline`, `solid`. Shapes: `sm` for compact labels and `pill` for filters/counters. Sizes: `sm`, `md`.
+- Optional `icon`, `dot`, and `ariaLabel` support icon-leading and dot-only dense-table badges without hand-rolled spans.
 
 ### 8. EmptyState
 
@@ -371,7 +374,7 @@ Horizontal numbered step indicator showing progress through a multi-step workflo
 
 - Variants: default (`w-8 h-8` circles) and `compact` (`w-6 h-6`)
 - Current step: `bg-teal-500/10 border-2 border-teal-500 text-teal-400` + ring glow
-- Completed step: `bg-green-500/10 border-2 border-green-500/40 text-green-400` + `CheckCircle` icon
+- Completed step: `bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-400` + `CheckCircle` icon
 - Future step: `bg-zinc-800/50 border-2 border-zinc-700 text-zinc-500`
 - Connector line: `h-px bg-zinc-700` between steps
 - Clickable steps show teal hover feedback (`group-hover:border-teal-500`)
@@ -496,14 +499,14 @@ src/components/ui/
 ├── TrendBadge.tsx          # Canonical directional delta indicator (emerald/red/zinc)
 ├── DateRangeSelector.tsx   # Unified date/period picker
 ├── DataList.tsx            # Ranked list display
-├── Badge.tsx               # Status/category pill
+├── Badge.tsx               # Category/metadata/counter pill
 ├── EmptyState.tsx          # Placeholder for empty/unconfigured states
 ├── ErrorState.tsx          # Error display with retry action; includes NetworkError, DataError, PermissionError helpers
 ├── LoadingState.tsx        # Spinner + contextual message; also exports Skeleton and TableSkeleton
 ├── TabBar.tsx              # Sub-navigation tabs
 ├── Skeleton.tsx            # Shimmer/skeleton loading placeholders (5 variants)
 ├── AIContextIndicator.tsx  # AI data source completeness bar
-├── StatusBadge.tsx         # Unified status badges with statusConfig color map
+├── StatusBadge.tsx         # Unified status/severity/priority badge registry
 ├── TierGate.tsx            # Tier lock overlay + TierBadge
 ├── OnboardingChecklist.tsx # Full-screen modal guiding users through initial workspace setup
 ├── WorkflowStepper.tsx     # Horizontal numbered step indicator for multi-step workflows
@@ -568,9 +571,9 @@ Context so `<label htmlFor>` ↔ `<input id>` is wired automatically.
 | Primitive | API | Behavior |
 |-----------|-----|----------|
 | **FormField** | `label`, `error?`, `hint?`, `required?`, `children` | Wraps input with label above + error/hint below. Generates `inputId` + `descriptionId` via Context for a11y. forwardRef to the wrapping div. |
-| **FormInput** | `value`, `onChange(value)`, `type?`, `placeholder?`, plus HTMLInput attrs (minus `onChange`) | Native input with mint focus ring. Reads error state + id from FormFieldContext. |
+| **FormInput** | `value: string \| number`, `onChange?(value)`, `commitOnBlur?`, `onCommit?(value)`, `type?`, `placeholder?`, plus HTMLInput attrs (minus `onChange`/`value`) | Native input with mint focus ring. Reads error state + id from FormFieldContext. `commitOnBlur` buffers locally for editor cells that previously used `defaultValue` + `onBlur`. |
 | **FormSelect** | `options={[{value,label}]}`, `value`, `onChange(value)`, `placeholder?`, plus HTMLSelect attrs (minus `onChange`, `children`, `multiple`) | Select with the same dark-theme styling. Accepts `size`, `autoFocus`, `form`, `name`, etc. through rest spread. `multiple` is intentionally Omit'd — the single-string onChange can't represent multi-select; build a dedicated MultiSelect primitive if needed. |
-| **FormTextarea** | `value`, `onChange(value)`, `rows?`, `maxLength?` | Textarea with optional character counter (turns red at ≥90% of limit). |
+| **FormTextarea** | `value`, `onChange?(value)`, `commitOnBlur?`, `onCommit?(value)`, `rows?`, `maxLength?` | Textarea with optional character counter (turns red at ≥90% of limit). `commitOnBlur` buffers locally for long-form editor fields. |
 | **Checkbox** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | Custom visual checkbox over hidden native input — Space-key + a11y preserved. Mint on checked (Law 01). |
 | **Toggle** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | `role="switch"` with implicit aria-checked. Mint track on (Law 01), knob slides with transition. |
 

@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { SprintData } from '../../shared/types/roadmap';
-import { Button } from './ui';
+import { Button, FormSelect } from './ui';
 
 const PRIORITY_OPTIONS = [
   { value: 'all', label: 'All Priorities' },
@@ -57,37 +57,36 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select aria-label="Filter by priority" value={priority} onChange={e => setParam('priority', e.target.value)} className={cls}>
-        {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <FormSelect aria-label="Filter by priority" value={priority} onChange={value => setParam('priority', value)} options={PRIORITY_OPTIONS} className={cls} />
 
-      <select aria-label="Filter by status" value={status} onChange={e => setParam('status', e.target.value)} className={cls}>
-        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <FormSelect aria-label="Filter by status" value={status} onChange={value => setParam('status', value)} options={STATUS_OPTIONS} className={cls} />
 
-      <select aria-label="Filter by sprint" value={sprint} onChange={e => setParam('sprint', e.target.value)} className={cls}>
-        <option value="all">All Sprints</option>
-        {sprints.map(s => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
+      <FormSelect
+        aria-label="Filter by sprint"
+        value={sprint}
+        onChange={value => setParam('sprint', value)}
+        options={[{ value: 'all', label: 'All Sprints' }, ...sprints.map(s => ({ value: s.id, label: s.name }))]}
+        className={cls}
+      />
 
       {featureMap.size > 0 && (
-        <select aria-label="Filter by feature" value={feature} onChange={e => setParam('feature', e.target.value)} className={cls}>
-          <option value="all">All Features</option>
-          {Array.from(featureMap.entries()).map(([id, name]) => (
-            <option key={id} value={String(id)}>{name}</option>
-          ))}
-        </select>
+        <FormSelect
+          aria-label="Filter by feature"
+          value={feature}
+          onChange={value => setParam('feature', value)}
+          options={[{ value: 'all', label: 'All Features' }, ...Array.from(featureMap.entries()).map(([id, name]) => ({ value: String(id), label: name }))]}
+          className={cls}
+        />
       )}
 
       {allTags.length > 0 && (
-        <select aria-label="Filter by tag" value={tags} onChange={e => setParam('tags', e.target.value)} className={cls}>
-          <option value="all">All Tags</option>
-          {allTags.map(tag => (
-            <option key={tag} value={tag}>{tag}</option>
-          ))}
-        </select>
+        <FormSelect
+          aria-label="Filter by tag"
+          value={tags}
+          onChange={value => setParam('tags', value)}
+          options={[{ value: 'all', label: 'All Tags' }, ...allTags.map(tag => ({ value: tag, label: tag }))]}
+          className={cls}
+        />
       )}
 
       {hasActiveFilter && (

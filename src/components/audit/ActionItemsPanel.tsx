@@ -6,7 +6,7 @@ import {
   Loader2, CheckCircle, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
 import { get, post, patch, del } from '../../api/client';
-import { Button, EmptyState, Icon, IconButton, SectionCard, cn } from '../ui';
+import { Button, EmptyState, FormInput, Icon, IconButton, SectionCard, cn } from '../ui';
 
 interface ActionItem {
   id: string;
@@ -118,17 +118,17 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       {/* Add form */}
       {adding && (
         <div className="px-4 py-3 border-b border-[var(--brand-border)] space-y-2">
-          <input
+          <FormInput
             value={newTitle}
-            onChange={e => setNewTitle(e.target.value)}
+            onChange={setNewTitle}
             placeholder="What needs to be done?"
             className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
-          <input
+          <FormInput
             value={newDesc}
-            onChange={e => setNewDesc(e.target.value)}
+            onChange={setNewDesc}
             placeholder="Description (optional)"
             className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />

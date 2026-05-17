@@ -24,7 +24,7 @@ import {
   useGenerateCopy,
   useSendEntryToClientReview,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, IconButton } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, IconButton, FormTextarea } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopySection, QualityFlag } from '../../../shared/types/copy-pipeline';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
@@ -153,9 +153,9 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
           {/* Generated copy */}
           {editMode ? (
             <div className="space-y-2">
-              <textarea
+              <FormTextarea
                 value={editText}
-                onChange={e => setEditText(e.target.value)}
+                onChange={setEditText}
                 rows={8}
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
                 aria-label={`Edit copy for ${sectionLabel}`}
@@ -237,10 +237,10 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
               <label htmlFor={`regen-note-${section.id}`} className="t-caption text-[var(--brand-text-muted)]">
                 Steering note for regeneration
               </label>
-              <textarea
+              <FormTextarea
                 id={`regen-note-${section.id}`}
                 value={regenNote}
-                onChange={e => setRegenNote(e.target.value)}
+                onChange={setRegenNote}
                 rows={3}
                 placeholder="e.g. Make it more concise, lead with the value prop..."
                 className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"

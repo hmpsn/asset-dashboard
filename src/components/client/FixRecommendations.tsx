@@ -455,18 +455,18 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                     <span className="t-ui text-[var(--brand-text-bright)]">{cat.label}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
                     {cat.highTrafficPages > 0 && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand flex items-center gap-1">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-teal-500/10 border border-teal-500/20 text-accent-brand flex items-center gap-1">
                         <Icon as={ArrowUp} size="sm" />
                         {cat.highTrafficPages} with traffic
                       </span>
                     )}
                     {allDone && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-1">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-1">
                         <Icon as={CheckCircle2} size="sm" /> Addressed
                       </span>
                     )}
                     {completedCount > 0 && pendingCount > 0 && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-accent-info">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok bg-blue-500/10 border border-blue-500/20 text-accent-info">
                         {completedCount} done · {pendingCount} remaining
                       </span>
                     )}

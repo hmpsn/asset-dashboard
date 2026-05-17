@@ -6,7 +6,7 @@ import {
   Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X, Search,
 } from 'lucide-react';
-import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon, Button, ClickableRow } from '../ui';
+import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard, FormInput, FormTextarea, Icon, Button, ClickableRow } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 import { resolvePagePath } from '../../lib/pathUtils';
 import type {
@@ -205,7 +205,7 @@ export function PageEditRow({
                   size="sm"
                   loading={isAnalyzing}
                   icon={isAnalyzing ? undefined : Search}
-                  className="gap-1 px-2 py-1 t-caption-sm bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded"
+                  className="gap-1 px-2 py-1 t-caption-sm bg-teal-600/80 hover:bg-teal-500/80 text-white font-medium rounded-[var(--radius-md)]"
                   title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
                 >
                   {hasAnalysis ? 'Re-analyze' : 'Analyze Page'}
@@ -291,10 +291,10 @@ export function PageEditRow({
                 </Button>
               </div>
             </div>
-            <input
+            <FormInput
               type="text"
               value={edit.seoTitle}
-              onChange={e => onUpdateField(page.id, 'seoTitle', e.target.value)}
+              onChange={value => onUpdateField(page.id, 'seoTitle', value)}
               placeholder="Enter SEO title..."
               className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
             />
@@ -340,9 +340,9 @@ export function PageEditRow({
                 </Button>
               </div>
             </div>
-            <textarea
+            <FormTextarea
               value={edit.seoDescription}
-              onChange={e => onUpdateField(page.id, 'seoDescription', e.target.value)}
+              onChange={value => onUpdateField(page.id, 'seoDescription', value)}
               placeholder="Enter meta description..."
               rows={2}
               className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
@@ -395,8 +395,8 @@ export function PageEditRow({
                 size="sm"
                 loading={isDraftSaving}
                 icon={isDraftSaving ? undefined : isDraftSaved ? Check : Save}
-                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium ${
-                  isDraftSaved ? 'bg-blue-600 text-white border-0' : 'disabled:opacity-50 disabled:cursor-not-allowed'
+                className={`gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium ${
+                  isDraftSaved ? 'bg-emerald-600 text-white border-0' : 'disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 {isDraftSaved ? 'Draft Saved!' : isDraftSaving ? 'Saving...' : 'Save Draft'}

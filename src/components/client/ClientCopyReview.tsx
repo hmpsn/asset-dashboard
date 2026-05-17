@@ -9,7 +9,7 @@ import {
   FileText, Check, MessageSquare, ChevronDown, ChevronUp,
   AlertCircle, PenLine, FileCheck,
 } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, FormTextarea } from '../ui';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
@@ -554,9 +554,9 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
           <label className="t-caption text-[var(--brand-text)] block">
             How would you like this section to read?
           </label>
-          <textarea
+          <FormTextarea
             value={suggestedText}
-            onChange={e => setSuggestedText(e.target.value)}
+            onChange={setSuggestedText}
             placeholder="Type your suggested version here..."
             rows={4}
             className="w-full t-body bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"

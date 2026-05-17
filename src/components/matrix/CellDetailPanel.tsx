@@ -3,7 +3,7 @@ import {
   X, ExternalLink, FileText, PenTool, Flag, Check,
   Search, ArrowRight, ChevronRight, Clock,
 } from 'lucide-react';
-import { Badge, Button, IconButton } from '../ui';
+import { Badge, Button, FormTextarea, IconButton } from '../ui';
 import { TrendBadge } from '../ui/TrendBadge';
 import type { MatrixCell } from './types';
 import { timeAgo } from '../../lib/timeAgo';
@@ -289,18 +289,18 @@ export function CellDetailPanel({
               variant="secondary"
               className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 font-medium"
             >
-              Send for Review {/* send-for-review-anti-pattern-ok: matrix component predates Admin Send Convention */}
+              Send to client
             </Button>
           )}
 
           {onFlag && (showFlagForm ? (
             <div className="space-y-2">
-              <textarea
+              <FormTextarea
                 value={flagComment}
-                onChange={e => setFlagComment(e.target.value)}
+                onChange={setFlagComment}
                 placeholder="Describe what needs to change..."
                 rows={2}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
               />
               <div className="flex items-center gap-2">
                 <Button

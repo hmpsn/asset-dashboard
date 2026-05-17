@@ -1,4 +1,4 @@
-import { Icon, Button, IconButton, ClickableRow } from '../ui';
+import { Icon, Button, IconButton, ClickableRow, FormInput } from '../ui';
 import {
   ChevronDown, ChevronRight, Loader2, Pencil, Check, X,
   Search, BarChart3, Shield, DollarSign, ArrowUp, ArrowDown,
@@ -102,10 +102,10 @@ export function PageKeywordMapPanel({
         <div className="flex items-center gap-2 mt-2">
           <div className="relative flex-1">
             <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
-            <input
+            <FormInput
               type="text"
               value={pageSearch}
-              onChange={e => onSetPageSearch(e.target.value)}
+              onChange={onSetPageSearch}
               placeholder="Search pages, keywords..."
               className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
             />
@@ -153,11 +153,11 @@ export function PageKeywordMapPanel({
                     {page.searchIntent}
                   </span>
                 )}
-                <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] max-w-[180px] truncate">
+                <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] badge-span-ok max-w-[180px] truncate">
                   {page.primaryKeyword}
                 </span>
                 {page.validated === false && (
-                  <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded-[var(--radius-sm)] border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
+                  <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded-[var(--radius-sm)] badge-span-ok border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
                     Unvalidated
                   </span>
                 )}
@@ -284,19 +284,19 @@ export function PageKeywordMapPanel({
                   <div className="space-y-2">
                     <div>
                       <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider block mb-1">Primary Keyword</label>
-                      <input
+                      <FormInput
                         type="text"
                         value={editDraft.primary}
-                        onChange={e => onSetEditDraft(prev => ({ ...prev, primary: e.target.value }))}
+                        onChange={value => onSetEditDraft(prev => ({ ...prev, primary: value }))}
                         className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       />
                     </div>
                     <div>
                       <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider block mb-1">Secondary Keywords (comma-separated)</label>
-                      <input
+                      <FormInput
                         type="text"
                         value={editDraft.secondary}
-                        onChange={e => onSetEditDraft(prev => ({ ...prev, secondary: e.target.value }))}
+                        onChange={value => onSetEditDraft(prev => ({ ...prev, secondary: value }))}
                         className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       />
                     </div>
