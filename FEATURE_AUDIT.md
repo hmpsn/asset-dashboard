@@ -5960,3 +5960,16 @@ Bug hardening included:
 **Mutual:** Advances the phased parity program from “measuring drift” to “driving drift to zero,” preparing the next promotion wave with objective zero-backlog metrics.
 
 **Files:** `src/components/AssetAudit.tsx`; `src/components/assets/AssetCard.tsx`; `src/components/SearchDetail.tsx`; `src/components/briefs/BriefDetail.tsx`; `src/components/post-editor/ReviewChecklist.tsx`; `src/components/client/InboxTab.tsx`; `src/components/LandingPage.tsx`; `src/components/PostEditor.tsx`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 435. Styleguide Parity Ratchet Wave 14 (Warn → Error Promotions)
+**What it does:** Promotes three zero-backlog styleguide parity heuristics from warn-tier to error-tier enforcement in `pr-check`: `duplicate-heading-signal`, `nested-card-density-signal`, and `blue-action-semantic-drift`. The promotion uses existing fixture coverage in `tests/pr-check.test.ts` plus sustained zero-hit `verify:style-drift` results from Wave 13 cleanup. Registry and enforcement documentation are updated in the same PR so policy, machine-readable rule tiers, and verified-clean rationale stay in lockstep.
+
+**Agency value:** Locks in route-level cleanliness guarantees so duplicate headings, card-density drift, and blue-action semantic regressions are blocked at PR time rather than resurfacing in later polish passes.
+
+**Client value:** Preserves the cleaner styleguide-aligned interaction hierarchy and page structure in live surfaces by preventing these high-signal regressions from re-entering the product.
+
+**Mutual:** Completes another ratchet step with objective evidence (zero-hit metrics + fixtures), reducing advisory noise and tightening parity governance for future waves.
+
+**Files:** `scripts/pr-check.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `docs/rules/verified-clean-rules.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
