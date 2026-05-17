@@ -252,11 +252,12 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
               style={{ borderRadius: 'var(--radius-signature)' }}
             >
               <div className="px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  {/* Left: title + meta */}
-                  <div
-                    role="button"
-                    tabIndex={0}
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Left: title + meta */}
+                    {/* button-ok: this is a focusable content-summary region with sibling action buttons in the same row. */}
+                    <div
+                      role="button"
+                      tabIndex={0}
                     onClick={() => setActivePostId(post.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {

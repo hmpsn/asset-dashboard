@@ -32,8 +32,8 @@ The machine-readable companion is `data/styleguide-rule-registry.json`.
 
 ## Current Snapshot (2026-05-18)
 
-- `error`: 16
-- `warn`: 4
+- `error`: 18
+- `warn`: 2
 - `manual`: 3
 
 ## Promotion Contract

@@ -132,6 +132,7 @@ export function StrategyKeywordsSection({
                   const isOpen = openKeywordDrawer === row.normalized;
                   const isRemoving = removingKeyword === row.normalized;
                   return (
+                    // button-ok: row container remains a div because it contains nested action buttons.
                     <div
                       key={row.normalized}
                       role="button"
@@ -202,11 +203,12 @@ export function StrategyKeywordsSection({
               No suggestions right now — check back after your next data sync.
             </p>
           ) : (
-            <div className="flex flex-col gap-1">
-              {keywordIdeaRows.map(row => (
-                <div
-                  key={row.normalized}
-                  role="button"
+              <div className="flex flex-col gap-1">
+                {keywordIdeaRows.map(row => (
+                  // button-ok: suggestion row contains nested add-action button; wrapper cannot be a button element.
+                  <div
+                    key={row.normalized}
+                    role="button"
                   tabIndex={0}
                   className="relative overflow-hidden flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 cursor-pointer hover:border-teal-500/30 transition-colors"
                   onClick={() => { if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized); }}

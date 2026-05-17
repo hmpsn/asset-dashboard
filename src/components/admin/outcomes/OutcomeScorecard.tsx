@@ -162,7 +162,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
                     >
                       {pct}%
                     </span>
-                    <Badge label={`${cat.scored}/${cat.count}`} color="zinc" />
+                    <Badge label={`${cat.scored}/${cat.count}`} tone="zinc" />
                   </div>
                 </div>
               );

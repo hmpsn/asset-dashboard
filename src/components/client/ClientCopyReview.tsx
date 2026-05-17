@@ -285,7 +285,7 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Badge label={badgeConfig.label} color={badgeConfig.color} />
+          <Badge label={badgeConfig.label} tone={badgeConfig.color} />
           {/* Progress indicator — both fraction and bar use totalSections as denominator */}
           {copyStatus.totalSections > 0 && (
             <span className="t-caption text-[var(--brand-text-muted)]">
@@ -473,7 +473,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
           <PenLine className="w-3.5 h-3.5 text-[var(--brand-text)] shrink-0" />
           <span className="t-caption font-medium text-[var(--brand-text)]">{sectionLabel}</span>
         </div>
-        <Badge label={badgeConfig.label} color={badgeConfig.color} />
+        <Badge label={badgeConfig.label} tone={badgeConfig.color} />
       </div>
 
       {/* Copy text */}

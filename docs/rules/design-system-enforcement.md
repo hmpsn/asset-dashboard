@@ -42,9 +42,10 @@ from the `CHECKS` array.
   `global-token-declaration-outside-canonical-token-files`,
   `hardcoded card radius outside ui primitives`, and
   `badge-like-span-outside-primitives`.
+- Wave 9 ratchet (2026-05-18) promoted these zero-hit checks to error:
+  `badge-color-prop-deprecation` and
+  `interactive-div-role-button`.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
-  `badge-color-prop-deprecation`,
-  `interactive-div-role-button`, and
   `primitive-override-drift-on-form-controls`.
 
 ## Escape hatch

@@ -230,12 +230,12 @@
       "intent": "Deprecate Badge color prop in favor of tone semantics.",
       "scope": "src/components/**",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "component tests + tests/pr-check.test.ts before promotion",
       "metricKey": "badge_color_prop_usage_count",
       "owner": "client + admin-editor + enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "interactive-div-role-button",
@@ -243,12 +243,12 @@
       "intent": "Avoid non-primitive clickable containers for button-like interactions.",
       "scope": "src/components/**",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": "// button-ok",
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "interactive_div_button_count",
       "owner": "admin-editor + client + enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "primitive-override-drift-on-form-controls",

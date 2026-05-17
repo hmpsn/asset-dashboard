@@ -499,7 +499,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
       {/* Sections */}
       <SectionCard
         title="Sections"
-        titleExtra={<Badge label={`${sections.length}`} color="zinc" />}
+        titleExtra={<Badge label={`${sections.length}`} tone="zinc" />}
         titleIcon={<FileText className="w-4 h-4 text-amber-400" />}
         action={
           <span className="t-caption text-[var(--brand-text-muted)]">Drag to reorder</span>

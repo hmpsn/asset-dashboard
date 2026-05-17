@@ -196,7 +196,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 </h3>
                 <Badge
                   label={STATUS_CONFIG[activeSub.status]?.label || activeSub.status}
-                  color={STATUS_CONFIG[activeSub.status]?.badgeColor || 'zinc'}
+                  tone={STATUS_CONFIG[activeSub.status]?.badgeColor || 'zinc'}
                 />
               </div>
               <p className="t-caption-sm text-[var(--brand-text)]">
@@ -308,7 +308,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                     </span>
                     <Badge
                       label={cfg?.label || sub.status}
-                      color={cfg?.badgeColor || 'zinc'}
+                      tone={cfg?.badgeColor || 'zinc'}
                     />
                   </div>
                 </div>
