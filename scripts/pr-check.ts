@@ -5315,7 +5315,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'src-index-css-no-token-declarations',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.css'],
     displayScope: 'src/index.css',
     message:

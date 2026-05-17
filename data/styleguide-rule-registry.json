@@ -178,12 +178,12 @@
       "intent": "Forbid --* token declarations in src/index.css (token declarations belong in src/tokens.css only).",
       "scope": "src/index.css",
       "detectability": "deterministic",
-      "enforcementLevel": "warn",
+      "enforcementLevel": "error",
       "hatch": null,
       "fixtureRequirement": "tests/pr-check.test.ts before promotion",
       "metricKey": "src_index_token_decl_count",
       "owner": "enforcement",
-      "status": "advisory"
+      "status": "enforced"
     },
     {
       "id": "styleguide-css-must-import-public-tokens",

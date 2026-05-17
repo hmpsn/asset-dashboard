@@ -47,8 +47,10 @@ from the `CHECKS` array.
   `interactive-div-role-button`.
 - Wave 10 ratchet (2026-05-18) promoted this zero-hit check to error:
   `primitive-override-drift-on-form-controls`.
-- Current advisory backlog is warn-tier and intentionally non-blocking:
+- Wave 11 ratchet (2026-05-17) promoted this zero-hit check to error:
   `src-index-css-no-token-declarations`.
+- Current advisory backlog is empty (`warn` tier: 0). Remaining parity directives are
+  either enforced (`error`) or intentionally manual-review.
 
 ## Escape hatch
 
@@ -104,8 +106,8 @@ violations and fixture coverage was added.
 Verification: `npx tsx scripts/verify-styleguide-parity.ts`
 pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 
-`src/index.css` token declaration gap is now mechanized via
-`src-index-css-no-token-declarations` (warn tier). `verify-styleguide-parity.ts`
+`src/index.css` token declaration drift is now blocked by
+`src-index-css-no-token-declarations` (error tier). `verify-styleguide-parity.ts`
 remains as an additional parity gate.
 
 ### Outstanding hatches to migrate

@@ -5934,3 +5934,16 @@ Bug hardening included:
 **Mutual:** Advances the phased parity ratchet with measurable debt burn-down and a clean advisory-to-error promotion path.
 
 **Files:** `scripts/pr-check.ts`; `src/components/**` (form primitive callsites); `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 433. Styleguide Parity Ratchet Wave 11 (Token Declaration Authority Lock)
+**What it does:** Promotes `src-index-css-no-token-declarations` from advisory to blocking error after sustained zero-hit scans and existing fixture coverage. This locks token declaration authority so `--*` custom properties remain centralized in `src/tokens.css` (with `public/tokens.css` mirror) and cannot regress into `src/index.css`. Registry/enforcement docs and generated rule docs are synchronized in the same wave.
+
+**Agency value:** Hardens one of the highest-leverage token-governance invariants and removes a common source of silent theme drift.
+
+**Client value:** Preserves visual consistency by preventing split token declarations that can desynchronize styleguide and live surfaces.
+
+**Mutual:** Completes the current automated parity warning backlog, leaving styleguide parity rules either enforced (`error`) or intentionally manual-review.
+
+**Files:** `scripts/pr-check.ts`; `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
