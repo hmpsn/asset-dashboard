@@ -5486,7 +5486,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'duplicate-heading-signal',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/'],
@@ -5545,7 +5545,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'nested-card-density-signal',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/'],
@@ -5599,7 +5599,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'blue-action-semantic-drift',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: ['src/components/ui/'],
