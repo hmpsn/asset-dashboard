@@ -14,7 +14,7 @@ const TREND_COLORS = [CHART_SERIES_COLORS.blue, '#38bdf8', '#22d3ee', CHART_SERI
 
 // ── Sparkline: compact position-over-time for a single keyword ──
 function PositionSparkline({ data }: { data: { date: string; position: number }[] }) {
-  if (data.length < 2) return <span className="t-caption text-[var(--brand-text-dim)] italic">Not enough snapshots for trend</span>;
+  if (data.length < 2) return <span className="t-caption text-[var(--brand-text-muted)] italic">Not enough snapshots for trend</span>;
 
   const W = 200, H = 40, P = 4;
   const positions = data.map(d => d.position);
@@ -95,7 +95,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-signature-lg)]">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">Position History — Pinned Keywords</h4>
-        <span className="t-caption-sm text-[var(--brand-text-dim)]">{data.length} snapshots · lower is better</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.length} snapshots · lower is better</span>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible">
         {/* Y gridlines + labels */}

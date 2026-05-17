@@ -101,7 +101,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     <span className="t-caption-sm text-[var(--brand-text)] truncate">{link.foundOn || link.foundOnSlug}</span>
                     {link.anchorText && (
                       <>
-                        <span className="t-caption-sm text-[var(--brand-text-dim)]">·</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] italic truncate">"{link.anchorText}"</span>
                       </>
                     )}

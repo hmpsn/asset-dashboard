@@ -355,7 +355,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
                 const label = lp.landingPage === '/' ? 'Homepage' : lp.landingPage;
                 return (
                   <div key={i} className="flex items-center gap-2 py-1.5 px-2.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]/50 transition-colors">
-                    <span className="t-caption-sm text-[var(--brand-text-dim)] w-4 text-right">{i + 1}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] w-4 text-right">{i + 1}</span>
                     <span className="t-caption text-[var(--brand-text-bright)] flex-1 truncate font-mono">{label}</span>
                     <span className="t-caption text-accent-success font-medium tabular-nums flex-shrink-0">{formatNum(lp.sessions)}</span>
                     <span className={`t-caption-sm flex-shrink-0 w-12 text-right ${lp.bounceRate > 70 ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]'}`}>{lp.bounceRate}%</span>
@@ -363,7 +363,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
                 );
               })}
             </div>
-            <div className="flex items-center justify-end gap-4 mt-2 t-caption-sm text-[var(--brand-text-dim)]">
+            <div className="flex items-center justify-end gap-4 mt-2 t-caption-sm text-[var(--brand-text-muted)]">
               <span>Sessions</span>
               <span>Bounce</span>
             </div>
