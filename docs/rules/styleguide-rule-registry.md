@@ -30,9 +30,9 @@ The machine-readable companion is `data/styleguide-rule-registry.json`.
 - `warn`: useful automated signal but not yet promotion-safe.
 - `manual`: visual/editorial checks requiring reviewer judgment.
 
-## Current Snapshot (2026-05-17, Wave 14)
+## Current Snapshot (2026-05-17, Wave 15)
 
-- `error`: 22
+- `error`: 23
 - `warn`: 1
 - `manual`: 0
 

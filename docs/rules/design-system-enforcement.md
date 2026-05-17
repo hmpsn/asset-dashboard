@@ -55,8 +55,12 @@ from the `CHECKS` array.
   `duplicate-heading-signal`,
   `nested-card-density-signal`, and
   `blue-action-semantic-drift`.
+- Wave 15 ratchet (2026-05-17) promoted `src-index-css-no-token-declarations`
+  to error after sustained zero-hit verification and added
+  `status-semantic-mapping-drift` as a new warn-tier advisory detector with
+  file-level reporting.
 - Current advisory backlog is warn-tier and intentionally non-blocking:
-  `src-index-css-no-token-declarations`.
+  `status-semantic-mapping-drift`,
 
 ## Escape hatch
 
@@ -113,7 +117,7 @@ Verification: `npx tsx scripts/verify-styleguide-parity.ts`
 pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 
 `src/index.css` token declaration gap is now mechanized via
-`src-index-css-no-token-declarations` (warn tier). `verify-styleguide-parity.ts`
+`src-index-css-no-token-declarations` (error tier). `verify-styleguide-parity.ts`
 remains as an additional parity gate.
 
 Route-level cleanliness heuristics for duplicate headings, nested `SectionCard`

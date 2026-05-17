@@ -5315,7 +5315,7 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'src-index-css-no-token-declarations',
-    severity: 'warn',
+    severity: 'error',
     fileGlobs: ['*.css'],
     displayScope: 'src/index.css',
     message:
@@ -5643,6 +5643,78 @@ export const CHECKS: Check[] = [
             file,
             line: index + 1,
             text: `${startMatch[1]} uses blue action styling`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+  {
+    name: 'status-semantic-mapping-drift',
+    severity: 'warn',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/'],
+    message:
+      'Potential local status color/tone mapping detected. Prefer StatusBadge domain mappings (or shared status config) over per-component status maps. Hatch intentional cases with // status-semantic-ok.',
+    rationale:
+      'Local status maps drift quickly across inbox/content/schema/settings surfaces. Centralizing status semantics preserves consistent tone meanings and label behavior.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const statusMapDefRe = /\bconst\s+(statusColors?|statusMap)\s*[:=]/;
+      const statusTernaryRe = /\bconst\s+statusColor\s*=\s*.*\bstatus\b.*[?:]/;
+      const statusBadgeFnRe = /\bconst\s+statusBadge\s*=\s*\(/;
+      const statusToneTokenRe = /\b(?:bg|text|border)-(?:amber|red|orange|emerald|teal|blue|zinc)-[0-9]+|\btext-accent-(?:danger|warning|success|brand|info)\b/;
+      const statusToneLiteralRe = /['"`](?:red|amber|orange|emerald|teal|blue|zinc)['"`]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+
+        let src: string;
+        try {
+          src = readFileSync(file, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const lines = src.split('\n');
+        const flagged = new Set<number>();
+
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          const windowText = lines.slice(index, Math.min(lines.length, index + 24)).join(' ');
+
+          if (statusMapDefRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/<StatusBadge\b/.test(windowText)) continue;
+            if (!statusToneTokenRe.test(windowText) && !statusToneLiteralRe.test(windowText)) continue;
+            flagged.add(index + 1);
+            continue;
+          }
+
+          if (statusTernaryRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/statusCfg\?\.color/.test(line)) continue;
+            if (!statusToneLiteralRe.test(windowText)) continue;
+            flagged.add(index + 1);
+            continue;
+          }
+
+          if (statusBadgeFnRe.test(line)) {
+            if (hasHatch(lines, index, 'status-semantic-ok')) continue;
+            if (/<StatusBadge\b/.test(windowText)) continue;
+            if (!/(<Badge\b|<span\b)/.test(windowText)) continue;
+            flagged.add(index + 1);
+          }
+        }
+
+        for (const lineNumber of [...flagged].sort((a, b) => a - b)) {
+          hits.push({
+            file,
+            line: lineNumber,
+            text: 'local status mapping detected',
           });
         }
       }

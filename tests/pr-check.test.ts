@@ -4689,6 +4689,7 @@ describe('Meta: customCheck rule name registry', () => {
     'duplicate-heading-signal',
     'nested-card-density-signal',
     'blue-action-semantic-drift',
+    'status-semantic-mapping-drift',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -7388,6 +7389,54 @@ describe('Rule: blue-action-semantic-drift', () => {
       lines(
         'export function Foo() {',
         '  return <span className="text-blue-400">Read-only metric</span>;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: status-semantic-mapping-drift', () => {
+  const RULE = 'status-semantic-mapping-drift';
+
+  it('flags local status tone maps', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo({ status }: { status: string }) {',
+        '  const statusColors: Record<string, string> = {',
+        "    open: 'bg-blue-500/10 text-accent-info border-blue-500/30',",
+        "    done: 'bg-emerald-500/10 text-accent-success border-emerald-500/30',",
+        '  };',
+        '  return <span className={statusColors[status] ?? statusColors.open}>{status}</span>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('local status mapping');
+  });
+
+  it('passes when using StatusBadge domain mapping', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        "import { StatusBadge } from '../ui';",
+        'export function Foo({ status }: { status: string }) {',
+        '  return <StatusBadge status={status} domain="approval" fallback="neutral" />;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects status-semantic-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-status-semantic', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo({ status }: { status: string }) {',
+        '  const statusColor = status === "ok" ? "emerald" : "red"; // status-semantic-ok: HTTP status code badge map',
+        '  return <span className={statusColor}>{status}</span>;',
         '}',
       ),
     );
