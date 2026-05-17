@@ -5934,3 +5934,16 @@ Bug hardening included:
 **Mutual:** Advances the phased parity ratchet with measurable debt burn-down and a clean advisory-to-error promotion path.
 
 **Files:** `scripts/pr-check.ts`; `src/components/**` (form primitive callsites); `docs/rules/automated-rules.md`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 433. Styleguide Parity Ratchet Wave 12 (Advisory Surface Signals)
+**What it does:** Adds three non-blocking styleguide-parity advisory detectors to improve live-surface cleanliness targeting before promotion to error-tier enforcement: `duplicate-heading-signal`, `nested-card-density-signal`, and `blue-action-semantic-drift`. The checks live in `scripts/pr-check.ts` as warn-tier custom detectors with explicit hatches, and `tests/pr-check.test.ts` now includes fixture coverage for trigger + hatch behavior so each detector has stable regression tests. `scripts/report-style-drift.ts` was extended to report file-level advisory counts for all three categories, including top-file breakdown output to guide ownership-slice cleanup.
+
+**Agency value:** Gives us actionable, low-noise visibility into styleguide drift patterns that are currently most responsible for “clean styleguide vs busier live UI” perception.
+
+**Client value:** Enables focused polish passes on real client/admin routes by surfacing duplicated headings, over-nested card surfaces, and action-color semantics that feel inconsistent.
+
+**Mutual:** Keeps delivery velocity high by measuring these rules in advisory mode first, while building the data and fixture confidence needed for later ratchet-to-error promotions.
+
+**Files:** `scripts/pr-check.ts`; `tests/pr-check.test.ts`; `scripts/report-style-drift.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `docs/rules/verified-clean-rules.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

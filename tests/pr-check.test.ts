@@ -4686,6 +4686,9 @@ describe('Meta: customCheck rule name registry', () => {
     'badge-color-prop-deprecation',
     'interactive-div-role-button',
     'primitive-override-drift-on-form-controls',
+    'duplicate-heading-signal',
+    'nested-card-density-signal',
+    'blue-action-semantic-drift',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -7259,6 +7262,132 @@ describe('Rule: primitive-override-drift-on-form-controls', () => {
         "import { FormInput } from '../ui/forms';",
         'export function Foo() {',
         '  return <FormInput value="" onChange={() => {}} className="px-3 py-2 border border-[var(--brand-border)] rounded-[var(--radius-lg)]" />; // form-override-ok: compact legacy row',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: duplicate-heading-signal', () => {
+  const RULE = 'duplicate-heading-signal';
+
+  it('flags repeated heading text in one file', () => {
+    const file = write(
+      uniqPath('rule-duplicate-heading', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return (',
+        '    <>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '      <section>...</section>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '    </>',
+        '  );',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('duplicate heading');
+  });
+
+  it('respects duplicate-heading-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-duplicate-heading', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return (',
+        '    <>',
+        '      <h2 className="t-h2">Overview Summary</h2>',
+        '      <section>...</section>',
+        '      <h2 className="t-h2">Overview Summary</h2> // duplicate-heading-ok: mirrored mobile branch',
+        '    </>',
+        '  );',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: nested-card-density-signal', () => {
+  const RULE = 'nested-card-density-signal';
+
+  it('flags nested SectionCard usage', () => {
+    const file = write(
+      uniqPath('rule-nested-card', 'src/components/Foo.tsx'),
+      lines(
+        "import { SectionCard } from '../ui';",
+        'export function Foo() {',
+        '  return (',
+        '    <SectionCard>',
+        '      <SectionCard>Inner</SectionCard>',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('nested inside');
+  });
+
+  it('respects nested-card-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-nested-card', 'src/components/Foo.tsx'),
+      lines(
+        "import { SectionCard } from '../ui';",
+        'export function Foo() {',
+        '  return (',
+        '    <SectionCard>',
+        '      <SectionCard>Inner</SectionCard> // nested-card-ok: intentional contained specimen',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: blue-action-semantic-drift', () => {
+  const RULE = 'blue-action-semantic-drift';
+
+  it('flags blue-styled action buttons', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        "import { Button } from '../ui';",
+        'export function Foo() {',
+        '  return <Button className="bg-blue-500/10 text-blue-400">Save</Button>;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('Button uses blue action styling');
+  });
+
+  it('respects blue-action-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        "import { Button } from '../ui';",
+        'export function Foo() {',
+        '  return <Button className="bg-blue-500/10 text-blue-400">Save</Button>; // blue-action-ok: analytics toggle demo',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-action blue text', () => {
+    const file = write(
+      uniqPath('rule-blue-action', 'src/components/Foo.tsx'),
+      lines(
+        'export function Foo() {',
+        '  return <span className="text-blue-400">Read-only metric</span>;',
         '}',
       ),
     );
