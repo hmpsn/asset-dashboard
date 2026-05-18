@@ -80,6 +80,16 @@ describe('parseDateRange', () => {
   it('returns undefined when both are missing', () => {
     expect(parseDateRange({})).toBeUndefined();
   });
+
+  it('returns undefined when either date is not canonical YYYY-MM-DD', () => {
+    expect(parseDateRange({ startDate: '2024-1-01', endDate: '2024-01-31' })).toBeUndefined();
+    expect(parseDateRange({ startDate: 'not-a-date', endDate: '2024-01-31' })).toBeUndefined();
+    expect(parseDateRange({ startDate: '2024-01-01', endDate: '2024-02-30' })).toBeUndefined();
+  });
+
+  it('returns undefined when startDate is after endDate', () => {
+    expect(parseDateRange({ startDate: '2024-02-01', endDate: '2024-01-31' })).toBeUndefined();
+  });
 });
 
 // ── applySuppressionsToAudit ──

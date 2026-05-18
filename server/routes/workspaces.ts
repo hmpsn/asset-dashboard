@@ -384,7 +384,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);
@@ -395,7 +395,7 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
 // --- Auto-generate brand voice from website crawl ---
 router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);
@@ -406,7 +406,7 @@ router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess()
 // --- Auto-generate audience personas from website crawl ---
 router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), async (req, res) => {
   try {
-    const started = startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, req.params.id);
+    const started = await startWorkspaceContextGenerationJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION, req.params.id);
     res.json(started);
   } catch (err) {
     const response = workspaceContextJobErrorResponse(err);

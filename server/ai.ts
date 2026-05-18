@@ -51,6 +51,9 @@ export const RESEARCH_MODE_INSTRUCTIONS = `RESEARCH MODE:
 - If the context does not contain enough evidence, say what is missing instead of guessing.
 - Do not invent statistics, quotes, citations, studies, client results, publication names, or source URLs.
 - When using supplied source material, preserve source names and direct evidence accurately.
+- Distinguish observed evidence from inference. Use explicit language ("The provided data shows..." vs "This likely means...").
+- If a user asks for sources or citations and none were provided, explicitly say source verification is unavailable in this context.
+- Never present inferred or example values as verified facts.
 - Prefer cautious, verifiable wording over confident claims when evidence is partial.`;
 
 function applyResearchMode(system: string | undefined, enabled: boolean | undefined): string | undefined {

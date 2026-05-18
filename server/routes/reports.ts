@@ -339,6 +339,9 @@ router.post('/api/monthly-report/:workspaceId', requireWorkspaceAccess('workspac
     const result = await triggerMonthlyReport(req.params.workspaceId);
     res.json({ sent: result.sent, html: result.html, reportId: result.reportId });
   } catch (err) {
+    if (err instanceof Error && err.message === 'Workspace not found') {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate report' });
   }
 });

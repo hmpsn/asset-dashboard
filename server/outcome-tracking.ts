@@ -43,14 +43,10 @@ const stmts = createStmtCache(() => ({
   getByWorkspaceAndSource: db.prepare(`SELECT * FROM tracked_actions WHERE workspace_id = ? AND source_type = ? AND source_id = ?`),
   getPendingMeasurement: db.prepare(`SELECT * FROM tracked_actions WHERE measurement_complete = 0`),
   getNotActedOn: db.prepare(`SELECT * FROM tracked_actions WHERE attribution = 'not_acted_on' AND measurement_complete = 0`),
-  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
-  updateAttribution: db.prepare(`UPDATE tracked_actions SET attribution = ?, updated_at = datetime('now') WHERE id = ?`),
-  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
-  markComplete: db.prepare(`UPDATE tracked_actions SET measurement_complete = 1, updated_at = datetime('now') WHERE id = ?`),
-  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
-  updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ?`),
-  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
-  updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ?`),
+  updateAttribution: db.prepare(`UPDATE tracked_actions SET attribution = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
+  markComplete: db.prepare(`UPDATE tracked_actions SET measurement_complete = 1, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
+  updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
+  updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ?`),
   insertOutcome: db.prepare(`
     INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at)
     VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at)
@@ -239,20 +235,24 @@ export function getNotActedOnActions(): TrackedAction[] {
   return rows.map(rowToTrackedAction);
 }
 
-export function updateAttribution(actionId: string, attribution: Attribution): void {
-  stmts().updateAttribution.run(attribution, actionId);
+export function updateAttribution(actionId: string, workspaceId: string, attribution: Attribution): boolean {
+  const result = stmts().updateAttribution.run(attribution, actionId, workspaceId);
+  return result.changes > 0;
 }
 
-export function markActionComplete(actionId: string): void {
-  stmts().markComplete.run(actionId);
+export function markActionComplete(actionId: string, workspaceId: string): boolean {
+  const result = stmts().markComplete.run(actionId, workspaceId);
+  return result.changes > 0;
 }
 
-export function updateActionContext(actionId: string, context: ActionContext): void {
-  stmts().updateContext.run(JSON.stringify(context), actionId);
+export function updateActionContext(actionId: string, workspaceId: string, context: ActionContext): boolean {
+  const result = stmts().updateContext.run(JSON.stringify(context), actionId, workspaceId);
+  return result.changes > 0;
 }
 
-export function updateBaselineSnapshot(actionId: string, snapshot: BaselineSnapshot): void {
-  stmts().updateBaseline.run(JSON.stringify(snapshot), actionId);
+export function updateBaselineSnapshot(actionId: string, workspaceId: string, snapshot: BaselineSnapshot): boolean {
+  const result = stmts().updateBaseline.run(JSON.stringify(snapshot), actionId, workspaceId);
+  return result.changes > 0;
 }
 
 export function recordOutcome(params: {

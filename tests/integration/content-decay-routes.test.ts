@@ -350,14 +350,11 @@ describe('POST /api/content-decay/:workspaceId/analyze', () => {
     expect(body).toHaveProperty('error');
   });
 
-  it('returns 500 when workspace has no GSC configuration', async () => {
+  it('returns 400 when workspace has no GSC configuration', async () => {
     // wsEmpty has no gscPropertyUrl or webflowSiteId — analyzeContentDecay will throw
     const res = await postJson(`/api/content-decay/${wsEmpty}/analyze`, {});
-    // The route catches the error and returns 500 with { error: string }
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toHaveProperty('error');
-    expect(typeof body.error).toBe('string');
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'GSC not configured for this workspace' });
   });
 });
 

@@ -338,7 +338,7 @@ router.post(
         ...action.context,
         notes: existingNotes ? `${existingNotes}\n${req.body.note}` : req.body.note,
       };
-      updateActionContext(req.params.actionId, updatedContext);
+      updateActionContext(req.params.actionId, req.params.workspaceId, updatedContext);
       res.json({ success: true });
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId, actionId: req.params.actionId }, 'Failed to add note');

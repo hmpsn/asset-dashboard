@@ -85,6 +85,7 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
       maxTokens,
       feature: 'admin-chat',
       workspaceId: ws.id,
+      researchMode: true,
     });
 
     const answer = aiResult.text || 'No response generated.';

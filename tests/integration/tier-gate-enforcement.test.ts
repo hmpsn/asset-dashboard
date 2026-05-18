@@ -192,6 +192,14 @@ describe('GET /api/public/chat-usage/:workspaceId — chat tier gating', () => {
 });
 
 describe('POST /api/public/search-chat/:workspaceId — trial tier rate gate', () => {
+  it('returns 404 for unknown workspace', async () => {
+    const res = await postJson('/api/public/search-chat/nonexistent-ws-id', {
+      question: 'What changed this month?',
+    });
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
+  });
+
   it('trial workspace bypasses free conversation cap before AI configuration check', async () => {
     for (let i = 0; i < 3; i += 1) {
       addMessage(trialWs.workspaceId, `trial-rate-test-${i}`, 'client', 'user', 'hello');

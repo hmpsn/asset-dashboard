@@ -239,7 +239,8 @@ router.get('/api/public/pricing/:id', (req, res) => {
 
 router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
   const filtered = latest.audit;
@@ -257,7 +258,8 @@ router.get('/api/public/audit-summary/:workspaceId', (req, res) => {
 
 router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
-  if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const latest = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
   if (!latest) return res.json(null);
   const filtered = latest.audit;

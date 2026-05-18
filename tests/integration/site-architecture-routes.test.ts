@@ -7,7 +7,7 @@
  *      and strategy keywords (Webflow API is skipped for workspaces without a siteId)
  *   3. GET /api/site-architecture/:workspaceId/schema-coverage — schema coverage analysis
  *   4. Empty workspace returns an empty tree (root only), not an error
- *   5. Unknown workspace returns 500 (workspace not found)
+ *   5. Unknown workspace returns 404 (workspace not found)
  *   6. Workspace scoping — data from workspace A is not visible via workspace B's URL
  *
  * Webflow API calls are bypassed by omitting webflowSiteId on the test workspace.
@@ -433,12 +433,11 @@ describe('URL hierarchy — path segment accuracy', () => {
 // ===========================================================================
 
 describe('GET /api/site-architecture/:workspaceId', () => {
-  it('returns 500 for an unknown workspace', async () => {
+  it('returns 404 for an unknown workspace', async () => {
     const res = await api('/api/site-architecture/ws_nonexistent_arch_xyz');
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body).toHaveProperty('error');
-    expect(body.error).toMatch(/not found/i);
+    expect(body).toEqual({ error: 'Workspace not found' });
   });
 
   it('returns 200 with a valid tree for a workspace without Webflow configured', async () => {

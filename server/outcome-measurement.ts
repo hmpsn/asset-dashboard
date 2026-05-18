@@ -139,7 +139,7 @@ export async function captureBaselineFromGsc(
     const fullUrl = resolveFullPageUrl(pageUrl, ws);
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 28);
     if (!rows.length) return;
-    updateBaselineSnapshot(actionId, {
+    updateBaselineSnapshot(actionId, workspaceId, {
       ...averageGscRows(rows),
       captured_at: new Date().toISOString(),
     });
@@ -376,7 +376,7 @@ async function scoreActionAtCheckpoint(
         ...action.context,
         relatedActions,
       };
-      updateActionContext(action.id, updatedContext);
+      updateActionContext(action.id, action.workspaceId, updatedContext);
     }
   }
 
