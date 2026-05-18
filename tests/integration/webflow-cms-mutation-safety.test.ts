@@ -163,6 +163,12 @@ describe('webflow CMS mutation safety', () => {
     await expect(res.json()).resolves.toEqual({ error: 'offset must be a non-negative integer' });
   });
 
+  it('GET collection items rejects non-integer offset values', async () => {
+    const res = await api(`/api/webflow/collections/col_123/items?workspaceId=${workspaceAId}&siteId=${siteA}&offset=1.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'offset must be a non-negative integer' });
+  });
+
   it('PATCH collection item success writes draft page state, activity, broadcast, and read-path visibility', async () => {
     const res = await patchJson('/api/webflow/collections/col_123/items/item_123', {
       workspaceId: workspaceAId,
