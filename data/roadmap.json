@@ -12,8 +12,9 @@
           "source": "UI_UX_AUDIT §7",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-18: merged NotificationBell + TaskPanel into a unified Notification Hub with categorized sections (Actions Needed, Alerts, System Events), background task progress/cancel/dismiss controls in-drawer, and removed standalone floating TaskPanel mount from App.",
+          "status": "done",
+          "shippedAt": "2026-05-18"
         },
         {
           "id": 535,

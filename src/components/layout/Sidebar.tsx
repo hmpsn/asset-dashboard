@@ -259,7 +259,10 @@ export function Sidebar({
 
       {/* Bottom: icon-only utility bar */}
       <div className="px-3 py-2.5 border-t border-[var(--brand-border)] flex items-center justify-center gap-1">
-        <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} />
+        <NotificationBell
+          onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))}
+          workspaceId={selected?.id}
+        />
         <IconButton
           onClick={() => navigate('/revenue')}
           icon={DollarSign}

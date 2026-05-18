@@ -14,7 +14,6 @@ import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, use
 import { useQueryClient } from '@tanstack/react-query';
 import { ToastProvider } from './components/Toast';
 import { BackgroundTaskProvider } from './hooks/useBackgroundTasks';
-import { TaskPanel } from './components/TaskPanel';
 import { AdminChat } from './components/AdminChat';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
@@ -166,7 +165,7 @@ function AdminApp() {
     return <div className={theme === 'light' ? 'dashboard-light' : ''}><LoginScreen onLogin={auth.login} /></div>;
   }
 
-  return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /><TaskPanel /></div>;
+  return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
 function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
