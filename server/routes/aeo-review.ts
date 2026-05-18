@@ -116,6 +116,9 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
   if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
     return res.status(400).json({ error: 'maxPages must be a positive integer' });
   }
+  if (requestedMaxPages > 25) {
+    return res.status(400).json({ error: 'maxPages must be between 1 and 25' });
+  }
   const maxPages = Math.min(requestedMaxPages, 25);
 
   try {
