@@ -103,132 +103,6 @@
       ]
     },
     {
-      "id": "sprint-platform-health-wave6-deferred-polish",
-      "name": "Platform Health Wave 6 — Deferred Platform Polish",
-      "hours": "16-28",
-      "rationale": "Park useful but less urgent platform-health work behind the first five waves so it stays visible without competing with higher-confidence unlocks.",
-      "items": [
-        {
-          "id": "platform-org-frontend-container-decomposition",
-          "title": "Frontend Container Decomposition Pass",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "4-8h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Shipped 2026-05-15 in three sequential staging-first PRs: (1) HealthTab decomposition (`useHealthTabShell` + section components + extraction contract), (2) InboxTab decomposition (`useInboxTabShell`, extracted inbox filter contract module, new/legacy layout wrappers, and extraction contract), (3) ClientDashboard shell decomposition (`useClientWorkspaceBootstrap`, extracted nav derivation helpers, tab-composition shell, and updated deep-link contract parser for panel-map routing). All work was behavior-preserving (no API/shared-type/route/feature-flag semantic changes), independently reviewed, and merged after green CI on each PR.\nWave follow-up 2026-05-16: centralized repeated HealthTab pure logic into `healthTabModel.ts` (issue-impact mapping, filtered-page derivation, category stats, info counts, fix-type grouping) and wired `useHealthTabShell`/`HealthTabSections` to consume the shared helpers, with new extraction/model guardrail tests."
-        },
-        {
-          "id": "platform-org-api-wrapper-cleanup",
-          "title": "API Wrapper Domain Cleanup",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Shipped 2026-05-16: completed an incremental, backward-compatible API-wrapper domain split. Added `src/api/platform.ts` (jobs/roadmap/features/notifications/workspace-home/observability surfaces) and `src/api/schema.ts` (schema/schema-validation/schema-plan/schema-impact surfaces), then converted `src/api/misc.ts` and `src/api/seo.ts` into compatibility re-export facades for those moved wrappers. Updated adjacent consumers to import from new domain modules (`useWorkspaceHome`, `useIntegrationHealth`, `useNotifications`, `FeatureLibrary`, `Roadmap`, `BulkAcceptPanel`, `useSchemaValidation`, `SchemaPlanPanel`, `SchemaImpactPanel`, `useSchemaSuggesterPublishingWorkflow`). Added contract guardrails (`tests/contract/api-wrapper-domain-cleanup.test.ts`) plus compatibility test updates to lock ownership boundaries while preserving legacy import paths."
-        },
-        {
-          "id": "platform-org-architecture-drift-checks",
-          "title": "Architecture Drift Checks",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).\nWave follow-up 2026-05-15: completed a parallel admin action-button primitive sweep across SEO Editor action rows (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls, WorkspaceHome action links/status cards, and SchemaSuggester top controls. Style drift metrics improved from `raw_button_unallowlisted_count: 891 -> 855` and `non_primitive_action_count: 876 -> 840`; admin raw-button count now `717` (down from `753`).\nWave 3b follow-up 2026-05-15: migrated admin settings/audit controls in `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and SEO Audit share actions to `Button`/`IconButton`. Style drift metrics improved further to `raw_button_unallowlisted_count: 808` and `non_primitive_action_count: 793`; admin raw-button count now `670`.\nWave 4 follow-up 2026-05-17: established canonical styleguide parity rule registry artifacts (`docs/rules/styleguide-rule-registry.md`, `data/styleguide-rule-registry.json`) with rule-level enforcement tiers (`error|warn|manual`), ownership, metric keys, and promotion prerequisites to guide future ratchet waves from advisory to blocking checks.\nWave 5 follow-up 2026-05-17: added three non-blocking parity detectors in `pr-check` (`styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`) with fixture coverage in `tests/pr-check.test.ts` so token/typography drift surfaces as advisory before promotion.\nWave 8 follow-up 2026-05-18: promoted five zero-backlog parity rules to blocking errors (`hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`), added warn-tier detectors (`src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, `primitive-override-drift-on-form-controls`), and migrated the final four live badge-like spans to `Badge` primitives in client surfaces.\nWave 10 follow-up 2026-05-17: removed structural class overrides from shared form primitive callsites across client/admin/editor surfaces, tightened `primitive-override-drift-on-form-controls` to structural drift only, promoted that rule from warn to error with docs/registry sync, and reached zero backlog (`raw form control advisory: admin=0, client=0, total=0`).\nWave 12 follow-up 2026-05-17: added three warn-tier styleguide parity heuristics in `pr-check` (`duplicate-heading-signal`, `nested-card-density-signal`, `blue-action-semantic-drift`), added fixture coverage for trigger + hatch behavior in `tests/pr-check.test.ts`, and expanded `scripts/report-style-drift.ts` with file-level advisory breakdowns for duplicate headings, nested SectionCard density, and blue action-semantic drift so cleanup can be targeted by ownership slice without blocking CI.\nWave 13 follow-up 2026-05-17: resolved all active advisory hits for the three Wave 12 heuristics by (a) converting remaining blue-styled action controls to teal semantics in asset audit/cards and SERP evidence links, and (b) marking intentional duplicated heading patterns in feature-flagged or dynamic-title surfaces with explicit `duplicate-heading-ok` hatches. Current style drift report is zero across duplicate-heading, nested-card-density, and blue-action-semantic advisories.\nWave 15 follow-up 2026-05-17: promoted `src-index-css-no-token-declarations` from warn to error after sustained zero-hit verification and added `status-semantic-mapping-drift` as a new warn-tier detector with fixture coverage and `report-style-drift` file-level advisory breakdowns to drive centralized StatusBadge/status-registry cleanup.\nWave 16 follow-up 2026-05-17: completed the remaining status-semantic migration sweep (requests, workspace-home, batch generation, redirect manager), added a canonical `request` StatusBadge domain, drove `status_semantic_mapping_drift_count` to zero, and promoted `status-semantic-mapping-drift` from warn to error with docs/registry synchronization.\nWave 17 pre-plan audit 2026-05-17: ran parallel read-only audits across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing; registered newly discovered parity directives as planned warn/manual contracts in the canonical registry; and published an execution matrix in  to drive the next detector + cleanup ratchet batches.\nWave 17b follow-up 2026-05-17: added automated staging merge integrity guardrails for stacked PR flows (`scripts/report-staging-merge-integrity.ts`) with CI + nightly wiring and explicit historical exception tracking in `data/staging-merge-integrity-exceptions.json` so non-staging merges that fail to land in `staging` are surfaced immediately.\nWave 18 follow-up 2026-05-17: began typography hierarchy ratchet by promoting `muted-text-two-tier-only` from planned to active advisory, adding warn-tier detection + hatch support in `pr-check`, and extending `report-style-drift` with per-file muted-tier counts (`mutedTextTierViolationCount`) to drive targeted cleanup waves.\nWave 19 follow-up 2026-05-17: activated three additional Wave 17 planned styleguide parity directives as warn-tier advisories — `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal` — with `pr-check` detectors, hatch support, fixture coverage in `tests/pr-check.test.ts`, and new `report-style-drift` file-level metrics to route cleanup by ownership slice.",
-          "shippedAt": "2026-05-15"
-        },
-        {
-          "id": "platform-confidence-demo-workspaces",
-          "title": "Deterministic QA/Demo Workspaces",
-          "source": "Product engineering confidence review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "done",
-          "notes": "Shipped 2026-05-16: expanded `npm run seed:demo` into a deterministic 6-scenario workspace matrix. Added explicit scenario coverage for `empty-new`, `free-client`, `growth-active`, `premium-history`, `broken-integrations`, and `rich-cms`, with fixed IDs and deterministic fixture values. Seeder now resets seeded workspace-scope artifacts each run (`requests`, `work_orders`, `approval_batches`, `client_actions`, `content_topic_requests`, `content_briefs`, `content_posts`, `schema_site_plans`, `schema_snapshots`, `schema_publish_history`, `page_edit_states`) and then applies scenario-specific history seeds so manual QA + smoke runs start from a repeatable baseline. Added guard tests for scenario coverage and broken-integration invariants, and updated local onboarding docs with the full fixture matrix and route list."
-        },
-        {
-          "id": "platform-confidence-risky-module-dashboard",
-          "title": "Risky Module Health Dashboard",
-          "source": "Product engineering confidence review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P3",
-          "status": "done",
-          "notes": "Shipped 2026-05-16: added `scripts/platform-risky-module-dashboard.ts` risk analyzer and `scripts/report-risky-modules.ts` CLI wrapper. The dashboard ranks modules by weighted risk signals: line count, 90/180-day git churn, internal import fan-in/fan-out, TODO/FIXME/HACK + `*-ok` hatch density, test linkage, route write handlers lacking nearby integration tests, and `pr-check` warning-hit concentration. Added package commands (`verify:risky-modules`, `report:risky-modules`), integrated the audit into `scripts/verify-platform.ts`, documented workflow in `docs/workflows/risky-module-dashboard.md`, and added unit coverage in `tests/unit/platform-risky-module-dashboard.test.ts`."
-        },
-        {
-          "id": "platform-org-context-required-in-specs",
-          "title": "Require Bounded Context in New Feature Specs",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "1h",
-          "priority": "P3",
-          "status": "done",
-          "notes": "Shipped 2026-05-16: added a required spec skeleton at `docs/workflows/feature-spec-template.md` that standardizes ownership + contract capture before implementation planning (owning bounded context, route/API surface, shared contracts, query keys/invalidation, WebSocket events/listeners, and test ownership). Wired the template into core planning workflow docs: `docs/PLAN_WRITING_GUIDE.md` now requires filling the spec skeleton before task breakdown, `docs/workflows/new-feature-checklist.md` now includes a mandatory pre-planning check, and `docs/workflows/platform-golden-paths.md` now points teams to fill the spec skeleton before selecting a feature-class template."
-        },
-        {
-          "id": "platform-org-feature-maturity-scorecard",
-          "title": "Feature Maturity Scorecard",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "2-3h",
-          "priority": "P3",
-          "status": "done",
-          "notes": "Shipped 2026-05-16: added `docs/workflows/feature-maturity-scorecard.md` with an explicit 8-dimension maturity rubric (shipped, documented, tested, client-visible value, monitored, monetizable, owner assigned, intelligence/reporting integration where relevant), 0-2 scoring guidance, placement thresholds, hard-stop promotion gates, and a copy/paste worksheet for evidence links. Wired the scorecard into product-surface governance and PR workflow: `docs/rules/product-surface-rationalization.md` now requires maturity scoring for placement recommendations, and `docs/workflows/pr-readiness-checklist.md` now asks for a completed scorecard when a PR promotes/demotes major surfaces."
-        },
-        {
-          "id": "platform-org-product-surface-audit",
-          "title": "Product Surface Area Audit",
-          "source": "Product engineering organization review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Review the 357-feature audit through a product-lens taxonomy: first-class capabilities, support systems, internal-only infrastructure, client-facing differentiators, and candidates to hide behind progressive disclosure. Goal is to reduce cognitive load without deleting valuable capability."
-        },
-        {
-          "id": "platform-base-collaboration-artifact",
-          "title": "Collaboration Artifact Base",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "4-7h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Unify the deeper base behind send-to-client surfaces: approval batches, client actions, note-bearing conversations, review items, source payloads, inbox routing section, client visibility, activity logging, and broadcast behavior. Keep existing user-facing terminology and routes stable while reducing per-tool send-to-client wiring."
-        },
-        {
-          "id": "platform-base-url-tab-state-helper",
-          "title": "URL/Tab State Helper",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "1-2h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Create a shared helper or hook for ?tab= search-param tab state, including valid-tab guards, legacy aliases, default fallback, and sender/receiver contract tests. This should reduce custom deep-link wiring and prevent default-tab regressions."
-        },
-        {
-          "id": "platform-base-analytics-date-contract",
-          "title": "Analytics Date/Metric Contract",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "Define a shared analytics contract for date-range params, comparison windows, percentage vs decimal semantics, metric labels, empty-state fallbacks, and display formatting. Apply first to GSC, GA4, outcomes, ROI, and reports surfaces where date and metric semantics can drift."
-        },
-        {
-          "id": "platform-base-job-helper-polish",
-          "title": "Background Job Helper Polish",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "2-4h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Add or polish golden helpers for starting jobs, surfacing TaskPanel state, subscribing/polling progress, opening results, handling cancellation, and invalidating domain queries on completion. This builds on the existing background job platform rather than changing its architecture."
-        },
-        {
-          "id": "platform-base-test-seed-unification",
-          "title": "Test Factory and Demo Seed Unification",
-          "source": "Product engineering base-layer review 2026-05-13",
-          "est": "3-5h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Unify test factories and deterministic demo seeds so integration tests, visual QA, and local manual checks can share stable workspace shapes. Coordinate with the deterministic QA/demo workspaces item in the Platform Confidence sprint."
-        }
-      ]
-    },
-    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",
@@ -1030,6 +904,139 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-platform-health-wave6-deferred-polish",
+      "name": "✅ SHIPPED — Platform Health Wave 6 — Deferred Platform Polish",
+      "hours": "16-28",
+      "rationale": "Park useful but less urgent platform-health work behind the first five waves so it stays visible without competing with higher-confidence unlocks.",
+      "items": [
+        {
+          "id": "platform-org-frontend-container-decomposition",
+          "title": "Frontend Container Decomposition Pass",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "4-8h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped 2026-05-15 in three sequential staging-first PRs: (1) HealthTab decomposition (`useHealthTabShell` + section components + extraction contract), (2) InboxTab decomposition (`useInboxTabShell`, extracted inbox filter contract module, new/legacy layout wrappers, and extraction contract), (3) ClientDashboard shell decomposition (`useClientWorkspaceBootstrap`, extracted nav derivation helpers, tab-composition shell, and updated deep-link contract parser for panel-map routing). All work was behavior-preserving (no API/shared-type/route/feature-flag semantic changes), independently reviewed, and merged after green CI on each PR.\nWave follow-up 2026-05-16: centralized repeated HealthTab pure logic into `healthTabModel.ts` (issue-impact mapping, filtered-page derivation, category stats, info counts, fix-type grouping) and wired `useHealthTabShell`/`HealthTabSections` to consume the shared helpers, with new extraction/model guardrail tests."
+        },
+        {
+          "id": "platform-org-api-wrapper-cleanup",
+          "title": "API Wrapper Domain Cleanup",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-16: completed an incremental, backward-compatible API-wrapper domain split. Added `src/api/platform.ts` (jobs/roadmap/features/notifications/workspace-home/observability surfaces) and `src/api/schema.ts` (schema/schema-validation/schema-plan/schema-impact surfaces), then converted `src/api/misc.ts` and `src/api/seo.ts` into compatibility re-export facades for those moved wrappers. Updated adjacent consumers to import from new domain modules (`useWorkspaceHome`, `useIntegrationHealth`, `useNotifications`, `FeatureLibrary`, `Roadmap`, `BulkAcceptPanel`, `useSchemaValidation`, `SchemaPlanPanel`, `SchemaImpactPanel`, `useSchemaSuggesterPublishingWorkflow`). Added contract guardrails (`tests/contract/api-wrapper-domain-cleanup.test.ts`) plus compatibility test updates to lock ownership boundaries while preserving legacy import paths."
+        },
+        {
+          "id": "platform-org-architecture-drift-checks",
+          "title": "Architecture Drift Checks",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-15: implemented styleguide drift architecture guardrails with a canonical lockdown contract (`docs/rules/styleguide-lockdown-contract.md`), new pr-check enforcement rules (style exception metadata contract, raw `<button>` drift detector, raw CTA literal detector), warning→error ratchet promotions for zero-backlog style rules, and a machine-readable style drift report/baseline regression gate (`scripts/report-style-drift.ts`, `verify:style-drift`, `report:style-drift`).\nWave follow-up 2026-05-15: completed a parallel admin action-button primitive sweep across SEO Editor action rows (`SeoEditorHeaderActions`, `ApprovalPanel`, `SeoEditorTableControls`, `BulkOperations`), SettingsPanel top-level controls, WorkspaceHome action links/status cards, and SchemaSuggester top controls. Style drift metrics improved from `raw_button_unallowlisted_count: 891 -> 855` and `non_primitive_action_count: 876 -> 840`; admin raw-button count now `717` (down from `753`).\nWave 3b follow-up 2026-05-15: migrated admin settings/audit controls in `ConnectionsTab`, `FeaturesTab`, `ClientDashboardTab`, and SEO Audit share actions to `Button`/`IconButton`. Style drift metrics improved further to `raw_button_unallowlisted_count: 808` and `non_primitive_action_count: 793`; admin raw-button count now `670`.\nWave 4 follow-up 2026-05-17: established canonical styleguide parity rule registry artifacts (`docs/rules/styleguide-rule-registry.md`, `data/styleguide-rule-registry.json`) with rule-level enforcement tiers (`error|warn|manual`), ownership, metric keys, and promotion prerequisites to guide future ratchet waves from advisory to blocking checks.\nWave 5 follow-up 2026-05-17: added three non-blocking parity detectors in `pr-check` (`styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`) with fixture coverage in `tests/pr-check.test.ts` so token/typography drift surfaces as advisory before promotion.\nWave 8 follow-up 2026-05-18: promoted five zero-backlog parity rules to blocking errors (`hardcoded card radius outside ui primitives`, `badge-like-span-outside-primitives`, `styleguide-css-must-import-public-tokens`, `styleguide-typography-extra-class-drift`, `global-token-declaration-outside-canonical-token-files`), added warn-tier detectors (`src-index-css-no-token-declarations`, `badge-color-prop-deprecation`, `interactive-div-role-button`, `primitive-override-drift-on-form-controls`), and migrated the final four live badge-like spans to `Badge` primitives in client surfaces.\nWave 10 follow-up 2026-05-17: removed structural class overrides from shared form primitive callsites across client/admin/editor surfaces, tightened `primitive-override-drift-on-form-controls` to structural drift only, promoted that rule from warn to error with docs/registry sync, and reached zero backlog (`raw form control advisory: admin=0, client=0, total=0`).\nWave 12 follow-up 2026-05-17: added three warn-tier styleguide parity heuristics in `pr-check` (`duplicate-heading-signal`, `nested-card-density-signal`, `blue-action-semantic-drift`), added fixture coverage for trigger + hatch behavior in `tests/pr-check.test.ts`, and expanded `scripts/report-style-drift.ts` with file-level advisory breakdowns for duplicate headings, nested SectionCard density, and blue action-semantic drift so cleanup can be targeted by ownership slice without blocking CI.\nWave 13 follow-up 2026-05-17: resolved all active advisory hits for the three Wave 12 heuristics by (a) converting remaining blue-styled action controls to teal semantics in asset audit/cards and SERP evidence links, and (b) marking intentional duplicated heading patterns in feature-flagged or dynamic-title surfaces with explicit `duplicate-heading-ok` hatches. Current style drift report is zero across duplicate-heading, nested-card-density, and blue-action-semantic advisories.\nWave 15 follow-up 2026-05-17: promoted `src-index-css-no-token-declarations` from warn to error after sustained zero-hit verification and added `status-semantic-mapping-drift` as a new warn-tier detector with fixture coverage and `report-style-drift` file-level advisory breakdowns to drive centralized StatusBadge/status-registry cleanup.\nWave 16 follow-up 2026-05-17: completed the remaining status-semantic migration sweep (requests, workspace-home, batch generation, redirect manager), added a canonical `request` StatusBadge domain, drove `status_semantic_mapping_drift_count` to zero, and promoted `status-semantic-mapping-drift` from warn to error with docs/registry synchronization.\nWave 17 pre-plan audit 2026-05-17: ran parallel read-only audits across static styleguide/docs, client surfaces, admin/editor/settings/schema surfaces, and enforcement plumbing; registered newly discovered parity directives as planned warn/manual contracts in the canonical registry; and published an execution matrix in  to drive the next detector + cleanup ratchet batches.\nWave 17b follow-up 2026-05-17: added automated staging merge integrity guardrails for stacked PR flows (`scripts/report-staging-merge-integrity.ts`) with CI + nightly wiring and explicit historical exception tracking in `data/staging-merge-integrity-exceptions.json` so non-staging merges that fail to land in `staging` are surfaced immediately.\nWave 18 follow-up 2026-05-17: began typography hierarchy ratchet by promoting `muted-text-two-tier-only` from planned to active advisory, adding warn-tier detection + hatch support in `pr-check`, and extending `report-style-drift` with per-file muted-tier counts (`mutedTextTierViolationCount`) to drive targeted cleanup waves.\nWave 19 follow-up 2026-05-17: activated three additional Wave 17 planned styleguide parity directives as warn-tier advisories — `focus-visible-ring-contract`, `raw-z-index-inline-literal`, and `stat-primitive-bypass-signal` — with `pr-check` detectors, hatch support, fixture coverage in `tests/pr-check.test.ts`, and new `report-style-drift` file-level metrics to route cleanup by ownership slice.",
+          "shippedAt": "2026-05-15"
+        },
+        {
+          "id": "platform-confidence-demo-workspaces",
+          "title": "Deterministic QA/Demo Workspaces",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Shipped 2026-05-16: expanded `npm run seed:demo` into a deterministic 6-scenario workspace matrix. Added explicit scenario coverage for `empty-new`, `free-client`, `growth-active`, `premium-history`, `broken-integrations`, and `rich-cms`, with fixed IDs and deterministic fixture values. Seeder now resets seeded workspace-scope artifacts each run (`requests`, `work_orders`, `approval_batches`, `client_actions`, `content_topic_requests`, `content_briefs`, `content_posts`, `schema_site_plans`, `schema_snapshots`, `schema_publish_history`, `page_edit_states`) and then applies scenario-specific history seeds so manual QA + smoke runs start from a repeatable baseline. Added guard tests for scenario coverage and broken-integration invariants, and updated local onboarding docs with the full fixture matrix and route list."
+        },
+        {
+          "id": "platform-confidence-risky-module-dashboard",
+          "title": "Risky Module Health Dashboard",
+          "source": "Product engineering confidence review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added `scripts/platform-risky-module-dashboard.ts` risk analyzer and `scripts/report-risky-modules.ts` CLI wrapper. The dashboard ranks modules by weighted risk signals: line count, 90/180-day git churn, internal import fan-in/fan-out, TODO/FIXME/HACK + `*-ok` hatch density, test linkage, route write handlers lacking nearby integration tests, and `pr-check` warning-hit concentration. Added package commands (`verify:risky-modules`, `report:risky-modules`), integrated the audit into `scripts/verify-platform.ts`, documented workflow in `docs/workflows/risky-module-dashboard.md`, and added unit coverage in `tests/unit/platform-risky-module-dashboard.test.ts`."
+        },
+        {
+          "id": "platform-org-context-required-in-specs",
+          "title": "Require Bounded Context in New Feature Specs",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "1h",
+          "priority": "P3",
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added a required spec skeleton at `docs/workflows/feature-spec-template.md` that standardizes ownership + contract capture before implementation planning (owning bounded context, route/API surface, shared contracts, query keys/invalidation, WebSocket events/listeners, and test ownership). Wired the template into core planning workflow docs: `docs/PLAN_WRITING_GUIDE.md` now requires filling the spec skeleton before task breakdown, `docs/workflows/new-feature-checklist.md` now includes a mandatory pre-planning check, and `docs/workflows/platform-golden-paths.md` now points teams to fill the spec skeleton before selecting a feature-class template."
+        },
+        {
+          "id": "platform-org-feature-maturity-scorecard",
+          "title": "Feature Maturity Scorecard",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "2-3h",
+          "priority": "P3",
+          "status": "done",
+          "notes": "Shipped 2026-05-16: added `docs/workflows/feature-maturity-scorecard.md` with an explicit 8-dimension maturity rubric (shipped, documented, tested, client-visible value, monitored, monetizable, owner assigned, intelligence/reporting integration where relevant), 0-2 scoring guidance, placement thresholds, hard-stop promotion gates, and a copy/paste worksheet for evidence links. Wired the scorecard into product-surface governance and PR workflow: `docs/rules/product-surface-rationalization.md` now requires maturity scoring for placement recommendations, and `docs/workflows/pr-readiness-checklist.md` now asks for a completed scorecard when a PR promotes/demotes major surfaces."
+        },
+        {
+          "id": "platform-org-product-surface-audit",
+          "title": "Product Surface Area Audit",
+          "source": "Product engineering organization review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: added machine-readable audit artifact pipeline (`scripts/report-product-surface-audit.ts`, `npm run report:product-surface-audit`) that reads current `FEATURE_AUDIT.md` headline coverage and product-surface taxonomy from `scripts/product-surface-map.ts`, writing canonical output to `data/product-surface-audit.json`. Added human-reviewed prioritization guide `docs/workflows/product-surface-audit-wave6.md` with promote/keep/hide/deprecate buckets and explicit human-verification queue. No route removals in this pass."
+        },
+        {
+          "id": "platform-base-collaboration-artifact",
+          "title": "Collaboration Artifact Base",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "4-7h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: introduced shared collaboration-artifact contract (`shared/types/collaboration-artifact.ts`) and adapter layer (`src/lib/collaboration-artifacts.ts`) that normalizes `approval_batches` and `client_actions` into one routing primitive with note-based Decisions vs Conversations semantics and shared visibility metadata. `InboxTab` now partitions pending batches/actions through the shared artifact base instead of local duplicated predicates."
+        },
+        {
+          "id": "platform-base-url-tab-state-helper",
+          "title": "URL/Tab State Helper",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "1-2h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: added shared `?tab=` contract helpers in `src/lib/tab-search-param.ts` (`resolveTabSearchParam`, `isValidTabSearchParam`, `clearTabSearchParam`) and migrated Inbox filter resolution, ContentPipeline, LinksPanel, and WorkspaceSettings receiver initialization/cleanup to the shared helper path. Added `tests/unit/tab-search-param.test.ts` and updated inbox shell extraction contract coverage."
+        },
+        {
+          "id": "platform-base-analytics-date-contract",
+          "title": "Analytics Date/Metric Contract",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: added `shared/types/analytics-contract.ts` with canonical date-range and metric display semantics (including explicit already-percentage boundaries for CTR and bounce/new-user metrics). Applied contract types across analytics API wrappers, client GA4/GSC hooks, GA4 shared hook/query keys, ClientDashboard/ClientHeader date-range state, and GA4 server `CustomDateRange` typing to reduce inline shape drift."
+        },
+        {
+          "id": "platform-base-job-helper-polish",
+          "title": "Background Job Helper Polish",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "2-4h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: introduced composable background-job helpers in `src/lib/background-job-helpers.ts` for start+track, attach tracking, cancellation, and completion invalidation. Migrated SEO bulk workflow and content post generation tracking to helper-first usage while preserving TaskPanel/useBackgroundTasks architecture. Added helper unit coverage and updated background-job wiring contract tests."
+        },
+        {
+          "id": "platform-base-test-seed-unification",
+          "title": "Test Factory and Demo Seed Unification",
+          "source": "Product engineering base-layer review 2026-05-13",
+          "est": "3-5h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-05-18",
+          "notes": "Shipped 2026-05-18: extracted canonical demo scenario definitions into `shared/demo-workspace-scenarios.ts` and rewired `scripts/seed-demo-workspaces.ts` to consume the shared source of truth. Added fixture helpers in `tests/fixtures/demo-scenario-seed.ts` and parity validation in `tests/unit/demo-scenario-parity.test.ts` so demo seeding and test fixtures align on deterministic workspace identities/integration shape."
+        }
+      ],
+      "shippedAt": "2026-05-18"
     },
     {
       "id": "sprint-platform-health-wave5-product-lifecycle-discipline",

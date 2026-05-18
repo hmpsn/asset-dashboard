@@ -30,8 +30,8 @@ describe('InboxTab phase-2 shell extraction contract', () => {
   it('falls back for invalid inbox deep-link filters instead of introducing unsupported values', () => {
     const filtersSource = readFileSync(INBOX_FILTER_PATH, 'utf-8'); // readFile-ok - guard invalid query params resolve through fallback.
 
-    expect(filtersSource).toContain('if (param && LEGACY_FILTER_MAP[param])');
-    expect(filtersSource).toContain('return fallback;');
+    expect(filtersSource).toContain('resolveTabSearchParam<InboxFilter>(');
+    expect(filtersSource).toContain('legacyAliases: LEGACY_FILTER_MAP');
     expect(filtersSource).not.toContain("'schema-review': 'reviews'");
   });
 

@@ -14,7 +14,7 @@
  *  client-search → ['client-search', wsId, metric, days, dr] similarly
  */
 
-export type DateRange = { startDate: string; endDate: string };
+export type DateRange = AnalyticsDateRange;
 
 export const queryKeys = {
   // ── Admin ─────────────────────────────────────────────────────────
@@ -226,3 +226,4 @@ export const queryKeys = {
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';

@@ -4,6 +4,7 @@ import type {
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../components/client/types';
 import { useGA4Base } from '../shared/useGA4Base';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 export interface ClientGA4Data {
   ga4Overview: GA4Overview | null;
@@ -23,7 +24,7 @@ export interface ClientGA4Data {
 export function useClientGA4(
   wsId: string,
   days: number,
-  dateRange: { startDate: string; endDate: string } | undefined,
+  dateRange: AnalyticsDateRange | undefined,
   enabled: boolean,
 ) {
   const {

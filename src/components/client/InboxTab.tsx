@@ -27,6 +27,7 @@ import type { FlaggedItem } from '../../../shared/types/decision';
 import { useInboxTabShell, type InboxMode } from './inbox/useInboxTabShell';
 import type { InboxFilter } from './inbox/inbox-filter';
 import { LegacyInboxLayout, NewInboxLayout } from './inbox/InboxTabLayouts';
+import { partitionCollaborationArtifacts } from '../../lib/collaboration-artifacts';
 export {
   INBOX_FILTER_VALUES,
   LEGACY_FILTER_MAP,
@@ -164,25 +165,47 @@ export function InboxTab({
   // Feature flag: new 3-section inbox IA layout
   const newInboxIa = useFeatureFlag('new-inbox-ia');
 
-  // Routing: approval_batches split by note presence
-  const approvalsForDecisions = approvalBatches.filter(b =>
-    !b.note && b.items.some(i => i.status === 'pending'),
+  const pendingApprovalBatches = approvalBatches.filter(batch =>
+    batch.items.some(item => item.status === 'pending'),
   );
-  const approvalsForConversations = approvalBatches.filter(b =>
-    !!b.note && b.items.some(i => i.status === 'pending'),
+  const collaboration = partitionCollaborationArtifacts(pendingApprovalBatches, pendingClientActions);
+  const decisionBatchIds = new Set(
+    collaboration.decisions
+      .filter(item => item.source === 'approval_batch')
+      .map(item => item.sourceId),
   );
+  const conversationBatchIds = new Set(
+    collaboration.conversations
+      .filter(item => item.source === 'approval_batch')
+      .map(item => item.sourceId),
+  );
+  const approvalsForDecisions = pendingApprovalBatches.filter(batch => decisionBatchIds.has(batch.id));
+  const approvalsForConversations = pendingApprovalBatches.filter(batch => conversationBatchIds.has(batch.id));
 
   // NormalizedDecision lists for the Decisions section.
   // approval_batches without a note are rendered inline via ApprovalsTab (not DecisionCard),
   // so they are excluded here and inserted separately in the Decisions section below.
-  const decisionItems = [
-    ...pendingClientActions.map(a => normalizeClientAction(a)),
-  ];
+  const decisionActionIds = new Set(
+    collaboration.decisions
+      .filter(item => item.source === 'client_action')
+      .map(item => item.sourceId),
+  );
+  const conversationActionIds = new Set(
+    collaboration.conversations
+      .filter(item => item.source === 'client_action')
+      .map(item => item.sourceId),
+  );
+  const decisionItems = pendingClientActions
+    .filter(action => decisionActionIds.has(action.id))
+    .map(action => normalizeClientAction(action));
+  const conversationItems = pendingClientActions
+    .filter(action => conversationActionIds.has(action.id))
+    .map(action => normalizeClientAction(action));
 
   // Filter chip counts
   const decisionsCount = decisionItems.length + planReviewCount + approvalsForDecisions.length;
   const reviewsCount = contentReviews + copyReviewCount + (!betaMode && schemaPlanPending ? 1 : 0);
-  const conversationsCount = requestReplies + approvalsForConversations.length;
+  const conversationsCount = requestReplies + approvalsForConversations.length + conversationItems.length;
 
   const newInboxFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
@@ -195,9 +218,9 @@ export function InboxTab({
   const legacyFilterChips: { id: InboxFilter; label: string; count?: number }[] = [
     { id: 'all', label: 'All' },
     { id: 'decisions', label: 'Decisions',
-      count: (pendingClientActions.length + planReviewCount + (pendingApprovals ?? 0) + (schemaPlanPending ? 1 : 0)) || undefined },
+      count: (decisionItems.length + planReviewCount + approvalsForDecisions.length + (schemaPlanPending ? 1 : 0)) || undefined },
     { id: 'conversations', label: 'Conversations',
-      count: requestReplies || undefined },
+      count: (requestReplies + approvalsForConversations.length) || undefined },
     ...(!betaMode ? [{ id: 'reviews' as InboxFilter, label: 'Reviews',
       count: (contentReviews + copyReviewCount) || undefined }] : []),
   ];
@@ -513,6 +536,23 @@ export function InboxTab({
                   <Badge label={`${conversationsCount} active`} tone="teal" variant="outline" shape="pill" />
                 )}
               </div>
+              {conversationItems.length > 0 && (
+                <div className="space-y-3">
+                  {conversationItems.map(decision => (
+                    <DecisionCard
+                      key={decision.id}
+                      decision={decision}
+                      onOpen={() => setOpenDecision(decision)}
+                      onApprove={decision.isSingleAction
+                        ? () => respondToClientAction(decision.sourceId, 'approved').catch(() => {})
+                        : undefined}
+                      onFlagWithNote={decision.isSingleAction
+                        ? (note) => respondToClientAction(decision.sourceId, 'changes_requested', note || undefined).catch(() => {})
+                        : undefined}
+                    />
+                  ))}
+                </div>
+              )}
               <RequestsTab
                 workspaceId={workspaceId}
                 requests={requests}

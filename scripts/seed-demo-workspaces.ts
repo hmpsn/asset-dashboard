@@ -2,14 +2,10 @@
 
 import { pathToFileURL } from 'url';
 import db from '../server/db/index.js';
-
-type DemoScenario =
-  | 'empty-new'
-  | 'free-client'
-  | 'growth-active'
-  | 'premium-history'
-  | 'broken-integrations'
-  | 'rich-cms';
+import {
+  DEMO_WORKSPACE_SCENARIOS,
+  type DemoScenario,
+} from '../shared/demo-workspace-scenarios.js';
 
 interface DemoWorkspaceSeed {
   id: string;
@@ -31,98 +27,27 @@ const DEMO_PASSWORD = 'demo-client';
 const DEMO_NOW = '2026-05-16T00:00:00.000Z';
 const NON_LOCAL_DEMO_SEED_OVERRIDE = 'ALLOW_NON_LOCAL_DEMO_SEED';
 
-export const DEMO_WORKSPACES: DemoWorkspaceSeed[] = [
-  {
-    id: 'ws_demo_empty',
-    name: 'Demo Empty Workspace',
-    folder: 'demo-empty-workspace',
-    tier: 'free',
-    scenario: 'empty-new',
-    domain: 'empty-demo.local',
-    webflowSiteId: 'site_demo_empty',
-    webflowSiteName: 'Demo Empty Site',
-    webflowToken: 'demo-webflow-token-empty',
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: 'sc-domain:empty-demo.local',
-    ga4PropertyId: 'properties/100000',
-    seoDataProvider: 'dataforseo',
-  },
-  {
-    id: 'ws_demo_free',
-    name: 'Demo Free Client Workspace',
-    folder: 'demo-free-workspace',
-    tier: 'free',
-    scenario: 'free-client',
-    domain: 'free-demo.local',
-    webflowSiteId: 'site_demo_free',
-    webflowSiteName: 'Demo Free Site',
-    webflowToken: 'demo-webflow-token-free',
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: 'sc-domain:free-demo.local',
-    ga4PropertyId: 'properties/100003',
-    seoDataProvider: 'dataforseo',
-  },
-  {
-    id: 'ws_demo_growth',
-    name: 'Demo Growth Active Workspace',
-    folder: 'demo-growth-workspace',
-    tier: 'growth',
-    scenario: 'growth-active',
-    domain: 'growth-demo.local',
-    webflowSiteId: 'site_demo_growth',
-    webflowSiteName: 'Demo Growth Site',
-    webflowToken: 'demo-webflow-token-growth',
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: 'sc-domain:growth-demo.local',
-    ga4PropertyId: 'properties/100001',
-    seoDataProvider: 'dataforseo',
-  },
-  {
-    id: 'ws_demo_premium',
-    name: 'Demo Premium History Workspace',
-    folder: 'demo-premium-workspace',
-    tier: 'premium',
-    scenario: 'premium-history',
-    domain: 'premium-demo.local',
-    webflowSiteId: 'site_demo_premium',
-    webflowSiteName: 'Demo Premium Site',
-    webflowToken: 'demo-webflow-token-premium',
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: 'sc-domain:premium-demo.local',
-    ga4PropertyId: 'properties/100002',
-    seoDataProvider: 'dataforseo',
-  },
-  {
-    id: 'ws_demo_broken_integrations',
-    name: 'Demo Broken Integrations Workspace',
-    folder: 'demo-broken-integrations-workspace',
-    tier: 'growth',
-    scenario: 'broken-integrations',
-    domain: 'broken-demo.local',
-    webflowSiteId: null,
-    webflowSiteName: null,
-    webflowToken: null,
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: null,
-    ga4PropertyId: null,
-    seoDataProvider: 'semrush',
-  },
-  {
-    id: 'ws_demo_rich_cms',
-    name: 'Demo Rich CMS Workspace',
-    folder: 'demo-rich-cms-workspace',
-    tier: 'premium',
-    scenario: 'rich-cms',
-    domain: 'cms-demo.local',
-    webflowSiteId: 'site_demo_rich_cms',
-    webflowSiteName: 'Demo Rich CMS Site',
-    webflowToken: 'demo-webflow-token-rich-cms',
-    clientPassword: DEMO_PASSWORD,
-    gscPropertyUrl: 'sc-domain:cms-demo.local',
-    ga4PropertyId: 'properties/100004',
-    seoDataProvider: 'dataforseo',
-  },
-];
+function inferDemoWebflowToken(webflowSiteId: string | null): string | null {
+  if (!webflowSiteId) return null;
+  const suffix = webflowSiteId.replace(/^site_demo_/, '').replace(/_/g, '-');
+  return `demo-webflow-token-${suffix}`;
+}
+
+export const DEMO_WORKSPACES: DemoWorkspaceSeed[] = DEMO_WORKSPACE_SCENARIOS.map((scenario) => ({
+  id: scenario.id,
+  name: scenario.name,
+  folder: scenario.folder,
+  tier: scenario.tier,
+  scenario: scenario.scenario,
+  domain: scenario.domain,
+  webflowSiteId: scenario.integrations.webflowSiteId,
+  webflowSiteName: scenario.integrations.webflowSiteName,
+  webflowToken: inferDemoWebflowToken(scenario.integrations.webflowSiteId),
+  clientPassword: DEMO_PASSWORD,
+  gscPropertyUrl: scenario.integrations.gscPropertyUrl,
+  ga4PropertyId: scenario.integrations.ga4PropertyId,
+  seoDataProvider: scenario.integrations.seoDataProvider,
+}));
 
 function upsertDemoWorkspace(seed: DemoWorkspaceSeed): 'created' | 'updated' {
   const existing = db.prepare('SELECT id FROM workspaces WHERE id = ?').get(seed.id) as { id: string } | undefined;

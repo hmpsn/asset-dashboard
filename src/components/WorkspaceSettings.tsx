@@ -11,6 +11,7 @@ import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
+import { resolveTabSearchParam } from '../lib/tab-search-param';
 
 const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
 
@@ -77,8 +78,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   // Tab deep-link two-halves contract: senders append ?tab=X; receiver reads it here.
   // See CLAUDE.md "?tab= deep-link two-halves contract" + useDeepLinkFocus hook.
   const [tab, setTab] = useState<SectionTab>(() => {
-    const param = searchParams.get('tab');
-    return (VALID_SECTION_TABS as readonly string[]).includes(param ?? '') ? (param as SectionTab) : 'connections';
+    return resolveTabSearchParam<SectionTab>(searchParams.get('tab'), {
+      validValues: VALID_SECTION_TABS,
+      fallback: 'connections',
+    });
   });
   // Sync tab state with subsequent ?tab= URL changes (e.g., when SchemaImpactRow's
   // Edit→ link navigates to ?tab=features while already on this page).
@@ -88,10 +91,10 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   // setTab(sameValue) is a React no-op so re-firing on every searchParams change
   // is safe. (Devin Review BUG-0001 round 4 on PR #379.)
   useEffect(() => {
-    const param = searchParams.get('tab');
-    if (param && (VALID_SECTION_TABS as readonly string[]).includes(param)) {
-      setTab(param as SectionTab);
-    }
+    setTab(resolveTabSearchParam<SectionTab>(searchParams.get('tab'), {
+      validValues: VALID_SECTION_TABS,
+      fallback: 'connections',
+    }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   const [ws, setWs] = useState<WorkspaceData | null>(null);
