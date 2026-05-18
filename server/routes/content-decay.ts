@@ -82,7 +82,12 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const existing = loadDecayAnalysis(req.params.workspaceId);
     if (!existing) return res.status(404).json({ error: 'Run decay analysis first' });
-    const maxPages = req.body.maxPages || 5;
+    const rawMaxPages = req.body?.maxPages;
+    const requestedMaxPages = rawMaxPages == null ? 5 : Number(rawMaxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    const maxPages = Math.min(requestedMaxPages, 25);
     const updated = await generateBatchRecommendations(ws, existing, maxPages);
 
     try {
