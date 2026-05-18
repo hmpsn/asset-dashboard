@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **369 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **370 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 370. Unified Notification Hub (Notifications + Background Tasks)
+
+**What it does:** Merges the top-right notification drawer and the separate floating task panel into one unified hub. The drawer now presents categorized sections for Actions Needed, Alerts, and System Events, and includes in-place background task lifecycle controls (progress, cancel, dismiss, clear completed) scoped to the active workspace.
+
+**Agency value:** Reduces operator context-switching and duplicated “what needs attention now” surfaces during daily triage.
+
+**Client value:** Indirectly improves response time and consistency by making high-priority actions and system task outcomes visible in one canonical panel.
+
+**Mutual:** Consolidates attention management into a single, predictable contract and lowers UI fragmentation drift.
 
 ---
 
