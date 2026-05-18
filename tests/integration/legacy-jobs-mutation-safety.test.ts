@@ -492,12 +492,10 @@ describe('legacy job mutation safety bundle', () => {
       type: BACKGROUND_JOB_TYPES.SALES_REPORT,
       params: { url: 'https://example.com', maxPages: 999 },
     });
-    expect(boundedRes.status).toBe(200);
-    const boundedStart = await boundedRes.json() as { jobId: string };
-    const boundedJob = await waitForJob(boundedStart.jobId);
-    expect(boundedJob.status).toBe('done');
-    expect(salesReportState.lastMaxPages).toBe(100);
+    expect(boundedRes.status).toBe(400);
+    await expect(boundedRes.json()).resolves.toEqual({ error: 'maxPages must be between 1 and 100' });
+    expect(salesReportState.lastMaxPages).toBe(25);
 
-    expect(countGlobalJobs()).toBe(countBeforeMissingUrl + 1);
+    expect(countGlobalJobs()).toBe(countBeforeMissingUrl);
   });
 });

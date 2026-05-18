@@ -600,13 +600,15 @@ router.post('/api/jobs', async (req, res) => {
         if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
           return res.status(400).json({ error: 'maxPages must be a positive integer' });
         }
-        const boundedMaxPages = Math.min(requestedMaxPages, 100);
+        if (requestedMaxPages > 100) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+        }
         const job = createJob('sales-report', { message: `Auditing ${url}...` });
         res.json({ jobId: job.id });
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Crawling site...' });
-            const result = await runSalesAudit(url, boundedMaxPages);
+            const result = await runSalesAudit(url, requestedMaxPages);
             const reportsDir = getDataDir('sales-reports');
             const reportId = `sr_${Date.now()}`;
             const reportFile = path.join(reportsDir, `${reportId}.json`);
