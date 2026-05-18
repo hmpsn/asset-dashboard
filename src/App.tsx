@@ -130,6 +130,13 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
     const target = clientPath(workspaceId, splatRoot, betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
+  if (workspaceId && splatRoot === 'schema-review') {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, 'schema-review', betaMode);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
 
