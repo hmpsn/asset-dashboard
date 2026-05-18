@@ -17,15 +17,6 @@
           "shippedAt": "2026-05-18"
         },
         {
-          "id": 535,
-          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
-          "source": "PR #138 review / manual testing",
-          "est": "3-5h",
-          "priority": "P1",
-          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
-          "status": "pending"
-        },
-        {
           "id": 624,
           "title": "Stripe payment modal — visual QA in test mode (light + dark)",
           "source": "Phase 5 Phase 2 follow-up — PR #314",
@@ -104,179 +95,6 @@
       ]
     },
     {
-      "id": "sprint-send-to-client",
-      "name": "Send to Client Expansion",
-      "hours": "9-14",
-      "rationale": "Unified delivery story — every major analysis surface (AEO, Internal Links, Keywords, Redirects, Content Decay, Page Rewriter) gains a client-send action in one sprint.",
-      "items": [
-        {
-          "id": 609,
-          "title": "AEO Review: Send to Client per-page changes",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.\nShipped / verified 2026-05-06: AeoReview sends page-level client actions with sourceType 'aeo_change', sourceId `aeo:${page.pageUrl}`, client-ready change filtering, and payload.page for client review.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 610,
-          "title": "Internal Links: Send to Client link suggestions",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.\nShipped / verified 2026-05-06 as a filtered-batch client action: InternalLinks has a Send to Client action that packages the currently filtered link suggestions with sourceType 'internal_link' and summary metadata. It is not a literal per-page button, but the client-reviewable link-suggestion workflow is live.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 611,
-          "title": "Keyword Strategy: Send to Client strategy recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.\nShipped / verified 2026-05-06: KeywordStrategy has a Send to Client action with sourceType 'keyword_strategy' that packages mapped pages, quick wins, content gaps, opportunities, and low-hanging fruit into the client action queue.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 612,
-          "title": "Redirect Manager: Send to Client redirect proposals",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.\nShipped / verified 2026-05-06: RedirectManager sends accepted redirect proposals to the client action queue with sourceType 'redirect_proposal' and source/target rule payloads.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 297,
-          "title": "Content Decay: Send to Client refresh recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.\nShipped / verified 2026-05-06: ContentDecay exposes per-page Send to Client on AI refresh recommendation cards and creates sourceType 'content_decay' client actions with the decaying page payload.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 579,
-          "title": "Page Rewriter: PDF export via print stylesheet",
-          "source": "User request Apr 2026",
-          "est": "1h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
-        }
-      ]
-    },
-    {
-      "id": "sprint-seo-intelligence-depth",
-      "name": "SEO Intelligence Depth",
-      "hours": "19-24",
-      "rationale": "Deepen the data layer: competitor monitoring, difficulty calibration, URL-level keyword intel, score history, anti-hallucination, and E-E-A-T signals.",
-      "items": [
-        {
-          "id": 570,
-          "title": "Competitor Content Monitoring (Scheduled Job)",
-          "source": "USER REQUEST",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.\nShipped / verified 2026-05-06: startCompetitorMonitoringCron() is started from server/startup.ts; server/intelligence-crons.ts snapshots configured competitor domains, diffs against previous snapshots, writes competitor_alert rows, and upserts competitor_alert insights.",
-          "status": "done",
-          "shippedAt": "2026-05-06"
-        },
-        {
-          "id": 571,
-          "title": "Authority-Adjusted Difficulty Filtering",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.\nShipped 2026-04-23 under Recommendation Intelligence Tier 1 item #615. adjustKdImpactScore() adjusts recommendation impact by site strength vs keyword difficulty, with unit coverage in tests/unit/recommendations-authority-kd.test.ts. This roadmap duplicate is now closed.",
-          "status": "done",
-          "shippedAt": "2026-04-23"
-        },
-        {
-          "id": 322,
-          "title": "URL-Level Keyword Intelligence (url_organic API)",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added provider-level URL organic keyword support (`getUrlKeywords`) for SEMRush and DataForSEO, persisted `urlLevelKeywords`/`urlLevelKeywordSource` on page keyword rows, and made strategy enrichment prefer URL-level page-specific keyword data over domain-level fallback when available. Capped per-run URL lookups to avoid provider-credit blowups.",
-          "status": "done",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": 351,
-          "title": "Page Intelligence — Optimization Score History & Trending",
-          "source": "USER REQUEST",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added append-only `page_keyword_score_history` snapshots, attached score history to `PageKeywordMap`, recorded snapshots on single/batch analysis writes only when the score changes, and surfaced compact Page Intelligence score deltas in the page list. Broader month-level reporting can build on the same table later.",
-          "status": "done",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": 355,
-          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
-          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Expanded `RESEARCH_MODE_INSTRUCTIONS` in `server/ai.ts` to require explicit observed-vs-inferred framing, forbid presenting inferred/example values as verified facts, and require explicit source-availability disclosure when citations are requested but missing. Admin chat (`/api/admin-chat`) now always calls `callAI` with `researchMode: true`. Added regression guard in `tests/contract/factual-ai-output-contracts.test.ts` to prevent drift.",
-          "status": "done",
-          "shippedAt": "2026-05-18"
-        },
-        {
-          "id": 629,
-          "title": "Content Review Evidence Panel — Show SERP provenance for factual claims",
-          "source": "USER REQUEST",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Post review now loads the source brief and displays stored `realPeopleAlsoAsk` and `realTopResults` in the existing review checklist as reviewer support. AI review still marks factual accuracy/no hallucinations as human-review-only and never auto-checks provenance-sensitive items.",
-          "status": "done",
-          "shippedAt": "2026-05-14"
-        },
-        {
-          "id": 631,
-          "title": "Internal Link Recommendation Source Audit",
-          "source": "USER REQUEST",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added formal audit deliverable at `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md` inventorying producer/consumer contracts across scanner, SEO copy, briefs, and client actions. Audit confirms scanner contract (`fromPage/fromTitle/toPage/toTitle/anchorText/reason/priority`) as canonical actionable source and documents drift queue for `#632` (source-title preservation + URL/title field semantics cleanup).",
-          "status": "done",
-          "shippedAt": "2026-05-18"
-        },
-        {
-          "id": 632,
-          "title": "Internal Link Client Review Display Model Cleanup",
-          "source": "USER REQUEST",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Follow-up from backend hardening PR 5. Clean up the internal-link recommendation model and client-review display so Target URL, target title, source page path, and source title are carried as distinct typed fields. Current client review display can show target URL as a page title and source page as a slug, which makes review confusing. Preserve reviewer-support wording and avoid changing the broader approval workflow.",
-          "status": "pending"
-        },
-        {
-          "id": 633,
-          "title": "Audit Snapshot Effective Summary Query Optimization",
-          "source": "PR 5 REVIEW",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added `listSnapshotsDetailed(siteId)` in `server/reports.ts` and refactored suppression paths in `server/audit-snapshot-views.ts` to compute current + previous effective scores from one ordered in-memory snapshot list, eliminating per-summary `getSnapshot()` and repeated previous-snapshot lookups. Added unit coverage in `tests/unit/audit-snapshot-views.test.ts` for suppression-adjusted history semantics.",
-          "status": "done",
-          "shippedAt": "2026-05-18"
-        },
-        {
-          "id": 356,
-          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
-          "source": "USER REQUEST",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
-          "status": "pending"
-        }
-      ]
-    },
-    {
       "id": "sprint-self-service",
       "name": "Self-Service & Growth",
       "hours": "26-37",
@@ -340,53 +158,55 @@
       ]
     },
     {
-      "id": "sprint-future",
-      "name": "Future",
-      "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
+      "id": "sprint-roadmap-closeout-residuals",
+      "name": "Roadmap Residual Closeout — Near-Finish Sprint Cleanup",
+      "hours": "8-13",
+      "rationale": "Consolidate the final 1–2 items from near-finished sprints into one explicit closeout queue so shipped sprint history stays clean while remaining work is execution-ready.",
       "items": [
         {
-          "id": "schema-page-element-catalog-pr1",
-          "title": "Schema Page-Element Catalog PR1 — slice + 3 element types + 3 schema integrations",
-          "source": "docs/superpowers/plans/2026-04-29-page-element-catalog-pr1.md",
-          "est": "5d",
+          "id": 535,
+          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "source": "PR #138 review / manual testing",
+          "est": "3-5h",
           "priority": "P1",
-          "sprint": "J",
-          "status": "done",
-          "shippedAt": "2026-04-29",
-          "notes": "PageElementSlice + page_elements table + extractors for videos/HowTo/citations + VideoObject/HowTo/Article.citation[] schema integrations on Article + BlogPosting. No AI in PR1. Spec: docs/superpowers/specs/2026-04-29-page-element-catalog-design.md. Audit: docs/superpowers/audits/2026-04-29-page-element-catalog-audit.md."
+          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
+          "status": "pending"
         },
         {
-          "id": "schema-page-element-catalog-pr2",
-          "title": "Schema Page-Element Catalog PR2 — images + tables + testimonials",
-          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.2 + §6",
-          "est": "4d",
-          "priority": "P1",
-          "sprint": "J",
-          "status": "done",
-          "notes": "Shipped 3 pattern extractors (images w/ rule-based hero/informative/decorative + AI vision classifier; tables w/ pricing+comparison heuristics; testimonials w/ author+rating) + 2 AI extractors (vision image-role classifier via openai SDK direct, HowTo disambiguation via callAI) behind schema-ai-element-classifier flag (default off, 120-call shared per-run AiBudget). Threaded one AiBudget per regenerate-all through generateSchemaSuggestions's 3 generateLeanSchema sites (Devin r5 follow-up). Added 4 validator REQUIRED_BY_TYPE entries (Review/AggregateRating/Table/ImageGallery) + 3 schema integrations: ImageGallery (Article+Service), Review[]+AggregateRating (Service+LocalBusiness), Table mainEntity (Service). Pre-emission gates on every new node type (synchronous, per PR1 Devin r2 lesson). 4 new HTML fixtures + 6 new test files + extended integration tests."
+          "id": 579,
+          "title": "Page Rewriter: PDF export via print stylesheet",
+          "source": "User request Apr 2026",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
         },
         {
-          "id": "schema-entity-graph-workstream-c",
-          "title": "Schema Workstream C — Entity Graph Hub Dispatch",
-          "source": "claude/schema-v2-brainstorm branch",
-          "est": "1d",
-          "priority": "P0",
-          "sprint": "J",
-          "status": "done",
-          "shippedAt": "2026-04-30",
-          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex → Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex → Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex → CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+          "id": 632,
+          "title": "Internal Link Client Review Display Model Cleanup",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from backend hardening PR 5. Clean up the internal-link recommendation model and client-review display so Target URL, target title, source page path, and source title are carried as distinct typed fields. Current client review display can show target URL as a page title and source page as a slug, which makes review confusing. Preserve reviewer-support wording and avoid changing the broader approval workflow.",
+          "status": "pending"
         },
         {
-          "id": "schema-semantic-extraction",
-          "title": "Schema Semantic Extraction & AI-Powered Generation",
-          "source": "docs/superpowers/plans/2026-05-01-schema-semantic-extraction.md",
-          "est": "3d",
-          "priority": "P1",
-          "sprint": "J",
-          "status": "done",
-          "shippedAt": "2026-05-01",
-          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page — stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
-        },
+          "id": 356,
+          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "source": "USER REQUEST",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-value-schema-intelligence-next",
+      "name": "Platform Value Wave — Schema Intelligence & Authority",
+      "hours": "80-140",
+      "rationale": "Highest strategic SEO differentiation and trust-evidence value. Prioritizes schema intelligence upgrades that improve rich-result eligibility, E-E-A-T signaling, and entity grounding.",
+      "items": [
         {
           "id": "schema-page-element-catalog-pr3",
           "title": "Schema Page-Element Catalog PR3 — polish (codeBlocks, headings/ToC, speakable)",
@@ -396,17 +216,6 @@
           "sprint": "future",
           "status": "pending",
           "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
-        },
-        {
-          "id": "schema-context-builder-pattern-b-migration",
-          "title": "Migrate buildSchemaContext direct reads to intelligence slices",
-          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
-          "est": "2-3h cumulative across opportunistic PRs",
-          "priority": "P1",
-          "sprint": "I",
-          "status": "done",
-          "shippedAt": "2026-05-07",
-          "notes": "Completed 2026-05-07. buildSchemaContext now reads schema context from `buildWorkspaceIntelligence({ slices: ['seoContext'] })` for businessContext, knowledgeBase, personas, siteKeywords, and business profile (including structured address + foundedDate/numberOfEmployees via seoContext.businessProfile). Legacy `ctx.brandVoice` assignment was removed as dead schema context. Remaining direct reads are identity-only (`ws.name`, `ws.id`, `ws.liveDomain`, `ws.brandLogoUrl`, `ws.siteHasSearch`, `_siteId`) plus analytics maps, matching the allowlist intent behind `schema-context-direct-read-not-on-allowlist`."
         },
         {
           "id": "schema-cleanup-dead-pageKeywordMap",
@@ -467,6 +276,406 @@
           "sprint": "future",
           "status": "pending",
           "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names → Award entity[]), Workspace.organizationMemberships (industry orgs → ProgramMembership/Organization references), Workspace.organizationCredentials (certifications → EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
+        },
+        {
+          "id": "schema-intelligence-layer-v2",
+          "title": "Schema Intelligence Layer (FAQ-from-GSC, E-E-A-T, healthcare subtypes)",
+          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md (deferred scope)",
+          "est": "2-3w",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "pending",
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-value-team-collaboration-controls",
+      "name": "Platform Value Wave — Team, Permissions, and Collaboration Controls",
+      "hours": "20-28",
+      "rationale": "Unlocks multi-user adoption and safer account expansion by closing core team-management, role-gating, and collaboration workflow gaps.",
+      "items": [
+        {
+          "id": 16,
+          "title": "Internal team management",
+          "source": "AUTH_ROADMAP Phase 3",
+          "est": "4-5h",
+          "priority": "P2",
+          "notes": "Invite team members, manage roles, assign workspaces.\n[Audit 2026-04-22 partial] Internal-user backend (roles, invite, workspace assignment) fully shipped via /api/users; admin frontend UI to invite/manage internal team members is not built.",
+          "status": "pending"
+        },
+        {
+          "id": 17,
+          "title": "Permission-based feature access",
+          "source": "AUTH_ROADMAP Phase 5",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.\n[Audit 2026-04-22 partial] Role enum (owner/admin/member, client_owner/client_member) and requireRole middleware shipped; per-action gating (client_member view-only on approvals, member-can't-delete-workspace) is not implemented in routes.",
+          "status": "pending"
+        },
+        {
+          "id": 23,
+          "title": "Writer assignment",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Assign content briefs to specific writers with notifications.\n[Audit 2026-04-22 partial] Adjacent infrastructure exists on work_orders (assigned_to column + mapper); content briefs lack any writer-assignment field and no notification flow is wired.",
+          "status": "pending"
+        },
+        {
+          "id": 117,
+          "title": "Client team collaboration",
+          "source": "FEATURE_VISION #12",
+          "est": "8-10h",
+          "priority": "P3",
+          "notes": "Comments on strategy items, @mentions on briefs, shared notes. Per-seat pricing opportunity.",
+          "status": "pending"
+        },
+        {
+          "id": 20,
+          "title": "Notification preferences",
+          "source": "AUTH_ROADMAP Phase 6",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-value-experience-adoption",
+      "name": "Platform Value Wave — UX Adoption & Onboarding Momentum",
+      "hours": "34-48",
+      "rationale": "Improves activation and stickiness through customizable workspace surfaces, guided education, accessibility UX uplift, and onboarding automation.",
+      "items": [
+        {
+          "id": 540,
+          "title": "Widget System — Customizable Workspace Home dashboard",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "6-8h",
+          "priority": "P2",
+          "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config.",
+          "status": "pending"
+        },
+        {
+          "id": 541,
+          "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built.",
+          "status": "pending"
+        },
+        {
+          "id": 542,
+          "title": "Command Palette 2.0 — Action palette with natural language",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\").",
+          "status": "pending"
+        },
+        {
+          "id": 514,
+          "title": "Client Education Hub — Embedded SEO education throughout",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.\n[Audit 2026-04-22 partial] SeoGlossary.tsx + SeoEducationTip.tsx (tab-keyed learnMore content for overview/performance/health/strategy/content/roi) ship; \"Why this matters\" framing, video embeds, and Glossary cross-links from tips are not wired.",
+          "status": "pending"
+        },
+        {
+          "id": 515,
+          "title": "Performance Budget Dashboard — Visual page weight tracker",
+          "source": "UI_UX_AUDIT §Long-Term",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.\n[Audit 2026-04-22 partial] PageWeight + PageSpeedPanel + server/performance-store ship point-in-time data; historical weight trend per workspace + regression alerts are not built.",
+          "status": "pending"
+        },
+        {
+          "id": 516,
+          "title": "Accessibility Improvements — WCAG AA compliance pass",
+          "source": "UI_UX_AUDIT §10",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
+          "status": "pending"
+        },
+        {
+          "id": 52,
+          "title": "Responsive mobile layout",
+          "source": "FEATURE_AUDIT",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
+          "status": "pending"
+        },
+        {
+          "id": 523,
+          "title": "Workspace onboarding automation — templates, batch setup, reduce repetitive per-workspace tasks",
+          "source": "Connected Intelligence brainstorming",
+          "est": "6-8h",
+          "priority": "P3",
+          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-value-automation-ops",
+      "name": "Platform Value Wave — Operational Automation & Quality Signals",
+      "hours": "30-45",
+      "rationale": "Reduces manual operating overhead and increases signal quality with workflow automation, accessibility quality expansion, and strategy-memory follow-through.",
+      "items": [
+        {
+          "id": 76,
+          "title": "Strategy & implementation hours system",
+          "source": "Tier audit discussion",
+          "est": "4-6h",
+          "priority": "P3",
+          "notes": "Premium includes 3 strategy & implementation hrs/mo. Defer until premium tier has more subscribers.",
+          "status": "pending"
+        },
+        {
+          "id": 26,
+          "title": "Webhook / Zapier triggers",
+          "source": "ACTION_PLAN",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Fire webhooks on key events. Enables automation integrations.",
+          "status": "pending"
+        },
+        {
+          "id": 32,
+          "title": "Shared notes / wiki per workspace",
+          "source": "ACTION_PLAN",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Team-internal notes about a client.",
+          "status": "pending"
+        },
+        {
+          "id": 34,
+          "title": "Client NPS survey",
+          "source": "ACTION_PLAN",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Periodic in-dashboard satisfaction survey.",
+          "status": "pending"
+        },
+        {
+          "id": 38,
+          "title": "Schema auto-schedule",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Re-generate schemas on cadence, flag stale pages.",
+          "status": "pending"
+        },
+        {
+          "id": 41,
+          "title": "Historical redirect comparison",
+          "source": "FEATURE_AUDIT",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Track redirect status over time, detect new 404s.",
+          "status": "pending"
+        },
+        {
+          "id": 43,
+          "title": "Accessibility audit expansion",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "WCAG contrast, ARIA, heading order, form labels.",
+          "status": "pending"
+        },
+        {
+          "id": 44,
+          "title": "WCAG AA full compliance",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Focus indicators, keyboard nav for all interactive elements.",
+          "status": "pending"
+        },
+        {
+          "id": 116,
+          "title": "AI strategy memory & learning",
+          "source": "FEATURE_VISION #11",
+          "est": "8-12h",
+          "priority": "P3",
+          "notes": "AI learns from conversations, approved changes, rejected suggestions. Proprietary knowledge asset.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-platform-value-integrations-expansion",
+      "name": "Platform Value Wave — Integrations, Distribution, and Expansion Bets",
+      "hours": "65-95",
+      "rationale": "Packages higher-latency integration and expansion work into a distinct growth track so near-term value sprints stay focused while long-horizon platform expansion remains actionable.",
+      "items": [
+        {
+          "id": 45,
+          "title": "GSC: URL Inspection API",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Per-URL indexing status, crawl info.",
+          "status": "pending"
+        },
+        {
+          "id": 46,
+          "title": "GA4: Exit pages + attribution",
+          "source": "Memory/Roadmap",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Advanced analytics.",
+          "status": "pending"
+        },
+        {
+          "id": 47,
+          "title": "Webflow Enterprise API: 301 redirects",
+          "source": "FEATURE_AUDIT",
+          "est": "1-2h",
+          "priority": "P4",
+          "notes": "Push rules via API (Enterprise-only).",
+          "status": "pending"
+        },
+        {
+          "id": 49,
+          "title": "Sales report: email delivery",
+          "source": "FEATURE_AUDIT",
+          "est": "2h",
+          "priority": "P4",
+          "notes": "Send reports directly to prospects.",
+          "status": "pending"
+        },
+        {
+          "id": 89,
+          "title": "Sales report: CRM integration",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Push prospect data to HubSpot/Pipedrive.",
+          "status": "pending"
+        },
+        {
+          "id": 108,
+          "title": "Predictive SEO & trend forecasting",
+          "source": "FEATURE_VISION #3",
+          "est": "8-12h",
+          "priority": "P4",
+          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
+          "status": "pending"
+        },
+        {
+          "id": 109,
+          "title": "Cross-client benchmarking network",
+          "source": "FEATURE_VISION #4",
+          "est": "6-8h",
+          "priority": "P4",
+          "notes": "Anonymized benchmarks across all clients. Needs 20+ active clients.",
+          "status": "pending"
+        },
+        {
+          "id": 110,
+          "title": "Backlink intelligence & outreach",
+          "source": "FEATURE_VISION #5",
+          "est": "10-15h",
+          "priority": "P2",
+          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
+          "status": "pending"
+        },
+        {
+          "id": 112,
+          "title": "Local SEO module",
+          "source": "FEATURE_VISION #7",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo.",
+          "status": "pending"
+        },
+        {
+          "id": 118,
+          "title": "WordPress / Shopify support",
+          "source": "FEATURE_VISION #13",
+          "est": "15-20h",
+          "priority": "P4",
+          "notes": "Abstract CMS integration layer. Only after Webflow PMF proven.",
+          "status": "pending"
+        },
+        {
+          "id": 120,
+          "title": "Embeddable SEO widgets",
+          "source": "FEATURE_VISION #15",
+          "est": "4-6h",
+          "priority": "P4",
+          "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-future",
+      "name": "Future (Historical Done/Deferred Archive)",
+      "rationale": "Historical record of completed or explicitly deferred future-theme work. Active future execution now lives in value-ranked actionable sprints.",
+      "items": [
+        {
+          "id": "schema-page-element-catalog-pr1",
+          "title": "Schema Page-Element Catalog PR1 — slice + 3 element types + 3 schema integrations",
+          "source": "docs/superpowers/plans/2026-04-29-page-element-catalog-pr1.md",
+          "est": "5d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "PageElementSlice + page_elements table + extractors for videos/HowTo/citations + VideoObject/HowTo/Article.citation[] schema integrations on Article + BlogPosting. No AI in PR1. Spec: docs/superpowers/specs/2026-04-29-page-element-catalog-design.md. Audit: docs/superpowers/audits/2026-04-29-page-element-catalog-audit.md."
+        },
+        {
+          "id": "schema-page-element-catalog-pr2",
+          "title": "Schema Page-Element Catalog PR2 — images + tables + testimonials",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.2 + §6",
+          "est": "4d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "notes": "Shipped 3 pattern extractors (images w/ rule-based hero/informative/decorative + AI vision classifier; tables w/ pricing+comparison heuristics; testimonials w/ author+rating) + 2 AI extractors (vision image-role classifier via openai SDK direct, HowTo disambiguation via callAI) behind schema-ai-element-classifier flag (default off, 120-call shared per-run AiBudget). Threaded one AiBudget per regenerate-all through generateSchemaSuggestions's 3 generateLeanSchema sites (Devin r5 follow-up). Added 4 validator REQUIRED_BY_TYPE entries (Review/AggregateRating/Table/ImageGallery) + 3 schema integrations: ImageGallery (Article+Service), Review[]+AggregateRating (Service+LocalBusiness), Table mainEntity (Service). Pre-emission gates on every new node type (synchronous, per PR1 Devin r2 lesson). 4 new HTML fixtures + 6 new test files + extended integration tests."
+        },
+        {
+          "id": "schema-entity-graph-workstream-c",
+          "title": "Schema Workstream C — Entity Graph Hub Dispatch",
+          "source": "claude/schema-v2-brainstorm branch",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-04-30",
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex → Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex → Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex → CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+        },
+        {
+          "id": "schema-semantic-extraction",
+          "title": "Schema Semantic Extraction & AI-Powered Generation",
+          "source": "docs/superpowers/plans/2026-05-01-schema-semantic-extraction.md",
+          "est": "3d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-05-01",
+          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page — stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
+        },
+        {
+          "id": "schema-context-builder-pattern-b-migration",
+          "title": "Migrate buildSchemaContext direct reads to intelligence slices",
+          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
+          "est": "2-3h cumulative across opportunistic PRs",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "done",
+          "shippedAt": "2026-05-07",
+          "notes": "Completed 2026-05-07. buildSchemaContext now reads schema context from `buildWorkspaceIntelligence({ slices: ['seoContext'] })` for businessContext, knowledgeBase, personas, siteKeywords, and business profile (including structured address + foundedDate/numberOfEmployees via seoContext.businessProfile). Legacy `ctx.brandVoice` assignment was removed as dead schema context. Remaining direct reads are identity-only (`ws.name`, `ws.id`, `ws.liveDomain`, `ws.brandLogoUrl`, `ws.siteHasSearch`, `_siteId`) plus analytics maps, matching the allowlist intent behind `schema-context-direct-read-not-on-allowlist`."
         },
         {
           "id": "test-flake-aiLimiter-state-pollution",
@@ -550,313 +759,6 @@
           "priority": "P2",
           "status": "deferred",
           "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output — it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
-        },
-        {
-          "id": 16,
-          "title": "Internal team management",
-          "source": "AUTH_ROADMAP Phase 3",
-          "est": "4-5h",
-          "priority": "P2",
-          "notes": "Invite team members, manage roles, assign workspaces.\n[Audit 2026-04-22 partial] Internal-user backend (roles, invite, workspace assignment) fully shipped via /api/users; admin frontend UI to invite/manage internal team members is not built.",
-          "status": "pending"
-        },
-        {
-          "id": 17,
-          "title": "Permission-based feature access",
-          "source": "AUTH_ROADMAP Phase 5",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.\n[Audit 2026-04-22 partial] Role enum (owner/admin/member, client_owner/client_member) and requireRole middleware shipped; per-action gating (client_member view-only on approvals, member-can't-delete-workspace) is not implemented in routes.",
-          "status": "pending"
-        },
-        {
-          "id": 23,
-          "title": "Writer assignment",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Assign content briefs to specific writers with notifications.\n[Audit 2026-04-22 partial] Adjacent infrastructure exists on work_orders (assigned_to column + mapper); content briefs lack any writer-assignment field and no notification flow is wired.",
-          "status": "pending"
-        },
-        {
-          "id": 117,
-          "title": "Client team collaboration",
-          "source": "FEATURE_VISION #12",
-          "est": "8-10h",
-          "priority": "P3",
-          "notes": "Comments on strategy items, @mentions on briefs, shared notes. Per-seat pricing opportunity.",
-          "status": "pending"
-        },
-        {
-          "id": 20,
-          "title": "Notification preferences",
-          "source": "AUTH_ROADMAP Phase 6",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built.",
-          "status": "pending"
-        },
-        {
-          "id": 540,
-          "title": "Widget System — Customizable Workspace Home dashboard",
-          "source": "UI_UX_AUDIT §Long-Term",
-          "est": "6-8h",
-          "priority": "P2",
-          "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config.",
-          "status": "pending"
-        },
-        {
-          "id": 541,
-          "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
-          "source": "UI_UX_AUDIT §Long-Term",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built.",
-          "status": "pending"
-        },
-        {
-          "id": 542,
-          "title": "Command Palette 2.0 — Action palette with natural language",
-          "source": "UI_UX_AUDIT §Long-Term",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\").",
-          "status": "pending"
-        },
-        {
-          "id": 514,
-          "title": "Client Education Hub — Embedded SEO education throughout",
-          "source": "UI_UX_AUDIT §Long-Term",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.\n[Audit 2026-04-22 partial] SeoGlossary.tsx + SeoEducationTip.tsx (tab-keyed learnMore content for overview/performance/health/strategy/content/roi) ship; \"Why this matters\" framing, video embeds, and Glossary cross-links from tips are not wired.",
-          "status": "pending"
-        },
-        {
-          "id": 515,
-          "title": "Performance Budget Dashboard — Visual page weight tracker",
-          "source": "UI_UX_AUDIT §Long-Term",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.\n[Audit 2026-04-22 partial] PageWeight + PageSpeedPanel + server/performance-store ship point-in-time data; historical weight trend per workspace + regression alerts are not built.",
-          "status": "pending"
-        },
-        {
-          "id": 516,
-          "title": "Accessibility Improvements — WCAG AA compliance pass",
-          "source": "UI_UX_AUDIT §10",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
-          "status": "pending"
-        },
-        {
-          "id": 76,
-          "title": "Strategy & implementation hours system",
-          "source": "Tier audit discussion",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Premium includes 3 strategy & implementation hrs/mo. Defer until premium tier has more subscribers.",
-          "status": "pending"
-        },
-        {
-          "id": 26,
-          "title": "Webhook / Zapier triggers",
-          "source": "ACTION_PLAN",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Fire webhooks on key events. Enables automation integrations.",
-          "status": "pending"
-        },
-        {
-          "id": 52,
-          "title": "Responsive mobile layout",
-          "source": "FEATURE_AUDIT",
-          "est": "4-6h",
-          "priority": "P3",
-          "notes": "Sidebar → bottom nav, stacked cards on small screens.",
-          "status": "pending"
-        },
-        {
-          "id": 32,
-          "title": "Shared notes / wiki per workspace",
-          "source": "ACTION_PLAN",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Team-internal notes about a client.",
-          "status": "pending"
-        },
-        {
-          "id": 34,
-          "title": "Client NPS survey",
-          "source": "ACTION_PLAN",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Periodic in-dashboard satisfaction survey.",
-          "status": "pending"
-        },
-        {
-          "id": 38,
-          "title": "Schema auto-schedule",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Re-generate schemas on cadence, flag stale pages.",
-          "status": "pending"
-        },
-        {
-          "id": 41,
-          "title": "Historical redirect comparison",
-          "source": "FEATURE_AUDIT",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Track redirect status over time, detect new 404s.",
-          "status": "pending"
-        },
-        {
-          "id": 43,
-          "title": "Accessibility audit expansion",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "WCAG contrast, ARIA, heading order, form labels.",
-          "status": "pending"
-        },
-        {
-          "id": 44,
-          "title": "WCAG AA full compliance",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Focus indicators, keyboard nav for all interactive elements.",
-          "status": "pending"
-        },
-        {
-          "id": 45,
-          "title": "GSC: URL Inspection API",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Per-URL indexing status, crawl info.",
-          "status": "pending"
-        },
-        {
-          "id": 46,
-          "title": "GA4: Exit pages + attribution",
-          "source": "Memory/Roadmap",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Advanced analytics.",
-          "status": "pending"
-        },
-        {
-          "id": 47,
-          "title": "Webflow Enterprise API: 301 redirects",
-          "source": "FEATURE_AUDIT",
-          "est": "1-2h",
-          "priority": "P4",
-          "notes": "Push rules via API (Enterprise-only).",
-          "status": "pending"
-        },
-        {
-          "id": 49,
-          "title": "Sales report: email delivery",
-          "source": "FEATURE_AUDIT",
-          "est": "2h",
-          "priority": "P4",
-          "notes": "Send reports directly to prospects.",
-          "status": "pending"
-        },
-        {
-          "id": 89,
-          "title": "Sales report: CRM integration",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Push prospect data to HubSpot/Pipedrive.",
-          "status": "pending"
-        },
-        {
-          "id": 108,
-          "title": "Predictive SEO & trend forecasting",
-          "source": "FEATURE_VISION #3",
-          "est": "8-12h",
-          "priority": "P4",
-          "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out.",
-          "status": "pending"
-        },
-        {
-          "id": 109,
-          "title": "Cross-client benchmarking network",
-          "source": "FEATURE_VISION #4",
-          "est": "6-8h",
-          "priority": "P4",
-          "notes": "Anonymized benchmarks across all clients. Needs 20+ active clients.",
-          "status": "pending"
-        },
-        {
-          "id": 110,
-          "title": "Backlink intelligence & outreach",
-          "source": "FEATURE_VISION #5",
-          "est": "10-15h",
-          "priority": "P2",
-          "notes": "Ahrefs/Moz API → backlink profile → link gaps → AI outreach templates. Elevated from P3 — backlinks are a top-3 ranking factor and this capability justifies premium pricing. Lightweight overview (#213) ships first in Sprint F; this is the full-featured follow-up.",
-          "status": "pending"
-        },
-        {
-          "id": 112,
-          "title": "Local SEO module",
-          "source": "FEATURE_VISION #7",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo.",
-          "status": "pending"
-        },
-        {
-          "id": 116,
-          "title": "AI strategy memory & learning",
-          "source": "FEATURE_VISION #11",
-          "est": "8-12h",
-          "priority": "P3",
-          "notes": "AI learns from conversations, approved changes, rejected suggestions. Proprietary knowledge asset.",
-          "status": "pending"
-        },
-        {
-          "id": 118,
-          "title": "WordPress / Shopify support",
-          "source": "FEATURE_VISION #13",
-          "est": "15-20h",
-          "priority": "P4",
-          "notes": "Abstract CMS integration layer. Only after Webflow PMF proven.",
-          "status": "pending"
-        },
-        {
-          "id": 120,
-          "title": "Embeddable SEO widgets",
-          "source": "FEATURE_VISION #15",
-          "est": "4-6h",
-          "priority": "P4",
-          "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
-          "status": "pending"
-        },
-        {
-          "id": 523,
-          "title": "Workspace onboarding automation — templates, batch setup, reduce repetitive per-workspace tasks",
-          "source": "Connected Intelligence brainstorming",
-          "est": "6-8h",
-          "priority": "P3",
-          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
-          "status": "pending"
-        },
-        {
-          "id": "schema-intelligence-layer-v2",
-          "title": "Schema Intelligence Layer (FAQ-from-GSC, E-E-A-T, healthcare subtypes)",
-          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md (deferred scope)",
-          "est": "2-3w",
-          "priority": "P1",
-          "sprint": "I",
-          "status": "pending",
-          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
     },
@@ -905,6 +807,95 @@
         }
       ],
       "name": "Client Inbox IA — Phase 3 Deferred (3.1–3.4)"
+    },
+    {
+      "id": "sprint-seo-intelligence-depth",
+      "name": "✅ SHIPPED — SEO Intelligence Depth",
+      "hours": "19-24",
+      "rationale": "Deepen the data layer: competitor monitoring, difficulty calibration, URL-level keyword intel, score history, anti-hallucination, and E-E-A-T signals.",
+      "items": [
+        {
+          "id": 570,
+          "title": "Competitor Content Monitoring (Scheduled Job)",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.\nShipped / verified 2026-05-06: startCompetitorMonitoringCron() is started from server/startup.ts; server/intelligence-crons.ts snapshots configured competitor domains, diffs against previous snapshots, writes competitor_alert rows, and upserts competitor_alert insights.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        },
+        {
+          "id": 571,
+          "title": "Authority-Adjusted Difficulty Filtering",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.\nShipped 2026-04-23 under Recommendation Intelligence Tier 1 item #615. adjustKdImpactScore() adjusts recommendation impact by site strength vs keyword difficulty, with unit coverage in tests/unit/recommendations-authority-kd.test.ts. This roadmap duplicate is now closed.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 322,
+          "title": "URL-Level Keyword Intelligence (url_organic API)",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added provider-level URL organic keyword support (`getUrlKeywords`) for SEMRush and DataForSEO, persisted `urlLevelKeywords`/`urlLevelKeywordSource` on page keyword rows, and made strategy enrichment prefer URL-level page-specific keyword data over domain-level fallback when available. Capped per-run URL lookups to avoid provider-credit blowups.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": 351,
+          "title": "Page Intelligence — Optimization Score History & Trending",
+          "source": "USER REQUEST",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Added append-only `page_keyword_score_history` snapshots, attached score history to `PageKeywordMap`, recorded snapshots on single/batch analysis writes only when the score changes, and surfaced compact Page Intelligence score deltas in the page list. Broader month-level reporting can build on the same table later.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": 355,
+          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
+          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Expanded `RESEARCH_MODE_INSTRUCTIONS` in `server/ai.ts` to require explicit observed-vs-inferred framing, forbid presenting inferred/example values as verified facts, and require explicit source-availability disclosure when citations are requested but missing. Admin chat (`/api/admin-chat`) now always calls `callAI` with `researchMode: true`. Added regression guard in `tests/contract/factual-ai-output-contracts.test.ts` to prevent drift.",
+          "status": "done",
+          "shippedAt": "2026-05-18"
+        },
+        {
+          "id": 629,
+          "title": "Content Review Evidence Panel — Show SERP provenance for factual claims",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-14 in Output Quality Follow-Ups PR. Post review now loads the source brief and displays stored `realPeopleAlsoAsk` and `realTopResults` in the existing review checklist as reviewer support. AI review still marks factual accuracy/no hallucinations as human-review-only and never auto-checks provenance-sensitive items.",
+          "status": "done",
+          "shippedAt": "2026-05-14"
+        },
+        {
+          "id": 631,
+          "title": "Internal Link Recommendation Source Audit",
+          "source": "USER REQUEST",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added formal audit deliverable at `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md` inventorying producer/consumer contracts across scanner, SEO copy, briefs, and client actions. Audit confirms scanner contract (`fromPage/fromTitle/toPage/toTitle/anchorText/reason/priority`) as canonical actionable source and documents drift queue for `#632` (source-title preservation + URL/title field semantics cleanup).",
+          "status": "done",
+          "shippedAt": "2026-05-18"
+        },
+        {
+          "id": 633,
+          "title": "Audit Snapshot Effective Summary Query Optimization",
+          "source": "PR 5 REVIEW",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added `listSnapshotsDetailed(siteId)` in `server/reports.ts` and refactored suppression paths in `server/audit-snapshot-views.ts` to compute current + previous effective scores from one ordered in-memory snapshot list, eliminating per-summary `getSnapshot()` and repeated previous-snapshot lookups. Added unit coverage in `tests/unit/audit-snapshot-views.test.ts` for suppression-adjusted history semantics.",
+          "status": "done",
+          "shippedAt": "2026-05-18"
+        }
+      ],
+      "shippedAt": "2026-05-18"
     },
     {
       "id": "sprint-platform-health-wave6-deferred-polish",
@@ -2229,6 +2220,65 @@
         }
       ],
       "shippedAt": "2026-05-08"
+    },
+    {
+      "id": "sprint-send-to-client",
+      "name": "✅ SHIPPED — Send to Client Expansion",
+      "hours": "9-14",
+      "rationale": "Unified delivery story — every major analysis surface (AEO, Internal Links, Keywords, Redirects, Content Decay, Page Rewriter) gains a client-send action in one sprint.",
+      "items": [
+        {
+          "id": 609,
+          "title": "AEO Review: Send to Client per-page changes",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.\nShipped / verified 2026-05-06: AeoReview sends page-level client actions with sourceType 'aeo_change', sourceId `aeo:${page.pageUrl}`, client-ready change filtering, and payload.page for client review.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        },
+        {
+          "id": 610,
+          "title": "Internal Links: Send to Client link suggestions",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.\nShipped / verified 2026-05-06 as a filtered-batch client action: InternalLinks has a Send to Client action that packages the currently filtered link suggestions with sourceType 'internal_link' and summary metadata. It is not a literal per-page button, but the client-reviewable link-suggestion workflow is live.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        },
+        {
+          "id": 611,
+          "title": "Keyword Strategy: Send to Client strategy recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.\nShipped / verified 2026-05-06: KeywordStrategy has a Send to Client action with sourceType 'keyword_strategy' that packages mapped pages, quick wins, content gaps, opportunities, and low-hanging fruit into the client action queue.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        },
+        {
+          "id": 612,
+          "title": "Redirect Manager: Send to Client redirect proposals",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.\nShipped / verified 2026-05-06: RedirectManager sends accepted redirect proposals to the client action queue with sourceType 'redirect_proposal' and source/target rule payloads.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        },
+        {
+          "id": 297,
+          "title": "Content Decay: Send to Client refresh recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.\nShipped / verified 2026-05-06: ContentDecay exposes per-page Send to Client on AI refresh recommendation cards and creates sourceType 'content_decay' client actions with the decaying page payload.",
+          "status": "done",
+          "shippedAt": "2026-05-06"
+        }
+      ],
+      "shippedAt": "2026-05-06"
     },
     {
       "id": "sprint-deep-bug-remediation",
