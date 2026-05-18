@@ -5,6 +5,7 @@ import { Button, FormInput, Icon, IconButton } from '../ui';
 import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 import type { ApprovalBatch, ApprovalItem } from '../../../shared/types/approvals';
 import type { ClientAction, AeoChangePayload, InternalLinkPayload, RedirectProposalPayload } from '../../../shared/types/client-actions';
+import { normalizeInternalLinkSuggestion } from '../../lib/internal-link-client-action';
 
 // ── Approval batch item row ────────────────────────────────────────────────
 
@@ -158,6 +159,7 @@ function AeoRenderer({ payload }: { payload: AeoChangePayload }) {
 
 function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
   const suggestions = payload.suggestions ?? [];
+  const normalizedSuggestions = suggestions.map(normalizeInternalLinkSuggestion);
   if (suggestions.length === 0) {
     return (
       <p className="t-body text-[var(--brand-text-muted)]">No link suggestions.</p>
@@ -172,26 +174,38 @@ function InternalLinkRenderer({ payload }: { payload: InternalLinkPayload }) {
               Anchor text
             </th>
             <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
+              Target title
+            </th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
               Target URL
             </th>
+            <th className="py-2 pr-4 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
+              Source title
+            </th>
             <th className="py-2 t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider">
-              Source page
+              Source URL
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--brand-border)]">
-          {suggestions.map((s, i) => (
+          {normalizedSuggestions.map((s, i) => (
             <tr key={i}>
               <td className="py-3 pr-4 t-ui font-medium text-[var(--brand-text-bright)] align-top">
                 {s.anchorText}
               </td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-bright)] align-top">
+                {s.targetTitle || '—'}
+              </td>
               <td className="py-3 pr-4 align-top">
                 <span className="t-caption text-accent-brand">
-                  {s.targetTitle || s.targetUrl}
+                  {s.targetUrl}
                 </span>
               </td>
+              <td className="py-3 pr-4 t-caption text-[var(--brand-text-muted)] align-top">
+                {s.sourcePageTitle || '—'}
+              </td>
               <td className="py-3 t-caption text-[var(--brand-text-muted)] align-top">
-                {s.sourcePage || '—'}
+                {s.sourcePageUrl || '—'}
               </td>
             </tr>
           ))}

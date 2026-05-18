@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { DecisionDetailModal } from '../../src/components/client/DecisionDetailModal';
 import type { NormalizedDecision } from '../../shared/types/decision';
 import type { ApprovalBatch } from '../../shared/types/approvals';
+import type { ClientAction } from '../../shared/types/client-actions';
 
 const mockDecision: NormalizedDecision = {
   id: 'ab-1',
@@ -38,6 +39,42 @@ const mockBatch: ApprovalBatch = {
   updatedAt: '2026-05-01T00:00:00Z',
 };
 
+const internalLinkDecision: NormalizedDecision = {
+  id: 'ca-1',
+  source: 'client_action',
+  sourceId: 'ca-1',
+  title: 'Internal links',
+  summary: 'Review links',
+  priority: 'medium',
+  itemCount: 1,
+  isSingleAction: false,
+  badge: 'Internal Links',
+  createdAt: '2026-05-01T00:00:00Z',
+};
+
+const internalLinkAction: ClientAction = {
+  id: 'ca-1',
+  workspaceId: 'ws-1',
+  sourceType: 'internal_link',
+  sourceId: 'internal-links:test',
+  title: 'Internal links',
+  summary: 'Review links',
+  payload: {
+    suggestions: [
+      {
+        anchorText: 'Learn more',
+        targetUrl: '/services',
+        sourcePageUrl: '/about',
+        sourcePageTitle: 'About Us',
+      },
+    ],
+  },
+  status: 'pending',
+  priority: 'medium',
+  createdAt: '2026-05-01T00:00:00Z',
+  updatedAt: '2026-05-01T00:00:00Z',
+};
+
 function renderModal(onApprove = vi.fn().mockResolvedValue(undefined), onDismiss = vi.fn()) {
   return render(
     <DecisionDetailModal
@@ -45,6 +82,17 @@ function renderModal(onApprove = vi.fn().mockResolvedValue(undefined), onDismiss
       originalData={{ type: 'approval_batch', batch: mockBatch }}
       onApprove={onApprove}
       onDismiss={onDismiss}
+    />,
+  );
+}
+
+function renderInternalLinkModal() {
+  return render(
+    <DecisionDetailModal
+      decision={internalLinkDecision}
+      originalData={{ type: 'client_action', action: internalLinkAction }}
+      onApprove={vi.fn().mockResolvedValue(undefined)}
+      onDismiss={vi.fn()}
     />,
   );
 }
@@ -100,5 +148,18 @@ describe('DecisionDetailModal', () => {
     renderModal(onApprove);
     fireEvent.click(screen.getByRole('button', { name: /looks good/i }));
     await waitFor(() => expect(onApprove).toHaveBeenCalledWith([]));
+  });
+
+  it('renders internal link target/source titles separately from URLs', () => {
+    renderInternalLinkModal();
+
+    const rows = screen.getAllByRole('row');
+    const firstDataRow = rows[1];
+    const cells = within(firstDataRow).getAllByRole('cell');
+
+    expect(cells[1].textContent).toBe('—');
+    expect(cells[2].textContent).toContain('/services');
+    expect(cells[3].textContent).toBe('About Us');
+    expect(cells[4].textContent).toBe('/about');
   });
 });
