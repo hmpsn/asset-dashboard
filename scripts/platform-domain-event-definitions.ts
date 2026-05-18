@@ -287,6 +287,10 @@ function sortRecordValues(record: Record<string, string[]>): Record<string, stri
   return sorted;
 }
 
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
 function discoverProducerModulesByEvent(): Record<string, string[]> {
   const producersByEvent: Record<string, string[]> = {};
   const eventNameByKey = new Map<WsEventKey, WsEventName>(
@@ -489,12 +493,23 @@ export function buildDomainEventDefinitionsReport(
   discovery: DomainEventDiscovery = discoverDomainEventUsage(),
 ): DomainEventDefinitionsReport {
   const coverageEntries: DomainEventCoverageEntry[] = entries
-    .map(entry => ({
-      ...entry,
-      discoveredProducerModules: discovery.producerModulesByEvent[entry.eventName] ?? [],
-      discoveredAdminListenerModules: discovery.adminListenersByEvent[entry.eventName] ?? [],
-      discoveredClientListenerModules: discovery.clientListenersByEvent[entry.eventName] ?? [],
-    }))
+    .map(entry => {
+      const discoveredProducerModules = discovery.producerModulesByEvent[entry.eventName] ?? [];
+      const discoveredAdminListenerModules = discovery.adminListenersByEvent[entry.eventName] ?? [];
+      const discoveredClientListenerModules = discovery.clientListenersByEvent[entry.eventName] ?? [];
+
+      return {
+        ...entry,
+        // Keep curated defaults, but automatically include newly discovered modules
+        // so advisory drift focuses on structural gaps rather than stale mappings.
+        producerModules: uniqueSorted([...entry.producerModules, ...discoveredProducerModules]),
+        adminListeners: uniqueSorted([...entry.adminListeners, ...discoveredAdminListenerModules]),
+        clientListeners: uniqueSorted([...entry.clientListeners, ...discoveredClientListenerModules]),
+        discoveredProducerModules,
+        discoveredAdminListenerModules,
+        discoveredClientListenerModules,
+      };
+    })
     .sort((a, b) => a.eventName.localeCompare(b.eventName));
 
   return {
