@@ -8,6 +8,7 @@ import { validate, z } from '../middleware/validate.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { withWorkspaceLock } from '../bridge-infrastructure.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { listWorkspaces } from '../workspaces.js';
 import {
@@ -248,30 +249,33 @@ router.post(
     attribution: attributionEnum.optional(),
     measurementWindow: z.number().int().min(7).max(365).optional(),
   })),
-  (req, res) => {
+  async (req, res) => {
     try {
-      // Idempotency: if sourceId is provided, check for existing action in THIS workspace
-      if (req.body.sourceId) {
-        const existing = getActionByWorkspaceAndSource(req.params.workspaceId, req.body.sourceType, req.body.sourceId);
-        if (existing) {
-          return res.json({ success: true, action: existing, deduplicated: true });
+      const response = await withWorkspaceLock(req.params.workspaceId, async () => {
+        // Idempotency: if sourceId is provided, check for existing action in THIS workspace
+        if (req.body.sourceId) {
+          const existing = getActionByWorkspaceAndSource(req.params.workspaceId, req.body.sourceType, req.body.sourceId);
+          if (existing) {
+            return { success: true, action: existing, deduplicated: true } as const;
+          }
         }
-      }
 
-      const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
-        workspaceId: req.params.workspaceId,
-        actionType: req.body.actionType as ActionType,
-        sourceType: req.body.sourceType,
-        sourceId: req.body.sourceId,
-        pageUrl: req.body.pageUrl,
-        targetKeyword: req.body.targetKeyword,
-        baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
-        attribution: req.body.attribution,
-        measurementWindow: req.body.measurementWindow,
+        const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
+          workspaceId: req.params.workspaceId,
+          actionType: req.body.actionType as ActionType,
+          sourceType: req.body.sourceType,
+          sourceId: req.body.sourceId,
+          pageUrl: req.body.pageUrl,
+          targetKeyword: req.body.targetKeyword,
+          baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
+          attribution: req.body.attribution,
+          measurementWindow: req.body.measurementWindow,
+        });
+
+        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
+        return { success: true, action } as const;
       });
-
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
-      res.json({ success: true, action });
+      res.json(response);
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to record action');
       res.status(500).json({ error: 'Failed to record action' });
