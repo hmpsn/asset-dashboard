@@ -219,6 +219,22 @@ describe('AEO review routes', () => {
     await expect(res.json()).resolves.toEqual({ error: 'No Webflow site linked' });
   });
 
+  it('POST /api/aeo-review/:workspaceId/site rejects non-positive maxPages values', async () => {
+    const ws = createWorkspace('AEO Max Pages Guard Workspace', 'wf-site-max-pages', 'Max Pages Site');
+    workspaceIds.add(ws.id);
+    updateWorkspace(ws.id, { liveDomain: 'example.test' });
+
+    const res = await api(`/api/aeo-review/${ws.id}/site`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maxPages: -2 }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    expect(state.reviewSiteCalls).toHaveLength(0);
+  });
+
   it('POST /api/aeo-review/:workspaceId/site reviews discovered pages and persists the result', async () => {
     const ws = createWorkspace('AEO Site Review Workspace', 'wf-site-batch', 'Batch Site');
     workspaceIds.add(ws.id);

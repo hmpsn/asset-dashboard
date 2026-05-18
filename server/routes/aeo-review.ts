@@ -111,7 +111,12 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
-  const maxPages = Math.min(Number(req.body.maxPages) || 10, 25);
+  const rawMaxPages = req.body?.maxPages;
+  const requestedMaxPages = rawMaxPages == null ? 10 : Number(rawMaxPages);
+  if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+    return res.status(400).json({ error: 'maxPages must be a positive integer' });
+  }
+  const maxPages = Math.min(requestedMaxPages, 25);
 
   try {
     const baseUrl = ws.liveDomain
