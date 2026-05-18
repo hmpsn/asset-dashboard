@@ -307,7 +307,7 @@ describe('legacy job mutation safety bundle', () => {
     expect(countWorkspaceRows('jobs', workspaceBId)).toBe(0);
   });
 
-  it('seo-audit failure and cross-workspace mismatch produce no mutation side effects', async () => {
+  it('seo-audit error and cross-workspace mismatch produce no mutation side effects', async () => {
     seoAuditState.mode = 'error';
 
     const failRes = await postJson('/api/jobs', {
@@ -405,7 +405,7 @@ describe('legacy job mutation safety bundle', () => {
     expect(broadcastState.calls).toHaveLength(0);
   });
 
-  it('bulk-seo-fix per-page AI failures do not broadcast page-state updates', async () => {
+  it('bulk-seo-fix per-page AI error responses do not broadcast page-state updates', async () => {
     bulkSeoState.mode = 'error';
 
     const res = await postJson('/api/jobs', {
@@ -434,7 +434,7 @@ describe('legacy job mutation safety bundle', () => {
     expect(countActivities(workspaceAId, 'seo_updated')).toBe(1);
   });
 
-  it('sales-report enforces job terminal states and keeps workspace-scoped state untouched', async () => {
+  it('sales-report error handling enforces terminal states and keeps workspace-scoped state untouched', async () => {
     const globalBefore = countGlobalJobs();
     const successRes = await postJson('/api/jobs', {
       type: BACKGROUND_JOB_TYPES.SALES_REPORT,

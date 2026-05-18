@@ -14,6 +14,14 @@ describe('schema snapshot invalidation contract', () => {
     expect(readProjectFile('src/lib/wsEvents.ts')).toContain("SCHEMA_SNAPSHOT_UPDATED: 'schema:snapshot_updated'");
   });
 
+  it('guards against invalid legacy websocket event literals', () => {
+    const serverEvents = readProjectFile('server/ws-events.ts');
+    const clientEvents = readProjectFile('src/lib/wsEvents.ts');
+
+    expect(serverEvents).not.toContain('schema:snapshot-update');
+    expect(clientEvents).not.toContain('schema:snapshot-update');
+  });
+
   it('broadcasts snapshot updates from every route path that mutates persisted schema snapshots', () => {
     const source = readProjectFile('server/routes/webflow-schema.ts');
     const calls = source.match(/broadcastSchemaSnapshotUpdated\([^;]+;/g) ?? [];

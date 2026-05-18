@@ -106,4 +106,18 @@ describe('AI dispatch migration', () => {
     expect(source).not.toContain('callOpenAI({');
     expect(source).not.toContain('callAnthropic({');
   });
+
+  it('rejects invalid migration drift if a direct provider call reappears in migrated files', () => {
+    const migratedFiles = [
+      ...migratedGeneralGenerationFiles,
+      ...migratedJsonGenerationFiles,
+      ...migratedParsedJsonTextFiles,
+      ...migratedAnthropicGenerationFiles,
+    ];
+
+    for (const file of migratedFiles) {
+      const source = readFileSync(file.path, 'utf-8');
+      expect(source, file.path).not.toMatch(/\b(callOpenAI|callAnthropic)\s*\(/);
+    }
+  });
 });

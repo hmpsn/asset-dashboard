@@ -363,4 +363,9 @@ describe('?tab= deep-link wiring contract', () => {
 
     expect(mismatches).toEqual([]);
   });
+
+  it('returns false for invalid receiver file paths', () => {
+    const missingFile = join(ROOT, 'src/components/__missing__/NoReceiver.tsx');
+    expect(readsTabParam(missingFile)).toBe(false);
+  });
 });

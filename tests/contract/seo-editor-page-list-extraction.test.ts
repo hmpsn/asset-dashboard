@@ -18,4 +18,12 @@ describe('SeoEditor page list extraction contract', () => {
     expect(source).not.toContain('No CMS pages found');
     expect(source).not.toContain('Manual apply required — CMS pages must be updated directly in Webflow');
   });
+
+  it('guards against invalid inline page-list import regressions in SeoEditor', () => {
+    const source = fs.readFileSync(SEO_EDITOR_PATH, 'utf-8');
+
+    expect(source).not.toContain("from './PageEditRow'");
+    expect(source).not.toContain('function PageEditRow(');
+    expect(source).not.toContain('const PageEditRow =');
+  });
 });

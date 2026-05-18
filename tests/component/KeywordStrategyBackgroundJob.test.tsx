@@ -168,4 +168,29 @@ describe('KeywordStrategyPanel background job wiring', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['keyword-strategy', 'ws-1'] });
     });
   });
+
+  it('shows an error state when a started job fails', async () => {
+    const { queryClient, rerender } = renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /generate strategy/i }));
+
+    await waitFor(() => {
+      expect(mocks.startJob).toHaveBeenCalled();
+    });
+
+    mocks.jobs = [{
+      id: 'job-keyword-1',
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'error',
+      error: 'Provider timeout',
+      message: 'Provider timeout',
+      createdAt: '2026-05-04T00:00:00.000Z',
+      updatedAt: '2026-05-04T00:00:01.000Z',
+      workspaceId: 'ws-1',
+    }];
+    rerender(panelUi(queryClient));
+
+    expect(await screen.findByText('Strategy Generation Failed')).toBeInTheDocument();
+    expect(screen.getByText('Provider timeout')).toBeInTheDocument();
+  });
 });
