@@ -123,6 +123,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       return;
     }
 
+    const requestedMaxPages = req.body?.maxPages == null ? undefined : Number(req.body.maxPages);
+    if (requestedMaxPages != null && (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0)) {
+      res.status(400).json({ error: 'maxPages must be a positive integer' });
+      return;
+    }
+
     const competitorDomainsProvided = Array.isArray(req.body?.competitorDomains);
     const result = await generateKeywordStrategy({
       workspaceId: req.params.workspaceId,
@@ -131,7 +137,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       seoDataMode: readSeoDataMode(req.body),
       competitorDomains: competitorDomainsProvided ? req.body.competitorDomains : undefined,
       competitorDomainsProvided,
-      maxPages: req.body?.maxPages != null ? Number(req.body.maxPages) : undefined,
+      maxPages: requestedMaxPages,
       onProgress: wantsStream ? (event) => writeSse(event) : undefined,
       startKeepalive: wantsStream ? () => {
         ensureStream();
