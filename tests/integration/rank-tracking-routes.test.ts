@@ -93,6 +93,12 @@ describe('Rank Tracking — history and latest', () => {
     expect(Array.isArray(body)).toBe(true);
   });
 
+  it('GET /api/rank-tracking/:workspaceId/history rejects non-positive limit', async () => {
+    const res = await api(`/api/rank-tracking/${testWsId}/history?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
   it('GET /api/rank-tracking/:workspaceId/latest returns array', async () => {
     const res = await api(`/api/rank-tracking/${testWsId}/latest`);
     expect(res.status).toBe(200);
@@ -116,6 +122,12 @@ describe('Rank Tracking — public endpoints', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('GET /api/public/rank-tracking/:workspaceId/history rejects non-positive limit', async () => {
+    const res = await api(`/api/public/rank-tracking/${testWsId}/history?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
   it('GET /api/public/rank-tracking/:workspaceId/latest returns array', async () => {
