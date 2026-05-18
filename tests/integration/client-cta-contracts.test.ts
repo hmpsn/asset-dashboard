@@ -197,7 +197,7 @@ describe('Rate limiting contract — CTA must handle 429 gracefully', () => {
 // ── Workspace validation contract ─────────────────────────────────────────────
 
 describe('Workspace validation contract — CTA must validate workspace before sending', () => {
-  it('unknown workspaceId returns 400', async () => {
+  it('unknown workspaceId returns 404', async () => {
     // CTA must check that the workspace exists before rendering the button,
     // but also handle the case where a stale/invalid workspace is passed.
     const res = await postJson('/api/public/signal/ws-does-not-exist-cta-contract', {
@@ -205,7 +205,7 @@ describe('Workspace validation contract — CTA must validate workspace before s
       triggerMessage: 'should not land',
       chatContext: [],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });

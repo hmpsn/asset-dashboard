@@ -7,6 +7,7 @@ import {
   hasActiveJob,
   updateJob,
 } from './jobs.js';
+import { withWorkspaceLock } from './bridge-infrastructure.js';
 import { createLogger } from './logger.js';
 import { parseAIJson } from './openai-helpers.js';
 import { getActionBySource, recordAction } from './outcome-tracking.js';
@@ -252,7 +253,7 @@ function recordBrandVoiceOutcome(workspaceId: string): void {
   }
 }
 
-export function startWorkspaceContextGenerationJob(type: BackgroundJobType, workspaceId: string): { jobId: string } {
+export async function startWorkspaceContextGenerationJob(type: BackgroundJobType, workspaceId: string): Promise<{ jobId: string }> {
   if (!Object.prototype.hasOwnProperty.call(JOB_LABELS, type)) {
     throw new WorkspaceContextJobStartError('Unknown workspace context generation job type', 400);
   }
@@ -263,27 +264,36 @@ export function startWorkspaceContextGenerationJob(type: BackgroundJobType, work
   if (!ws) throw new WorkspaceContextJobStartError('Workspace not found', 404);
   if (!ws.webflowSiteId) throw new WorkspaceContextJobStartError('No Webflow site linked', 400);
 
-  const active = hasActiveJob(contextType, workspaceId);
-  if (active) {
-    throw new WorkspaceContextJobStartError(
-      `${JOB_LABELS[contextType]} generation is already running for this workspace`,
-      409,
-      active.id,
-    );
-  }
+  return withWorkspaceLock(workspaceId, async () => {
+    const active = hasActiveJob(contextType, workspaceId);
+    if (active) {
+      throw new WorkspaceContextJobStartError(
+        `${JOB_LABELS[contextType]} generation is already running for this workspace`,
+        409,
+        active.id,
+      );
+    }
 
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'workspace_context_generations')) {
-    throw new WorkspaceContextJobStartError('Monthly AI generation limit reached', 429);
-  }
+    if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'workspace_context_generations')) {
+      throw new WorkspaceContextJobStartError('Monthly AI generation limit reached', 429);
+    }
 
-  const job = createJob(contextType, {
-    message: `Preparing ${JOB_LABELS[contextType]} generation...`,
-    workspaceId,
-    total: 100,
+    let jobId = '';
+    try {
+      const job = createJob(contextType, {
+        message: `Preparing ${JOB_LABELS[contextType]} generation...`,
+        workspaceId,
+        total: 100,
+      });
+      jobId = job.id;
+    } catch (err) {
+      decrementUsage(workspaceId, 'workspace_context_generations');
+      throw err;
+    }
+
+    void runWorkspaceContextGenerationJob({ jobId, workspaceId, type: contextType });
+    return { jobId };
   });
-
-  void runWorkspaceContextGenerationJob({ jobId: job.id, workspaceId, type: contextType });
-  return { jobId: job.id };
 }
 
 export function workspaceContextJobErrorResponse(err: unknown): { status: number; body: { error: string; jobId?: string } } {

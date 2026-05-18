@@ -651,7 +651,7 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.PERSONA_GENERATION: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         try {
-          const started = startWorkspaceContextGenerationJob(type, wsId);
+          const started = await startWorkspaceContextGenerationJob(type, wsId);
           res.json(started);
         } catch (err) {
           const response = workspaceContextJobErrorResponse(err);
