@@ -889,17 +889,18 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // public boundary. Defensive: pull via optional chaining so older drafts
   // without `aiPolish` round-trip cleanly.
   const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
+  const briefing = {
+    weekOf: latest.weekOf,
+    publishedAt: latest.publishedAt,
+    stories: latest.stories,
+    issueSummary,
+    issueNumber,
+    recommendations,
+    weeklyOpener: weeklyOpener || undefined,
+  };
 
   res.json({
-    briefing: {
-      weekOf: latest.weekOf,
-      publishedAt: latest.publishedAt,
-      stories: latest.stories,
-      issueSummary,
-      issueNumber,
-      recommendations,
-      ...(weeklyOpener ? { weeklyOpener } : {}),
-    },
+    briefing,
   });
 });
 

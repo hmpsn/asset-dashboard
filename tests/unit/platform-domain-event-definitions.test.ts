@@ -61,7 +61,7 @@ describe('platform domain event definitions', () => {
     });
   });
 
-  it('reports mapping drift warnings when discovered modules are not in registry lists', () => {
+  it('merges discovered modules into advisory registry coverage', () => {
     const singleEntryRegistry: DomainEventDefinition[] = [
       {
         eventKey: 'APPROVAL_UPDATE',
@@ -89,21 +89,19 @@ describe('platform domain event definitions', () => {
     };
 
     const report = buildDomainEventDefinitionsReport(singleEntryRegistry, mockedDiscovery);
-    expect(report.warnings).toContainEqual({
-      eventKey: 'APPROVAL_UPDATE',
-      eventName: WS_EVENTS.APPROVAL_UPDATE,
-      issue: 'Discovered producer modules not listed in registry: server/routes/content-plan-review.ts',
-    });
-    expect(report.warnings).toContainEqual({
-      eventKey: 'APPROVAL_UPDATE',
-      eventName: WS_EVENTS.APPROVAL_UPDATE,
-      issue: 'Discovered admin listener modules not listed in registry: src/components/AdminInbox.tsx',
-    });
-    expect(report.warnings).toContainEqual({
-      eventKey: 'APPROVAL_UPDATE',
-      eventName: WS_EVENTS.APPROVAL_UPDATE,
-      issue: 'Discovered client listener modules not listed in registry: src/components/client/DecisionCard.tsx',
-    });
+    expect(report.warnings).toEqual([]);
+    expect(report.entries[0]?.producerModules).toEqual([
+      'server/routes/approvals.ts',
+      'server/routes/content-plan-review.ts',
+    ]);
+    expect(report.entries[0]?.adminListeners).toEqual([
+      'src/components/AdminInbox.tsx',
+      'src/hooks/useWsInvalidation.ts',
+    ]);
+    expect(report.entries[0]?.clientListeners).toEqual([
+      'src/components/client/DecisionCard.tsx',
+      'src/components/ClientDashboard.tsx',
+    ]);
   });
 
   it('formats markdown for human review', () => {
