@@ -469,8 +469,32 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/performance-trend/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/performance-trend/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/search-devices/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/search-devices/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/search-comparison/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/search-comparison/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-trend/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-trend/${wsConfiguredId}?days=15.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-trend/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-trend/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -518,8 +542,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-event-trend/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-event-trend/${wsConfiguredId}?event=page_view&days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-landing-pages/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-landing-pages/${wsConfiguredId}?days=9.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-landing-pages/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-landing-pages/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -536,8 +572,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-top-pages/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-top-pages/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-sources/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-sources/${wsConfiguredId}?days=13.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-sources/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-sources/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -548,8 +596,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-devices/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-devices/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-countries/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-countries/${wsConfiguredId}?days=5.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-countries/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-countries/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -560,8 +620,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-comparison/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-comparison/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-new-vs-returning/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-new-vs-returning/${wsConfiguredId}?days=16.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-new-vs-returning/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-new-vs-returning/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -572,8 +644,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-events/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-events/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-conversions/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-conversions/${wsConfiguredId}?days=2.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-conversions/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-conversions/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
@@ -584,8 +668,20 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-event-explorer/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-event-explorer/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-organic/:workspaceId rejects non-integer days values', async () => {
     const res = await api(`/api/public/analytics-organic/${wsConfiguredId}?days=20.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-organic/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-organic/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });

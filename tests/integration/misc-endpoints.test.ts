@@ -389,6 +389,15 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('rejects Google search country reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('rejects Google search comparison reads with non-integer days', async () => {
     const res = await api(
       `/api/google/search-comparison/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=19.5`,
