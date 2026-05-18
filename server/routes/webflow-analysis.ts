@@ -31,7 +31,11 @@ const log = createLogger('webflow-analysis');
 router.post('/api/competitor-compare', async (req, res) => {
   const { myUrl, competitorUrl, maxPages } = req.body as { myUrl: string; competitorUrl: string; maxPages?: number };
   if (!myUrl || !competitorUrl) return res.status(400).json({ error: 'myUrl and competitorUrl required' });
-  const limit = Math.min(maxPages || 20, 30);
+  const requestedLimit = maxPages == null ? 20 : Number(maxPages);
+  if (!Number.isInteger(requestedLimit) || requestedLimit <= 0) {
+    return res.status(400).json({ error: 'maxPages must be a positive integer' });
+  }
+  const limit = Math.min(requestedLimit, 30);
   try {
     log.info(`Comparing ${myUrl} vs ${competitorUrl} (max ${limit} pages each)`);
     const [myAudit, theirAudit] = await Promise.all([
