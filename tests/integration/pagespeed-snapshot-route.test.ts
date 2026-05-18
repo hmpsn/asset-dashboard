@@ -37,4 +37,10 @@ describe('GET /api/webflow/pagespeed-snapshot/:siteId', () => {
     expect(body.result?.strategy).toBe('desktop');
     expect(body.result?.averageScore).toBe(96);
   });
+
+  it('rejects non-positive maxPages on live pagespeed runs', async () => {
+    const res = await api(`/api/webflow/pagespeed/${siteId}?workspaceId=${workspaceId}&maxPages=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+  });
 });
