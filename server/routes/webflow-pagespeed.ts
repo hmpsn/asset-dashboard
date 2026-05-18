@@ -25,7 +25,12 @@ function parseStrategy(value: unknown): 'mobile' | 'desktop' {
 router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
     const strategy = parseStrategy(req.query.strategy);
-    const maxPages = parseInt(req.query.maxPages as string) || 5;
+    const rawMaxPages = req.query.maxPages;
+    const requestedMaxPages = rawMaxPages == null ? 5 : Number(rawMaxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    const maxPages = requestedMaxPages;
     const psWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
     savePageSpeed(req.params.siteId, strategy, result);
