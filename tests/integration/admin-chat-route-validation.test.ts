@@ -38,4 +38,14 @@ describe('POST /api/admin-chat validation', () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be between 1 and 365' });
   });
+
+  it('rejects out-of-range days above the supported window before provider checks', async () => {
+    const res = await postJson('/api/admin-chat', {
+      workspaceId,
+      question: 'What changed this week?',
+      days: 366,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be between 1 and 365' });
+  });
 });

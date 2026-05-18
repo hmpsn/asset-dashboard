@@ -317,9 +317,45 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('rejects Google performance trend reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/performance-trend/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search devices reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-devices/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=11.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search devices reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-devices/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('rejects Google search types reads with non-integer days', async () => {
     const res = await api(
       `/api/google/search-types/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=21.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search types reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-types/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
       { headers: scopedHeaders() },
     );
     expect(res.status).toBe(400);
@@ -356,6 +392,15 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
   it('rejects Google search comparison reads with non-integer days', async () => {
     const res = await api(
       `/api/google/search-comparison/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=19.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search comparison reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-comparison/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
       { headers: scopedHeaders() },
     );
     expect(res.status).toBe(400);

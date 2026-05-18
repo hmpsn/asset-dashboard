@@ -203,6 +203,12 @@ describe('Integration health center endpoint', () => {
     expect(body.error).toContain('days must be between');
   });
 
+  it('GET /api/observability/:workspaceId with non-positive days returns 400', async () => {
+    const res = await api(`/api/observability/${workspaceId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/observability/:workspaceId with non-integer days returns 400', async () => {
     const res = await api(`/api/observability/${workspaceId}?days=7.5`);
     expect(res.status).toBe(400);

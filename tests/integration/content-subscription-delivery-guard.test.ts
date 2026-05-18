@@ -97,4 +97,22 @@ describe('integration: content subscription delivered count guard', () => {
     const after = getContentSubscription(subscriptionId);
     expect(after?.postsDeliveredThisPeriod).toBe(before?.postsDeliveredThisPeriod);
   });
+
+  it('rejects zero delivered count and keeps existing tally unchanged', async () => {
+    const before = getContentSubscription(subscriptionId);
+    expect(before).not.toBeNull();
+
+    const res = await fetch(`${baseUrl}/api/content-subscription/${subscriptionId}/delivered`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: 0 }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body).toEqual({ error: 'count must be a positive integer' });
+
+    const after = getContentSubscription(subscriptionId);
+    expect(after?.postsDeliveredThisPeriod).toBe(before?.postsDeliveredThisPeriod);
+  });
 });
