@@ -187,22 +187,24 @@ function applyOutcomeFeedback(
     return;
   }
 
-  recordAction({
-    workspaceId,
-    actionType: OUTCOME_ACTION_TYPE_BY_SOURCE[action.sourceType],
-    sourceType: 'client_action',
-    sourceId: action.id,
-    pageUrl: origin.pageUrl ?? null,
-    targetKeyword: origin.targetKeyword ?? null,
-    baselineSnapshot: {
-      captured_at: new Date().toISOString(),
-    },
-    attribution: 'platform_executed',
-    context: {
-      notes: `Lifecycle action recorded from client action ${action.status}: ${action.title}`,
-      relatedActions: [action.id],
-    },
-  });
+  if (workspaceId) {
+    recordAction({ // recordAction-ok: workspaceId provided by workspace-scoped mutation routes
+      workspaceId,
+      actionType: OUTCOME_ACTION_TYPE_BY_SOURCE[action.sourceType],
+      sourceType: 'client_action',
+      sourceId: action.id,
+      pageUrl: origin.pageUrl ?? null,
+      targetKeyword: origin.targetKeyword ?? null,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+      },
+      attribution: 'platform_executed',
+      context: {
+        notes: `Lifecycle action recorded from client action ${action.status}: ${action.title}`,
+        relatedActions: [action.id],
+      },
+    });
+  }
 }
 
 export function applyClientActionFeedbackLoop(
