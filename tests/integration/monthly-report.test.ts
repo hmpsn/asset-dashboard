@@ -428,11 +428,10 @@ describe('renderMonthlyReport — subject and HTML', () => {
 // ── Integration: triggerMonthlyReport via HTTP ──
 
 describe('POST /api/monthly-report/:workspaceId — trigger report', () => {
-  it('returns 500 for a non-existent workspace (route does not catch the throw)', async () => {
+  it('returns 404 for a non-existent workspace', async () => {
     const res = await postJson('/api/monthly-report/ws_does_not_exist_xyz', {});
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toHaveProperty('error');
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
   });
 
   it('generates a report for an empty workspace and returns html + reportId', async () => {
