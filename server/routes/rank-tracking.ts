@@ -19,6 +19,13 @@ import {
 import { getSearchOverview } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 
+function parseHistoryLimit(rawLimit: unknown): number | null {
+  if (rawLimit == null) return 90;
+  const limit = Number(rawLimit);
+  if (!Number.isInteger(limit) || limit <= 0) return null;
+  return limit;
+}
+
 // --- Rank Tracking ---
 // Get tracked keywords for a workspace
 router.get('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -63,7 +70,8 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
 
 // Get rank history (for charting)
 router.get('/api/rank-tracking/:workspaceId/history', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const limit = parseInt(req.query.limit as string) || 90;
+  const limit = parseHistoryLimit(req.query.limit);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
@@ -75,7 +83,8 @@ router.get('/api/rank-tracking/:workspaceId/latest', requireWorkspaceAccess('wor
 
 // Public: client can view rank history
 router.get('/api/public/rank-tracking/:workspaceId/history', (req, res) => {
-  const limit = parseInt(req.query.limit as string) || 90;
+  const limit = parseHistoryLimit(req.query.limit);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   const queries = req.query.queries ? (req.query.queries as string).split(',') : undefined;
   res.json(getRankHistory(req.params.workspaceId, queries, limit));
 });
