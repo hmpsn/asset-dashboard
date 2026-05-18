@@ -19,6 +19,7 @@ const bulkSeoState = vi.hoisted(() => ({
 
 const salesReportState = vi.hoisted(() => ({
   mode: 'success' as 'success' | 'error',
+  lastMaxPages: null as number | null,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -138,7 +139,8 @@ vi.mock('../../server/sales-audit.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../server/sales-audit.js')>();
   return {
     ...actual,
-    runSalesAudit: vi.fn(async () => {
+    runSalesAudit: vi.fn(async (_url: string, maxPages: number) => {
+      salesReportState.lastMaxPages = maxPages;
       if (salesReportState.mode === 'error') throw new Error('Sales report failed in test');
       return {
         siteScore: 67,
@@ -245,6 +247,7 @@ beforeEach(() => {
   seoAuditState.mode = 'success';
   bulkSeoState.mode = 'success';
   salesReportState.mode = 'success';
+  salesReportState.lastMaxPages = null;
 
   const wsA = createWorkspace('Legacy Jobs Mutation A', 'wf-site-a', 'Site A');
   const wsB = createWorkspace('Legacy Jobs Mutation B', 'wf-site-b', 'Site B');
@@ -484,6 +487,17 @@ describe('legacy job mutation safety bundle', () => {
     await expect(invalidMaxPagesRes.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
     expect(countGlobalJobs()).toBe(countBeforeInvalidMaxPages);
 
-    expect(countGlobalJobs()).toBe(countBeforeMissingUrl);
+    salesReportState.mode = 'success';
+    const boundedRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.SALES_REPORT,
+      params: { url: 'https://example.com', maxPages: 999 },
+    });
+    expect(boundedRes.status).toBe(200);
+    const boundedStart = await boundedRes.json() as { jobId: string };
+    const boundedJob = await waitForJob(boundedStart.jobId);
+    expect(boundedJob.status).toBe('done');
+    expect(salesReportState.lastMaxPages).toBe(100);
+
+    expect(countGlobalJobs()).toBe(countBeforeMissingUrl + 1);
   });
 });
