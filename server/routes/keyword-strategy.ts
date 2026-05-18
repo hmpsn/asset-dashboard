@@ -128,6 +128,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       res.status(400).json({ error: 'maxPages must be a positive integer' });
       return;
     }
+    if (requestedMaxPages != null && requestedMaxPages > 100) {
+      res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+      return;
+    }
 
     const competitorDomainsProvided = Array.isArray(req.body?.competitorDomains);
     const result = await generateKeywordStrategy({

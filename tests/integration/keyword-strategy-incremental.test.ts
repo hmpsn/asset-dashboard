@@ -104,6 +104,15 @@ describe('Incremental strategy mode — request validation', () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
   });
+
+  it('rejects maxPages above the supported cap', async () => {
+    const res = await ctx.postJson(`/api/webflow/keyword-strategy/${workspaceId}`, {
+      mode: 'incremental',
+      maxPages: 101,
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 1 and 100' });
+  });
 });
 
 describe('Incremental strategy mode — page filtering logic', () => {
