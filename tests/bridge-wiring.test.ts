@@ -54,6 +54,16 @@ describe('Bridge infrastructure: bridgeSource pattern', () => {
   });
 });
 
+describe('Bridge infrastructure: legacy failure guards', () => {
+  it('rejects invalid legacy resolveInsight in_progress bridge pattern', () => {
+    const scheduledAuditsSrc = fs.readFileSync(path.join(serverDir, 'scheduled-audits.ts'), 'utf-8'); // readFile-ok — failure guard for deprecated legacy bridge pattern.
+    const outcomeTrackingSrc = fs.readFileSync(path.join(serverDir, 'outcome-tracking.ts'), 'utf-8'); // readFile-ok — failure guard for deprecated legacy bridge pattern.
+
+    expect(scheduledAuditsSrc).not.toContain("resolveInsight(insight.id, 'in_progress'");
+    expect(outcomeTrackingSrc).not.toContain("resolveInsight(insight.id, 'in_progress'");
+  });
+});
+
 describe('Bridge infrastructure: composable score adjustments', () => {
   it('Bridge #1 uses applyScoreAdjustment instead of _outcomeBaseScore', () => {
     const src = fs.readFileSync(path.join(serverDir, 'outcome-tracking.ts'), 'utf-8'); // readFile-ok — migration guard: asserts Bridge #1 replaced the deprecated _outcomeBaseScore field with composable applyScoreAdjustment().

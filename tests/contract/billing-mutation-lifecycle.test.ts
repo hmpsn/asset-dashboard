@@ -48,4 +48,13 @@ describe('billing mutation lifecycle contracts', () => {
     expect(clientDashboard).toContain("[WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: () => refetchClient('content-subscription', '')");
     expect(clientDashboard).toContain("[WS_EVENTS.CONTENT_SUBSCRIPTION_RENEWED]: () => refetchClient('content-subscription', '')");
   });
+
+  it('rejects invalid literal billing broadcast regressions in stripe mutations', () => {
+    const stripeSrc = readFileSync('server/stripe.ts', 'utf-8'); // readFile-ok — regression guard against string-literal broadcast drift
+
+    expect(stripeSrc).not.toContain("broadcastToWorkspace(workspaceId, 'workspace:updated'");
+    expect(stripeSrc).not.toContain("broadcastToWorkspace(workspaceId, 'content-subscription:created'");
+    expect(stripeSrc).not.toContain("broadcastToWorkspace(workspaceId, 'content-subscription:updated'");
+    expect(stripeSrc).not.toContain("broadcastToWorkspace(workspaceId, 'content-subscription:renewed'");
+  });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SettingsPanel } from '../../src/components/SettingsPanel';
 
 const getMock = vi.fn();
@@ -71,5 +71,19 @@ describe('SettingsPanel', () => {
     fireEvent.click(refresh);
 
     expect(getOptionalMock).toHaveBeenCalledWith('/api/admin/storage-stats');
+  });
+
+  it('handles storage refresh error without crashing', async () => {
+    getOptionalMock.mockRejectedValueOnce(new Error('storage unavailable'));
+    render(<SettingsPanel />);
+
+    const refresh = await screen.findByRole('button', { name: 'Refresh storage stats' });
+    fireEvent.click(refresh);
+
+    await waitFor(() => {
+      expect(getOptionalMock).toHaveBeenCalledWith('/api/admin/storage-stats');
+    });
+    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Platform Health')).toBeInTheDocument();
   });
 });
