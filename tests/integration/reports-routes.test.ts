@@ -479,6 +479,16 @@ describe('Reports — sales reports', () => {
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
   });
+
+  it('POST /api/sales-report rejects non-positive maxPages', async () => {
+    const res = await postJson('/api/sales-report', {
+      url: 'https://example.com',
+      maxPages: 0,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
 });
 
 describe('Reports — public workspace reports', () => {
