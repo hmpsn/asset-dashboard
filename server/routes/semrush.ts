@@ -21,10 +21,18 @@ import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('semrush-routes');
 
+function parseCsvQuery(rawValue: unknown): string[] {
+  const rawParts = Array.isArray(rawValue) ? rawValue : [rawValue];
+  return rawParts
+    .flatMap(value => typeof value === 'string' ? value.split(',') : [])
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
 // --- Competitive Intelligence Hub ---
 router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
-  const competitors = (req.query.competitors as string || '').split(',').map(d => d.trim()).filter(Boolean);
+  const competitors = parseCsvQuery(req.query.competitors);
   if (competitors.length === 0) return res.status(400).json({ error: 'competitors query param required (comma-separated domains)' });
 
   const ws = listWorkspaces().find(w => w.id === workspaceId);

@@ -249,6 +249,13 @@ describe('SEMRush HTTP routes', () => {
       expect(body).toHaveProperty('error');
     });
 
+    it('accepts repeated competitors query params without throwing', async () => {
+      const res = await api(`/api/semrush/competitive-intel/${testWsId}?competitors=rival.com&competitors=other.com`);
+      expect([400, 503]).toContain(res.status);
+      const body = await res.json();
+      expect(body).toHaveProperty('error');
+    });
+
     it('returns 404 for unknown workspace', async () => {
       const res = await api('/api/semrush/competitive-intel/no-such-ws?competitors=rival.com');
       expect(res.status).toBe(404);

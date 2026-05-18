@@ -43,4 +43,10 @@ describe('GET /api/webflow/pagespeed-snapshot/:siteId', () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
   });
+
+  it('rejects out-of-range maxPages on live pagespeed runs', async () => {
+    const res = await api(`/api/webflow/pagespeed/${siteId}?workspaceId=${workspaceId}&maxPages=26`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 1 and 25' });
+  });
 });

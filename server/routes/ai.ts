@@ -26,6 +26,13 @@ import { checkAIContext } from '../ai-context-check.js';
 import { aiLimiter } from '../middleware.js';
 import { assembleAdminContext, buildSystemPrompt } from '../admin-chat-context.js';
 
+function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
 // Context is now assembled server-side based on the question —
 // the frontend only needs to send { workspaceId, question, sessionId }.
@@ -108,7 +115,8 @@ router.get('/api/ai/context/:workspaceId', /* tenant-boundary-audit-ok: admin HM
 router.get('/api/ai/usage', (req, res) => {
   const workspaceId = req.query.workspaceId as string | undefined;
   const since = req.query.since as string | undefined;
-  const days = parseInt(req.query.days as string || '30', 10);
+  const days = parsePositiveIntQuery(req.query.days, 30);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   const summary = getTokenUsage(workspaceId, since);
   const daily = getUsageByDay(workspaceId, days);
   const byFeature = getUsageByFeature(workspaceId, since);
