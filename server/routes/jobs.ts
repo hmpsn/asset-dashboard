@@ -596,12 +596,16 @@ router.post('/api/jobs', async (req, res) => {
       case 'sales-report': {
         const { url, maxPages } = params as { url: string; maxPages?: number };
         if (!url) return res.status(400).json({ error: 'url required' });
+        const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
+        if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
+          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
         const job = createJob('sales-report', { message: `Auditing ${url}...` });
         res.json({ jobId: job.id });
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Crawling site...' });
-            const result = await runSalesAudit(url, maxPages || 25);
+            const result = await runSalesAudit(url, requestedMaxPages);
             const reportsDir = getDataDir('sales-reports');
             const reportId = `sr_${Date.now()}`;
             const reportFile = path.join(reportsDir, `${reportId}.json`);
