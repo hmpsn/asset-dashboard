@@ -40,6 +40,11 @@ router.post(
       if (err instanceof Error && err.message === 'BRIEF_UNCHANGED') {
         try {
           const existing = getMeetingBrief(workspaceId);
+          if (!existing) {
+            log.error({ workspaceId }, 'BRIEF_UNCHANGED received but no cached brief exists');
+            res.status(500).json({ error: 'Failed to generate meeting brief' });
+            return;
+          }
           res.json({ brief: existing, unchanged: true });
         } catch (readErr) {
           log.error({ readErr, workspaceId }, 'Failed to read cached brief after BRIEF_UNCHANGED');
