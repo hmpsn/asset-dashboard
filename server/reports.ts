@@ -93,6 +93,40 @@ function listSnapshotsStmt() {
   return _listSnapshots;
 }
 
+let _latestSnapshotBySite: ReturnType<typeof db.prepare> | null = null;
+function latestSnapshotBySiteStmt() {
+  if (!_latestSnapshotBySite) {
+    _latestSnapshotBySite = db.prepare(`
+      SELECT id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score
+      FROM audit_snapshots
+      WHERE site_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `);
+  }
+  return _latestSnapshotBySite;
+}
+
+let _latestSnapshotBefore: ReturnType<typeof db.prepare> | null = null;
+function latestSnapshotBeforeStmt() {
+  if (!_latestSnapshotBefore) {
+    _latestSnapshotBefore = db.prepare(`
+      SELECT s.id, s.site_id, s.site_name, s.created_at, s.audit, s.logo_url, s.action_items, s.previous_score
+      FROM audit_snapshots AS s
+      JOIN audit_snapshots AS anchor ON anchor.id = @beforeSnapshotId
+      WHERE s.site_id = @siteId
+        AND anchor.site_id = @siteId
+        AND (
+          s.created_at < anchor.created_at
+          OR (s.created_at = anchor.created_at AND s.id < anchor.id)
+        )
+      ORDER BY s.created_at DESC, s.id DESC
+      LIMIT 1
+    `);
+  }
+  return _latestSnapshotBefore;
+}
+
 let _cleanupOldSnapshots: ReturnType<typeof db.prepare> | null = null;
 function cleanupOldSnapshotsStmt() {
   if (!_cleanupOldSnapshots) {
@@ -452,17 +486,19 @@ export function listSnapshots(siteId: string): SnapshotSummary[] {
   });
 }
 
+export function listSnapshotsDetailed(siteId: string): AuditSnapshot[] {
+  const rows = listSnapshotsStmt().all(siteId) as SnapshotRow[];
+  return rows.map(rowToSnapshot);
+}
+
 export function getLatestSnapshot(siteId: string): AuditSnapshot | null {
-  const summaries = listSnapshots(siteId);
-  if (summaries.length === 0) return null;
-  return getSnapshot(summaries[0].id);
+  const row = latestSnapshotBySiteStmt().get(siteId) as SnapshotRow | undefined;
+  return row ? rowToSnapshot(row) : null;
 }
 
 export function getLatestSnapshotBefore(siteId: string, beforeSnapshotId: string): AuditSnapshot | null {
-  const summaries = listSnapshots(siteId);
-  const idx = summaries.findIndex(s => s.id === beforeSnapshotId);
-  if (idx < 0 || idx + 1 >= summaries.length) return null;
-  return getSnapshot(summaries[idx + 1].id);
+  const row = latestSnapshotBeforeStmt().get({ beforeSnapshotId, siteId }) as SnapshotRow | undefined;
+  return row ? rowToSnapshot(row) : null;
 }
 
 export function renderReportHTML(snapshot: AuditSnapshot): string {

@@ -347,8 +347,9 @@
           "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.\n[Hardening 2026-05-13 partial] Added internal callAI researchMode support for OpenAI/Anthropic and applied it to factual content brief, post generation, post review, and provenance-sensitive AI-fix paths. Also threads stored SERP evidence into post context and surfaces numeric claims for reviewer attention. SEO audit recommendations/admin chat remain pending for this broader roadmap item.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Expanded `RESEARCH_MODE_INSTRUCTIONS` in `server/ai.ts` to require explicit observed-vs-inferred framing, forbid presenting inferred/example values as verified facts, and require explicit source-availability disclosure when citations are requested but missing. Admin chat (`/api/admin-chat`) now always calls `callAI` with `researchMode: true`. Added regression guard in `tests/contract/factual-ai-output-contracts.test.ts` to prevent drift.",
+          "status": "done",
+          "shippedAt": "2026-05-18"
         },
         {
           "id": 629,
@@ -366,8 +367,9 @@
           "source": "USER REQUEST",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up from backend hardening PR 5. Audit whether internal link recommendations are fed from one canonical source or multiple sources (internal link scanner, AI recommendations, strategy/content surfaces, approval payloads). Document the owning source of truth, data contracts, and any drift between admin generation, client review, and intelligence/chat context before consolidating implementation.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added formal audit deliverable at `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md` inventorying producer/consumer contracts across scanner, SEO copy, briefs, and client actions. Audit confirms scanner contract (`fromPage/fromTitle/toPage/toTitle/anchorText/reason/priority`) as canonical actionable source and documents drift queue for `#632` (source-title preservation + URL/title field semantics cleanup).",
+          "status": "done",
+          "shippedAt": "2026-05-18"
         },
         {
           "id": 632,
@@ -384,8 +386,9 @@
           "source": "PR 5 REVIEW",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up from audit intelligence hardening PR 5. listEffectiveSnapshotSummaries now preserves suppression-adjusted score/history correctness by loading full snapshots when suppressions exist, but that can become N+1-heavy for long audit histories and workspace report-list reads. Add an efficient table-backed summary/read model or bounded cached effective-history helper that preserves suppression-adjusted current/history semantics without repeatedly parsing full audit JSON blobs.",
-          "status": "pending"
+          "notes": "Shipped 2026-05-18 in SEO Intelligence backend closeout. Added `listSnapshotsDetailed(siteId)` in `server/reports.ts` and refactored suppression paths in `server/audit-snapshot-views.ts` to compute current + previous effective scores from one ordered in-memory snapshot list, eliminating per-summary `getSnapshot()` and repeated previous-snapshot lookups. Added unit coverage in `tests/unit/audit-snapshot-views.test.ts` for suppression-adjusted history semantics.",
+          "status": "done",
+          "shippedAt": "2026-05-18"
         },
         {
           "id": 356,

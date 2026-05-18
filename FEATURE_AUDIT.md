@@ -6051,3 +6051,16 @@ Bug hardening included:
 **Mutual:** Preserves ratchet discipline by converting planned contracts into measured advisories with tests before any warn→error promotion.
 
 **Files:** `scripts/pr-check.ts`; `scripts/report-style-drift.ts`; `tests/pr-check.test.ts`; `docs/rules/design-system-enforcement.md`; `docs/rules/styleguide-rule-registry.md`; `data/styleguide-rule-registry.json`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 441. SEO Intelligence Backend Closeout (`#355`, `#631`, `#633`)
+**What it does:** Closes three pending SEO Intelligence Depth backend items in one pass. **`#355` Research Mode hardening:** expanded factual grounding contract in `server/ai.ts` so research-mode outputs must distinguish observed evidence from inference, avoid presenting inferred/example values as verified facts, and explicitly disclose when source verification is unavailable. Admin chat now runs through `callAI({ researchMode: true })`, and a contract test guards against regression. **`#631` Internal-link source audit:** added a dated audit artifact at `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md` that inventories all internal-link recommendation producers/consumers, documents cross-surface contract drift, and defines scanner recommendations as the canonical actionable source with follow-on cleanup queued in `#632`. **`#633` effective summary optimization:** suppression-adjusted audit history reads now compute from one ordered snapshot list in memory via `listSnapshotsDetailed(siteId)` instead of per-row snapshot fetches + repeated previous lookup calls, preserving response shape/semantics while removing the N+1 summary-read pattern.
+
+**Agency value:** Improves factual reliability for admin analysis, codifies internal-link ownership/contracts before model cleanup, and reduces audit-history read amplification in suppression-heavy workspaces.
+
+**Client value:** Client-visible audit history numbers remain consistent while backend reads are more efficient; internal-link review cleanup now has a concrete contract baseline for clearer follow-through.
+
+**Mutual:** Converts partial hardening into closed roadmap outcomes with regression tests and documented ownership boundaries.
+
+**Files:** `server/ai.ts`; `server/routes/ai.ts`; `tests/contract/factual-ai-output-contracts.test.ts`; `server/reports.ts`; `server/audit-snapshot-views.ts`; `tests/unit/audit-snapshot-views.test.ts`; `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

@@ -62,4 +62,10 @@ describe('factual AI output contracts', () => {
     expect(text).toContain('allPaths.has');
     expect(text).toContain('existingEdges.has');
   });
+
+  it('keeps admin chat on research-mode grounding for factual analysis', () => {
+    const text = source('server/routes/ai.ts');
+    expect(text).toContain("feature: 'admin-chat'");
+    expect(text).toContain('researchMode: true');
+  });
 });
