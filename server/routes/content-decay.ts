@@ -64,6 +64,9 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
     res.json(analysis);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg === 'GSC not configured for this workspace') {
+      return res.status(400).json({ error: msg });
+    }
     res.status(500).json({ error: msg });
   }
 });
