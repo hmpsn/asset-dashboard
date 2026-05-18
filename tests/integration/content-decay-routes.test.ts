@@ -379,6 +379,13 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
+  it('returns 400 when maxPages is non-positive', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 0 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
   // Timeout stays generous for slower CI machines, but the server now inherits
   // an empty OPENAI_API_KEY so the fallback path uses the synchronous missing-key
   // guard instead of retrying a fake provider key.
