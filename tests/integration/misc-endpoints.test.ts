@@ -206,8 +206,20 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('GET /api/workspace-home/:id rejects non-integer days values', async () => {
+    const res = await api(`/api/workspace-home/${testWsId}?days=7.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/seo-changes/:workspaceId rejects non-positive limit values', async () => {
     const res = await api(`/api/seo-changes/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/seo-changes/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/seo-changes/${testWsId}?limit=3.5`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
@@ -218,8 +230,20 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
+  it('GET /api/seo-change-impact/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/seo-change-impact/${testWsId}?limit=2.2`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
   it('GET /api/schema-impact/:workspaceId rejects non-positive limit values', async () => {
     const res = await api(`/api/schema-impact/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/schema-impact/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/schema-impact/${testWsId}?limit=4.4`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
