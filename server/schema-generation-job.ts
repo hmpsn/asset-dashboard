@@ -25,7 +25,7 @@ export async function runSchemaGenerationJob({
 }: RunSchemaGenerationJobOptions): Promise<void> {
   try {
     updateJob(jobId, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-    const { ctx, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId } = await prepareBulkSchemaGenerationContext(siteId);
+    const { ctx } = await prepareBulkSchemaGenerationContext(siteId);
     // Debounced incremental save — persist partial results every 10s
     let lastSaveTime = 0;
     const SAVE_INTERVAL = 10_000;
@@ -36,7 +36,7 @@ export async function runSchemaGenerationJob({
         lastSaveTime = now;
         saveSchemaSnapshot(siteId, workspaceId, partial);
       }
-    }, () => isJobCancelled(jobId), gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
+    }, () => isJobCancelled(jobId));
     // Final save — always write the complete result
     if (result.length > 0) {
       saveSchemaSnapshot(siteId, workspaceId, result);

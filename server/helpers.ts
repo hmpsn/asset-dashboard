@@ -8,12 +8,10 @@ import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
-import { getAllGscPages, getQueryPageData } from './search-console.js';
+import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
-import { getInsights } from './analytics-insights-store.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listSites } from './webflow-pages.js';
-import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { PAGE_ADDRESS_SOURCES } from '../shared/types/page-address.js';
 import type { PageAddress, PageAddressInput, ResolvePageAddressOptions } from '../shared/types/page-address.js';
 import { isProgrammingError } from './errors.js';
@@ -413,17 +411,8 @@ export function applySuppressionsToAudit(
 
 // ── Schema Context Builder ──
 
-export type SchemaAnalyticsMaps = {
-  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>;
-  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>;
-  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>;
-  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>;
-};
-
-// 5-minute TTL cache for analytics maps + intelligence signals — prevents repeated API calls on
-// the interactive single-page generation endpoint.
+// 5-minute TTL cache for schema intelligence signals used during generation.
 const analyticsCache: Record<string, {
-  maps: SchemaAnalyticsMaps;
   serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
   backlinkReferringDomains?: number;
   ts: number;
@@ -453,7 +442,7 @@ export async function buildSchemaContext(
   options?: { includeAnalytics?: boolean },
 ): Promise<{
   ctx: SchemaContext;
-} & SchemaAnalyticsMaps> {
+}> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
   const ctx: SchemaContext = {};
@@ -521,97 +510,15 @@ export async function buildSchemaContext(
     ctx._siteHasSearch = ws.siteHasSearch === true;
 
   }
-  // Fetch analytics maps when requested (for schema generation routes)
-  let gscMap: SchemaAnalyticsMaps['gscMap'];
-  let ga4Map: SchemaAnalyticsMaps['ga4Map'];
-  let queryPageData: SchemaAnalyticsMaps['queryPageData'];
-  let insightsMap: SchemaAnalyticsMaps['insightsMap'];
-
+  // Fetch schema intelligence signals when requested (for schema generation routes)
   if (options?.includeAnalytics && ws) {
     const cacheKey = ws.id;
     const cached = analyticsCache[cacheKey];
     if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) {
-      gscMap = cached.maps.gscMap;
-      ga4Map = cached.maps.ga4Map;
-      queryPageData = cached.maps.queryPageData;
-      insightsMap = cached.maps.insightsMap;
       if (cached.serpFeatures) ctx._serpFeatures = cached.serpFeatures;
       if (cached.backlinkReferringDomains != null) ctx._backlinkReferringDomains = cached.backlinkReferringDomains;
     } else {
-      const [gscResults, ga4Results, qpResults] = await Promise.allSettled([
-        ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
-        ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
-        ws.gscPropertyUrl ? getQueryPageData(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
-      ]);
-
-      if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
-        gscMap = new Map();
-        for (const p of gscResults.value) {
-          try {
-            const urlPath = normalizePageUrl(p.page);
-            const existing = gscMap.get(urlPath);
-            if (existing) {
-              // Accumulate metrics for duplicate pathnames (www vs non-www, http vs https)
-              const prev = (existing as { _count?: number })._count ?? 1;
-              existing.clicks += p.clicks;
-              existing.impressions += p.impressions;
-              existing.position = (existing.position * prev + p.position) / (prev + 1);
-              existing.ctr = existing.impressions > 0 ? +((existing.clicks / existing.impressions) * 100).toFixed(1) : 0;
-              (existing as { _count?: number })._count = prev + 1;
-            } else {
-              gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
-            }
-          } catch { /* skip malformed URLs */ }
-        }
-      }
-
-      if (ga4Results.status === 'fulfilled' && ga4Results.value.length > 0) {
-        ga4Map = new Map();
-        for (const p of ga4Results.value) {
-          const urlPath = normalizePageUrl(p.path);
-          ga4Map.set(urlPath, { pageviews: p.pageviews, users: p.users, avgEngagementTime: p.avgEngagementTime });
-        }
-      }
-
-      if (qpResults.status === 'fulfilled' && qpResults.value.length > 0) {
-        queryPageData = qpResults.value.map(r => ({ query: r.query, page: r.page, impressions: r.impressions, position: r.position }));
-      }
-
-      // Build insights map from intelligence layer (SQLite — synchronous)
-      try {
-        const insightsWorkspaceId = ctx.workspaceId;
-        if (!insightsWorkspaceId) throw new Error('workspaceId missing while building schema insights map');
-        // schema-context-direct-read-ok: legacy analytics store path (intentionally retained for map-shape parity)
-        const allInsights = getInsights(insightsWorkspaceId);
-        insightsMap = new Map();
-        // ranking_opportunity pageIds are stored as relative paths after the
-        // page-identity normalisation; legacy composite-key form ("path::query")
-        // may still exist in not-yet-migrated rows. split('::')[0] is a no-op
-        // for the new format and a safe extraction for the legacy form.
-        const quickWinPageUrls = new Set(
-          allInsights
-            .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
-            .map(i => i.pageId!.split('::')[0]),
-        );
-        const healthInsights = allInsights.filter(
-          (i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health' && !!i.pageId,
-        );
-        for (const insight of healthInsights) {
-          insightsMap.set(insight.pageId!, {
-            healthScore: insight.data.score,
-            healthTrend: insight.data.trend,
-            isQuickWin: quickWinPageUrls.has(insight.pageId!),
-          });
-        }
-      } catch (err) {
-        if (isProgrammingError(err)) {
-          log.warn({ err }, 'helpers/buildSchemaContext: unexpected error building insights map');
-        } else {
-          log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping insights');
-        }
-      }
-
-      // Wire in SEO intelligence signals — cached alongside analytics to avoid per-request latency
+      // Wire in SEO intelligence signals — cached to avoid per-request latency.
       let cachedSerpFeatures: typeof ctx._serpFeatures | undefined;
       let cachedBacklinkDomains: number | undefined;
       try {
@@ -632,9 +539,8 @@ export async function buildSchemaContext(
         }
       }
 
-      // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
+      // Store in cache (even if empty — avoids repeated read work on sites with no connections)
       analyticsCache[cacheKey] = {
-        maps: { gscMap, ga4Map, queryPageData, insightsMap },
         serpFeatures: cachedSerpFeatures,
         backlinkReferringDomains: cachedBacklinkDomains,
         ts: Date.now(),
@@ -642,7 +548,7 @@ export async function buildSchemaContext(
     }
   }
 
-  return { ctx, gscMap, ga4Map, queryPageData, insightsMap };
+  return { ctx };
 }
 
 // ── Audit Traffic Cache ──
