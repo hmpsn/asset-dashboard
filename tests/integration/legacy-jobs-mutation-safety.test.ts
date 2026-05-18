@@ -487,6 +487,14 @@ describe('legacy job mutation safety bundle', () => {
     await expect(invalidMaxPagesRes.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
     expect(countGlobalJobs()).toBe(countBeforeInvalidMaxPages);
 
+    const nonIntegerMaxPagesRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.SALES_REPORT,
+      params: { url: 'https://example.com', maxPages: 2.5 },
+    });
+    expect(nonIntegerMaxPagesRes.status).toBe(400);
+    await expect(nonIntegerMaxPagesRes.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    expect(countGlobalJobs()).toBe(countBeforeInvalidMaxPages);
+
     salesReportState.mode = 'success';
     const boundedRes = await postJson('/api/jobs', {
       type: BACKGROUND_JOB_TYPES.SALES_REPORT,
