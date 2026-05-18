@@ -667,6 +667,9 @@ router.post('/api/jobs', async (req, res) => {
         if (maxPages != null && (!Number.isInteger(maxPages) || maxPages <= 0)) {
           return res.status(400).json({ error: 'maxPages must be a positive integer' });
         }
+        if (maxPages != null && maxPages > 100) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+        }
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });
         if (hasActiveKeywordStrategyGeneration(wsId)) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
