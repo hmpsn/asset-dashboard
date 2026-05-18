@@ -122,7 +122,11 @@ router.post('/api/content-subscription/:id/delivered', (req, res) => {
     const existing = getContentSubscription(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Subscription not found' });
     if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
-    const count = req.body.count || 1;
+    const rawCount = req.body?.count;
+    const count = rawCount === undefined ? 1 : rawCount;
+    if (!Number.isInteger(count) || count <= 0) {
+      return res.status(400).json({ error: 'count must be a positive integer' });
+    }
     incrementDeliveredPosts(existing.workspaceId, req.params.id, count);
     const sub = getContentSubscription(req.params.id);
     res.json(sub);
