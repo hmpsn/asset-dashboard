@@ -660,6 +660,10 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY: {
         const wsId = params.workspaceId as string;
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
+        const maxPages = params.maxPages == null ? undefined : Number(params.maxPages);
+        if (maxPages != null && (!Number.isInteger(maxPages) || maxPages <= 0)) {
+          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });
         if (hasActiveKeywordStrategyGeneration(wsId)) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
@@ -680,7 +684,6 @@ router.post('/api/jobs', async (req, res) => {
               const seoDataMode = (params.seoDataMode as string) || (params.semrushMode as string) || 'none';
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
-              const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
               const mode = params.mode === 'incremental' ? 'incremental' : 'full';
               const generationResult = await generateKeywordStrategy({
                 workspaceId: wsId,

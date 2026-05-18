@@ -468,6 +468,30 @@ describe('keyword strategy job mutation safety', () => {
     expect(listJobs(workspace.workspaceId)).toHaveLength(1);
   });
 
+  it('rejects non-positive maxPages before creating a keyword strategy job', async () => {
+    const jobsBefore = listJobs(workspace.workspaceId).length;
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 0,
+      },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
+    expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
+    expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
+    expect(countRows('content_gaps', workspace.workspaceId)).toBe(0);
+    expect(countRows('quick_wins', workspace.workspaceId)).toBe(0);
+    expect(countRows('activity_log', workspace.workspaceId)).toBe(0);
+    expect(getTrackedKeywords(workspace.workspaceId)).toEqual([]);
+    expect(getActionBySource('strategy', workspace.workspaceId)).toBeNull();
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
   it('rejects a duplicate active keyword strategy job without another write path starting', async () => {
     const activeJob = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
       workspaceId: workspace.workspaceId,
