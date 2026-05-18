@@ -72,4 +72,10 @@ describe('ApprovalsTab filter logic', () => {
     const result = filterBatches([approved], 'needs-action');
     expect(result).toHaveLength(0);
   });
+
+  it('invalid filter values fall back to the unfiltered list', () => {
+    const result = filterBatches([pending, approved, applied, mixed], 'invalid-filter');
+    expect(result).toHaveLength(4);
+    expect(result).toEqual([pending, approved, applied, mixed]);
+  });
 });

@@ -61,6 +61,13 @@ describe('siteIntelligenceClientView toggle', () => {
     expect(ws.siteIntelligenceClientView).toBe(true);
   });
 
+  it('returns not found for invalid workspace id on public workspace endpoint', async () => {
+    const res = await api('/api/public/workspace/ws_does_not_exist');
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: expect.any(String) });
+  });
+
   it('public workspace endpoint reflects siteIntelligenceClientView false', async () => {
     // Set to false via admin route
     await patchJson(`/api/workspaces/${workspaceId}`, { siteIntelligenceClientView: false });

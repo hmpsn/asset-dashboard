@@ -441,5 +441,7 @@ describe('Analytics endpoints — missing credentials guard', () => {
   it('GET /api/public/analytics-overview — 404 for non-existent workspace', async () => {
     const res = await api('/api/public/analytics-overview/ws_nonexistent_xyz');
     expect([400, 404]).toContain(res.status);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: expect.any(String) });
   });
 });

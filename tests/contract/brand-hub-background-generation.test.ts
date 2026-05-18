@@ -52,4 +52,13 @@ describe('BrandHub background generation contract', () => {
     expect(source).toContain('storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION, jobId)');
     expect(source).toContain('storeContextJobId(workspaceId, BACKGROUND_JOB_TYPES.PERSONA_GENERATION, null)');
   });
+
+  it('flags invalid BrandHub regression when direct workspace generation APIs reappear', () => {
+    const source = readProjectFile('src/components/BrandHub.tsx');
+
+    expect(source).not.toMatch(/workspaces\.(generateKnowledgeBase|generateBrandVoice|generatePersonas)\s*\(/);
+    expect(source).toContain('startJob(BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION');
+    expect(source).toContain('startJob(BACKGROUND_JOB_TYPES.BRAND_VOICE_GENERATION');
+    expect(source).toContain('startJob(BACKGROUND_JOB_TYPES.PERSONA_GENERATION');
+  });
 });
