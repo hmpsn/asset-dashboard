@@ -299,6 +299,24 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('rejects Google search overview reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-overview/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=7.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google performance trend reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/performance-trend/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=14.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('rejects Google search country reads with non-positive limit', async () => {
     const res = await api(
       `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&limit=0`,
@@ -306,6 +324,24 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('rejects Google search country reads with non-integer limit', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&limit=2.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('rejects Google search country reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=9.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
   it('rejects Stripe payment reads for a workspace outside the JWT scope', async () => {
