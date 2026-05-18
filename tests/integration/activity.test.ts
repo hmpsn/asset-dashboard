@@ -85,11 +85,23 @@ describe('Activity Log API', () => {
     expect(body).toHaveLength(1);
   });
 
+  it('GET /api/activity rejects non-positive limit', async () => {
+    const res = await api(`/api/activity?workspaceId=${testWsId}&limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
   it('GET /api/public/activity/:wsId returns client-visible entries', async () => {
     const res = await api(`/api/public/activity/${testWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
     // Client-visible entries are filtered by type
+  });
+
+  it('GET /api/public/activity/:wsId rejects non-positive limit', async () => {
+    const res = await api(`/api/public/activity/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 });
