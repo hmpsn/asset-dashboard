@@ -35,7 +35,10 @@ router.post('/api/competitor-compare', async (req, res) => {
   if (!Number.isInteger(requestedLimit) || requestedLimit <= 0) {
     return res.status(400).json({ error: 'maxPages must be a positive integer' });
   }
-  const limit = Math.min(requestedLimit, 30);
+  if (requestedLimit > 30) {
+    return res.status(400).json({ error: 'maxPages must be between 1 and 30' });
+  }
+  const limit = requestedLimit;
   try {
     log.info(`Comparing ${myUrl} vs ${competitorUrl} (max ${limit} pages each)`);
     const [myAudit, theirAudit] = await Promise.all([

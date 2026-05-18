@@ -199,6 +199,54 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     const res = await api('/api/semrush/status');
     expect(res.status).toBe(200);
   });
+
+  it('GET /api/workspace-home/:id rejects non-positive days values', async () => {
+    const res = await api(`/api/workspace-home/${testWsId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/workspace-home/:id rejects non-integer days values', async () => {
+    const res = await api(`/api/workspace-home/${testWsId}?days=7.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/seo-changes/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/seo-changes/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/seo-changes/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/seo-changes/${testWsId}?limit=3.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/seo-change-impact/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/seo-change-impact/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/seo-change-impact/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/seo-change-impact/${testWsId}?limit=2.2`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/schema-impact/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/schema-impact/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/schema-impact/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/schema-impact/${testWsId}?limit=4.4`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
 });
 
 describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
@@ -251,6 +299,69 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
+  it('rejects Google search overview reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-overview/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=7.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google performance trend reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/performance-trend/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=14.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google performance trend reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/performance-trend/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search devices reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-devices/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=11.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search devices reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-devices/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search types reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-types/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=21.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search types reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-types/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('rejects Google search country reads with non-positive limit', async () => {
     const res = await api(
       `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&limit=0`,
@@ -258,6 +369,51 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('rejects Google search country reads with non-integer limit', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&limit=2.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('rejects Google search country reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=9.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search country reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-countries/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search comparison reads with non-integer days', async () => {
+    const res = await api(
+      `/api/google/search-comparison/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=19.5`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('rejects Google search comparison reads with non-positive days', async () => {
+    const res = await api(
+      `/api/google/search-comparison/${ownedSiteId}?workspaceId=${testWsId}&gscSiteUrl=${encodeURIComponent('https://owned.example.com/')}&days=0`,
+      { headers: scopedHeaders() },
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
   });
 
   it('rejects Stripe payment reads for a workspace outside the JWT scope', async () => {

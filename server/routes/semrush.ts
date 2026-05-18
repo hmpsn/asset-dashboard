@@ -21,11 +21,22 @@ import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('semrush-routes');
 
+function parseCsvQuery(rawValue: unknown): string[] {
+  const rawParts = Array.isArray(rawValue) ? rawValue : [rawValue];
+  return rawParts
+    .flatMap(value => typeof value === 'string' ? value.split(',') : [])
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
 // --- Competitive Intelligence Hub ---
 router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
-  const competitors = (req.query.competitors as string || '').split(',').map(d => d.trim()).filter(Boolean);
+  const competitors = parseCsvQuery(req.query.competitors);
   if (competitors.length === 0) return res.status(400).json({ error: 'competitors query param required (comma-separated domains)' });
+  if (competitors.length > MAX_COMPETITORS) {
+    return res.status(400).json({ error: `competitors must include at most ${MAX_COMPETITORS} domains` });
+  }
 
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -40,7 +51,7 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
     // Fetch domain overviews in parallel (my domain + configured competitor cap)
     // Use backlinks-specific provider which falls back to SEMRush if DataForSEO lacks subscription
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
-    const cappedCompetitors = competitors.slice(0, MAX_COMPETITORS);
+    const cappedCompetitors = competitors;
     const allDomains = [myDomain, ...cappedCompetitors];
     const [overviews, backlinks, keywordGaps] = await Promise.all([
       Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),

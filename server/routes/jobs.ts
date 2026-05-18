@@ -600,6 +600,9 @@ router.post('/api/jobs', async (req, res) => {
         if (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0) {
           return res.status(400).json({ error: 'maxPages must be a positive integer' });
         }
+        if (requestedMaxPages > 100) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+        }
         const job = createJob('sales-report', { message: `Auditing ${url}...` });
         res.json({ jobId: job.id });
         (async () => {
@@ -663,6 +666,9 @@ router.post('/api/jobs', async (req, res) => {
         const maxPages = params.maxPages == null ? undefined : Number(params.maxPages);
         if (maxPages != null && (!Number.isInteger(maxPages) || maxPages <= 0)) {
           return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        }
+        if (maxPages != null && maxPages > 100) {
+          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
         }
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });

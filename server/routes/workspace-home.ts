@@ -22,6 +22,13 @@ const log = createLogger('workspace-home');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
+function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 /**
  * GET /api/workspace-home/:id
  *
@@ -32,7 +39,8 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
 
   // Fire all fetches in parallel — each wrapped so a single failure doesn't break the rest
   const safe = <T,>(p: Promise<T>, fallback: T): Promise<T> =>

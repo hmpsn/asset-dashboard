@@ -87,6 +87,9 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
     if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
       return res.status(400).json({ error: 'maxPages must be a positive integer' });
     }
+    if (requestedMaxPages > 25) {
+      return res.status(400).json({ error: 'maxPages must be between 1 and 25' });
+    }
     const maxPages = Math.min(requestedMaxPages, 25);
     const updated = await generateBatchRecommendations(ws, existing, maxPages);
 

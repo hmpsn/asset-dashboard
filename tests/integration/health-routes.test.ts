@@ -203,6 +203,18 @@ describe('Integration health center endpoint', () => {
     expect(body.error).toContain('days must be between');
   });
 
+  it('GET /api/observability/:workspaceId with non-positive days returns 400', async () => {
+    const res = await api(`/api/observability/${workspaceId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/observability/:workspaceId with non-integer days returns 400', async () => {
+    const res = await api(`/api/observability/${workspaceId}?days=7.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   afterAll(async () => {
     if (memberUserId && ownerToken) {
       setAuthToken(ownerToken);
@@ -239,11 +251,35 @@ describe('Admin storage pruning', () => {
     expect(body.maxAgeDays).toBe(30);
   }, 15_000);
 
+  it('POST /api/admin/storage/prune-chat rejects non-positive maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-chat', { maxAgeDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-chat rejects non-integer maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-chat', { maxAgeDays: 30.5 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
+  }, 15_000);
+
   it('POST /api/admin/storage/prune-backups with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-backups', {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('retainDays');
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-backups rejects non-positive retainDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-backups', { retainDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'retainDays must be a positive integer' });
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-backups rejects non-integer retainDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-backups', { retainDays: 1.1 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'retainDays must be a positive integer' });
   }, 15_000);
 
   it('POST /api/admin/storage/prune-reports with default params', async () => {
@@ -253,10 +289,34 @@ describe('Admin storage pruning', () => {
     expect(body).toHaveProperty('keepPerSite');
   }, 15_000);
 
+  it('POST /api/admin/storage/prune-reports rejects non-positive keepPerSite', async () => {
+    const res = await postJson('/api/admin/storage/prune-reports', { keepPerSite: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'keepPerSite must be a positive integer' });
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-reports rejects non-integer keepPerSite', async () => {
+    const res = await postJson('/api/admin/storage/prune-reports', { keepPerSite: 2.2 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'keepPerSite must be a positive integer' });
+  }, 15_000);
+
   it('POST /api/admin/storage/prune-activity with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-activity', {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('maxAgeDays');
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-activity rejects non-positive maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-activity', { maxAgeDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-activity rejects non-integer maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-activity', { maxAgeDays: 7.7 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
   }, 15_000);
 });

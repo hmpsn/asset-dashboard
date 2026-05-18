@@ -386,6 +386,20 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body).toEqual({ error: 'maxPages must be a positive integer' });
   });
 
+  it('returns 400 when maxPages exceeds the supported window', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 26 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be between 1 and 25' });
+  });
+
+  it('returns 400 when maxPages is not an integer', async () => {
+    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 1.5 });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be a positive integer' });
+  });
+
   // Timeout stays generous for slower CI machines, but the server now inherits
   // an empty OPENAI_API_KEY so the fallback path uses the synchronous missing-key
   // guard instead of retrying a fake provider key.

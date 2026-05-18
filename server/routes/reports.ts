@@ -104,6 +104,9 @@ router.post('/api/sales-report', async (req, res) => {
     if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
       return res.status(400).json({ error: 'maxPages must be a positive integer' });
     }
+    if (requestedMaxPages > 100) {
+      return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+    }
     const boundedMaxPages = Math.min(requestedMaxPages, 100);
     log.info(`Starting audit for ${url}`);
     const result = await runSalesAudit(url, boundedMaxPages);
