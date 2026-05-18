@@ -33,6 +33,13 @@ function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | nu
   return parsed;
 }
 
+function parseBoundedPositiveIntBody(rawValue: unknown, fallback: number, max: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > max) return null;
+  return parsed;
+}
+
 // ── Admin AI Chat (auth-gated, internal analyst persona) ──
 // Context is now assembled server-side based on the question —
 // the frontend only needs to send { workspaceId, question, sessionId }.
@@ -42,6 +49,8 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
   if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(400).json({ error: 'Workspace not found' });
+  const dataDays = parseBoundedPositiveIntBody(days, 28, 365);
+  if (dataDays == null) return res.status(400).json({ error: 'days must be between 1 and 365' });
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
 
@@ -57,7 +66,6 @@ router.post('/api/admin-chat', aiLimiter, async (req, res) => {
     }
 
     // Assemble context server-side — question-aware, pulls only relevant data
-    const dataDays = typeof days === 'number' ? days : 28;
     const assembled = await assembleAdminContext(workspaceId, question, dataDays);
 
     // Build the system prompt based on the assembled context and chat mode
