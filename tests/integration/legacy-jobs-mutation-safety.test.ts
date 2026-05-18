@@ -474,6 +474,16 @@ describe('legacy job mutation safety bundle', () => {
     });
     expect(missingRes.status).toBe(400);
     await expect(missingRes.json()).resolves.toEqual({ error: 'url required' });
+
+    const countBeforeInvalidMaxPages = countGlobalJobs();
+    const invalidMaxPagesRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.SALES_REPORT,
+      params: { url: 'https://example.com', maxPages: 0 },
+    });
+    expect(invalidMaxPagesRes.status).toBe(400);
+    await expect(invalidMaxPagesRes.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    expect(countGlobalJobs()).toBe(countBeforeInvalidMaxPages);
+
     expect(countGlobalJobs()).toBe(countBeforeMissingUrl);
   });
 });
