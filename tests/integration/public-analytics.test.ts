@@ -20,7 +20,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertInsight } from '../../server/analytics-insights-store.js';
 import { cleanSeedData } from '../global-setup.js';
 
@@ -35,6 +35,7 @@ let wsBId = '';
 let wsAInsightId1 = '';
 let wsAInsightId2 = '';
 let wsAInsightId3 = '';
+let wsConfiguredId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -42,8 +43,15 @@ beforeAll(async () => {
   // Create both workspaces via the server helper (inserts a real workspaces row)
   const wsA = createWorkspace('Public Analytics Test WS-A');
   const wsB = createWorkspace('Public Analytics Test WS-B');
+  const wsConfigured = createWorkspace('Public Analytics Query Validation WS');
   wsAId = wsA.id;
   wsBId = wsB.id;
+  wsConfiguredId = wsConfigured.id;
+  updateWorkspace(wsConfiguredId, {
+    webflowSiteId: 'public-analytics-validation-site',
+    gscPropertyUrl: 'https://validation.example.com/',
+    ga4PropertyId: '123456789',
+  });
 
   // ── Seed workspace A with three insights of different types ────────────────
   // impactScore >= 20 so buildClientInsights() includes them in narrative
@@ -90,8 +98,10 @@ beforeAll(async () => {
 afterAll(async () => {
   cleanSeedData(wsAId);
   cleanSeedData(wsBId);
+  cleanSeedData(wsConfiguredId);
   deleteWorkspace(wsAId);
   deleteWorkspace(wsBId);
+  deleteWorkspace(wsConfiguredId);
   await ctx.stopServer();
 });
 
@@ -411,6 +421,24 @@ describe('GET /api/public/insights/:workspaceId/narrative — client insights', 
 // The correct behaviour is a 400 with a descriptive error, not a 500 or crash.
 
 describe('Analytics endpoints — missing credentials guard', () => {
+  it('GET /api/public/search-overview/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/search-overview/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/search-countries/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/public/search-countries/${wsConfiguredId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-overview/:workspaceId rejects non-positive days values', async () => {
+    const res = await api(`/api/public/analytics-overview/${wsConfiguredId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/search-overview/:workspaceId returns 400 when GSC not configured', async () => {
     const res = await api(`/api/public/search-overview/${wsAId}`);
     expect(res.status).toBe(400);

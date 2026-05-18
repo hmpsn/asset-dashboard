@@ -28,6 +28,18 @@ import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from 
 import { isProgrammingError } from '../errors.js';
 const router = Router();
 
+function parseNonNegativeIntQuery(rawValue: unknown): number | null {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+function parsePositiveIntQuery(rawValue: unknown): number | null {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 // --- CMS Collections ---
 router.get('/api/webflow/collections/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
@@ -58,8 +70,10 @@ router.get('/api/webflow/collections/:collectionId/items', requireWorkspaceSiteA
   workspace: { source: 'query', name: 'workspaceId' },
   site: { source: 'query', name: 'siteId' },
 }), async (req, res) => {
-  const limit = parseInt(req.query.limit as string) || 100;
-  const offset = parseInt(req.query.offset as string) || 0;
+  const limit = req.query.limit == null ? 100 : parsePositiveIntQuery(req.query.limit);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
+  const offset = req.query.offset == null ? 0 : parseNonNegativeIntQuery(req.query.offset);
+  if (offset == null) return res.status(400).json({ error: 'offset must be a non-negative integer' });
   try {
     const siteId = typeof req.query.siteId === 'string' ? req.query.siteId : undefined;
     const token = siteId ? getTokenForSite(siteId) || undefined : undefined;

@@ -145,6 +145,18 @@ afterAll(async () => {
 });
 
 describe('webflow CMS mutation safety', () => {
+  it('GET collection items rejects non-positive limit values', async () => {
+    const res = await api(`/api/webflow/collections/col_123/items?workspaceId=${workspaceAId}&siteId=${siteA}&limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET collection items rejects negative offset values', async () => {
+    const res = await api(`/api/webflow/collections/col_123/items?workspaceId=${workspaceAId}&siteId=${siteA}&offset=-1`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'offset must be a non-negative integer' });
+  });
+
   it('PATCH collection item success writes draft page state, activity, broadcast, and read-path visibility', async () => {
     const res = await patchJson('/api/webflow/collections/col_123/items/item_123', {
       workspaceId: workspaceAId,

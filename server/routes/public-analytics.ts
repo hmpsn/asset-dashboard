@@ -67,6 +67,13 @@ const log = createLogger('public-analytics');
 
 const router = Router();
 
+function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
 // ── AI intent classification ──────────────────────────────────────────────────
@@ -171,7 +178,8 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured for this workspace' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   const dr = parseDateRange(req.query);
   try {
     const overview = await fetchSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, dr);
@@ -185,7 +193,8 @@ router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
 router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const trend = await fetchPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
     res.json(trend);
@@ -198,7 +207,8 @@ router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
 router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await fetchSearchDevices(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
@@ -210,8 +220,10 @@ router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
 router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parseInt(req.query.days as string) || 28;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const limit = parsePositiveIntQuery(req.query.limit, 20);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   try {
     res.json(await fetchSearchCountries(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
   } catch (err) {
@@ -223,7 +235,8 @@ router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
 router.get('/api/public/search-types/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await fetchSearchTypes(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
@@ -235,7 +248,8 @@ router.get('/api/public/search-types/:workspaceId', async (req, res) => {
 router.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await fetchSearchComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
@@ -536,7 +550,8 @@ ${JSON.stringify(context, null, 2)}`;
 router.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured for this workspace' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const overview = await getGA4Overview(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(overview);
@@ -549,7 +564,8 @@ router.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const trend = await getGA4DailyTrend(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(trend);
@@ -562,7 +578,8 @@ router.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200, parseDateRange(req.query));
     res.json(pages);
@@ -575,7 +592,8 @@ router.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const sources = await getGA4TopSources(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(sources);
@@ -588,7 +606,8 @@ router.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(devices);
@@ -601,7 +620,8 @@ router.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const countries = await getGA4Countries(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(countries);
@@ -614,7 +634,8 @@ router.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
@@ -626,7 +647,8 @@ router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => 
 router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
@@ -639,7 +661,8 @@ router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, re
 router.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const events = await getGA4KeyEvents(ws.ga4PropertyId, days, 20, parseDateRange(req.query));
     res.json(events);
@@ -652,7 +675,8 @@ router.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
 router.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   const eventName = req.query.event as string;
   if (!eventName) return res.status(400).json({ error: 'event query param required' });
   try {
@@ -667,7 +691,8 @@ router.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) =>
 router.get('/api/public/analytics-conversions/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     const conversions = await getGA4Conversions(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(conversions);
@@ -681,7 +706,8 @@ router.get('/api/public/analytics-conversions/:workspaceId', async (req, res) =>
 router.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   const eventName = req.query.event as string | undefined;
   const pagePath = req.query.page as string | undefined;
   try {
@@ -697,9 +723,11 @@ router.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res)
 router.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   const organicOnly = req.query.organic === 'true';
-  const limit = parseInt(req.query.limit as string) || 25;
+  const limit = parsePositiveIntQuery(req.query.limit, 25);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   try {
     res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly, parseDateRange(req.query)));
   } catch (err) {
@@ -711,7 +739,8 @@ router.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) 
 router.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.ga4PropertyId) return res.status(400).json({ error: 'GA4 not configured' });
-  const days = parseInt(req.query.days as string) || 28;
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
   try {
     res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
