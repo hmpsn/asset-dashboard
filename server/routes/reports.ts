@@ -100,8 +100,13 @@ router.post('/api/sales-report', async (req, res) => {
   try {
     const { url, maxPages } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
+    const requestedMaxPages = maxPages == null ? 25 : Number(maxPages);
+    if (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 1) {
+      return res.status(400).json({ error: 'maxPages must be a positive integer' });
+    }
+    const boundedMaxPages = Math.min(requestedMaxPages, 100);
     log.info(`Starting audit for ${url}`);
-    const result = await runSalesAudit(url, maxPages || 25);
+    const result = await runSalesAudit(url, boundedMaxPages);
 
     // Save to disk
     const reportsDir = getDataDir('sales-reports');
