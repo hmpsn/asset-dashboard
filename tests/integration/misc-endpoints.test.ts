@@ -199,6 +199,30 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
     const res = await api('/api/semrush/status');
     expect(res.status).toBe(200);
   });
+
+  it('GET /api/workspace-home/:id rejects non-positive days values', async () => {
+    const res = await api(`/api/workspace-home/${testWsId}?days=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/seo-changes/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/seo-changes/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/seo-change-impact/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/seo-change-impact/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
+
+  it('GET /api/schema-impact/:workspaceId rejects non-positive limit values', async () => {
+    const res = await api(`/api/schema-impact/${testWsId}?limit=0`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
+  });
 });
 
 describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {

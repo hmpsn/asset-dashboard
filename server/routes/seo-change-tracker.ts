@@ -13,11 +13,19 @@ const log = createLogger('seo-change-tracker');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
+function parseBoundedPositiveIntQuery(rawValue: unknown, fallback: number, max: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return Math.min(parsed, max);
+}
+
 // List recent SEO changes for a workspace
 router.get('/api/seo-changes/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const limit = parseBoundedPositiveIntQuery(req.query.limit, 50, 200);
+  if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   const changes = getSeoChanges(req.params.workspaceId, limit);
   res.json({ changes });
 });
@@ -30,7 +38,8 @@ router.get('/api/seo-change-impact/:workspaceId', requireWorkspaceAccess('worksp
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
 
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const limit = parseBoundedPositiveIntQuery(req.query.limit, 20, 50);
+    if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
     const source = req.query.source as string | undefined;
     const impact = await getSeoChangeImpact(
       req.params.workspaceId,
@@ -54,7 +63,8 @@ router.get('/api/schema-impact/:workspaceId', requireWorkspaceAccess('workspaceI
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
 
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 30, 50);
+    const limit = parseBoundedPositiveIntQuery(req.query.limit, 30, 50);
+    if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
     const summary = await getSchemaImpactSummary(
       req.params.workspaceId,
       ws.gscPropertyUrl,
