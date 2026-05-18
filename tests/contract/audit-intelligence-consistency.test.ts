@@ -64,4 +64,11 @@ describe('audit intelligence consistency contracts', () => {
     expect(publicPortalSrc).toContain('listEffectiveSnapshotSummaries(ws.webflowSiteId');
     expect(publicPortalSrc).toContain('getEffectiveAudit(prev.audit');
   });
+
+  it('prevents invalid regressions to unsuppressed snapshot readers in public portal routes', () => {
+    const publicPortalSrc = readFileSync('server/routes/public-portal.ts', 'utf-8'); // readFile-ok - invalid regression guard for suppression-aware reads.
+
+    expect(publicPortalSrc).not.toContain('getLatestSnapshot(ws.webflowSiteId');
+    expect(publicPortalSrc).not.toContain('listSnapshotSummaries(ws.webflowSiteId');
+  });
 });

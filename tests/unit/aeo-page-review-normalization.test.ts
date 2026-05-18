@@ -38,4 +38,26 @@ describe('normalizeAeoReviewResponse', () => {
     expect(review.changes[1].verifiedSourceEvidence).toContain('2025 industry survey');
     expect(review.quickWinCount).toBe(1);
   });
+
+  it('normalizes invalid payload fields to safe defaults', () => {
+    const review = normalizeAeoReviewResponse({
+      overallScore: -10,
+      summary: 42,
+      changes: [
+        {
+          changeType: 'not-a-real-type',
+          suggestedChange: 9,
+          rationale: null,
+          effort: 'totally-unknown',
+          priority: 'urgent',
+        },
+      ],
+    });
+
+    expect(review.overallScore).toBe(0);
+    expect(review.summary).toBe('AEO review completed.');
+    expect(review.changes[0].changeType).toBe('copy_edit');
+    expect(review.changes[0].effort).toBe('moderate');
+    expect(review.changes[0].priority).toBe('medium');
+  });
 });

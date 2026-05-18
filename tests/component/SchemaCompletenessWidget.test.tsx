@@ -104,4 +104,28 @@ describe('SchemaCompletenessWidget', () => {
     expect(logoIdx).toBeGreaterThanOrEqual(0);
     expect(addressIdx).toBeGreaterThan(logoIdx);
   });
+
+  it('blocks invalid navigation when workspaceId is missing', () => {
+    let capturedLocation = '';
+    render(
+      <MemoryRouter initialEntries={['/ws/ws_test/seo-schema']}>
+        <Routes>
+          <Route
+            path="/ws/:workspaceId/*"
+            element={(
+              <>
+                <SchemaCompletenessWidget
+                  pages={[{ pageId: 'p1', validationFindings: [finding('error', 'publisher.logo')] }]}
+                />
+                <LocationCapture onLocation={loc => { capturedLocation = loc; }} />
+              </>
+            )}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Publisher logo'));
+    expect(capturedLocation).toBe('/ws/ws_test/seo-schema');
+  });
 });

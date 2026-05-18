@@ -27,6 +27,14 @@ describe('InboxTab phase-2 shell extraction contract', () => {
     expect(source).not.toContain('useEffect(() => {');
   });
 
+  it('falls back for invalid inbox deep-link filters instead of introducing unsupported values', () => {
+    const filtersSource = readFileSync(INBOX_FILTER_PATH, 'utf-8'); // readFile-ok - guard invalid query params resolve through fallback.
+
+    expect(filtersSource).toContain('if (param && LEGACY_FILTER_MAP[param])');
+    expect(filtersSource).toContain('return fallback;');
+    expect(filtersSource).not.toContain("'schema-review': 'reviews'");
+  });
+
   it('keeps shell/state, layout rendering, and filter contracts in dedicated modules', () => {
     const shellSource = readFileSync(INBOX_SHELL_PATH, 'utf-8'); // readFile-ok - migration guard for shell state ownership.
     const layoutsSource = readFileSync(INBOX_LAYOUTS_PATH, 'utf-8'); // readFile-ok - migration guard for branch-specific layout wrappers.
