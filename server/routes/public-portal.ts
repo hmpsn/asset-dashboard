@@ -224,9 +224,9 @@ router.get('/api/public/pricing/:id', (req, res) => {
   // Apply workspace content pricing overrides for brief/post
   if (pricing) {
     for (const key of Object.keys(priceMap)) {
-      if (key.startsWith('brief_') && pricing.briefPrice) priceMap[key].price = pricing.briefPrice;
+      if (key.startsWith('brief_') && typeof pricing.briefPrice === 'number') priceMap[key].price = pricing.briefPrice;
     }
-    if (priceMap['post_polished'] && pricing.fullPostPrice) priceMap['post_polished'].price = pricing.fullPostPrice;
+    if (priceMap['post_polished'] && typeof pricing.fullPostPrice === 'number') priceMap['post_polished'].price = pricing.fullPostPrice;
   }
   // Bundle definitions
   const bundles = [
