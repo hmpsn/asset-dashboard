@@ -158,6 +158,11 @@ export function AeoReview({ workspaceId }: Props) {
         priority: highCount > 0 ? 'high' : 'medium',
         clientNote: (pageNotes[page.pageUrl] ?? '').trim() || undefined,
         payload: {
+          metadata: {
+            origin: {
+              pageUrl: clientReadyPage.pageUrl,
+            },
+          },
           diffs: (clientReadyPage.changes ?? []).map(c => ({
             page: clientReadyPage.pageTitle || clientReadyPage.pageUrl,
             section: c.location,

@@ -17,6 +17,8 @@ vi.mock('../../server/broadcast.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { getClientAction } from '../../server/client-actions.js';
+import { getInsightById, upsertInsight } from '../../server/analytics-insights-store.js';
+import { getActionByWorkspaceAndSource, recordAction } from '../../server/outcome-tracking.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
@@ -138,6 +140,14 @@ afterAll(async () => {
   if (clientUserId) deleteClientUser(clientUserId, privateWsId);
   db.prepare('DELETE FROM activity_log WHERE workspace_id IN (?, ?, ?)').run(wsId, otherWsId, privateWsId);
   db.prepare('DELETE FROM client_actions WHERE workspace_id IN (?, ?, ?)').run(wsId, otherWsId, privateWsId);
+  db.prepare('DELETE FROM analytics_insights WHERE workspace_id IN (?, ?, ?)').run(wsId, otherWsId, privateWsId);
+  db.prepare(`
+    DELETE FROM action_outcomes
+    WHERE action_id IN (
+      SELECT id FROM tracked_actions WHERE workspace_id IN (?, ?, ?)
+    )
+  `).run(wsId, otherWsId, privateWsId);
+  db.prepare('DELETE FROM tracked_actions WHERE workspace_id IN (?, ?, ?)').run(wsId, otherWsId, privateWsId);
   deleteWorkspace(wsId);
   deleteWorkspace(otherWsId);
   deleteWorkspace(privateWsId);
@@ -295,5 +305,120 @@ describe('client action mutation safety', () => {
     expect(clientActionBroadcasts()).toHaveLength(0);
     expect(activitiesForAction(wsId, created.id, 'client_action_completed')).toHaveLength(1);
     expect(getClientAction(wsId, created.id)?.status).toBe('completed');
+  });
+
+  it('resolves explicit origin insight IDs and records tracked lifecycle action on approval', async () => {
+    const insightA = upsertInsight({
+      workspaceId: privateWsId,
+      pageId: '/services',
+      insightType: 'content_decay',
+      data: { query: 'seo services', position: 9 },
+      severity: 'warning',
+    });
+    const insightB = upsertInsight({
+      workspaceId: privateWsId,
+      pageId: '/pricing',
+      insightType: 'ranking_opportunity',
+      data: { keyword: 'seo pricing', position: 11 },
+      severity: 'warning',
+    });
+
+    const createRes = await postJson(`/api/client-actions/${privateWsId}`, {
+      sourceType: 'internal_link',
+      sourceId: 'mutation-safety:explicit-origin',
+      title: 'Client action with explicit origin metadata',
+      summary: 'Should resolve explicit origin insight ids to in-progress.',
+      payload: {
+        metadata: {
+          origin: {
+            insightIds: [insightA.id, insightB.id],
+            pageUrl: '/services',
+            targetKeyword: 'seo services',
+          },
+        },
+      },
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json() as ClientAction;
+
+    const approveRes = await patchJson(
+      `/api/public/client-actions/${privateWsId}/${created.id}/respond`,
+      { status: 'approved', clientNote: 'Approved with explicit origin ids.' },
+      { headers: { Cookie: clientUserCookie() } },
+    );
+    expect(approveRes.status).toBe(200);
+
+    expect(getInsightById(insightA.id, privateWsId)?.resolutionStatus).toBe('in_progress');
+    expect(getInsightById(insightB.id, privateWsId)?.resolutionStatus).toBe('in_progress');
+
+    const lifecycleAction = getActionByWorkspaceAndSource(privateWsId, 'client_action', created.id);
+    expect(lifecycleAction).toMatchObject({
+      workspaceId: privateWsId,
+      actionType: 'internal_link_added',
+      attribution: 'platform_executed',
+    });
+  });
+
+  it('uses conservative fallback matching and only resolves when unambiguous', async () => {
+    const ambiguousA = upsertInsight({
+      workspaceId: wsId,
+      pageId: '/decay-page',
+      insightType: 'content_decay',
+      data: { keyword: 'decay keyword one', query: 'decay keyword one' },
+      severity: 'warning',
+    });
+    const ambiguousB = upsertInsight({
+      workspaceId: wsId,
+      pageId: '/decay-page',
+      insightType: 'ranking_opportunity',
+      data: { keyword: 'decay keyword two', query: 'decay keyword two' },
+      severity: 'warning',
+    });
+
+    const seedAction = recordAction({ // recordAction-ok: wsId from integration test seed
+      workspaceId: wsId,
+      actionType: 'content_refreshed',
+      sourceType: 'content_decay',
+      sourceId: '/decay-page',
+      pageUrl: '/decay-page',
+      targetKeyword: null,
+      baselineSnapshot: { captured_at: new Date().toISOString() },
+      attribution: 'not_acted_on',
+    });
+    expect(seedAction.attribution).toBe('not_acted_on');
+
+    const createRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'content_decay',
+      sourceId: 'mutation-safety:conservative-fallback',
+      title: 'Fallback should stay conservative',
+      summary: 'Ambiguous fallback candidates should not auto-resolve.',
+      payload: {
+        metadata: {
+          origin: {
+            pageUrl: '/decay-page',
+            trackingSourceId: '/decay-page',
+          },
+        },
+      },
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json() as ClientAction;
+
+    const completeRes = await patchJson(`/api/client-actions/${wsId}/${created.id}`, { status: 'completed' });
+    expect(completeRes.status).toBe(200);
+
+    expect(getInsightById(ambiguousA.id, wsId)?.resolutionStatus).toBeNull();
+    expect(getInsightById(ambiguousB.id, wsId)?.resolutionStatus).toBeNull();
+
+    const upgradedSource = getActionByWorkspaceAndSource(wsId, 'content_decay', '/decay-page');
+    expect(upgradedSource?.attribution).toBe('platform_executed');
+    expect(upgradedSource?.context.relatedActions).toContain(created.id);
+
+    const lifecycleAction = getActionByWorkspaceAndSource(wsId, 'client_action', created.id);
+    expect(lifecycleAction).toMatchObject({
+      workspaceId: wsId,
+      actionType: 'content_refreshed',
+      attribution: 'platform_executed',
+    });
   });
 });

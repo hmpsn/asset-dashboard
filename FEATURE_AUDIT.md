@@ -5630,7 +5630,7 @@ Bug hardening included:
 ---
 
 ### 402. Action Playbooks Resolution
-**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button.
+**What it does:** Closes the client approval dead-end. On `approved` response from client portal: (1) admin team notified via `action_approved` email event (batched, never throttled — internal category); (2) `content_decay` actions auto-create a content brief via `ACTION_PLAYBOOK_EXECUTE` background job and transition to `completed`; (3) all other approved action types surface in admin UI with an "Awaiting implementation" amber badge and one-click teal "Mark complete" button. Wave cleanup follow-up (2026-05-18) adds a shared feedback loop helper that runs on approval/completion to connect client actions back into intelligence/outcomes: resolve originating insights (explicit origin IDs first, conservative page/keyword fallback only when unambiguous), record lifecycle tracked actions (`sourceType='client_action'`), and upgrade pre-action intent rows (e.g., `content_decay`) when `trackingSourceId` metadata is provided.
 
 **Agency value:** Approved actions no longer disappear into a void. Admin team is instantly notified. `content_decay` briefs are auto-generated—no manual creation required. Other action types show in admin UI for tracking and manual completion.
 
@@ -5638,7 +5638,7 @@ Bug hardening included:
 
 **Mutual:** Closes the approval→implementation handoff gap. Systematic post-approval workflow prevents lost context. Email notifications keep admin team in sync without requiring constant UI checks.
 
-**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `shared/types/background-jobs.ts`, `src/components/admin/ClientActionsTab.tsx` (new).
+**Files:** `server/playbooks.ts` (new), `server/email-templates.ts`, `server/email.ts`, `server/routes/client-actions.ts`, `server/domains/inbox/client-action-feedback-loop.ts`, `server/domains/inbox/client-actions-mutations.ts`, `shared/types/background-jobs.ts`, `shared/types/client-actions.ts`, `src/components/admin/ClientActionsTab.tsx` (new), `src/components/AeoReview.tsx`, `src/components/ContentDecay.tsx`, `tests/integration/client-actions-mutation-safety.test.ts`.
 
 ---
 

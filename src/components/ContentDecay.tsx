@@ -98,7 +98,16 @@ export default function ContentDecay({ workspaceId }: Props) {
         summary: page.refreshRecommendation || `${page.page} has lost ${page.clickDeclinePct}% of clicks and should be reviewed for a content refresh.`,
         priority: page.severity === 'critical' ? 'high' : page.severity === 'warning' ? 'medium' : 'low',
         clientNote: (pageNotes[page.page] ?? '').trim() || undefined,
-        payload: { page, analyzedAt: analysis?.analyzedAt },
+        payload: {
+          metadata: {
+            origin: {
+              pageUrl: page.page,
+              trackingSourceId: page.page,
+            },
+          },
+          page,
+          analyzedAt: analysis?.analyzedAt,
+        },
       });
       setSentPages(prev => new Set(prev).add(page.page));
     } catch (err) {
