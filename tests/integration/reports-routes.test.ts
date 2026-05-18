@@ -491,6 +491,16 @@ describe('Reports — sales reports', () => {
     expect(body).toEqual({ error: 'maxPages must be a positive integer' });
   });
 
+  it('POST /api/sales-report rejects maxPages above 100', async () => {
+    const res = await postJson('/api/sales-report', {
+      url: 'https://example.com',
+      maxPages: 101,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'maxPages must be between 1 and 100' });
+  });
+
   it('POST /api/competitor-compare rejects non-positive maxPages', async () => {
     const res = await postJson('/api/competitor-compare', {
       myUrl: 'https://example.com',
