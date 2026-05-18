@@ -445,6 +445,12 @@ describe('Analytics endpoints — missing credentials guard', () => {
     await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
+  it('GET /api/public/analytics-trend/:workspaceId rejects non-integer days values', async () => {
+    const res = await api(`/api/public/analytics-trend/${wsConfiguredId}?days=15.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
   it('GET /api/public/analytics-overview/:workspaceId rejects non-positive days values', async () => {
     const res = await api(`/api/public/analytics-overview/${wsConfiguredId}?days=0`);
     expect(res.status).toBe(400);
@@ -480,6 +486,24 @@ describe('Analytics endpoints — missing credentials guard', () => {
     const res = await api(`/api/public/search-comparison/${wsConfiguredId}?days=12.5`);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-event-trend/:workspaceId rejects non-integer days values', async () => {
+    const res = await api(`/api/public/analytics-event-trend/${wsConfiguredId}?event=page_view&days=12.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-landing-pages/:workspaceId rejects non-integer days values', async () => {
+    const res = await api(`/api/public/analytics-landing-pages/${wsConfiguredId}?days=9.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'days must be a positive integer' });
+  });
+
+  it('GET /api/public/analytics-landing-pages/:workspaceId rejects non-integer limit values', async () => {
+    const res = await api(`/api/public/analytics-landing-pages/${wsConfiguredId}?limit=3.5`);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'limit must be a positive integer' });
   });
 
   it('GET /api/public/performance-trend/:workspaceId returns 400 when GSC not configured', async () => {
