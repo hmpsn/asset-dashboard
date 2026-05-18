@@ -245,11 +245,23 @@ describe('Admin storage pruning', () => {
     expect(body.maxAgeDays).toBe(30);
   }, 15_000);
 
+  it('POST /api/admin/storage/prune-chat rejects non-positive maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-chat', { maxAgeDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
+  }, 15_000);
+
   it('POST /api/admin/storage/prune-backups with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-backups', {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('retainDays');
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-backups rejects non-positive retainDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-backups', { retainDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'retainDays must be a positive integer' });
   }, 15_000);
 
   it('POST /api/admin/storage/prune-reports with default params', async () => {
@@ -259,10 +271,22 @@ describe('Admin storage pruning', () => {
     expect(body).toHaveProperty('keepPerSite');
   }, 15_000);
 
+  it('POST /api/admin/storage/prune-reports rejects non-positive keepPerSite', async () => {
+    const res = await postJson('/api/admin/storage/prune-reports', { keepPerSite: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'keepPerSite must be a positive integer' });
+  }, 15_000);
+
   it('POST /api/admin/storage/prune-activity with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-activity', {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('maxAgeDays');
+  }, 15_000);
+
+  it('POST /api/admin/storage/prune-activity rejects non-positive maxAgeDays', async () => {
+    const res = await postJson('/api/admin/storage/prune-activity', { maxAgeDays: 0 });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'maxAgeDays must be a positive integer' });
   }, 15_000);
 });

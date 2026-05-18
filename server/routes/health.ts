@@ -43,6 +43,13 @@ function parsePositiveIntQuery(rawValue: unknown, fallback: number): number | nu
   return parsed;
 }
 
+function parsePositiveIntBody(rawValue: unknown, fallback: number): number | null {
+  if (rawValue == null) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 function latestTimestamp(entries: Array<{ timestamp?: string }>): string | null {
   if (entries.length === 0) return null;
   return entries
@@ -381,7 +388,8 @@ router.get('/api/admin/storage-stats', async (_req, res) => {
 });
 
 router.post('/api/admin/storage/prune-chat', (req, res) => {
-  const maxAgeDays = typeof req.body?.maxAgeDays === 'number' ? req.body.maxAgeDays : 90;
+  const maxAgeDays = parsePositiveIntBody(req.body?.maxAgeDays, 90);
+  if (maxAgeDays == null) return res.status(400).json({ error: 'maxAgeDays must be a positive integer' });
   try {
     const result = pruneChatSessions(maxAgeDays);
     res.json({ ...result, maxAgeDays });
@@ -391,7 +399,8 @@ router.post('/api/admin/storage/prune-chat', (req, res) => {
 });
 
 router.post('/api/admin/storage/prune-backups', (req, res) => {
-  const retainDays = typeof req.body?.retainDays === 'number' ? req.body.retainDays : 3;
+  const retainDays = parsePositiveIntBody(req.body?.retainDays, 3);
+  if (retainDays == null) return res.status(400).json({ error: 'retainDays must be a positive integer' });
   try {
     const result = pruneBackups(retainDays);
     res.json({ ...result, retainDays });
@@ -401,7 +410,8 @@ router.post('/api/admin/storage/prune-backups', (req, res) => {
 });
 
 router.post('/api/admin/storage/prune-reports', (req, res) => {
-  const keepPerSite = typeof req.body?.keepPerSite === 'number' ? req.body.keepPerSite : 20;
+  const keepPerSite = parsePositiveIntBody(req.body?.keepPerSite, 20);
+  if (keepPerSite == null) return res.status(400).json({ error: 'keepPerSite must be a positive integer' });
   try {
     const result = pruneReportSnapshots(keepPerSite);
     res.json({ ...result, keepPerSite });
@@ -411,7 +421,8 @@ router.post('/api/admin/storage/prune-reports', (req, res) => {
 });
 
 router.post('/api/admin/storage/prune-activity', (req, res) => {
-  const maxAgeDays = typeof req.body?.maxAgeDays === 'number' ? req.body.maxAgeDays : 180;
+  const maxAgeDays = parsePositiveIntBody(req.body?.maxAgeDays, 180);
+  if (maxAgeDays == null) return res.status(400).json({ error: 'maxAgeDays must be a positive integer' });
   try {
     const result = pruneActivityLogs(maxAgeDays);
     res.json({ ...result, maxAgeDays });
