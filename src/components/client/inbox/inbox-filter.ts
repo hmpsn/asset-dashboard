@@ -1,3 +1,5 @@
+import { isValidTabSearchParam, resolveTabSearchParam } from '../../../lib/tab-search-param';
+
 export type InboxFilter = 'all' | 'decisions' | 'reviews' | 'conversations';
 
 export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
@@ -13,7 +15,7 @@ export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
 };
 
 export function isInboxFilter(value: string | null): value is InboxFilter {
-  return value !== null && (INBOX_FILTER_VALUES as readonly string[]).includes(value);
+  return isValidTabSearchParam(value, INBOX_FILTER_VALUES);
 }
 
 export function resolveInboxFilter(
@@ -24,15 +26,10 @@ export function resolveInboxFilter(
   const fallback = initialFilter === 'reviews' && betaMode
     ? 'decisions'
     : (initialFilter ?? 'decisions');
-
-  if (isInboxFilter(param)) {
-    if (param === 'reviews' && betaMode) return fallback;
-    return param;
-  }
-  if (param && LEGACY_FILTER_MAP[param]) {
-    const mapped = LEGACY_FILTER_MAP[param];
-    if (mapped === 'reviews' && betaMode) return fallback;
-    return mapped;
-  }
-  return fallback;
+  return resolveTabSearchParam<InboxFilter>(param, {
+    validValues: INBOX_FILTER_VALUES,
+    fallback,
+    legacyAliases: LEGACY_FILTER_MAP,
+    normalizeResolved: (value) => (value === 'reviews' && betaMode ? fallback : value),
+  });
 }

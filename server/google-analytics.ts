@@ -6,6 +6,7 @@
 
 import { getGlobalToken } from './google-auth.js';
 import { createLogger } from './logger.js';
+import type { AnalyticsDateRange } from '../shared/types/analytics-contract.js';
 const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
@@ -132,7 +133,7 @@ function dateStr(daysAgo: number): string {
   return d.toISOString().split('T')[0];
 }
 
-export interface CustomDateRange { startDate: string; endDate: string; }
+export type CustomDateRange = AnalyticsDateRange;
 
 /**
  * Get overview metrics for a GA4 property.

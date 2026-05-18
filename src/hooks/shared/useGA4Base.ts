@@ -17,11 +17,12 @@ import type {
   GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4ConversionSummary,
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../../shared/types/analytics';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 export interface GA4BaseOptions {
   wsId: string;
   days: number;
-  dateRange?: { startDate: string; endDate: string };
+  dateRange?: AnalyticsDateRange;
   enabled: boolean;
   /** Cache namespace — determines the React Query key prefix. */
   keyPrefix: 'admin-ga4' | 'client-ga4';

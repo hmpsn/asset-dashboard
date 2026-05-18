@@ -15,9 +15,10 @@ describe('background job task panel wiring', () => {
     expect(seoEditor).toContain('startJob,');
     expect(seoEditor).toContain('trackJob,');
     expect(seoEditor).toContain('cancelJob,');
-    expect(bulkWorkflow).toContain('startJob(BACKGROUND_JOB_TYPES.BULK_SEO_FIX');
-    expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId })');
-    expect(bulkWorkflow).toContain('trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId })');
+    expect(bulkWorkflow).toContain('startAndTrackJob(');
+    expect(bulkWorkflow).toContain('BACKGROUND_JOB_TYPES.BULK_SEO_FIX');
+    expect(bulkWorkflow).toContain('attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId })');
+    expect(bulkWorkflow).toContain('attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId })');
     expect(bulkWorkflow).toContain('setBulkAnalyzeJobId(jobId)');
     expect(bulkWorkflow).toContain('setBulkRewriteJobId(jobId)');
   });
@@ -41,6 +42,6 @@ describe('background job task panel wiring', () => {
     const contentBriefs = read('src/components/ContentBriefs.tsx');
 
     expect(contentBriefs).toContain('const { trackJob } = useBackgroundTasks()');
-    expect(contentBriefs).toContain('trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId })');
+    expect(contentBriefs).toContain('attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, skeleton.jobId, { workspaceId })');
   });
 });

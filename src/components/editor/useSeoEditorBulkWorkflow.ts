@@ -7,6 +7,12 @@ import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { resolvePagePath } from '../../lib/pathUtils';
+import {
+  attachTrackedJob,
+  cancelTrackedJob,
+  invalidateQueriesOnJobCompletion,
+  startAndTrackJob,
+} from '../../lib/background-job-helpers';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type { BackgroundJobType } from '../../../shared/types/background-jobs';
 import {
@@ -131,7 +137,7 @@ export function useSeoEditorBulkWorkflow({
         setBulkAnalyzeProgress(prev => (prev ? { ...prev, done: prev.total } : null));
         setBulkAnalyzeJobId(null);
         if (workspaceId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+          invalidateQueriesOnJobCompletion(queryClient, [queryKeys.admin.keywordStrategy(workspaceId)]);
         }
         setTimeout(() => setBulkAnalyzeProgress(null), 3000);
       }
@@ -190,7 +196,7 @@ export function useSeoEditorBulkWorkflow({
           seoDescription: edits[page.id]?.seoDescription || page.seo?.description || '',
         })),
       });
-      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId });
+      attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.SEO_BULK_ANALYZE, jobId, { workspaceId });
       setBulkAnalyzeJobId(jobId);
     } catch (err) {
       console.error('Failed to start bulk analyze:', err);
@@ -208,7 +214,10 @@ export function useSeoEditorBulkWorkflow({
     setBulkFixing(true);
     setBulkResults(null);
     try {
-      const jobId = await startJob(BACKGROUND_JOB_TYPES.BULK_SEO_FIX, {
+      const jobId = await startAndTrackJob(
+        { startJob, trackJob, cancelJob },
+        BACKGROUND_JOB_TYPES.BULK_SEO_FIX,
+        {
         siteId,
         workspaceId,
         field,
@@ -220,7 +229,8 @@ export function useSeoEditorBulkWorkflow({
           currentSeoTitle: page.seo?.title,
           currentDescription: page.seo?.description,
         })),
-      });
+      },
+      );
       if (jobId) {
         setBulkResults(`Started background ${field === 'title' ? 'title' : 'description'} fixes for ${pagesNeedingFix.length} pages.`);
         setTimeout(() => setBulkResults(null), 5000);
@@ -285,7 +295,7 @@ export function useSeoEditorBulkWorkflow({
         pages: buildBulkRewriteRequestPages(selectedIds, pages, edits),
         field,
       });
-      trackJob(BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId });
+      attachTrackedJob({ trackJob }, BACKGROUND_JOB_TYPES.SEO_BULK_REWRITE, jobId, { workspaceId });
       setBulkRewriteJobId(jobId);
     } catch (err) {
       console.error('Failed to start bulk rewrite:', err);
@@ -330,14 +340,14 @@ export function useSeoEditorBulkWorkflow({
     if (!bulkAnalyzeJobId) return;
     const activeJobId = bulkAnalyzeJobId;
     try {
-      await cancelJob(activeJobId);
+      await cancelTrackedJob({ cancelJob }, activeJobId);
     } catch (err) {
       console.error('Failed to cancel bulk analyze job:', err);
     } finally {
       setBulkAnalyzeJobId(null);
       setBulkAnalyzeProgress(null);
       if (workspaceId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+        invalidateQueriesOnJobCompletion(queryClient, [queryKeys.admin.keywordStrategy(workspaceId)]);
       }
     }
   };
@@ -350,7 +360,7 @@ export function useSeoEditorBulkWorkflow({
     }
     const activeJobId = bulkRewriteJobId;
     try {
-      await cancelJob(activeJobId);
+      await cancelTrackedJob({ cancelJob }, activeJobId);
     } catch (err) {
       console.error('Failed to cancel bulk rewrite job:', err);
     } finally {

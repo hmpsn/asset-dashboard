@@ -64,6 +64,7 @@ import {
   type ApprovalBatch,
   type ClientContentRequest,
 } from './client/types';
+import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.js';
 
 const HealthTab = lazyWithRetry(() => import('./client/HealthTab').then(m => ({ default: m.HealthTab })));
 const InsightsEngine = lazyWithRetry(() => import('./client/InsightsEngine').then(m => ({ default: m.InsightsEngine })));
@@ -106,7 +107,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const [requestedTopicsSeed, setRequestedTopics] = useState<Set<string>>(new Set());
   const [, setRequestingTopic] = useState<string | null>(null);
   const [days, setDays] = useState(28);
-  const [customDateRange, setCustomDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
+  const [customDateRange, setCustomDateRange] = useState<AnalyticsDateRange | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dataEnabled, setDataEnabled] = useState(false);
 

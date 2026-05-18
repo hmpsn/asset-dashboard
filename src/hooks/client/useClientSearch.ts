@@ -3,6 +3,7 @@ import { gsc } from '../../api/analytics';
 import { queryKeys } from '../../lib/queryKeys';
 import type { SearchOverview, PerformanceTrend, SearchComparison } from '../../components/client/types';
 import type { SearchDeviceBreakdown } from '../../../shared/types/analytics';
+import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
 export interface ClientSearchData {
   overview: SearchOverview | null;
@@ -14,7 +15,7 @@ export interface ClientSearchData {
 export function useClientSearch(
   wsId: string,
   days: number,
-  dateRange: { startDate: string; endDate: string } | undefined,
+  dateRange: AnalyticsDateRange | undefined,
   enabled: boolean,
 ) {
   const dr = dateRange;

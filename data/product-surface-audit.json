@@ -1,0 +1,395 @@
+{
+  "generatedAt": "2026-05-18T18:38:03.404Z",
+  "featureAuditHeadlineCount": 369,
+  "productSurfaceEntryCount": 18,
+  "humanVerificationCount": 5,
+  "recommendations": {
+    "promote": 1,
+    "keep": 11,
+    "hide-behind-progressive-disclosure": 4,
+    "deprecate-after-redirect-window": 2
+  },
+  "placement": {
+    "first-class-navigation": 8,
+    "context-triggered": 4,
+    "progressive-disclosure": 3,
+    "internal-only": 3
+  },
+  "lifecycle": {
+    "active": 13,
+    "flagged-dark-launch": 3,
+    "deprecated-but-present": 1,
+    "legacy-alias": 1
+  },
+  "byOwner": {
+    "outcomes-roi": 1,
+    "workspace-command-center": 3,
+    "platform-foundation": 2,
+    "brand-engine": 1,
+    "client-portal": 1,
+    "inbox": 3,
+    "content-pipeline": 1,
+    "integrations": 1,
+    "schema": 1,
+    "analytics-intelligence": 1,
+    "seo-health": 2,
+    "billing-monetization": 1
+  },
+  "humanVerificationQueue": [
+    {
+      "id": "ai-usage-ledger",
+      "capability": "AI Usage Ledger",
+      "owner": "platform-foundation",
+      "recommendation": "hide-behind-progressive-disclosure",
+      "notes": "High-utility operator view but not a core daily workflow for most admins."
+    },
+    {
+      "id": "client-inbox-legacy-aliases",
+      "capability": "Legacy Client Inbox Aliases",
+      "owner": "inbox",
+      "recommendation": "deprecate-after-redirect-window",
+      "notes": "Legacy route aliases prevent bookmark breakage; remove only after measured alias traffic cool-down."
+    },
+    {
+      "id": "prospect-tooling",
+      "capability": "Prospect Tooling",
+      "owner": "workspace-command-center",
+      "recommendation": "hide-behind-progressive-disclosure",
+      "notes": "Internal sales utility is valuable but can be progressively disclosed from the core nav."
+    },
+    {
+      "id": "schema-review-standalone-tab-retirement",
+      "capability": "Standalone Schema Review Tab Retirement",
+      "owner": "inbox",
+      "recommendation": "deprecate-after-redirect-window",
+      "notes": "Already migrated into Inbox > Reviews with redirects preserved; monitor and eventually trim legacy links."
+    },
+    {
+      "id": "team-outcomes-overview",
+      "capability": "Team Outcomes Overview (cross-workspace)",
+      "owner": "workspace-command-center",
+      "recommendation": "hide-behind-progressive-disclosure",
+      "notes": "Useful for operators but likely too advanced for primary admin navigation density."
+    }
+  ],
+  "prioritizedMoves": {
+    "promote": [
+      {
+        "id": "search-traffic-hub",
+        "capability": "Search & Traffic Hub",
+        "boundedContextId": "analytics-intelligence",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "promote",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "analytics-intelligence",
+        "notes": "High-value narrative surface that connects analytics, anomalies, and insight priorities.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (Search & Traffic nav item)"
+        ]
+      }
+    ],
+    "keep": [
+      {
+        "id": "outcomes-action-results",
+        "capability": "Action Results (Workspace-level outcomes)",
+        "boundedContextId": "outcomes-roi",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "outcomes-roi",
+        "notes": "Outcome narratives are differentiators and should stay visible for retention and upsell.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (MONITORING > Action Results)"
+        ]
+      },
+      {
+        "id": "command-center-home",
+        "capability": "Admin Command Center Home",
+        "boundedContextId": "workspace-command-center",
+        "placement": "first-class-navigation",
+        "role": "agency-operations",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": false,
+        "owner": "workspace-command-center",
+        "notes": "Primary operator landing surface for multi-workspace triage and follow-up work.",
+        "evidence": [
+          "src/routes.ts (Page: home)",
+          "src/components/layout/Sidebar.tsx (Home nav item)"
+        ]
+      },
+      {
+        "id": "brand-hub-copy-engine",
+        "capability": "Brand & AI Hub (Copy Engine)",
+        "boundedContextId": "brand-engine",
+        "placement": "progressive-disclosure",
+        "role": "support-system",
+        "lifecycle": "flagged-dark-launch",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "brand-engine",
+        "notes": "Gated rollout is correct while phased copy-engine contracts continue to stabilize.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (Brand nav item hidden by copy-engine flag)"
+        ]
+      },
+      {
+        "id": "client-brand-tab",
+        "capability": "Client Brand Tab",
+        "boundedContextId": "client-portal",
+        "placement": "progressive-disclosure",
+        "role": "support-system",
+        "lifecycle": "flagged-dark-launch",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "client-portal",
+        "notes": "Client-facing brand surface is correctly controlled while content maturity is assessed.",
+        "evidence": [
+          "src/components/ClientDashboard.tsx (useFeatureFlag: client-brand-section)"
+        ]
+      },
+      {
+        "id": "client-inbox",
+        "capability": "Client Inbox (Decisions, Conversations, Reviews)",
+        "boundedContextId": "inbox",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "inbox",
+        "notes": "Primary collaboration loop between agency and client.",
+        "evidence": [
+          "src/components/ClientDashboard.tsx (InboxTab)",
+          "src/routes.ts (ClientTab: inbox)"
+        ]
+      },
+      {
+        "id": "content-pipeline",
+        "capability": "Content Pipeline",
+        "boundedContextId": "content-pipeline",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "content-pipeline",
+        "notes": "Brief-to-post lifecycle is a principal client outcome system and should remain first-class.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (CONTENT > Pipeline)"
+        ]
+      },
+      {
+        "id": "provider-connections-health",
+        "capability": "Integrations + Connection Health",
+        "boundedContextId": "integrations",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": false,
+        "owner": "integrations",
+        "notes": "Operational trust surface best exposed through settings and diagnostics, not first-class nav.",
+        "evidence": [
+          "src/components/settings/ConnectionsTab.tsx",
+          "FEATURE_AUDIT.md (Integration Health Center)"
+        ]
+      },
+      {
+        "id": "schema-workbench",
+        "capability": "Schema Workbench",
+        "boundedContextId": "schema",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "schema",
+        "notes": "Schema generation and validation are premium-facing differentiators and should stay obvious.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (OPTIMIZATION > Schema)"
+        ]
+      },
+      {
+        "id": "strategy-intelligence",
+        "capability": "SEO Strategy + Page Intelligence",
+        "boundedContextId": "seo-health",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "seo-health",
+        "notes": "Directly informs planned work and connects strategy with page-level execution.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (SEO STRATEGY group)"
+        ]
+      },
+      {
+        "id": "site-health-cluster",
+        "capability": "Site Health Cluster (Audit, Performance, Links, Assets)",
+        "boundedContextId": "seo-health",
+        "placement": "first-class-navigation",
+        "role": "client-differentiator",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "seo-health",
+        "notes": "Core deliverable cluster directly tied to visible client outcomes.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (SITE HEALTH group)"
+        ]
+      },
+      {
+        "id": "billing-upgrade-flow",
+        "capability": "Tier Gating + Stripe Checkout Flow",
+        "boundedContextId": "billing-monetization",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "active",
+        "recommendation": "keep",
+        "clientFacing": true,
+        "monetizable": true,
+        "requiresHumanVerification": false,
+        "owner": "billing-monetization",
+        "notes": "Monetization path should appear contextually at upgrade moments, not as primary navigation.",
+        "evidence": [
+          "src/components/client/UpgradeModal.tsx",
+          "src/components/ui/TierGate.tsx"
+        ]
+      }
+    ],
+    "hideBehindProgressiveDisclosure": [
+      {
+        "id": "ai-usage-ledger",
+        "capability": "AI Usage Ledger",
+        "boundedContextId": "platform-foundation",
+        "placement": "internal-only",
+        "role": "platform-infrastructure",
+        "lifecycle": "active",
+        "recommendation": "hide-behind-progressive-disclosure",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": true,
+        "owner": "platform-foundation",
+        "notes": "High-utility operator view but not a core daily workflow for most admins.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (ADMIN > AI Usage)"
+        ]
+      },
+      {
+        "id": "deep-diagnostics",
+        "capability": "Deep Diagnostics",
+        "boundedContextId": "platform-foundation",
+        "placement": "progressive-disclosure",
+        "role": "platform-infrastructure",
+        "lifecycle": "flagged-dark-launch",
+        "recommendation": "hide-behind-progressive-disclosure",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": false,
+        "owner": "platform-foundation",
+        "notes": "Already hidden behind feature flag and should stay opt-in until operational playbook is complete.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (diagnostics nav item hidden by deep-diagnostics flag)"
+        ]
+      },
+      {
+        "id": "prospect-tooling",
+        "capability": "Prospect Tooling",
+        "boundedContextId": "workspace-command-center",
+        "placement": "internal-only",
+        "role": "agency-operations",
+        "lifecycle": "active",
+        "recommendation": "hide-behind-progressive-disclosure",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": true,
+        "owner": "workspace-command-center",
+        "notes": "Internal sales utility is valuable but can be progressively disclosed from the core nav.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (ADMIN > Prospect)"
+        ]
+      },
+      {
+        "id": "team-outcomes-overview",
+        "capability": "Team Outcomes Overview (cross-workspace)",
+        "boundedContextId": "outcomes-roi",
+        "placement": "internal-only",
+        "role": "agency-operations",
+        "lifecycle": "active",
+        "recommendation": "hide-behind-progressive-disclosure",
+        "clientFacing": false,
+        "monetizable": false,
+        "requiresHumanVerification": true,
+        "owner": "workspace-command-center",
+        "notes": "Useful for operators but likely too advanced for primary admin navigation density.",
+        "evidence": [
+          "src/components/layout/Sidebar.tsx (ADMIN > Team Outcomes)"
+        ]
+      }
+    ],
+    "deprecateAfterRedirectWindow": [
+      {
+        "id": "client-inbox-legacy-aliases",
+        "capability": "Legacy Client Inbox Aliases",
+        "boundedContextId": "inbox",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "legacy-alias",
+        "recommendation": "deprecate-after-redirect-window",
+        "clientFacing": true,
+        "monetizable": false,
+        "requiresHumanVerification": true,
+        "owner": "inbox",
+        "notes": "Legacy route aliases prevent bookmark breakage; remove only after measured alias traffic cool-down.",
+        "evidence": [
+          "src/routes.ts (CLIENT_INBOX_ALIASES approvals/requests/content)"
+        ]
+      },
+      {
+        "id": "schema-review-standalone-tab-retirement",
+        "capability": "Standalone Schema Review Tab Retirement",
+        "boundedContextId": "inbox",
+        "placement": "context-triggered",
+        "role": "support-system",
+        "lifecycle": "deprecated-but-present",
+        "recommendation": "deprecate-after-redirect-window",
+        "clientFacing": true,
+        "monetizable": false,
+        "requiresHumanVerification": true,
+        "owner": "inbox",
+        "notes": "Already migrated into Inbox > Reviews with redirects preserved; monitor and eventually trim legacy links.",
+        "evidence": [
+          "src/components/client/InboxTab.tsx (SchemaReviewModal mounted in Reviews section)"
+        ]
+      }
+    ]
+  }
+}
