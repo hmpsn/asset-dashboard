@@ -473,6 +473,25 @@ describe('Reports — action items CRUD', () => {
   });
 });
 
+describe('Reports — public audit workspace guards', () => {
+  it('GET /api/public/audit-summary/:workspaceId returns 404 for unknown workspaces', async () => {
+    const res = await api('/api/public/audit-summary/ws_reports_missing_workspace');
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Workspace not found' });
+  });
+
+  it('GET /api/public/audit-detail/:workspaceId returns 400 when workspace has no linked site', async () => {
+    const ws = createWorkspace('Reports Guard No Site Workspace');
+    try {
+      const res = await api(`/api/public/audit-detail/${ws.id}`);
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: 'No site linked' });
+    } finally {
+      deleteWorkspace(ws.id);
+    }
+  });
+});
+
 describe('Reports — sales reports', () => {
   it('GET /api/sales-reports returns array', async () => {
     const res = await api('/api/sales-reports');
