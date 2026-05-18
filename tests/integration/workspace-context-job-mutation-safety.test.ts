@@ -8,6 +8,7 @@ const broadcastState = vi.hoisted(() => ({
 
 const aiState = vi.hoisted(() => ({
   mode: 'success' as 'success' | 'error',
+  delayMs: 0,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -30,6 +31,9 @@ vi.mock('../../server/workspace-site-scrape.js', () => ({
 
 vi.mock('../../server/ai.js', () => ({
   callAI: vi.fn(async (opts: { feature?: string; operation?: string }) => {
+    if (aiState.delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, aiState.delayMs));
+    }
     if (aiState.mode === 'error') {
       throw new Error('Workspace context AI failed');
     }
@@ -155,6 +159,7 @@ beforeEach(() => {
   updateWorkspace(workspaceB.workspaceId, { tier: 'growth' });
   broadcastState.calls = [];
   aiState.mode = 'success';
+  aiState.delayMs = 0;
 });
 
 afterEach(() => {
@@ -300,6 +305,40 @@ describe('workspace-context background job mutation safety', () => {
 
     updateJob(active.id, { status: 'done' });
     expect(countRows('jobs', workspaceB.workspaceId)).toBe(0);
+    expect(countRows('tracked_actions', workspaceB.workspaceId)).toBe(0);
+  });
+
+  it('concurrent starts for same workspace collapse to one active job', async () => {
+    aiState.delayMs = 150;
+    const payload = {
+      type: BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION,
+      params: { workspaceId: workspaceA.workspaceId },
+    };
+
+    const [resA, resB] = await Promise.all([
+      postJson('/api/jobs', payload),
+      postJson('/api/jobs', payload),
+    ]);
+
+    const responses = [resA, resB];
+    const successResponses = responses.filter(r => r.status === 200);
+    const conflictResponses = responses.filter(r => r.status === 409);
+    expect(successResponses).toHaveLength(1);
+    expect(conflictResponses).toHaveLength(1);
+
+    const started = await successResponses[0].json() as { jobId: string };
+    const conflict = await conflictResponses[0].json() as { error: string; jobId: string };
+    expect(conflict.error).toBe('knowledge base generation is already running for this workspace');
+    expect(conflict.jobId).toBe(started.jobId);
+
+    const completed = await waitForJob(started.jobId);
+    expect(completed.status).toBe('done');
+
+    const workspaceJobs = db.prepare(
+      "SELECT COALESCE(COUNT(*), 0) AS count FROM jobs WHERE workspace_id = ? AND type = ?"
+    ).get(workspaceA.workspaceId, BACKGROUND_JOB_TYPES.KNOWLEDGE_BASE_GENERATION) as { count: number };
+    expect(workspaceJobs.count).toBe(1);
+    expect(countRows('tracked_actions', workspaceA.workspaceId)).toBe(0);
     expect(countRows('tracked_actions', workspaceB.workspaceId)).toBe(0);
   });
 });
