@@ -17,24 +17,15 @@
 import type { AnalyticsInsight, InsightType } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { ContentGap } from '../../shared/types/workspace.js';
+import {
+  buildBriefingContentGapStory,
+  buildBriefingInsightStory,
+  SUPPORTED_BRIEFING_INSIGHT_TYPES,
+} from '../signal-story-registry.js';
 
-import { buildStoryFromInsight as rankingMover } from './ranking-mover.js';
-import { buildStoryFromInsight as rankingOpportunity } from './ranking-opportunity.js';
-import { buildStoryFromInsight as anomalyDigest } from './anomaly-digest.js';
-import { buildStoryFromInsight as ctrOpportunity } from './ctr-opportunity.js';
-import { buildStoryFromInsight as freshnessAlert } from './freshness-alert.js';
-import { buildStoryFromInsight as cannibalization } from './cannibalization.js';
-import { buildStoryFromInsight as contentDecay } from './content-decay.js';
-import { buildStoryFromInsight as auditFinding } from './audit-finding.js';
-import { buildStoryFromInsight as competitorAlert } from './competitor-alert.js';
-import { buildStoryFromInsight as pageHealth } from './page-health.js';
-import { buildStoryFromInsight as milestoneAttribution } from './milestone-attribution.js';
-import { buildStoryFromContentGap as contentGapBuilder } from './content-gap.js';
-
-// Phase 2.5c — weCalledIt isn't routed through INSIGHT_DISPATCHERS because
-// its input is a TrackedAction + ActionOutcome, not an AnalyticsInsight row.
-// Re-exported here so the cron can dispatch wci-prefixed candidates from a
-// single entrypoint.
+// Phase 2.5c — weCalledIt is still dispatched separately because its input is
+// a TrackedAction + ActionOutcome, not an AnalyticsInsight row. Re-exported
+// here so the cron can dispatch wci-prefixed candidates from a single entrypoint.
 export { buildStoryFromWeCalledIt, type WeCalledItInput } from './we-called-it.js';
 
 /**
@@ -70,35 +61,6 @@ export interface TemplateContext {
 }
 
 /**
- * Insight types that have a dedicated template. Types not in this
- * registry skip story rendering — the cron's selection step is
- * responsible for filtering candidates of unsupported types upstream.
- */
-type InsightDispatcher = (
-  insight: AnalyticsInsight,
-  context: TemplateContext,
-) => BriefingStory | null;
-
-const INSIGHT_DISPATCHERS: Partial<Record<InsightType, InsightDispatcher>> = {
-  ranking_mover: rankingMover as InsightDispatcher,
-  ranking_opportunity: rankingOpportunity as InsightDispatcher,
-  anomaly_digest: anomalyDigest as InsightDispatcher,
-  ctr_opportunity: ctrOpportunity as InsightDispatcher,
-  freshness_alert: freshnessAlert as InsightDispatcher,
-  cannibalization: cannibalization as InsightDispatcher,
-  content_decay: contentDecay as InsightDispatcher,
-  audit_finding: auditFinding as InsightDispatcher,
-  competitor_alert: competitorAlert as InsightDispatcher,
-  page_health: pageHealth as InsightDispatcher,
-  milestone_attribution: milestoneAttribution as InsightDispatcher, // Phase 2.5c
-  // Intentionally not mapped — admin-only or planned for later phases:
-  //   keyword_cluster, competitor_gap, conversion_attribution,
-  //   serp_opportunity, strategy_alignment, site_health, emerging_keyword
-  // (Adding any of these to InsightDataMap requires the four-place
-  //  registration per CLAUDE.md "New insight type registration" rule.)
-};
-
-/**
  * Project an `AnalyticsInsight` to a `BriefingStory`. Returns `null` when:
  *   - The insight type has no registered template, OR
  *   - The template rejects the insight (e.g., required fields missing,
@@ -111,9 +73,7 @@ export function buildStoryFromInsight(
   insight: AnalyticsInsight,
   context: TemplateContext,
 ): BriefingStory | null {
-  const dispatcher = INSIGHT_DISPATCHERS[insight.insightType];
-  if (!dispatcher) return null;
-  return dispatcher(insight, context);
+  return buildBriefingInsightStory(insight, context);
 }
 
 /**
@@ -126,13 +86,11 @@ export function buildStoryFromContentGap(
   gap: ContentGap,
   context: TemplateContext,
 ): BriefingStory | null {
-  return contentGapBuilder(gap, context);
+  return buildBriefingContentGapStory(gap, context);
 }
 
 /**
  * List of every InsightType that has a registered template. Used by tests
  * to assert no insight type silently misses coverage when added.
  */
-export const SUPPORTED_INSIGHT_TYPES: readonly InsightType[] = Object.keys(
-  INSIGHT_DISPATCHERS,
-) as InsightType[];
+export const SUPPORTED_INSIGHT_TYPES: readonly InsightType[] = SUPPORTED_BRIEFING_INSIGHT_TYPES;
