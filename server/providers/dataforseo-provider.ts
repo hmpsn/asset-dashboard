@@ -739,7 +739,6 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit: cappedLimit,
-        order_by: ['relevance,desc', 'keyword_info.search_volume,desc'],
       }], workspaceId);
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
@@ -778,7 +777,6 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit: cappedLimit,
-        order_by: ['relevance,desc', 'keyword_info.search_volume,desc'],
       }], workspaceId);
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);

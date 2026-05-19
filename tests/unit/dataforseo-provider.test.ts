@@ -481,8 +481,8 @@ describe('DataForSeoProvider — keyword discovery endpoints', () => {
       keywords: ['seo dashboard'],
       limit: 25,
       language_code: 'en',
-      order_by: ['relevance,desc', 'keyword_info.search_volume,desc'],
     });
+    expect(body[0]).not.toHaveProperty('order_by');
     expect(results).toEqual([
       expect.objectContaining({
         keyword: 'best seo dashboard',
@@ -522,8 +522,8 @@ describe('DataForSeoProvider — keyword discovery endpoints', () => {
     expect(body[0]).toMatchObject({
       target: 'example.com',
       limit: 10,
-      order_by: ['relevance,desc', 'keyword_info.search_volume,desc'],
     });
+    expect(body[0]).not.toHaveProperty('order_by');
     expect(results[0]).toEqual(expect.objectContaining({
       keyword: 'dental implants austin',
       sourceKind: 'keywords_for_site',
