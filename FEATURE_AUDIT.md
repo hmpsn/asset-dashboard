@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **374 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **442 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 442. Keyword Operating Loop Source + Lifecycle Audit
+
+**What it does:** Adds a read-only audit of the full keyword operating loop before the next keyword intelligence implementation PRs. The audit maps current keyword sources, consumers, mutations, DataForSEO endpoint coverage, strategy refresh follow-ons, rank-tracking behavior, strategy-history diffs, client feedback, outcome tracking, broadcasts/cache invalidation, and source-to-surface handoffs. It also documents rich-data and sparse-workspace lifecycle traces so the next PRs can improve source data, rank-tracking reconciliation, shared keyword intelligence, and UX explainability without rediscovering scope.
+
+**Agency value:** Gives strategists and engineers a clear source-of-truth map for where keywords come from, why they are chosen, where they should appear, and what should update after regeneration. This reduces the risk of fixing one surface while leaving rank tracking, recommendations, or client views stale.
+
+**Client value:** Sets up a more useful keyword strategy experience: chosen keywords should eventually be tracked, explained, connected to content actions, and refreshed consistently rather than treated as a static generated document.
+
+**Mutual:** Converts keyword strategy into an operating-loop roadmap. The platform can move toward "why this keyword, what changed, what are we tracking, and what should we do next" with cleaner implementation boundaries.
 
 ---
 
