@@ -60,6 +60,35 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result!.volume).toBe(1200);
   });
 
+  it('does not restamp persisted Page Intelligence analysis during same-keyword strategy refresh', () => {
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/same-keyword-refresh',
+      pageTitle: 'Same Keyword Refresh',
+      primaryKeyword: 'same keyword',
+      secondaryKeywords: [],
+      optimizationScore: 84,
+      optimizationIssues: ['Old issue'],
+      analysisGeneratedAt: '2026-04-03T10:00:00Z',
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/same-keyword-refresh',
+      pageTitle: 'Same Keyword Refresh',
+      primaryKeyword: 'same keyword',
+      secondaryKeywords: [],
+      metricsSource: METRICS_SOURCE.BULK_LOOKUP,
+      volume: 1400,
+      difficulty: 37,
+      analysisGeneratedAt: '2026-05-19T10:00:00Z',
+    });
+
+    const result = getPageKeyword(wsId, '/services/same-keyword-refresh');
+    expect(result?.optimizationScore).toBe(84);
+    expect(result?.optimizationIssues).toEqual(['Old issue']);
+    expect(result?.analysisGeneratedAt).toBe('2026-04-03T10:00:00Z');
+    expect(result?.volume).toBe(1400);
+  });
+
   it('clears persisted Page Intelligence fields when strategy changes the primary keyword', () => {
     upsertPageKeyword(wsId, {
       pagePath: '/services/changed-keyword',
