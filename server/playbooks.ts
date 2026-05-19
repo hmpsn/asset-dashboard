@@ -9,6 +9,7 @@ import { sanitizeQueryForPrompt } from './helpers.js';
 import { createLogger } from './logger.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import type { ClientAction } from '../shared/types/client-actions.js';
+import { applyClientActionFeedbackLoop } from './domains/inbox/client-action-feedback-loop.js';
 
 const log = createLogger('playbooks');
 
@@ -78,6 +79,7 @@ async function executeContentDecayPlaybook(
         completedAction.summary,
         { actionId: completedAction.id, sourceType: completedAction.sourceType },
       );
+      applyClientActionFeedbackLoop(workspaceId, completedAction, 'completed');
     }
     broadcastToWorkspace(workspaceId, WS_EVENTS.CLIENT_ACTION_UPDATE, { actionId, action: 'completed' });
     invalidateIntelligenceCache(workspaceId);

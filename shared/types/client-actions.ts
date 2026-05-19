@@ -14,7 +14,33 @@ export type ClientActionStatus =
   | 'archived';
 
 export interface ClientActionPayload {
+  metadata?: ClientActionPayloadMetadata;
   [key: string]: unknown;
+}
+
+export interface ClientActionOriginMetadata {
+  /**
+   * Preferred linkage: explicit originating insight IDs.
+   * When present, these should be used before any heuristic page/keyword matching.
+   */
+  insightIds?: string[];
+  /**
+   * Optional originating page reference (URL or path) for conservative fallback matching.
+   */
+  pageUrl?: string;
+  /**
+   * Optional originating keyword for conservative fallback matching.
+   */
+  targetKeyword?: string;
+  /**
+   * Optional source_id for an existing tracked_actions row that should be upgraded
+   * from pre-action intent to acted-on attribution.
+   */
+  trackingSourceId?: string;
+}
+
+export interface ClientActionPayloadMetadata {
+  origin?: ClientActionOriginMetadata;
 }
 
 export interface ClientAction {
