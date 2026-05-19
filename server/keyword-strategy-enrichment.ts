@@ -100,7 +100,6 @@ export function isTopicKeywordCoveredByPageMap(
     if (assignedKeywords.some(assigned =>
       assigned === normalizedKeyword
       || (hasMultiWordTopicSignal(normalizedKeyword) && assigned.includes(normalizedKeyword))
-      || (hasMultiWordTopicSignal(assigned) && normalizedKeyword.includes(assigned))
     )) {
       return true;
     }
@@ -115,6 +114,23 @@ export function isTopicKeywordCoveredByPageMap(
   }
 
   return false;
+}
+
+function removePageCoveredContentGaps(
+  contentGaps: StrategyContentGap[] | undefined,
+  pageMap: StrategyPageMapEntry[] | undefined,
+): { kept: StrategyContentGap[]; removed: StrategyContentGap[] } {
+  if (!contentGaps?.length) return { kept: [], removed: [] };
+  const kept: StrategyContentGap[] = [];
+  const removed: StrategyContentGap[] = [];
+  for (const gap of contentGaps) {
+    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap)) {
+      removed.push(gap);
+    } else {
+      kept.push(gap);
+    }
+  }
+  return { kept, removed };
 }
 
 function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
@@ -225,9 +241,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
       });
       if (matchingRows.length > 0) {
-        const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-        if (kwMatch) {
-          pm.currentPosition = kwMatch.position;
+        const primaryKeyword = pm.primaryKeyword.trim().toLowerCase();
+        if (primaryKeyword) {
+          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(primaryKeyword));
+          if (kwMatch) {
+            pm.currentPosition = kwMatch.position;
+          }
         }
         // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -471,6 +490,17 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     }
   }
 
+  if (strategy.contentGaps?.length) {
+    const { kept, removed } = removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
+    if (removed.length > 0) {
+      log.info({
+        workspaceId,
+        removed: removed.map(gap => gap.targetKeyword),
+      }, 'Removed content gaps already covered by strategy page map');
+      strategy.contentGaps = kept;
+    }
+  }
+
   // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
   if (strategy.contentGaps?.length) {
     for (const cg of strategy.contentGaps) {
@@ -487,7 +517,8 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   {
     const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
     for (const pm of strategy.pageMap ?? []) {
-      const kw = pm.primaryKeyword.toLowerCase();
+      const kw = pm.primaryKeyword.trim().toLowerCase();
+      if (!kw) continue;
       if (!kwPages.has(kw)) kwPages.set(kw, []);
       kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
     }

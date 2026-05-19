@@ -9,6 +9,7 @@ import { listPayments } from '../payments.js';
 import { getWorkspace } from '../workspaces.js';
 import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
+import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('data-export');
@@ -75,9 +76,11 @@ router.get('/api/export/:workspaceId/strategy', requireWorkspaceAccess('workspac
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
-  if (!strategy?.pageMap?.length) return res.json([]);
-  log.info(`EXPORT strategy ${req.params.workspaceId}: ${strategy.pageMap.length} pages as ${format}`);
-  const rows = strategy.pageMap.map(p => ({
+  if (!strategy) return res.json([]);
+  const pageMap = listPageKeywords(req.params.workspaceId);
+  if (!pageMap.length) return res.json([]);
+  log.info(`EXPORT strategy ${req.params.workspaceId}: ${pageMap.length} pages as ${format}`);
+  const rows = pageMap.map(p => ({
     pagePath: p.pagePath,
     pageTitle: p.pageTitle || '',
     primaryKeyword: p.primaryKeyword,

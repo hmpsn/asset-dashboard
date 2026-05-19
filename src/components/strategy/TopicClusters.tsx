@@ -33,7 +33,9 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
       <h4 className="t-caption-sm font-semibold text-teal-300 mb-1 flex items-center gap-1.5">
         <Icon as={Layers} size="md" className="text-teal-300" /> Topical Authority
       </h4>
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Topic clusters ranked by coverage gap — lowest coverage = biggest opportunity.</p>
+      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
+        Topic clusters ranked by coverage gap. Coverage includes ranked keywords plus mapped page/title matches; avg position only reflects ranked terms.
+      </p>
       <div className="space-y-2">
         {clusters.slice(0, 10).map((cluster, i) => (
           <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
@@ -43,7 +45,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
                 <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${coverageColor(cluster.coveragePercent)}`}>
                   {cluster.coveragePercent}% coverage
                 </span>
-                <span className="t-micro text-[var(--brand-text-muted)]">{cluster.ownedCount}/{cluster.totalCount} kws</span>
+                <span className="t-micro text-[var(--brand-text-muted)]">{cluster.ownedCount}/{cluster.totalCount} covered</span>
               </div>
             </div>
             {/* Coverage bar */}
@@ -54,7 +56,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
               <div className="flex items-center gap-2 flex-wrap">
                 {cluster.avgPosition && (
                   <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5">
-                    <Icon as={BarChart3} size="sm" />Avg pos #{cluster.avgPosition}
+                    <Icon as={BarChart3} size="sm" />Ranking avg #{cluster.avgPosition}
                   </span>
                 )}
                 {cluster.topCompetitor && cluster.topCompetitorCoverage && (

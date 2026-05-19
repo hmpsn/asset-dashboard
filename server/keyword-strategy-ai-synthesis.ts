@@ -20,7 +20,7 @@ import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
-import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis } from './keyword-strategy-helpers.js';
+import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 
 const log = createLogger('keyword-strategy:synthesis');
@@ -335,42 +335,42 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
           if (!semrushByPath.has(p)) semrushByPath.set(p, []);
           semrushByPath.get(p)!.push(k);
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ } // url-fetch-ok
-        keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
+        upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' });
       }
     }
     // Add GSC queries to the pool (these are proven search terms)
     for (const r of gscData) {
       const q = r.query.toLowerCase();
-      if (!keywordPool.has(q) && q.length > 3 && q.split(' ').length >= 2) {
-        keywordPool.set(q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
+      if (q.length > 3 && q.split(' ').length >= 2) {
+        upsertKeywordPoolCandidate(keywordPool, q, { volume: r.impressions, difficulty: 0, source: 'gsc' });
       }
     }
     // Add competitor keywords to the pool — these are proven industry terms with real volume
     for (const ck of competitorKeywordData) {
       const kw = ck.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && ck.volume > 0) {
-        keywordPool.set(kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
+      if (ck.volume > 0) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
       }
     }
     // Add keyword gaps to the pool — highest priority since competitors rank and you don't
     for (const gap of keywordGaps) {
       const kw = gap.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && gap.volume > 0) {
-        keywordPool.set(kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
+      if (gap.volume > 0) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
       }
     }
     // Add provider discovery keywords to the pool for sparse/low-footprint sites.
     for (const dk of discoveryKeywords) {
       const kw = dk.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && dk.volume > 0) {
-        keywordPool.set(kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
+      if (isStrategyQualityDiscoveryKeyword(dk)) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
       }
     }
     // Add related keywords to the pool
     for (const rk of relatedKws) {
       const kw = rk.keyword.toLowerCase();
-      if (!keywordPool.has(kw) && rk.volume > 0) {
-        keywordPool.set(kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
+      if (rk.volume > 0) {
+        upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
       }
     }
     // Add client-tracked keywords to the pool — these are keywords the client explicitly wants to target
@@ -378,15 +378,16 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     let clientKeywordsAdded = 0;
     for (const tk of clientTracked) {
       const kw = tk.query.toLowerCase().trim();
-      if (!keywordPool.has(kw) && kw.length > 1) {
-        keywordPool.set(kw, { volume: 0, difficulty: 0, source: 'client' });
+      if (kw.length > 1) {
+        const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+        if (!added) continue;
         clientKeywordsAdded++;
       }
     }
     // Add client-requested keywords to pool
     for (const kw of requestedKeywords) {
-      if (!keywordPool.has(kw.toLowerCase())) {
-        keywordPool.set(kw.toLowerCase(), { volume: 0, difficulty: 0, source: 'client' });
+      const added = upsertKeywordPoolCandidate(keywordPool, kw, { volume: 0, difficulty: 0, source: 'client' });
+      if (added) {
         clientKeywordsAdded++;
       }
     }
@@ -758,7 +759,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical */ }
     }
 
-    const hasSemrush = semrushContext.length > 0;
+    const hasProviderContext = semrushContext.length > 0;
+    const hasKeywordGaps = keywordGaps.length > 0;
     const conflictNote = conflicts.length > 0
       ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
       : '';
@@ -864,7 +866,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from SEO provider/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from SEO provider/GSC data above when available — do NOT invent keywords. ${hasKeywordGaps ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -875,7 +877,7 @@ Rules:
 - If TOP CONVERTING PAGES data is available, mention specific conversion events in quickWin rationales (e.g., "this page drives 15 form_submissions — fixing its meta description could increase CTR").
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
-${hasSemrush ? '- Use SEO provider data to inform priorities. KD < 40% = quick wins.' : ''}
+${hasProviderContext ? '- Use SEO provider data to inform priorities. KD < 40% = quick wins.' : ''}
 ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing any of these brand tokens: ${[...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))].join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 

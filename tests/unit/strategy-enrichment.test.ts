@@ -529,6 +529,108 @@ describe('isTopicKeywordCoveredByPageMap', () => {
       secondaryKeywords: [],
     }])).toBe(false);
   });
+
+  it('does not treat a generic mapped keyword as covering location or cost long-tails', () => {
+    expect(isTopicKeywordCoveredByPageMap('austin dental implants', [{
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'dental implants',
+      secondaryKeywords: [],
+    }])).toBe(false);
+  });
+});
+
+describe('content gap page coverage guard', () => {
+  it('removes content gaps already covered by an existing strategy page', async () => {
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_content_gap_coverage',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/services/cosmetic-dentistry',
+          pageTitle: 'Cosmetic Dentistry',
+          primaryKeyword: 'cosmetic dentistry',
+          secondaryKeywords: ['professional teeth whitening'],
+        }],
+        contentGaps: [
+          {
+            topic: 'Cosmetic Dentistry',
+            targetKeyword: 'cosmetic dentistry',
+            priority: 'high',
+          },
+          {
+            topic: 'Dental Implant Guide',
+            targetKeyword: 'dental implant cost',
+            priority: 'medium',
+          },
+        ],
+      },
+      keywordPool: new Map([
+        ['cosmetic dentistry', { volume: 1200, difficulty: 35, source: 'related' }],
+        ['dental implant cost', { volume: 900, difficulty: 40, source: 'related' }],
+      ]),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider: null,
+      seoDataMode: 'none',
+      sendProgress: () => undefined,
+    });
+
+    expect(result.strategy.contentGaps?.map(gap => gap.targetKeyword)).toEqual(['dental implant cost']);
+  });
+});
+
+describe('empty primary keyword enrichment guards', () => {
+  it('does not match every GSC query or create blank cannibalization issues', async () => {
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_empty_primary_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [
+          {
+            pagePath: '/declined-a',
+            pageTitle: 'Declined A',
+            primaryKeyword: '',
+            secondaryKeywords: [],
+          },
+          {
+            pagePath: '/declined-b',
+            pageTitle: 'Declined B',
+            primaryKeyword: '',
+            secondaryKeywords: [],
+          },
+        ],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: {
+        gscData: [
+          {
+            page: 'https://example.com/declined-a',
+            query: 'cosmetic dentistry',
+            clicks: 2,
+            impressions: 200,
+            position: 8,
+          },
+        ],
+        analyticsData: null,
+        insights: [],
+        decayContexts: [],
+      },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider: null,
+      seoDataMode: 'none',
+      sendProgress: () => undefined,
+    });
+
+    expect(result.strategy.pageMap?.[0].currentPosition).toBeUndefined();
+    expect(result.cannibalization).toEqual([]);
+  });
 });
 
 // ── Keyword Cannibalization Detection ─────────────────────────────────

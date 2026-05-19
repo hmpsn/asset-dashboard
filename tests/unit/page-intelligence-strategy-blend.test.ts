@@ -59,6 +59,38 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result!.volume).toBe(1200);
   });
 
+  it('clears persisted Page Intelligence fields when strategy changes the primary keyword', () => {
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'old service keyword',
+      secondaryKeywords: [],
+      optimizationScore: 82,
+      optimizationIssues: ['Old keyword title mismatch'],
+      recommendations: ['Rewrite around old keyword'],
+      contentGaps: ['Old supporting topic'],
+      analysisGeneratedAt: '2026-04-01T10:00:00Z',
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'new service keyword',
+      secondaryKeywords: [],
+      metricsSource: METRICS_SOURCE.BULK_LOOKUP,
+      volume: 900,
+      difficulty: 32,
+    });
+
+    const result = getPageKeyword(wsId, '/services/changed-keyword');
+    expect(result?.primaryKeyword).toBe('new service keyword');
+    expect(result?.optimizationScore).toBeUndefined();
+    expect(result?.optimizationIssues).toBeUndefined();
+    expect(result?.recommendations).toBeUndefined();
+    expect(result?.contentGaps).toBeUndefined();
+    expect(result?.analysisGeneratedAt).toBeUndefined();
+  });
+
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {
     const result = getPageKeyword(wsId, '/services/seo');
     expect(result!.metricsSource).toBe(METRICS_SOURCE.BULK_LOOKUP);

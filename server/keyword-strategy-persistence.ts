@@ -110,7 +110,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       organicOverview: organicOverview || undefined,
       organicLandingPages: organicLandingPages.length > 0 ? organicLandingPages.slice(0, 15) : undefined,
     },
-    generatedAt: new Date().toISOString(),
+    generatedAt: now,
   };
 
   const writeKeywordStrategy = db.transaction(() => {
@@ -124,14 +124,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     const prevCannibalizationForHistory = listCannibalizationIssues(ws.id);
 
     if (strategyMode === 'full') {
-      const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-      upsertAndCleanPageKeywords(ws.id, stampedMap);
+      upsertAndCleanPageKeywords(ws.id, pageMap);
     } else {
       // Only update pages actually re-analyzed in this incremental run.
       const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
       const analyzedMappings = pageMap
-        .filter((pm) => analyzedPaths.has(pm.pagePath))
-        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
+        .filter((pm) => analyzedPaths.has(pm.pagePath));
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
     }
 
@@ -166,7 +164,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       sourceId: ws.id,
       pageUrl: null,
       targetKeyword: null,
-      baselineSnapshot: { captured_at: new Date().toISOString() },
+      baselineSnapshot: { captured_at: now },
       attribution: 'platform_executed',
     });
   });
