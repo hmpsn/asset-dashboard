@@ -4654,6 +4654,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Hand-rolled card div (use SectionCard)',
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
+    'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
     'Layout-driving state set in useEffect',
     'useGlobalAdminEvents import restriction',
     'Raw string literal in broadcastToWorkspace() event arg',
