@@ -1,21 +1,18 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import {
-  buildWorkspaceIntelligence,
   formatKeywordsForPrompt,
   formatPersonasForPrompt,
   formatPageMapForPrompt,
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
+import { buildContentGenerationContext } from './intelligence/generation-context-builders.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callAI } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
-import { getInsights } from './analytics-insights-store.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { stripCodeFences, sanitizeQueryForPrompt } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
@@ -578,6 +575,34 @@ export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   return PAGE_TYPE_CONFIGS.blog;
 }
 
+function hasMeaningfulBuilderPromptContext(promptContext: string): boolean {
+  return /##\s/.test(promptContext);
+}
+
+function buildBriefIntelligenceBlockFromSlice(
+  targetKeyword: string,
+  workspaceId: string,
+  insights: AnalyticsInsight[] | undefined,
+): string {
+  if (!insights?.length) return '';
+  return buildBriefIntelligenceBlock({
+    targetKeyword,
+    workspaceId,
+    cannibalizationInsights: insights
+      .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
+      .map(i => i.data),
+    decayInsights: insights
+      .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay')
+      .map(i => ({ pageId: i.pageId || '', ...i.data })),
+    quickWins: insights
+      .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
+      .map(i => ({ pageUrl: i.data.pageUrl, query: i.data.query, currentPosition: i.data.currentPosition, estimatedTrafficGain: i.data.estimatedTrafficGain })),
+    pageHealthScores: insights
+      .filter((i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health' && i.pageId != null)
+      .map(i => ({ pageId: i.pageId!, ...i.data })),
+  });
+}
+
 /**
  * Regenerate an existing brief with user feedback.
  * Passes the previous brief as context so AI can refine rather than start from scratch.
@@ -590,8 +615,10 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
-  const seo = intel.seoContext;
+  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+    slices: ['seoContext'],
+  });
+  const seo = intelligence.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
@@ -773,8 +800,10 @@ export async function regenerateOutline(
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
 
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
-  const seo = intel.seoContext;
+  const { intelligence } = await buildContentGenerationContext(workspaceId, {
+    slices: ['seoContext'],
+  });
+  const seo = intelligence.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
@@ -936,8 +965,10 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
-  const seo = intel.seoContext;
+  const { intelligence: seoContextResult } = await buildContentGenerationContext(workspaceId, {
+    slices: ['seoContext'],
+  });
+  const seo = seoContextResult.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
   // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
   const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
@@ -957,9 +988,11 @@ export async function generateBrief(
   );
   let pageAnalysisBlock = '';
   if (matchedPage) {
-    const pageIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['pageProfile'],
-      pagePath: matchedPage.pagePath });
-    const profile = pageIntel.pageProfile;
+    const { intelligence: pageProfileResult } = await buildContentGenerationContext(workspaceId, {
+      pagePath: matchedPage.pagePath,
+      slices: ['pageProfile'],
+    });
+    const profile = pageProfileResult.pageProfile;
     if (profile) {
       const parts: string[] = [];
       // Use optimizationIssues (AI per-page keyword analysis) — not auditIssues (structural Webflow audit)
@@ -1119,42 +1152,33 @@ The outline sections MUST match the following template sections in order. You ma
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post.`
     : '';
 
-  // Analytics intelligence from the intelligence layer
   let intelligenceBlock = '';
   try {
-    const allInsights = getInsights(workspaceId);
-    if (allInsights.length > 0) {
-      intelligenceBlock = buildBriefIntelligenceBlock({
-        targetKeyword,
-        workspaceId,
-        cannibalizationInsights: allInsights
-          .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
-          .map(i => i.data),
-        decayInsights: allInsights
-          .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay')
-          .map(i => ({ pageId: i.pageId || '', ...i.data })),
-        quickWins: allInsights
-          .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
-          .map(i => ({ pageUrl: i.data.pageUrl, query: i.data.query, currentPosition: i.data.currentPosition, estimatedTrafficGain: i.data.estimatedTrafficGain })),
-        pageHealthScores: allInsights
-          .filter((i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health' && i.pageId != null)
-          .map(i => ({ pageId: i.pageId!, ...i.data })),
-      });
-    }
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); /* intelligence layer not ready — skip */ }
+    const { intelligence } = await buildContentGenerationContext(workspaceId, {
+      slices: ['insights'],
+    });
+    intelligenceBlock = buildBriefIntelligenceBlockFromSlice(
+      targetKeyword,
+      workspaceId,
+      intelligence.insights?.all,
+    );
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
+    /* intelligence layer not ready — skip */
+  }
 
-  // Workspace learnings: what content types and strategies historically win
   let learningsBlock = '';
-  if (isFeatureEnabled('outcome-ai-injection')) {
-    try {
-      const learnings = getWorkspaceLearnings(workspaceId);
-      if (learnings) {
-        const block = formatLearningsForPrompt(learnings, 'content');
-        if (block) {
-          learningsBlock = `\n\n${block}`;
-        }
-      }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); /* learnings not available — skip */ }
+  try {
+    const { promptContext } = await buildContentGenerationContext(workspaceId, {
+      slices: ['learnings'],
+      learningsDomain: 'content',
+    });
+    if (hasMeaningfulBuilderPromptContext(promptContext)) {
+      learningsBlock = `\n\n${promptContext}`;
+    }
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
+    /* learnings not available — skip */
   }
 
   // Strategy card context from content request

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
+import { buildRecommendationGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 
 let capturedPrompt = '';
 
@@ -26,6 +27,10 @@ vi.mock('../../server/search-console.js', async (orig) => {
   };
 });
 
+vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
+  buildRecommendationGenerationContext: vi.fn(),
+}));
+
 describe('generateRefreshRecommendation — GSC query breakdown', () => {
   let ws: import('../../server/workspaces.js').Workspace;
   let cleanup: () => void;
@@ -36,6 +41,17 @@ describe('generateRefreshRecommendation — GSC query breakdown', () => {
     });
     ws = (await import('../../server/workspaces.js')).getWorkspace(seed.workspaceId)!;
     cleanup = seed.cleanup;
+    vi.mocked(buildRecommendationGenerationContext).mockResolvedValue({
+      intelligence: {
+        version: 1,
+        workspaceId: seed.workspaceId,
+        assembledAt: new Date().toISOString(),
+      },
+      slices: ['seoContext', 'learnings', 'pageProfile'],
+      promptContext: '[Workspace Intelligence]\n\n## SEO Context\nBusiness: Local plumbing services',
+      pagePath: '/plumbing',
+      learningsDomain: 'all',
+    });
   });
 
   afterAll(() => {

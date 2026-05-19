@@ -93,8 +93,8 @@
           "source": "Platform insights + AI content audit discussion 2026-05-18",
           "est": "5-8h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Refactor generateBrief() and generateRefreshRecommendation() to consume the shared content/recommendation context builders rather than assembling SEO context, page analysis, direct insight lookups, and learnings in bespoke blocks. Preserve existing SERP, reference URL, style example, template, GA4, and decay-query inputs, but route workspace-derived intelligence through the shared convention. Acceptance: generated prompts still include brand voice authority, personas, knowledge base, page profile, content gaps, cannibalization/decay/ranking insights, and outcome learnings when enabled; tests cover both rich-data and cold-start workspaces. This should not redesign the brief schema or post generation UX."
+          "status": "done",
+          "notes": "Completed in PR2. `server/content-decay.ts` now uses `buildRecommendationGenerationContext()` with an explicit `['seoContext', 'learnings', 'pageProfile']` slice override so the migration stays behavior-preserving while preserving the caller-owned GSC query breakdown block. `server/content-brief.ts` now routes workspace-derived intelligence through `buildContentGenerationContext()` for SEO context, matched-page pageProfile lookups, and formatted insights/learnings prompt context, removing direct `getInsights()` / `getWorkspaceLearnings()` prompt assembly. Added focused tests for builder override support plus migrated brief/decay integration expectations, and updated the intelligence consumer audit/inventory to treat builder-backed callers as canonical."
         },
         {
           "id": "intel-quality-story-registry",

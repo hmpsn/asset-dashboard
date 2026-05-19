@@ -106,4 +106,26 @@ describe('generation context builders', () => {
       learningsDomain: 'technical',
     });
   });
+
+  it('uses explicit slice overrides without widening to builder defaults', async () => {
+    const customSlices = ['seoContext', 'pageProfile'] as const;
+
+    const result = await buildContentGenerationContext('ws-custom', {
+      pagePath: '/pricing',
+      slices: customSlices,
+    });
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-custom', {
+      slices: customSlices,
+      pagePath: '/pricing',
+      learningsDomain: 'content',
+    });
+    expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
+      verbosity: 'detailed',
+      sections: customSlices,
+      tokenBudget: undefined,
+      learningsDomain: 'content',
+    });
+    expect(result.slices).toBe(customSlices);
+  });
 });

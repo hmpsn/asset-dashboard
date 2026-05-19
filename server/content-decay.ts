@@ -9,7 +9,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { callAI } from './ai.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -256,8 +256,10 @@ export async function generateRefreshRecommendation(
   page: DecayingPage,
 ): Promise<string> {
   const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
-  const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
+  const { promptContext: fullContext } = await buildRecommendationGenerationContext(ws.id, {
+    pagePath: page.page,
+    slices,
+  });
 
   // Fetch per-query GSC data for this specific page to show which queries are declining.
   let queryBreakdownBlock = '';

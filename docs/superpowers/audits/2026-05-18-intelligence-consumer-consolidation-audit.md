@@ -18,9 +18,9 @@ plans.
 
 ## Findings Summary
 
-- `native`: 25
-- `hybrid`: 4
-- `legacy`: 3
+- `native`: 27
+- `hybrid`: 3
+- `legacy`: 2
 
 Root pattern confirmed:
 
@@ -37,8 +37,8 @@ Root pattern confirmed:
 | `server/blueprint-generator.ts` | `content-pipeline` | `native` | slice-backed intelligence + `formatForPrompt()` | `buildContentGenerationContext()` later if it reduces local boilerplate | wave 4 |
 | `server/brand-identity.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if multi-slice context needed |
 | `server/brandscript.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if multi-slice context needed |
-| `server/content-brief.ts` | `content-pipeline` | `legacy` | mixed `buildWorkspaceIntelligence()`, direct `getInsights()`, direct `getWorkspaceLearnings()`, custom blocks | `buildContentGenerationContext()` + caller-owned evidence blocks | wave 1 |
-| `server/content-decay.ts` | `seo-health` | `hybrid` | low-level slices plus page-scoped custom prompt assembly | `buildRecommendationGenerationContext()` + caller-owned query breakdown block | wave 1 |
+| `server/content-brief.ts` | `content-pipeline` | `native` | shared `buildContentGenerationContext()` for seoContext, pageProfile, and formatted insights/learnings plus caller-owned evidence blocks | keep on content builder path | completed in wave 1 |
+| `server/content-decay.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for prompt context plus caller-owned GSC query breakdown block | keep on recommendation builder path | completed in wave 1 |
 | `server/content-posts-ai.ts` | `content-pipeline` | `native` | slice-backed voice context with aligned `slices` usage | `buildContentGenerationContext()` optional later | wave 4 |
 | `server/copy-generation.ts` | `brand-engine` | `native` | workspace-intelligence-backed SEO context | keep low-level for now | later only if builder consolidation crosses brand-engine |
 | `server/diagnostic-orchestrator.ts` | `analytics-intelligence` | `hybrid` | broad intelligence assembly plus direct `getInsights()` synthesis context | future diagnostics/chat-style builder, not PR1 | wave 3 |
@@ -69,9 +69,7 @@ Root pattern confirmed:
 
 Wave 1:
 
-- `server/content-brief.ts`
 - `server/routes/content-briefs.ts`
-- `server/content-decay.ts`
 
 Wave 2:
 

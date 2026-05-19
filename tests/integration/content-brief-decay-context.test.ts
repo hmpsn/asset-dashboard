@@ -15,23 +15,12 @@ import {
 
 setupOpenAIMocks();
 
+vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
+  buildContentGenerationContext: vi.fn(),
+}));
+
 // Mock workspace-intelligence to avoid needing a fully-populated workspace
 vi.mock('../../server/workspace-intelligence.js', () => ({
-  buildWorkspaceIntelligence: vi.fn(async () => ({
-    version: 1,
-    workspaceId: '',
-    assembledAt: new Date().toISOString(),
-    seoContext: {
-      strategy: { siteKeywords: [], businessContext: '', pageMap: [] },
-      brandVoice: '',
-      effectiveBrandVoiceBlock: '',
-      knowledgeBase: '',
-      businessContext: '',
-      personas: null,
-      pageKeywords: null,
-    },
-    pageProfile: null,
-  })),
   formatKeywordsForPrompt: vi.fn(() => ''),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
@@ -56,6 +45,7 @@ vi.mock('../../server/broadcast.js', () => ({
 
 import db from '../../server/db/index.js';
 import { generateBrief } from '../../server/content-brief.js';
+import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 
 const TEST_WS_ID = `ws_brief_decay_${Date.now()}`;
 const now = new Date().toISOString();
@@ -88,6 +78,27 @@ afterAll(() => {
 beforeEach(() => {
   resetOpenAIMocks();
   mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+  vi.mocked(buildContentGenerationContext).mockImplementation(async (_workspaceId, opts = {}) => ({
+    intelligence: {
+      version: 1,
+      workspaceId: TEST_WS_ID,
+      assembledAt: new Date().toISOString(),
+      seoContext: {
+        strategy: { siteKeywords: [], businessContext: '', pageMap: [] },
+        brandVoice: '',
+        effectiveBrandVoiceBlock: '',
+        knowledgeBase: '',
+        businessContext: '',
+        personas: null,
+        pageKeywords: null,
+      },
+      pageProfile: opts.slices?.includes('pageProfile') ? null : undefined,
+    },
+    slices: opts.slices ?? ['seoContext'],
+    promptContext: '',
+    pagePath: opts.pagePath,
+    learningsDomain: opts.learningsDomain ?? 'content',
+  }));
 });
 
 describe('generateBrief — decay query context', () => {
