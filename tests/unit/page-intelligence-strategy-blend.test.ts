@@ -3,6 +3,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import {
   getPageKeyword,
   listPageKeywords,
+  upsertAndCleanPageKeywords,
   upsertPageKeyword,
 } from '../../server/page-keywords.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
@@ -101,6 +102,34 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result?.analysisGeneratedAt).toBeUndefined();
     expect(result?.serpFeatures).toBeUndefined();
     expect(result?.optimizationScoreHistory).toBeUndefined();
+  });
+
+  it('clears score history when a full strategy cleanup removes all page mappings', () => {
+    const ws = createWorkspace('PI Empty Cleanup Test');
+    try {
+      upsertPageKeyword(ws.id, {
+        pagePath: '/services/empty-cleanup',
+        pageTitle: 'Empty Cleanup',
+        primaryKeyword: 'cleanup keyword',
+        secondaryKeywords: [],
+        optimizationScore: 91,
+        analysisGeneratedAt: '2026-04-04T10:00:00Z',
+      });
+
+      upsertAndCleanPageKeywords(ws.id, []);
+      upsertPageKeyword(ws.id, {
+        pagePath: '/services/empty-cleanup',
+        pageTitle: 'Empty Cleanup',
+        primaryKeyword: 'new cleanup keyword',
+        secondaryKeywords: [],
+      });
+
+      const result = getPageKeyword(ws.id, '/services/empty-cleanup');
+      expect(result?.primaryKeyword).toBe('new cleanup keyword');
+      expect(result?.optimizationScoreHistory).toBeUndefined();
+    } finally {
+      deleteWorkspace(ws.id);
+    }
   });
 
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {

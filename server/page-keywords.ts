@@ -407,6 +407,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
     if (entries.length === 0) {
       // Empty batch — delete all rows for this workspace
       stmts().deleteAll.run(workspaceId);
+      stmts().deleteAllScoreHistory.run(workspaceId);
       return;
     }
     const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
