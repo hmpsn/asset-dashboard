@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   registerProvider,
+  getConfiguredProvider,
   markCapabilityDisabled,
-  clearCapabilityDisabled,
   getProviderForCapability,
   getBacklinksProvider,
   _resetRegistryForTest,
@@ -75,5 +75,29 @@ describe('getProviderForCapability', () => {
     markCapabilityDisabled('dataforseo', 'backlinks');
     const provider = getBacklinksProvider('dataforseo');
     expect(provider).toBe(semrush);
+  });
+});
+
+describe('getConfiguredProvider', () => {
+  beforeEach(() => {
+    _resetRegistryForTest();
+  });
+
+  it('defaults to DataForSEO when both providers are configured and no preference is supplied', () => {
+    const semrush = makeProvider('semrush');
+    const dfs = makeProvider('dataforseo');
+    registerProvider('semrush', semrush);
+    registerProvider('dataforseo', dfs);
+
+    expect(getConfiguredProvider()).toBe(dfs);
+  });
+
+  it('uses SEMRush only when it is explicitly preferred', () => {
+    const semrush = makeProvider('semrush');
+    const dfs = makeProvider('dataforseo');
+    registerProvider('semrush', semrush);
+    registerProvider('dataforseo', dfs);
+
+    expect(getConfiguredProvider('semrush')).toBe(semrush);
   });
 });

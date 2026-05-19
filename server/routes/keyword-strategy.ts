@@ -49,6 +49,12 @@ function readSeoDataMode(body: unknown): string | undefined {
   return typeof candidate === 'string' ? candidate : undefined;
 }
 
+function readSeoDataProvider(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const candidate = (body as { seoDataProvider?: unknown }).seoDataProvider;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
 function serializeKeywordStrategy(
   strategy: KeywordStrategy,
   pageMap: ReturnType<typeof listPageKeywords>,
@@ -139,6 +145,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       businessContext: typeof req.body?.businessContext === 'string' ? req.body.businessContext : undefined,
       mode: req.body?.mode === 'incremental' ? 'incremental' : 'full',
       seoDataMode: readSeoDataMode(req.body),
+      seoDataProvider: readSeoDataProvider(req.body),
       competitorDomains: competitorDomainsProvided ? req.body.competitorDomains : undefined,
       competitorDomainsProvided,
       maxPages: requestedMaxPages,
