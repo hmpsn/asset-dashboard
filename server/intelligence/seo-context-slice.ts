@@ -183,8 +183,8 @@ export async function assembleSeoContext(
       const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
       if (domain) {
         // Pass workspace.seoDataProvider so provider selection respects the per-workspace
-        // preference and falls back to a capable provider if backlinks are disabled on the
-        // primary (e.g. DataForSEO without a backlinks subscription).
+        // preference. If DataForSEO is selected/default but backlinks are disabled, backlink
+        // enrichment is omitted instead of silently spending SEMRush credits.
         const provider = getBacklinksProvider(workspace?.seoDataProvider);
         if (provider?.isConfigured()) {
           const overview = await provider.getBacklinksOverview(domain, workspaceId);
