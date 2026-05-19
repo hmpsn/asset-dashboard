@@ -30,7 +30,7 @@ import { isProgrammingError } from '../errors.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasActiveJob } from '../jobs.js';
-import { generateKeywordStrategy, KeywordStrategyGenerationError } from '../keyword-strategy-generation.js';
+import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   adminBulkKeywordFeedbackSchema,
@@ -130,12 +130,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     }
 
     const requestedMaxPages = req.body?.maxPages == null ? undefined : Number(req.body.maxPages);
-    if (requestedMaxPages != null && (!Number.isInteger(requestedMaxPages) || requestedMaxPages <= 0)) {
-      res.status(400).json({ error: 'maxPages must be a positive integer' });
+    if (requestedMaxPages != null && (!Number.isInteger(requestedMaxPages) || requestedMaxPages < 0)) {
+      res.status(400).json({ error: 'maxPages must be a non-negative integer' });
       return;
     }
-    if (requestedMaxPages != null && requestedMaxPages > 100) {
-      res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+    if (requestedMaxPages != null && requestedMaxPages > KEYWORD_STRATEGY_MAX_PAGE_CAP) {
+      res.status(400).json({ error: `maxPages must be between 0 and ${KEYWORD_STRATEGY_MAX_PAGE_CAP}` });
       return;
     }
 
