@@ -129,8 +129,8 @@
           "source": "Platform insights + AI content audit discussion 2026-05-18",
           "est": "6-10h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Add a minimal source/evidence ledger for generated content. Preserve source packs from SERP/reference scraping, store claim-to-verify records with likely source candidates, and make post-review show the reviewer which claims need source confirmation rather than only a flat claimsToVerify list. The MVP should respect current content-quality-grounding rules: AI may surface claims and source candidates but must not auto-check factual_accuracy or no_hallucinations. Acceptance: briefs/posts preserve source metadata, AI review attaches claims to source candidates when available, public/client handoff never implies automated fact-checking, and tests cover no-source, partial-source, and malformed-source cases."
+          "status": "done",
+          "notes": "Completed in PR7. Added a content-post review evidence ledger that preserves saved brief source packs (`referenceUrls`, `realPeopleAlsoAsk`, `realTopResults`) and attaches claim-level source candidates to provenance-sensitive AI review items. `shared/types/content.ts` now supports `claimEvidence` entries per claim, while `server/content-review-evidence-ledger.ts` conservatively matches claims to saved top results, PAA prompts, and reference URLs, degrading to an explicit manual-review posture when no likely source is found. The admin review checklist now shows claim text plus likely supporting sources without implying automated fact-checking, and route/component/unit coverage locks in no-source, partial-source, and malformed-source behavior."
         },
         {
           "id": "intel-quality-authority-context-expansion",

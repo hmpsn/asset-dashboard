@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **372 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **373 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 373. Evidence Ledger MVP for Content Review
+
+**What it does:** Adds a minimal evidence-ledger layer to the content-post AI review flow so provenance-sensitive checklist items can show claim-level reviewer support instead of only a flat `claimsToVerify` list. The platform now preserves saved brief evidence (`referenceUrls`, `realPeopleAlsoAsk`, `realTopResults`) as a normalized source pack, then attaches likely source candidates to each claim when a conservative overlap match exists. When no likely candidate is found, the review explicitly says so instead of implying hidden evidence. The review checklist UI now shows the claim, likely sources, and a manual-review posture for unsupported claims.
+
+**Agency value:** Makes factual review faster and safer. Reviewers no longer have to mentally map a numeric/statistical claim back to a source pack on their own, and the platform is clearer about which claims still need manual confirmation.
+
+**Client value:** Improves content trust and QA rigor without pretending the system performed automated fact-checking. Clients receive reviewed content with a stronger human-verification workflow behind it.
+
+**Mutual:** Raises confidence in AI-assisted content operations while preserving the human-in-the-loop grounding contract. The system is more helpful, but still honest about what it knows.
 
 ---
 

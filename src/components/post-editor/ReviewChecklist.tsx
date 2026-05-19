@@ -140,10 +140,25 @@ export function ReviewChecklist({
               {evidenceToShow && (
                 <div className="mb-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/5 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="t-caption-sm font-medium text-blue-300">SERP Evidence</span>
+                    <span className="t-caption-sm font-medium text-blue-300">Saved Evidence</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">Reviewer support</span>
                   </div>
                   <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{evidenceToShow.note}</p>
+                  {evidenceToShow.referenceUrls.length > 0 && (
+                    <div className="mt-2">
+                      <p className="t-caption-sm text-[var(--brand-text)]">Reference URLs</p>
+                      <ul className="mt-1 space-y-1">
+                        {evidenceToShow.referenceUrls.map(referenceUrl => (
+                          <li key={referenceUrl} className="t-caption-sm text-[var(--brand-text-muted)]">
+                            <a href={referenceUrl} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-teal-300 hover:text-teal-200">
+                              <span className="truncate">{referenceUrl}</span>
+                              <Icon as={ExternalLink} size="xs" className="shrink-0" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {evidenceToShow.peopleAlsoAsk.length > 0 && (
                     <div className="mt-2">
                       <p className="t-caption-sm text-[var(--brand-text)]">People Also Ask</p>
@@ -196,11 +211,44 @@ export function ReviewChecklist({
                     <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded t-caption-sm ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
                       {aiResults[item.key].claimsToVerify?.length ? (
-                        <ul className="mt-1 space-y-0.5 list-disc pl-4 text-[var(--brand-text-muted)]">
-                          {aiResults[item.key].claimsToVerify!.map(claim => (
-                            <li key={claim}>{claim}</li>
-                          ))}
-                        </ul>
+                        <div className="mt-2 space-y-2">
+                          {aiResults[item.key].claimEvidence?.length ? (
+                            aiResults[item.key].claimEvidence!.map((claimEntry) => (
+                              <div key={claimEntry.claim} className="rounded-[var(--radius-md)] border border-amber-500/10 bg-[var(--surface-2)]/50 px-2 py-2">
+                                <p className="t-caption-sm text-[var(--brand-text)]">{claimEntry.claim}</p>
+                                {claimEntry.sourceCandidates[0]?.kind === 'manual_unknown' ? (
+                                  <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+                                    No likely source found in the saved evidence. Verify this claim manually before checking it off.
+                                  </p>
+                                ) : (
+                                  <ul className="mt-1 space-y-1 pl-4 list-disc text-[var(--brand-text-muted)]">
+                                    {claimEntry.sourceCandidates.map((candidate) => (
+                                      <li key={`${claimEntry.claim}-${candidate.kind}-${candidate.url ?? candidate.label}`} className="t-caption-sm">
+                                        {candidate.url ? (
+                                          <a href={candidate.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-teal-300 hover:text-teal-200">
+                                            <span className="truncate">{candidate.label}</span>
+                                            <Icon as={ExternalLink} size="xs" className="shrink-0" />
+                                          </a>
+                                        ) : (
+                                          <span className="text-[var(--brand-text)]">{candidate.label}</span>
+                                        )}
+                                        {candidate.matchReason && (
+                                          <span className="ml-1 text-[var(--brand-text-muted)]">- {candidate.matchReason}</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <ul className="space-y-0.5 list-disc pl-4 text-[var(--brand-text-muted)]">
+                              {aiResults[item.key].claimsToVerify!.map(claim => (
+                                <li key={claim}>{claim}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       ) : null}
                     </div>
                   )}
