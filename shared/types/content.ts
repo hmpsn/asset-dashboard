@@ -116,11 +116,33 @@ export interface AIReviewResult {
   reason: string;
   humanReviewRequired?: boolean;
   claimsToVerify?: string[];
+  claimEvidence?: ContentReviewClaimEvidence[];
 }
 
 export type AIReviewMap = Record<ReviewChecklistKey, AIReviewResult>;
 
+export type ContentReviewEvidenceSourceKind =
+  | 'reference_url'
+  | 'serp_top_result'
+  | 'paa'
+  | 'manual_unknown';
+
+export interface ContentReviewEvidenceCandidate {
+  kind: ContentReviewEvidenceSourceKind;
+  label: string;
+  url?: string;
+  position?: number;
+  confidence?: 'strong' | 'possible';
+  matchReason?: string;
+}
+
+export interface ContentReviewClaimEvidence {
+  claim: string;
+  sourceCandidates: ContentReviewEvidenceCandidate[];
+}
+
 export interface ContentReviewEvidence {
+  referenceUrls: string[];
   peopleAlsoAsk: string[];
   topResults: { position: number; title: string; url: string }[];
   note: string;

@@ -40,6 +40,7 @@ vi.mock('../../server/broadcast.js', () => ({
 // ── Imports (after mock declarations) ─────────────────────────────────────────
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { getPost, savePost } from '../../server/content-posts-db.js';
+import db from '../../server/db/index.js';
 
 // ── Test server helpers ────────────────────────────────────────────────────────
 
@@ -75,6 +76,39 @@ beforeAll(async () => {
 
   const ws = createWorkspace('AI Fix Test Workspace');
   wsId = ws.id;
+  db.prepare(
+    `INSERT OR IGNORE INTO content_briefs
+       (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+        suggested_meta_desc, outline, word_count_target, intent, audience,
+        competitor_insights, internal_link_suggestions, created_at, reference_urls,
+        real_people_also_ask, real_top_results)
+     VALUES
+       (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+        @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+        @competitor_insights, @internal_link_suggestions, @created_at, @reference_urls,
+        @real_people_also_ask, @real_top_results)`,
+  ).run({
+    id: 'brief_none',
+    workspace_id: wsId,
+    target_keyword: 'test keyword',
+    secondary_keywords: JSON.stringify(['test keyword']),
+    suggested_title: 'Evidence-backed Test Brief',
+    suggested_meta_desc: 'Meta description',
+    outline: JSON.stringify([{ heading: 'Section 1', notes: 'Notes', wordCount: 300, keywords: ['test keyword'] }]),
+    word_count_target: 1500,
+    intent: 'informational',
+    audience: 'general',
+    competitor_insights: '',
+    internal_link_suggestions: JSON.stringify(['/about']),
+    created_at: new Date().toISOString(),
+    reference_urls: JSON.stringify(['https://www.example.com/reports/revenue-benchmarks']),
+    real_people_also_ask: JSON.stringify(['How fast can SaaS revenue grow year over year?']),
+    real_top_results: JSON.stringify([{
+      position: 1,
+      title: 'SaaS Revenue Benchmarks for 2026',
+      url: 'https://www.example.com/reports/saas-revenue-benchmarks-2026',
+    }]),
+  });
   postId = `post_test_aifix_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString();
 
@@ -109,6 +143,7 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(() => {
+  db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(wsId);
   deleteWorkspace(wsId);
   stopServer?.();
   if (originalAppPassword === undefined) {
@@ -349,13 +384,23 @@ describe('POST /api/content-posts/:wsId/:postId/ai-review', () => {
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-review`, {});
     expect(res.status).toBe(200);
     const body = await res.json() as {
-      review: Record<string, { pass: boolean; reason: string; humanReviewRequired?: boolean; claimsToVerify?: string[] }>;
+      review: Record<string, {
+        pass: boolean;
+        reason: string;
+        humanReviewRequired?: boolean;
+        claimsToVerify?: string[];
+        claimEvidence?: Array<{
+          claim: string;
+          sourceCandidates: Array<{ kind: string; label: string }>;
+        }>;
+      }>;
     };
 
     expect(body.review.factual_accuracy.pass).toBe(false);
     expect(body.review.factual_accuracy.humanReviewRequired).toBe(true);
     expect(body.review.factual_accuracy.reason).toMatch(/Human verification is required/);
     expect(body.review.factual_accuracy.claimsToVerify).toContain('Revenue grew 42%.');
+    expect(body.review.factual_accuracy.claimEvidence?.[0]?.sourceCandidates.some(candidate => candidate.kind === 'serp_top_result')).toBe(true);
     expect(body.review.no_hallucinations.pass).toBe(false);
     expect(body.review.no_hallucinations.humanReviewRequired).toBe(true);
     expect(body.review.no_hallucinations.claimsToVerify).toContain('Revenue grew 42%.');
