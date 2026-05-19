@@ -207,9 +207,8 @@ describe('content-decay.ts migration contracts', () => {
     expect(src).toContain("'learnings'");
   });
 
-  it('formats with seoContext + learnings sections', () => {
-    // Accepts ['seoContext', 'learnings'] or ['seoContext', 'learnings', 'pageProfile'] (combined call)
-    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  it('uses the shared recommendation generation builder for prompt context', () => {
+    expect(src).toContain('buildRecommendationGenerationContext');
   });
 });
 

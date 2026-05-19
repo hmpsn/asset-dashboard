@@ -25,8 +25,8 @@ const INVENTORY: Array<{
   { file: 'server/blueprint-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/brand-identity.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/brandscript.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/content-brief.ts', classification: 'legacy', targetPath: 'content-builder' },
-  { file: 'server/content-decay.ts', classification: 'hybrid', targetPath: 'recommendation-builder' },
+  { file: 'server/content-brief.ts', classification: 'native', targetPath: 'content-builder' },
+  { file: 'server/content-decay.ts', classification: 'native', targetPath: 'recommendation-builder' },
   { file: 'server/content-posts-ai.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/copy-generation.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/diagnostic-orchestrator.ts', classification: 'hybrid', targetPath: 'future-chat-builder' },
@@ -71,7 +71,7 @@ function listTypeScriptFiles(dir: string): string[] {
 }
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
-  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
+  const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
   const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }

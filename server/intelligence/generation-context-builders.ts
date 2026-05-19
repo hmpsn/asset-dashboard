@@ -13,6 +13,7 @@ interface GenerationContextBuilderOptions {
   verbosity?: PromptVerbosity;
   tokenBudget?: number;
   learningsDomain?: LearningsDomain;
+  slices?: readonly IntelligenceSlice[];
 }
 
 export interface GenerationContextResult {
@@ -57,7 +58,7 @@ export async function buildContentGenerationContext(
   opts: ContentGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
   const baseSlices = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'] as const;
-  const slices = opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices;
+  const slices = opts.slices ?? (opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices);
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',
@@ -70,7 +71,7 @@ export async function buildRecommendationGenerationContext(
   opts: RecommendationGenerationContextOptions = {},
 ): Promise<GenerationContextResult> {
   const baseSlices = ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'] as const;
-  const slices = opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices;
+  const slices = opts.slices ?? (opts.pagePath ? [...baseSlices, 'pageProfile'] as const : baseSlices);
   return buildGenerationContext(workspaceId, slices, {
     ...opts,
     verbosity: opts.verbosity ?? 'detailed',

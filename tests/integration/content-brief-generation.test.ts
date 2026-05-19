@@ -15,6 +15,7 @@
  * buildStrategyCardBlock, getPageTypeConfig. This file focuses on the async generation pipeline.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
+import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 
 // ── Module-level mocks (hoisted by Vitest) ──────────────────────────────────
 
@@ -29,37 +30,12 @@ import {
 
 setupOpenAIMocks();
 
+vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
+  buildContentGenerationContext: vi.fn(),
+}));
+
 // Mock workspace-intelligence to avoid needing a fully-populated workspace
 vi.mock('../../server/workspace-intelligence.js', () => ({
-  buildWorkspaceIntelligence: vi.fn(async () => ({
-    version: 1,
-    workspaceId: '',
-    assembledAt: new Date().toISOString(),
-    seoContext: {
-      strategy: {
-        siteKeywords: ['seo', 'web design', 'content marketing'],
-        businessContext: 'Digital agency specializing in SEO and web design',
-        pageMap: [
-          {
-            pagePath: '/services/seo',
-            primaryKeyword: 'seo services',
-            secondaryKeywords: ['seo agency', 'search engine optimization'],
-            serpFeatures: ['featured_snippet', 'people_also_ask'],
-          },
-        ],
-      },
-      brandVoice: 'Professional but approachable. Data-driven.',
-      // Pre-formatted block with voice-authority applied. content-brief.ts reads this
-      // directly — it is the single source of truth for brand voice injection on the
-      // intelligence path (see PR #167).
-      effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional but approachable. Data-driven.',
-      knowledgeBase: 'We serve small to mid-size businesses.',
-      businessContext: 'Digital agency specializing in SEO and web design',
-      personas: null,
-      pageKeywords: null,
-    },
-    pageProfile: null,
-  })),
   formatKeywordsForPrompt: vi.fn(() => '\n\nKEYWORD STRATEGY (incorporate these naturally):\nSite target keywords: seo, web design'),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
@@ -71,11 +47,6 @@ vi.mock('../../server/web-scraper.js', () => ({
   buildReferenceContext: vi.fn(() => '\n\nREFERENCE PAGES:\n- https://competitor.com/guide'),
   buildSerpContext: vi.fn(() => '\n\nSERP DATA:\nPAA: How does SEO work?'),
   buildStyleExampleContext: vi.fn(() => ''),
-}));
-
-// Mock analytics-insights-store
-vi.mock('../../server/analytics-insights-store.js', () => ({
-  getInsights: vi.fn(() => []),
 }));
 
 // Mock broadcast (writes trigger broadcast calls)
@@ -97,12 +68,36 @@ import {
   getPageTypeConfig,
   type ContentBrief,
 } from '../../server/content-brief.js';
-import { getInsights } from '../../server/analytics-insights-store.js';
+import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 
 // ── Test fixtures ───────────────────────────────────────────────────────────
 
 const TEST_WS_ID = `ws_brief_gen_${Date.now()}`;
 const now = new Date().toISOString();
+let mockBuilderPromptContext = '';
+let mockBuilderPageProfile: Record<string, unknown> | null = null;
+let mockBuilderInsights: AnalyticsInsight[] = [];
+
+const mockSeoContext = {
+  strategy: {
+    siteKeywords: ['seo', 'web design', 'content marketing'],
+    businessContext: 'Digital agency specializing in SEO and web design',
+    pageMap: [
+      {
+        pagePath: '/services/seo',
+        primaryKeyword: 'seo services',
+        secondaryKeywords: ['seo agency', 'search engine optimization'],
+        serpFeatures: ['featured_snippet', 'people_also_ask'],
+      },
+    ],
+  },
+  brandVoice: 'Professional but approachable. Data-driven.',
+  effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional but approachable. Data-driven.',
+  knowledgeBase: 'We serve small to mid-size businesses.',
+  businessContext: 'Digital agency specializing in SEO and web design',
+  personas: null,
+  pageKeywords: null,
+};
 
 /** A well-formed brief JSON response that the mock AI will return. */
 function makeMockBriefResponse(overrides: Record<string, unknown> = {}) {
@@ -213,6 +208,36 @@ beforeAll(() => {
 
 beforeEach(() => {
   resetOpenAIMocks();
+  mockBuilderPromptContext = '';
+  mockBuilderPageProfile = null;
+  mockBuilderInsights = [];
+  vi.mocked(buildContentGenerationContext).mockImplementation(async (_workspaceId, opts = {}) => {
+    const slices = opts.slices ?? (opts.pagePath
+      ? ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'pageProfile']
+      : ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
+
+    return {
+      intelligence: {
+        version: 1,
+        workspaceId: TEST_WS_ID,
+        assembledAt: new Date().toISOString(),
+        seoContext: mockSeoContext,
+        insights: slices.includes('insights')
+          ? {
+              all: mockBuilderInsights,
+              byType: {},
+              bySeverity: { critical: 0, warning: 0, opportunity: 0, positive: 0 },
+              topByImpact: mockBuilderInsights,
+            }
+          : undefined,
+        pageProfile: slices.includes('pageProfile') ? mockBuilderPageProfile : null,
+      },
+      slices,
+      promptContext: slices.includes('learnings') ? mockBuilderPromptContext : '',
+      pagePath: opts.pagePath,
+      learningsDomain: opts.learningsDomain ?? 'content',
+    };
+  });
 });
 
 afterAll(() => {
@@ -951,9 +976,8 @@ describe('regenerateOutline — outline-only regeneration', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('generateBrief — analytics intelligence integration', () => {
-  it('injects analytics intelligence into the prompt when insights exist', async () => {
-    const insightsMock = getInsights as ReturnType<typeof vi.fn>;
-    insightsMock.mockReturnValueOnce([
+  it('injects builder-backed intelligence context into the prompt when available', async () => {
+    mockBuilderInsights = [
       {
         id: 'ins-1',
         workspaceId: TEST_WS_ID,
@@ -970,7 +994,7 @@ describe('generateBrief — analytics intelligence integration', () => {
         createdAt: now,
         updatedAt: now,
       },
-    ]);
+    ];
 
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 
@@ -979,13 +1003,13 @@ describe('generateBrief — analytics intelligence integration', () => {
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
     const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
+    expect(promptContent).toContain('ANALYTICS INTELLIGENCE');
     expect(promptContent).toContain('CANNIBALIZATION');
     expect(promptContent).toContain('consider updating');
   });
 
-  it('skips intelligence block when no insights are available', async () => {
-    const insightsMock = getInsights as ReturnType<typeof vi.fn>;
-    insightsMock.mockReturnValueOnce([]);
+  it('skips builder-backed intelligence block when no formatted sections are available', async () => {
+    mockBuilderPromptContext = '[Workspace Intelligence]';
 
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 
@@ -994,13 +1018,28 @@ describe('generateBrief — analytics intelligence integration', () => {
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
     const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
-    expect(promptContent).not.toContain('ANALYTICS INTELLIGENCE');
+    expect(promptContent).not.toContain('## Active Insights');
+    expect(promptContent).not.toContain('## Outcome Learnings');
   });
 
   it('gracefully handles intelligence layer errors', async () => {
-    const insightsMock = getInsights as ReturnType<typeof vi.fn>;
-    insightsMock.mockImplementationOnce(() => {
-      throw new Error('Intelligence layer not ready');
+    vi.mocked(buildContentGenerationContext).mockImplementation(async (_workspaceId, opts = {}) => {
+      if (opts.slices?.includes('insights') || opts.slices?.includes('learnings')) {
+        throw new Error('Intelligence layer not ready');
+      }
+      return {
+        intelligence: {
+          version: 1,
+          workspaceId: TEST_WS_ID,
+          assembledAt: new Date().toISOString(),
+          seoContext: mockSeoContext,
+          pageProfile: null,
+        },
+        slices: opts.slices ?? ['seoContext'],
+        promptContext: '',
+        pagePath: opts.pagePath,
+        learningsDomain: opts.learningsDomain ?? 'content',
+      };
     });
 
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
