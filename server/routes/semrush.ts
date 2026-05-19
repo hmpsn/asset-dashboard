@@ -48,8 +48,9 @@ router.get('/api/semrush/competitive-intel/:workspaceId', requireWorkspaceAccess
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   try {
-    // Fetch domain overviews in parallel (my domain + configured competitor cap)
-    // Use backlinks-specific provider which falls back to SEMRush if DataForSEO lacks subscription
+    // Fetch domain overviews in parallel (my domain + configured competitor cap).
+    // Backlinks are optional; if DataForSEO is selected/default but backlinks are disabled,
+    // omit backlink fields instead of silently falling back to SEMRush.
     const blProvider = getBacklinksProvider(ws.seoDataProvider);
     const cappedCompetitors = competitors;
     const allDomains = [myDomain, ...cappedCompetitors];

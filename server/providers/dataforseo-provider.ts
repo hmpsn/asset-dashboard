@@ -109,7 +109,7 @@ function areCreditsExhausted(): boolean {
 // ── Backlinks subscription detection ──
 // DataForSEO backlinks is a separate paid subscription (error 40204).
 // Once detected, we mark the capability disabled on the registry (with a 24h TTL)
-// so the resolver can fall back to SEMRush for backlink calls.
+// so optional backlink enrichment can degrade without spending provider credits.
 // The registry itself handles TTL expiry and auto-re-enables the capability.
 
 const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -354,7 +354,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       if (errMsg.includes('40204')) {
         markBacklinksDisabled();
         writeProbeCache('backlinks-disabled');
-        log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
+        log.info('DataForSEO backlinks subscription not available — backlink enrichment disabled');
       }
       // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
       // handles them, and we deliberately don't cache them so transient issues get retried next boot.

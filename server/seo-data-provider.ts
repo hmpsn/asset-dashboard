@@ -152,7 +152,8 @@ export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider
 
 // ── Per-provider capability flags ──
 // Providers can mark specific capabilities as unavailable (e.g. DataForSEO
-// without a backlinks subscription). The registry uses this for fallback.
+// without a backlinks subscription). The registry uses this to skip optional
+// enrichment for disabled capabilities.
 // Each entry stores an expiry timestamp (0 = permanent / no TTL).
 const disabledCapabilities = new Map<ProviderName, Map<string, number>>();
 
@@ -160,7 +161,7 @@ export function markCapabilityDisabled(providerName: ProviderName, capability: s
   if (!disabledCapabilities.has(providerName)) disabledCapabilities.set(providerName, new Map());
   const expiresAt = ttlMs > 0 ? Date.now() + ttlMs : 0;
   disabledCapabilities.get(providerName)!.set(capability, expiresAt);
-  log.warn(`${providerName}: "${capability}" capability disabled${ttlMs > 0 ? ` for ${ttlMs / 1000 / 3600}h` : ''} — will fall back to alternate provider`);
+  log.warn(`${providerName}: "${capability}" capability disabled${ttlMs > 0 ? ` for ${ttlMs / 1000 / 3600}h` : ''}`);
 }
 
 export function isCapabilityDisabled(providerName: ProviderName, capability: string): boolean {
@@ -197,8 +198,9 @@ export function getProviderDisplayName(providerName: string): string {
 
 /**
  * Generic capability-aware provider resolver.
- * Returns the preferred provider if the capability is available,
- * or falls back to any other configured provider that has it.
+ * Returns the selected provider only if the requested capability is available.
+ * Capability-specific calls do not silently fall back to alternate providers,
+ * because that can spend credits on a provider the workspace did not select.
  */
 export function getProviderForCapability(capability: string, preferred?: ProviderName): SeoDataProvider | null {
   const primary = getConfiguredProvider(preferred);
@@ -206,22 +208,18 @@ export function getProviderForCapability(capability: string, preferred?: Provide
 
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
   if (primaryName && isCapabilityDisabled(primaryName, capability)) {
-    // Primary provider cannot serve this capability — try fallbacks
-    for (const [name, p] of providers.entries()) {
-      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, capability)) {
-        return p;
-      }
-    }
-    return null; // No fallback available
+    return null;
   }
 
   return primary;
 }
 
 /**
- * Get a provider that supports backlinks. If the preferred provider's backlinks
- * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
- * to another configured provider that does support them.
+ * Get the selected provider for backlinks.
+ *
+ * Backlinks are intentionally strict: if DataForSEO is selected/default and its
+ * backlinks capability is disabled, return null and let callers degrade the
+ * optional backlink fields instead of silently spending SEMRush credits.
  */
 export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
   return getProviderForCapability('backlinks', preferred);
