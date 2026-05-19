@@ -126,6 +126,30 @@ describe('PageIntelligencePageList rendering', () => {
     expect(onAddSchema).toHaveBeenCalledWith(page);
   });
 
+  it('does not show persisted Page Intelligence analysis for strategy-only freshness timestamps', () => {
+    const strategyOnlyFreshnessPage: UnifiedPage = {
+      ...page,
+      strategy: {
+        ...page.strategy!,
+        analysisGeneratedAt: '2026-05-19T00:00:00.000Z',
+        optimizationScore: undefined,
+        optimizationIssues: undefined,
+        recommendations: undefined,
+        contentGaps: undefined,
+      },
+    };
+
+    render(
+      <PageIntelligencePageList
+        {...baseProps}
+        pages={[strategyOnlyFreshnessPage]}
+        expandedPageId="page-pricing"
+      />,
+    );
+
+    expect(screen.queryByText(/Analysis on file/i)).toBeNull();
+  });
+
   it('delegates SEO copy generation and copy actions through the list boundary', () => {
     const onGenerateSeoCopy = vi.fn();
     const onCopyText = vi.fn();

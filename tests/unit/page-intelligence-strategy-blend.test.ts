@@ -70,6 +70,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
       recommendations: ['Rewrite around old keyword'],
       contentGaps: ['Old supporting topic'],
       analysisGeneratedAt: '2026-04-01T10:00:00Z',
+      serpFeatures: ['featured_snippet'],
     });
 
     upsertPageKeyword(wsId, {
@@ -89,6 +90,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result?.recommendations).toBeUndefined();
     expect(result?.contentGaps).toBeUndefined();
     expect(result?.analysisGeneratedAt).toBeUndefined();
+    expect(result?.serpFeatures).toBeUndefined();
   });
 
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {

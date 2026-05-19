@@ -12,7 +12,7 @@ export function PageIntelligencePersistedAnalysisSummary({
   onAnalyzePage,
 }: Props) {
   const sp = page.strategy;
-  if (!sp?.analysisGeneratedAt) return null;
+  if (!sp?.analysisGeneratedAt || sp.optimizationScore == null) return null;
 
   return (
     <div className="pt-2 border-t border-[var(--brand-border)]">

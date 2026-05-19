@@ -124,12 +124,14 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     const prevCannibalizationForHistory = listCannibalizationIssues(ws.id);
 
     if (strategyMode === 'full') {
-      upsertAndCleanPageKeywords(ws.id, pageMap);
+      const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
+      upsertAndCleanPageKeywords(ws.id, stampedMap);
     } else {
       // Only update pages actually re-analyzed in this incremental run.
       const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
       const analyzedMappings = pageMap
-        .filter((pm) => analyzedPaths.has(pm.pagePath));
+        .filter((pm) => analyzedPaths.has(pm.pagePath))
+        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
     }
 

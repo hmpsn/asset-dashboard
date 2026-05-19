@@ -221,7 +221,7 @@ const stmts = createStmtCache(() => ({
       monthly_volume = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.monthly_volume, page_keywords.monthly_volume) ELSE excluded.monthly_volume END,
       topic_cluster = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.topic_cluster, page_keywords.topic_cluster) ELSE excluded.topic_cluster END,
       search_intent_confidence = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence) ELSE excluded.search_intent_confidence END,
-      serp_features = COALESCE(excluded.serp_features, page_keywords.serp_features)
+      serp_features = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END
   `),
   deleteOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
