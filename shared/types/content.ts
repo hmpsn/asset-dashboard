@@ -320,6 +320,30 @@ export interface KeywordCandidate {
   isRecommended: boolean;
 }
 
+export interface KeywordRecommendationReasoningAlternative {
+  keyword: string;
+  reasons: string[];
+}
+
+export interface KeywordRecommendationReasoning {
+  recommendedReason: string;
+  alternatives: KeywordRecommendationReasoningAlternative[];
+}
+
+export interface KeywordRecommendationOptions {
+  useAI?: boolean;
+  maxCandidates?: number;
+  includeReasoning?: boolean;
+}
+
+export interface KeywordRecommendationResult {
+  seedKeyword: string;
+  candidates: KeywordCandidate[];
+  recommended: string | null;
+  message?: string;
+  reasoning?: KeywordRecommendationReasoning;
+}
+
 export interface StatusHistoryEntry {
   from: MatrixCellStatus;
   to: MatrixCellStatus;

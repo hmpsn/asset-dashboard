@@ -157,6 +157,32 @@ describe('Content Matrices — CRUD', () => {
     expect(res.status).toBe(404);
   });
 
+  it('standalone keyword recommendations return optional reasoning without breaking the base shape', async () => {
+    const res = await postJson(`/api/content-matrices/${testWsId}/recommend-keywords`, {
+      seedKeyword: 'Emergency plumber in Austin',
+      includeReasoning: true,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      seedKeyword: 'Emergency plumber in Austin',
+      recommended: 'Emergency plumber in Austin',
+    });
+    expect(Array.isArray(body.candidates)).toBe(true);
+    expect(typeof body.reasoning?.recommendedReason).toBe('string');
+  });
+
+  it('cell keyword recommendations preserve the legacy payload and add reasoning only when requested', async () => {
+    const res = await postJson(`/api/content-matrices/${testWsId}/${matrixId}/cells/${firstCellId}/recommend-keywords`, {
+      includeReasoning: false,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.seedKeyword).toBeTruthy();
+    expect(Array.isArray(body.candidates)).toBe(true);
+    expect(body).not.toHaveProperty('reasoning');
+  });
+
   it('public content-plan stays hidden until cells are sent for review', async () => {
     const hiddenRes = await api(`/api/public/content-plan/${testWsId}`);
     expect(hiddenRes.status).toBe(200);
