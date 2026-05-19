@@ -50,6 +50,17 @@ export function isStrategyQualityDiscoveryKeyword(keyword: KeywordSourceEvidence
     && keyword.difficulty > 0;
 }
 
+const PLANNER_GROUPED_VOLUME_FLOOR = 1_000_000;
+
+export function isSuspiciousPlannerGroupedVolume(keyword: string | undefined, volume: number | undefined | null): boolean {
+  if (volume == null || volume < PLANNER_GROUPED_VOLUME_FLOOR) return false;
+  // DataForSEO Google Ads search-volume lookups can return planner-grouped
+  // buckets. A million-volume value on strategy-assigned page keywords is more
+  // likely a grouped forecast than a granular SEO signal, so callers should
+  // prefer organic/ranking evidence or leave volume unknown.
+  return !!keyword?.trim();
+}
+
 /** Composite opportunity score (0–100) for a content gap.
  * Weighted components of the raw score (pre-trend):
  * - volume: vol/10000 capped at 1.0, × 0.45 → up to 0.45

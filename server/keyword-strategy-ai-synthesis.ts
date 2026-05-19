@@ -20,7 +20,7 @@ import { isProgrammingError } from './errors.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
-import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
+import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 
 const log = createLogger('keyword-strategy:synthesis');
@@ -565,7 +565,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
-          .filter(pk => pk.volume && pk.volume > 0)
+          .filter(pk => pk.volume && pk.volume > 0 && !isSuspiciousPlannerGroupedVolume(pk.primaryKeyword, pk.volume))
           .map(pk => [pk.primaryKeyword.toLowerCase(), pk])
       );
 
@@ -608,7 +608,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           for (const pm of allPageMappings) {
             if (pm.validated != null) continue; // already handled
             const m = metricMap.get(pm.primaryKeyword.toLowerCase());
-            if (m && m.volume > 0) {
+            if (m && m.volume > 0 && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.validated = true;
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
