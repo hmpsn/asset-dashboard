@@ -2701,6 +2701,46 @@ describe('Rule: requireAuth usage outside allowed route files', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: buildWorkspaceIntelligence() without slices (assembles all 8 slices)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: buildWorkspaceIntelligence() without slices (assembles all 8 slices)', () => {
+  const RULE = 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)';
+
+  it('flags a truly slice-less call', () => {
+    const file = write(
+      uniqPath('rule-bwi-slices', 'server/no-slices.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",
+        "export async function run(workspaceId: string) {",
+        "  return buildWorkspaceIntelligence(workspaceId, { pagePath: '/pricing' });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag multiline object shorthand when slices is provided on a later line', () => {
+    const file = write(
+      uniqPath('rule-bwi-slices', 'server/intelligence/generation-context-builders.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';",
+        "export async function buildCtx(workspaceId: string, slices: readonly string[], pagePath?: string) {",
+        "  const intelligence = await buildWorkspaceIntelligence(workspaceId, {",
+        "    slices,",
+        "    pagePath,",
+        "  });",
+        "  return intelligence;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: Duplicate globally-applied rate limiter in route file
 // ════════════════════════════════════════════════════════════════════════════
 

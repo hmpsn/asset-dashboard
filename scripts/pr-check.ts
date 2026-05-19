@@ -532,6 +532,38 @@ export function extractDbPrepareArg(chunk: string): string {
   return chunk.slice(argStart); // never closed within chunk — fall through
 }
 
+/**
+ * Extract the full `buildWorkspaceIntelligence(...)` call starting at the first
+ * occurrence in `chunk`. Like `extractDbPrepareArg`, this walks the characters
+ * and respects nested parens plus string literals so multiline option objects
+ * are inspected as one unit.
+ */
+export function extractBuildWorkspaceIntelligenceCall(chunk: string): string {
+  const startIdx = chunk.search(/buildWorkspaceIntelligence\s*\(/);
+  if (startIdx === -1) return chunk;
+  let i = chunk.indexOf('(', startIdx);
+  if (i === -1) return chunk;
+  let depth = 1;
+  let quote: string | null = null;
+  i++;
+  while (i < chunk.length) {
+    const ch = chunk[i];
+    if (quote) {
+      if (ch === '\\' && i + 1 < chunk.length) { i += 2; continue; }
+      if (ch === quote) quote = null;
+    } else {
+      if (ch === '`' || ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return chunk.slice(startIdx, i + 1);
+      }
+    }
+    i++;
+  }
+  return chunk.slice(startIdx);
+}
+
 // ─── Slice field rendering helpers ────────────────────────────────────────────
 //
 // Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
@@ -1224,16 +1256,38 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
-    // Matches calls that don't specify slices — typically: buildWorkspaceIntelligence(id) or buildWorkspaceIntelligence(id, { pagePath })
-    pattern: 'buildWorkspaceIntelligence\\(',
+    // customCheck so multiline object literals with `slices` shorthand are
+    // treated correctly. The old line-based pattern falsely warned on the
+    // shared generation context builders because `slices` lived on the next line.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/workspace-intelligence.ts'],
-    // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
-    // 'slices:' catches key:value form; ' slices,' and ' slices }' catch object shorthand (const slices = [...]; { slices, pagePath })
-    excludeLines: ['slices:', ' slices,', ' slices }', ' slices)', '// bwi-all-ok'],
+    excludeLines: ['// bwi-all-ok'],
     message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
     severity: 'warn',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const inServerScope = rel.startsWith('server/') || rel.includes('/server/');
+        if (!inServerScope || rel.endsWith('/server/workspace-intelligence.ts') || rel === 'server/workspace-intelligence.ts') continue;
+        const content = readFileOrEmpty(file);
+        if (!content.includes('buildWorkspaceIntelligence(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].includes('buildWorkspaceIntelligence(')) continue;
+          if (hasHatch(lines, i, '// bwi-all-ok')) continue;
+          const chunk = lines.slice(i, i + 12).join('\n');
+          const call = extractBuildWorkspaceIntelligenceCall(chunk);
+          if (/\bslices\s*:/.test(call) || /\{\s*slices\b/.test(call) || /,\s*slices\s*[,\}]/.test(call)) {
+            continue;
+          }
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices)',

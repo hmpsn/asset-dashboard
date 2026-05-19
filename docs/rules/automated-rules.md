@@ -144,7 +144,7 @@ advisory but tracked.
 | # | Rule | Severity | Method | Scope | Escape hatch | Rationale |
 |---|------|----------|--------|-------|--------------|-----------|
 | 1 | Raw fetch() in components | warn | custom | `src/components/` | `// fetch-ok` | Raw fetch() bypasses typed API wrappers, error normalization, and auth headers — the #1 source of untyped response bugs in UI code. |
-| 2 | buildWorkspaceIntelligence() without slices (assembles all 8 slices) | warn | pattern | `server/` | `// bwi-all-ok` | Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional. |
+| 2 | buildWorkspaceIntelligence() without slices (assembles all 8 slices) | warn | custom | `server/` | `// bwi-all-ok` | Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional. |
 | 3 | Raw string literal in broadcastToWorkspace() event arg | warn | custom | `server/` | `// ws-event-ok` | Silent drift between broadcast emitter and frontend handler when an event string is typo’d or renamed on one side only. |
 | 4 | Raw string literal in broadcast() event arg | warn | custom | `server/` | `// ws-event-ok` | Silent drift between broadcast emitter and frontend handler when an event string is typo’d or renamed on one side only. |
 | 5 | isProgrammingError near new URL() or fetch() | warn | custom | `server/` | `// url-fetch-ok` | False-positive log.warn noise: network failures and user-supplied malformed URLs trigger TypeError alerts that obscure real code bugs. |
