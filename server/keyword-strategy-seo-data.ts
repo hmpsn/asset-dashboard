@@ -261,9 +261,11 @@ export async function fetchAndCacheKeywordStrategySeoData({
           discoveryCalls.push(provider.getKeywordSuggestions(seed, ws.id, 20));
         }
       }
-      if (provider.getKeywordsForKeywords && discoverySeedKeywords.length > 0) {
-        discoveryCalls.push(provider.getKeywordsForKeywords(discoverySeedKeywords, ws.id, 50));
-      }
+      // Keep Google Ads keywords_for_keywords available at the provider layer,
+      // but do not feed it into strategy generation by default yet. Google Ads
+      // volume is grouped for planner-style forecasting, which can inflate
+      // granular page-assignment candidates until PR12's shared quality engine
+      // can score and explain those source differences.
 
       const batches = await Promise.all(discoveryCalls.map(call => call.catch(err => {
         log.warn({ err }, 'Keyword discovery source failed');
