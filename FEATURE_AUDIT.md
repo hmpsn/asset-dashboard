@@ -309,6 +309,12 @@ A comprehensive value assessment of every feature in the platform — **371 feat
 **PR2 builder migration (2026-05-18):**
 - **Decay recommendation builder adoption**: `generateRefreshRecommendation()` now uses `buildRecommendationGenerationContext()` with a parity-safe slice override (`seoContext`, `learnings`, `pageProfile`) so the workspace-derived prompt context follows the shared intelligence builder convention while keeping the page-specific GSC query breakdown as a caller-owned enrichment block.
 
+**PR3 keyword recommendation quality pass (2026-05-18):**
+- **Shared recommendation-context builder adoption**: `server/keyword-recommendations.ts` now sources ranking context through `buildRecommendationGenerationContext()` with `seoContext + learnings + clientSignals`, removing the old ad hoc learnings import and promoting keyword recommendations onto the canonical intelligence-consumer path.
+- **Smarter opt-in ranking**: content-matrix keyword recommendation routes can now use the smart ranking path with meaningful workspace context, while preserving the legacy omitted-`useAI` contract and degrading safely to deterministic scoring if the AI path or context build fails.
+- **Noise reduction and strategic negatives**: keyword scoring now filters previously declined terms, down-ranks cannibalization conflicts and existing page-map overlaps, penalizes broad/weak-overlap adjacent terms, and boosts requested/business-priority/client-interest matches.
+- **Optional explainability**: recommendation responses accept `includeReasoning` and can return the winning rationale plus de-prioritized alternatives for admin/debug surfaces without changing the default payload for existing callers.
+
 **Agency value:** Every AI recommendation now factors in real search behavior (GSC queries) and market-proven recovery baselines. Content briefs for decaying pages arrive with context instead of generic generation. Recovery math in opportunities reflects issue-type reality instead of guessed averages.
 
 **Client value:** Content briefs speak directly to the declining keywords clients are seeing in their analytics. Recommended content priorities reflect actual market conditions, not generic templates.

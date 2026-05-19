@@ -32,7 +32,7 @@ const INVENTORY: Array<{
   { file: 'server/diagnostic-orchestrator.ts', classification: 'hybrid', targetPath: 'future-chat-builder' },
   { file: 'server/discovery-ingestion.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/internal-links.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/keyword-recommendations.ts', classification: 'hybrid', targetPath: 'recommendation-builder' },
+  { file: 'server/keyword-recommendations.ts', classification: 'native', targetPath: 'recommendation-builder' },
   { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/monthly-digest.ts', classification: 'legacy', targetPath: 'future-briefing-builder' },

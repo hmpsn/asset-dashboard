@@ -18,8 +18,8 @@ plans.
 
 ## Findings Summary
 
-- `native`: 27
-- `hybrid`: 3
+- `native`: 28
+- `hybrid`: 2
 - `legacy`: 2
 
 Root pattern confirmed:
@@ -44,7 +44,7 @@ Root pattern confirmed:
 | `server/diagnostic-orchestrator.ts` | `analytics-intelligence` | `hybrid` | broad intelligence assembly plus direct `getInsights()` synthesis context | future diagnostics/chat-style builder, not PR1 | wave 3 |
 | `server/discovery-ingestion.ts` | `workspace-command-center` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if richer slices are added |
 | `server/internal-links.ts` | `seo-health` | `native` | slice-backed SEO context for AI internal-link suggestions | recommendation builder later if it broadens beyond seoContext | wave 4 |
-| `server/keyword-recommendations.ts` | `seo-health` | `hybrid` | direct `getWorkspaceLearnings()` weighting plus slice-backed ranking prompt | `buildRecommendationGenerationContext()` + separate scoring hooks | wave 2 |
+| `server/keyword-recommendations.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for ranking context plus deterministic strategic-fit scoring hooks (declines, cannibalization, client signals) | keep on recommendation builder path | completed in wave 2 |
 | `server/keyword-strategy-ai-synthesis.ts` | `analytics-intelligence` | `native` | rich slice-backed context with consistent `slices` usage | content/recommendation builder optional later | keep as reference implementation |
 | `server/meeting-brief-generator.ts` | `analytics-intelligence` | `native` | intelligence facade only | keep low-level | only revisit if a dedicated briefing builder is introduced |
 | `server/monthly-digest.ts` | `analytics-intelligence` | `legacy` | direct `getInsights()` + direct `getWorkspaceLearnings()` prompt enrichment | future digest/briefing builder | wave 3 |
@@ -73,7 +73,6 @@ Wave 1:
 
 Wave 2:
 
-- `server/keyword-recommendations.ts`
 - `server/seo-audit-ai-recs.ts`
 
 Wave 3:
