@@ -39,6 +39,7 @@ import {
   generateKeywordStrategy,
   hasActiveKeywordStrategyGeneration,
   KeywordStrategyGenerationError,
+  KEYWORD_STRATEGY_MAX_PAGE_CAP,
 } from '../keyword-strategy-generation.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getEffectivePreviousScore } from '../audit-snapshot-views.js';
@@ -664,11 +665,11 @@ router.post('/api/jobs', async (req, res) => {
         const wsId = params.workspaceId as string;
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         const maxPages = params.maxPages == null ? undefined : Number(params.maxPages);
-        if (maxPages != null && (!Number.isInteger(maxPages) || maxPages <= 0)) {
-          return res.status(400).json({ error: 'maxPages must be a positive integer' });
+        if (maxPages != null && (!Number.isInteger(maxPages) || maxPages < 0)) {
+          return res.status(400).json({ error: 'maxPages must be a non-negative integer' });
         }
-        if (maxPages != null && maxPages > 100) {
-          return res.status(400).json({ error: 'maxPages must be between 1 and 100' });
+        if (maxPages != null && maxPages > KEYWORD_STRATEGY_MAX_PAGE_CAP) {
+          return res.status(400).json({ error: `maxPages must be between 0 and ${KEYWORD_STRATEGY_MAX_PAGE_CAP}` });
         }
         const activeStrat = hasActiveJob('keyword-strategy', wsId);
         if (activeStrat) return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace', jobId: activeStrat.id });

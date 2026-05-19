@@ -24,6 +24,7 @@ import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeyw
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 
 const log = createLogger('keyword-strategy');
+export const KEYWORD_STRATEGY_MAX_PAGE_CAP = 2000;
 
 // Concurrent generation guard: prevents two simultaneous strategy generations for the same
 // workspace from racing to the DB. The second request receives a 409 immediately.
@@ -115,7 +116,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   const seoDataMode = normalizeSeoDataMode(options.seoDataMode ?? options.semrushMode);
   const competitorDomains = options.competitorDomains ? [...options.competitorDomains] : [...(ws.competitorDomains || [])];
   const rawMaxPages = options.maxPages != null ? Number(options.maxPages) : 500;
-  const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, 2000) : 0; // 0 = no cap, clamped at 2000
+  const maxPagesParam = rawMaxPages > 0 ? Math.min(rawMaxPages, KEYWORD_STRATEGY_MAX_PAGE_CAP) : 0; // 0 = no cap
   const token = getTokenForSite(ws.webflowSiteId) || undefined;
 
   // Save competitor domains if provided

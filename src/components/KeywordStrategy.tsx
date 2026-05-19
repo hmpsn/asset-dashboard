@@ -193,7 +193,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         seoDataMode: seoDataAvailable ? seoDataMode : 'none',
         seoDataProvider: selectedSeoDataProvider,
         competitorDomains: compList,
-        maxPages: maxPages || undefined,
+        maxPages,
       });
       if (jobId) {
         setLastStartedJobId(jobId);

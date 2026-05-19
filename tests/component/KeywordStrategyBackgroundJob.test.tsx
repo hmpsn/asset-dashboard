@@ -141,6 +141,20 @@ describe('KeywordStrategyPanel background job wiring', () => {
     });
   });
 
+  it('passes maxPages=0 for the All pages setting instead of dropping it', async () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByText('All'));
+    fireEvent.click(screen.getByRole('button', { name: /generate strategy/i }));
+
+    await waitFor(() => {
+      expect(mocks.startJob).toHaveBeenCalledWith(
+        BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+        expect.objectContaining({ maxPages: 0 }),
+      );
+    });
+  });
+
   it('uses an active keyword strategy job as the generating state', () => {
     mocks.findActiveJob.mockReturnValue({
       id: 'job-keyword-active',

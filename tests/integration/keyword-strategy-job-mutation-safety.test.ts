@@ -165,6 +165,7 @@ vi.mock('../../server/keyword-strategy-follow-ons.js', async importOriginal => {
 
 import db from '../../server/db/index.js';
 import { createJob, clearCompletedJobs, listJobs } from '../../server/jobs.js';
+import { discoverKeywordStrategyPages } from '../../server/keyword-strategy-pages.js';
 import { getUsageCount } from '../../server/usage-tracking.js';
 import { getWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { listPageKeywords } from '../../server/page-keywords.js';
@@ -274,6 +275,7 @@ beforeAll(async () => {
 }, 30_000);
 
 beforeEach(() => {
+  vi.mocked(discoverKeywordStrategyPages).mockClear();
   workspace = seedWorkspace({ tier: 'premium' });
   otherWorkspace = seedWorkspace({ tier: 'premium' });
   broadcastState.calls = [];
@@ -468,10 +470,28 @@ describe('keyword strategy job mutation safety', () => {
     expect(listJobs(workspace.workspaceId)).toHaveLength(1);
   });
 
-  it('rejects non-positive maxPages before creating a keyword strategy job', async () => {
-    const jobsBefore = listJobs(workspace.workspaceId).length;
+  it('accepts the UI default maxPages=500 for keyword strategy jobs', async () => {
+    const startRes = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: 500,
+      },
+    });
 
-    const res = await postJson('/api/jobs', {
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+    });
+    expect(discoverKeywordStrategyPages).toHaveBeenCalledWith(expect.objectContaining({ maxPagesParam: 500 }));
+  });
+
+  it('accepts maxPages=0 as the All pages sentinel for keyword strategy jobs', async () => {
+    const startRes = await postJson('/api/jobs', {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       params: {
         workspaceId: workspace.workspaceId,
@@ -479,8 +499,30 @@ describe('keyword strategy job mutation safety', () => {
       },
     });
 
+    expect(startRes.status).toBe(200);
+    const started = await startRes.json() as { jobId: string };
+    const job = await waitForJob(started.jobId);
+    expect(job).toMatchObject({
+      workspaceId: workspace.workspaceId,
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      status: 'done',
+    });
+    expect(discoverKeywordStrategyPages).toHaveBeenCalledWith(expect.objectContaining({ maxPagesParam: 0 }));
+  });
+
+  it('rejects negative maxPages before creating a keyword strategy job', async () => {
+    const jobsBefore = listJobs(workspace.workspaceId).length;
+
+    const res = await postJson('/api/jobs', {
+      type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
+      params: {
+        workspaceId: workspace.workspaceId,
+        maxPages: -1,
+      },
+    });
+
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
     expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
     expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
     expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
@@ -499,12 +541,12 @@ describe('keyword strategy job mutation safety', () => {
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
       params: {
         workspaceId: workspace.workspaceId,
-        maxPages: 101,
+        maxPages: 2001,
       },
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 1 and 100' });
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be between 0 and 2000' });
     expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
     expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
     expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
@@ -528,7 +570,7 @@ describe('keyword strategy job mutation safety', () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a positive integer' });
+    await expect(res.json()).resolves.toEqual({ error: 'maxPages must be a non-negative integer' });
     expect(listJobs(workspace.workspaceId)).toHaveLength(jobsBefore);
     expect(getWorkspace(workspace.workspaceId)?.keywordStrategy).toBeUndefined();
     expect(countRows('page_keywords', workspace.workspaceId)).toBe(0);
