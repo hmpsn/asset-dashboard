@@ -596,7 +596,8 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
-  'forPage', 'winRateByActionType',
+  // availability is control-plane metadata for callers; it intentionally does not render into prompt text
+  'availability', 'forPage', 'winRateByActionType',
   // SiteHealthSlice
   // PageProfileSlice
   // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent

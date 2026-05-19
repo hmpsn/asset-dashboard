@@ -9,7 +9,6 @@ const SERVER_DIR = resolve(ROOT_DIR, 'server');
 const AUDIT_DOC = resolve(ROOT_DIR, 'docs/superpowers/audits/2026-05-18-intelligence-consumer-consolidation-audit.md');
 const MANUAL_CONSUMERS = new Set([
   'server/admin-chat-context.ts',
-  'server/routes/content-briefs.ts',
 ]);
 const FALSE_POSITIVE_FILES = new Set([
   'server/anomaly-detection.ts',
@@ -37,7 +36,6 @@ const INVENTORY: Array<{
   { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/monthly-digest.ts', classification: 'legacy', targetPath: 'future-briefing-builder' },
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/routes/content-briefs.ts', classification: 'legacy', targetPath: 'content-builder' },
   { file: 'server/routes/content-posts.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/jobs.ts', classification: 'native', targetPath: 'low-level' },

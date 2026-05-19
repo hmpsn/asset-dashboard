@@ -39,8 +39,6 @@ import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { recordAction } from '../outcome-tracking.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { isProgrammingError } from '../errors.js';
 import { validate, z } from '../middleware/validate.js';
 import { listMatrices } from '../content-matrices.js';
@@ -286,27 +284,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     const matchedTemplatePageType = templateCrossref?.pageType;
     const resolvedPageType = bodyPageType ?? matchedTemplatePageType ?? undefined;
 
-    // Adaptive pipeline: inject workspace learnings into the brief prompt
-    let adaptedBusinessContext = businessContext || ws?.keywordStrategy?.businessContext;
-    if (isFeatureEnabled('outcome-ai-injection')) {
-      try {
-        const learnings = getWorkspaceLearnings(req.params.workspaceId);
-        if (learnings) {
-          const block = formatLearningsForPrompt(learnings, 'content');
-          if (block) {
-            adaptedBusinessContext = adaptedBusinessContext
-              ? `${adaptedBusinessContext}\n\n${block}`
-              : block;
-          }
-        }
-      } catch (err) {
-        log.warn({ err }, 'Failed to inject workspace learnings into brief prompt');
-      }
-    }
-
     const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
       relatedQueries,
-      businessContext: adaptedBusinessContext,
+      businessContext: businessContext || ws?.keywordStrategy?.businessContext,
       existingPages,
       keywordMetrics,
       relatedKeywords,

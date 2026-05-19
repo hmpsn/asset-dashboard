@@ -215,6 +215,7 @@ beforeEach(() => {
     const slices = opts.slices ?? (opts.pagePath
       ? ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'pageProfile']
       : ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
+    const includesLearnings = slices.includes('learnings');
 
     return {
       intelligence: {
@@ -233,9 +234,10 @@ beforeEach(() => {
         pageProfile: slices.includes('pageProfile') ? mockBuilderPageProfile : null,
       },
       slices,
-      promptContext: slices.includes('learnings') ? mockBuilderPromptContext : '',
+      promptContext: includesLearnings ? mockBuilderPromptContext : '',
       pagePath: opts.pagePath,
       learningsDomain: opts.learningsDomain ?? 'content',
+      learningsAvailability: includesLearnings ? 'ready' : 'not_requested',
     };
   });
 });
@@ -1039,6 +1041,7 @@ describe('generateBrief — analytics intelligence integration', () => {
         promptContext: '',
         pagePath: opts.pagePath,
         learningsDomain: opts.learningsDomain ?? 'content',
+        learningsAvailability: 'not_requested',
       };
     });
 

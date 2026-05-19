@@ -71,6 +71,7 @@ const baseContext = {
       knowledgeBase: '',
     },
     learnings: {
+      availability: 'ready' as const,
       summary: {
         workspaceId: 'ws_test',
         computedAt: '2026-05-18T00:00:00.000Z',
@@ -113,6 +114,7 @@ const baseContext = {
   slices: ['seoContext', 'learnings', 'clientSignals'] as const,
   promptContext: 'BUSINESS CONTEXT: Emergency plumbing company serving Austin homeowners.',
   learningsDomain: 'strategy' as const,
+  learningsAvailability: 'ready' as const,
 };
 
 beforeEach(() => {

@@ -20,6 +20,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis } from './keyword-strategy-helpers.js';
+import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 
 const log = createLogger('keyword-strategy:synthesis');
 
@@ -265,6 +266,11 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     if (learningsBlock) {
       businessSection += `\n\n${learningsBlock}\n`;
       log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
+    } else {
+      const learningsStatusNote = buildOutcomeLearningStatusNote(strategyIntel.learnings?.availability, 'strategy');
+      if (learningsStatusNote) {
+        businessSection += `\nOUTCOME LEARNING STATUS: ${learningsStatusNote}\n`;
+      }
     }
 
     let strategy: StrategyOutput = {};

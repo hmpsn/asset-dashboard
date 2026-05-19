@@ -14,6 +14,7 @@ import { buildRecommendationGenerationContext } from './intelligence/generation-
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { checkKeywordCannibalization, type CannibalizationConflict } from './cannibalization-detection.js';
 import { createLogger } from './logger.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment, buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import type {
   KeywordCandidate,
   KeywordRecommendationReasoning,
@@ -48,7 +49,7 @@ interface CandidateScoringContext {
   contentGapTopics: string[];
   recentChatTopics: string[];
   rejectionReasons: string[];
-  kdRangeWinRates: Record<string, number>;
+  learnings?: LearningsSlice;
   backlinkProfile: SeoContextSlice['backlinkProfile'];
   excludedConflictIdentifiers: string[];
   workspaceId: string;
@@ -91,14 +92,6 @@ function isNearDuplicateKeyword(a: string, b: string): boolean {
   const longer = aTokens.length <= bTokens.length ? bTokens : aTokens;
   const matches = shorter.filter(token => longer.includes(token)).length;
   return matches / shorter.length >= 0.8;
-}
-
-function getDifficultyRangeLabel(difficulty: number): string {
-  if (difficulty <= 20) return '0-20';
-  if (difficulty <= 40) return '21-40';
-  if (difficulty <= 60) return '41-60';
-  if (difficulty <= 80) return '61-80';
-  return '81-100';
 }
 
 function findKeywordMatches(keyword: string, phrases: string[], maxMatches: number = 2): string[] {
@@ -194,7 +187,7 @@ function buildScoringContext(
     contentGapTopics: (clientSignals?.contentGapVotes ?? []).map(vote => vote.topic),
     recentChatTopics: clientSignals?.recentChatTopics ?? [],
     rejectionReasons: clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [],
-    kdRangeWinRates: learnings?.summary?.strategy?.winRateByDifficultyRange ?? {},
+    learnings: learnings ?? undefined,
     backlinkProfile: seoContext?.backlinkProfile,
     excludedConflictIdentifiers,
   };
@@ -277,15 +270,19 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
     reasons.push(`Connects to a recent client conversation topic (${recentChatMatches[0]})`);
   }
 
-  const kdRangeLabel = getDifficultyRangeLabel(candidate.difficulty ?? 0);
-  const kdWinRate = ctx.kdRangeWinRates[kdRangeLabel];
-  if (kdWinRate != null) {
-    if (kdWinRate > 0.5) {
-      score = Math.round(score * 1.2);
-      reasons.push(`Difficulty range ${kdRangeLabel} has performed well for this workspace historically`);
-    } else if (kdWinRate < 0.3) {
-      score = Math.round(score * 0.8);
-      penaltyReasons.push(`Difficulty range ${kdRangeLabel} has underperformed historically`);
+  const outcomeAdjustment = buildOutcomeAdjustment({
+    actionType: 'strategy_keyword_added',
+    learnings: ctx.learnings,
+    difficulty: candidate.difficulty,
+  });
+  if (outcomeAdjustment.multiplier !== 1) {
+    score = applyOutcomeAdjustmentScore(score, outcomeAdjustment);
+    for (const reason of outcomeAdjustment.reasons) {
+      if (reason.toLowerCase().includes('underperformed')) {
+        penaltyReasons.push(reason);
+      } else {
+        reasons.push(reason);
+      }
     }
   }
 
@@ -504,6 +501,10 @@ export async function getKeywordRecommendations(
     clientSignals,
     [...(options.excludeConflictIdentifiers ?? [])],
   );
+  const outcomeLearningStatusNote = buildOutcomeLearningStatusNote(
+    recommendationContext?.learningsAvailability,
+    'strategy',
+  );
 
   const seed = seedMetrics[0];
   const candidates: KeywordCandidate[] = [];
@@ -583,7 +584,10 @@ export async function getKeywordRecommendations(
   const shouldSmartRank = shouldUseSmartRanking(useAI, seoContext, clientSignals);
   if (shouldSmartRank && scored.length > 1 && recommendationContext?.promptContext) {
     try {
-      const aiRanked = await aiRankKeywords(scored, recommendationContext.promptContext, workspaceId);
+      const aiContext = outcomeLearningStatusNote
+        ? `${recommendationContext.promptContext}\n\nOUTCOME LEARNING STATUS:\n${outcomeLearningStatusNote}`
+        : recommendationContext.promptContext;
+      const aiRanked = await aiRankKeywords(scored, aiContext, workspaceId);
       const candidateMap = new Map(scored.map(candidate => [candidate.keyword.toLowerCase(), candidate])); // map-dup-ok — candidates are deduped by normalized keyword earlier in this function
       const reordered = aiRanked
         .map(candidate => candidateMap.get(candidate.keyword.toLowerCase()))

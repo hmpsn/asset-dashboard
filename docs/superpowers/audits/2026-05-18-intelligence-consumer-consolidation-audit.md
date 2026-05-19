@@ -20,7 +20,7 @@ plans.
 
 - `native`: 28
 - `hybrid`: 2
-- `legacy`: 2
+- `legacy`: 1
 
 Root pattern confirmed:
 
@@ -49,7 +49,6 @@ Root pattern confirmed:
 | `server/meeting-brief-generator.ts` | `analytics-intelligence` | `native` | intelligence facade only | keep low-level | only revisit if a dedicated briefing builder is introduced |
 | `server/monthly-digest.ts` | `analytics-intelligence` | `legacy` | direct `getInsights()` + direct `getWorkspaceLearnings()` prompt enrichment | future digest/briefing builder | wave 3 |
 | `server/page-analysis-job.ts` | `seo-health` | `native` | consistent slice-backed prompt assembly | recommendation builder later if it simplifies page job boilerplate | wave 4 |
-| `server/routes/content-briefs.ts` | `content-pipeline` | `legacy` | route-level direct `getWorkspaceLearnings()` enrichment around brief generation | move learnings/context orchestration into shared builder path | wave 1 |
 | `server/routes/content-posts.ts` | `content-pipeline` | `native` | `buildIntelPrompt(['seoContext', 'learnings'])` for review flows | keep low-level | later only if raw slice access becomes necessary |
 | `server/routes/google.ts` | `client-portal` | `native` | aligned slices + formatted block for client search chat | keep low-level | later only if shared client-story builder is added |
 | `server/routes/jobs.ts` | `seo-health` | `native` | slice-backed SEO context inside bulk AI jobs | keep low-level for job-specific prompts | wave 4 |
@@ -66,10 +65,6 @@ Root pattern confirmed:
 | `server/webflow-seo-bulk-rewrite-job.ts` | `seo-health` | `native` | slice-backed SEO context in job worker | keep low-level | wave 4 |
 
 ## Immediate Migration Queue
-
-Wave 1:
-
-- `server/routes/content-briefs.ts`
 
 Wave 2:
 
