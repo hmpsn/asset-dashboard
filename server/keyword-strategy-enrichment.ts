@@ -72,6 +72,51 @@ export interface EnrichKeywordStrategyResult {
   cannibalization: KeywordStrategyCannibalizationIssue[];
 }
 
+function normalizeTopicKeyword(value: string | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function hasMultiWordTopicSignal(keyword: string): boolean {
+  return normalizeTopicKeyword(keyword).split(' ').filter(Boolean).length >= 2;
+}
+
+export function isTopicKeywordCoveredByPageMap(
+  keyword: string,
+  pageMap: StrategyPageMapEntry[] | undefined,
+): boolean {
+  const normalizedKeyword = normalizeTopicKeyword(keyword);
+  if (!normalizedKeyword || !pageMap?.length) return false;
+
+  for (const page of pageMap) {
+    const assignedKeywords = [
+      page.primaryKeyword,
+      ...(page.secondaryKeywords ?? []),
+    ].map(normalizeTopicKeyword).filter(Boolean);
+
+    if (assignedKeywords.some(assigned =>
+      assigned === normalizedKeyword
+      || (hasMultiWordTopicSignal(normalizedKeyword) && assigned.includes(normalizedKeyword))
+      || (hasMultiWordTopicSignal(assigned) && normalizedKeyword.includes(assigned))
+    )) {
+      return true;
+    }
+
+    // Page titles and slugs are weaker than explicit keyword assignments, so only
+    // use phrase matches. This catches service pages like /services/cosmetic-dentistry
+    // without claiming broad one-word terms such as "dentist" are fully covered.
+    if (hasMultiWordTopicSignal(normalizedKeyword)) {
+      const pageSignal = normalizeTopicKeyword(`${page.pageTitle ?? ''} ${page.pagePath}`);
+      if (pageSignal.includes(normalizedKeyword)) return true;
+    }
+  }
+
+  return false;
+}
+
 function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
   if (!baseUrl || !pagePath) return null;
   try {
@@ -550,7 +595,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   if (keywordPool.size >= 10) {
     try {
       sendProgress('enrichment', 'Building topical authority clusters...', 0.92);
-      const ownedKws = new Set(domainKeywords.map(k => k.keyword.toLowerCase()));
+      const ownedRankingKws = new Set(domainKeywords.map(k => k.keyword.toLowerCase()));
 
       // Top keywords by volume for AI clustering
       const poolForClustering = [...keywordPool.entries()]
@@ -596,8 +641,10 @@ Rules:
             .filter((k: string) => keywordPool.has(k));
           if (normalizedKws.length < 3) continue;
 
-          const owned = normalizedKws.filter((k: string) => ownedKws.has(k));
-          const gap = normalizedKws.filter((k: string) => !ownedKws.has(k));
+          const owned = normalizedKws.filter((k: string) =>
+            ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
+          );
+          const gap = normalizedKws.filter((k: string) => !owned.includes(k));
           const coverage = Math.round((owned.length / normalizedKws.length) * 100);
 
           let avgPos: number | undefined;

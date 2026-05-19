@@ -16,7 +16,7 @@ import {
   hasSerpOpportunity,
   trendDirection,
 } from '../../server/seo-provider-signals.js';
-import { enrichKeywordStrategy } from '../../server/keyword-strategy-enrichment.js';
+import { enrichKeywordStrategy, isTopicKeywordCoveredByPageMap } from '../../server/keyword-strategy-enrichment.js';
 import type { SeoDataProvider } from '../../server/seo-data-provider.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import {
@@ -497,6 +497,37 @@ describe('URL-level keyword intelligence', () => {
 
     expect(getUrlKeywords).not.toHaveBeenCalled();
     expect(result.strategy.pageMap?.[0]?.metricsSource).toBe(METRICS_SOURCE.EXACT);
+  });
+});
+
+// ── Topical Authority Coverage ────────────────────────────────────────
+
+describe('isTopicKeywordCoveredByPageMap', () => {
+  it('counts explicit strategy keywords as topic coverage', () => {
+    expect(isTopicKeywordCoveredByPageMap('teeth whitening', [{
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'cosmetic dentistry',
+      secondaryKeywords: ['professional teeth whitening'],
+    }])).toBe(true);
+  });
+
+  it('counts page title and slug phrase matches as topic coverage', () => {
+    expect(isTopicKeywordCoveredByPageMap('cosmetic dentistry', [{
+      pagePath: '/services/cosmetic-dentistry',
+      pageTitle: 'Cosmetic Dentistry',
+      primaryKeyword: 'smile makeovers',
+      secondaryKeywords: [],
+    }])).toBe(true);
+  });
+
+  it('does not claim broad one-word terms from page title or slug matches', () => {
+    expect(isTopicKeywordCoveredByPageMap('dental', [{
+      pagePath: '/services/dental-implants',
+      pageTitle: 'Dental Implants',
+      primaryKeyword: 'implant dentistry',
+      secondaryKeywords: [],
+    }])).toBe(false);
   });
 });
 
