@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **371 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **372 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 372. AI Operation Contract Hardening
+
+**What it does:** Expands the named AI operation registry and adds a shared structured-output boundary for high-value JSON-returning AI features. `server/ai-operation-registry.ts` now covers content-post SEO meta generation, content-post unification, voice scoring, meeting briefs, voice-feedback suggestions, and intelligence-profile autofill. `server/ai-structured-output.ts` centralizes the “parse once, validate always” rule: strip fences/wrappers with `parseAIJson()`, then validate the payload with Zod before trusting it. The most user-visible callers now use operation-backed defaults and explicit malformed-output handling instead of regex-first JSON extraction.
+
+**Agency value:** Reduces the frustrating class of failures where the model produced a usable answer but the platform silently dropped it because the JSON wrapper or field shape drifted. Debugging gets faster because provider/model/timeout/retry posture lives in one auditable place.
+
+**Client value:** More reliable SEO meta generation, content-post unification, voice feedback, meeting briefs, and autofill suggestions. The AI features feel steadier because malformed model output degrades predictably instead of becoming mystery failures.
+
+**Mutual:** Raises confidence in the whole AI layer. Better context and outcome learning only matter if the structured outputs survive the boundary cleanly, and this feature makes that boundary explicit and testable.
 
 ---
 

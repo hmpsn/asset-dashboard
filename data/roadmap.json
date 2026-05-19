@@ -120,8 +120,8 @@
           "source": "Platform insights + AI content audit discussion 2026-05-18",
           "est": "3-5h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Migrate remaining high-value AI calls that manually pass feature/model/researchMode/responseFormat into named AI operation contracts where practical. Tighten JSON-returning paths such as SEO meta generation, voice scoring, and other post-review helpers to use responseFormat/json mode plus Zod validation rather than regex extraction or loose JSON.parse. Acceptance: each migrated operation declares provider/model intent, output mode, parser expectation, researchMode posture, retry policy, timeout profile, and tests for malformed output/provider failure. Direct-provider exceptions remain documented only where helper abstractions cannot represent the payload, such as vision/multimodal calls."
+          "status": "done",
+          "notes": "Completed in PR6. Added named operation contracts for `content-post-seo-meta`, `content-post-unify`, `voice-scoring`, `meeting-brief`, `voice-feedback-suggest`, and `intelligence-profile-autofill` in `server/ai-operation-registry.ts`, each with explicit provider/model intent, output mode, parser expectation, research posture, retry policy, and timeout profile. Added `server/ai-structured-output.ts` so high-value structured-output callers use `parseAIJson()` only for boundary cleanup and then validate with Zod. Hardened `server/content-posts-ai.ts`, `server/meeting-brief-generator.ts`, `server/copy-voice-feedback.ts`, and `server/routes/workspaces.ts` to use operation-backed calls plus schema validation, preserving existing graceful fallbacks while making malformed-output handling explicit. Added focused unit/contract coverage for registry entries, fenced/malformed JSON, retry-after-invalid-output behavior, and operation-backed caller contracts."
         },
         {
           "id": "intel-quality-evidence-ledger-mvp",

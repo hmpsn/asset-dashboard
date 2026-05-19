@@ -5,11 +5,19 @@
  * Standalone module — does not auto-apply changes. Returns suggestions for review.
  */
 import { callAI } from './ai.js';
+import { z } from 'zod';
+import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { parseAIJson } from './openai-helpers.js';
 import { getVoiceProfile } from './voice-calibration.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('copy-voice-feedback');
+
+const voiceFeedbackSuggestionSchema = z.object({
+  suggestedGuardrail: z.string().trim().min(1).nullable().optional(),
+  suggestedModifier: z.string().trim().min(1).nullable().optional(),
+  reasoning: z.string().optional(),
+});
 
 // ═══ TYPES ═══
 
@@ -186,21 +194,15 @@ Based on these feedback notes and the current voice profile, suggest a specific 
 
   try {
     const result = await callAI({
-      model: 'gpt-5.4-mini',
+      operation: 'voice-feedback-suggest',
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 300,
       temperature: 0.3,
-      responseFormat: { type: 'json_object' },
-      feature: 'voice-feedback-suggest',
       workspaceId,
     });
 
-    const parsed = parseAIJson<{
-      suggestedGuardrail?: string | null;
-      suggestedModifier?: string | null;
-      reasoning?: string;
-    }>(result.text);
+    const parsed = parseStructuredAIOutput(result.text, voiceFeedbackSuggestionSchema, 'voice-feedback-suggest');
 
     // If neither suggestion was made, return null
     if (!parsed.suggestedGuardrail && !parsed.suggestedModifier) {
@@ -229,6 +231,9 @@ Based on these feedback notes and the current voice profile, suggest a specific 
 
     return suggestion;
   } catch (err) {
+    if (err instanceof StructuredAIOutputError && err.issues) {
+      log.warn({ issues: err.issues, workspaceId }, 'voice feedback suggestion failed structured-output validation');
+    }
     log.error(
       { err: err instanceof Error ? err.message : String(err), workspaceId },
       'failed to suggest voice profile update',
