@@ -688,6 +688,7 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { status: 'running', message: 'Fetching pages and analyzing keywords...' });
               const businessContext = (params.businessContext as string) || stratWs.keywordStrategy?.businessContext || '';
               const seoDataMode = (params.seoDataMode as string) || (params.semrushMode as string) || 'none';
+              const seoDataProvider = typeof params.seoDataProvider === 'string' ? params.seoDataProvider : undefined;
               const competitorDomainsProvided = Array.isArray(params.competitorDomains);
               const competitorDomains = competitorDomainsProvided ? params.competitorDomains as string[] : stratWs.competitorDomains || [];
               const mode = params.mode === 'incremental' ? 'incremental' : 'full';
@@ -695,6 +696,7 @@ router.post('/api/jobs', async (req, res) => {
                 workspaceId: wsId,
                 businessContext,
                 seoDataMode,
+                seoDataProvider,
                 competitorDomains,
                 competitorDomainsProvided,
                 maxPages,

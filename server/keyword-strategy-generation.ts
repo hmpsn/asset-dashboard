@@ -3,7 +3,7 @@
  *
  * Shared by the direct keyword strategy route and background job worker.
  */
-import { getConfiguredProvider } from './seo-data-provider.js';
+import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -40,6 +40,7 @@ export interface GenerateKeywordStrategyOptions {
   businessContext?: string;
   mode?: 'full' | 'incremental';
   seoDataMode?: 'quick' | 'full' | 'none' | string;
+  seoDataProvider?: ProviderName | string;
   /** @deprecated use seoDataMode. Preserved for legacy route/job callers. */
   semrushMode?: 'quick' | 'full' | 'none' | string;
   competitorDomains?: string[];
@@ -75,6 +76,10 @@ function normalizeSeoDataMode(mode: string | undefined): 'quick' | 'full' | 'non
   return mode === 'quick' || mode === 'full' ? mode : 'none';
 }
 
+function normalizeSeoDataProvider(provider: string | undefined): ProviderName | undefined {
+  return provider === 'dataforseo' || provider === 'semrush' ? provider : undefined;
+}
+
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
   const ws = getWorkspace(options.workspaceId);
   if (!ws) throw new KeywordStrategyGenerationError(404, { error: 'Workspace not found' });
@@ -100,7 +105,10 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     throw new KeywordStrategyGenerationError(500, { error: 'OPENAI_API_KEY not configured' });
   }
 
-  const provider = getConfiguredProvider(ws.seoDataProvider);
+  const providerPreference = normalizeSeoDataProvider(options.seoDataProvider)
+    ?? ws.seoDataProvider
+    ?? DEFAULT_SEO_DATA_PROVIDER;
+  const provider = getConfiguredProvider(providerPreference);
 
   const businessContext = options.businessContext || ws.keywordStrategy?.businessContext || '';
   const strategyMode = options.mode === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'

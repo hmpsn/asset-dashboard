@@ -28,6 +28,15 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
 const VOLUME_THRESHOLD = 10;
+const DEFAULT_SEO_DATA_PROVIDER = 'dataforseo';
+
+type SeoProviderOption = { name: string; configured: boolean };
+
+function defaultSeoDataProvider(providers: SeoProviderOption[]): string | undefined {
+  const configured = providers.filter(provider => provider.configured);
+  return configured.find(provider => provider.name === DEFAULT_SEO_DATA_PROVIDER)?.name
+    ?? configured[0]?.name;
+}
 
 interface PageKeywordMap {
   pagePath: string;
@@ -67,6 +76,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // in this component, while still exposing pageMap via Page Intelligence separately.
   const isRealStrategy = strategy?.generatedAt != null;
   const seoDataAvailableFromHook = keywordData?.seoDataAvailable || false;
+  const savedSeoDataProvider = keywordData?.workspaceData?.seoDataProvider;
   const [businessContext, setBusinessContext] = useState('');
   const [contextOpen, setContextOpen] = useState(false);
   const [seoDataAvailable, setSeoDataAvailable] = useState(seoDataAvailableFromHook);
@@ -78,13 +88,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [showNextSteps, setShowNextSteps] = useState(false);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
-  const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
+  const [providerList, setProviderList] = useState<SeoProviderOption[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
   const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
   const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
   const generating = startingStrategyJob || Boolean(activeStrategyJob);
   const displayedSeoDataMode = strategy?.seoDataMode ?? strategy?.semrushMode;
+  const selectedSeoDataProvider = activeProvider
+    ?? savedSeoDataProvider
+    ?? defaultSeoDataProvider(providerList)
+    ?? DEFAULT_SEO_DATA_PROVIDER;
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
@@ -95,15 +109,22 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   // Load provider status + workspace preference
   useEffect(() => {
-    keywords.providerStatus()
-      .then(data => { if (data?.providers) setProviderList(data.providers); })
-      .catch(() => {});
-    workspaces.getById(workspaceId)
-      .then((ws) => {
+    let cancelled = false;
+    Promise.all([
+      keywords.providerStatus().catch(() => ({ providers: [] })),
+      workspaces.getById(workspaceId).catch(() => null),
+    ]).then(([data, ws]) => {
+      if (cancelled) return;
+      const providers = data?.providers ?? [];
+      setProviderList(providers);
+      setActiveProvider(() => {
         const wsObj = ws as Record<string, unknown> | null;
-        if (wsObj?.seoDataProvider) setActiveProvider(wsObj.seoDataProvider as string);
-      })
-      .catch(() => {});
+        return typeof wsObj?.seoDataProvider === 'string'
+          ? wsObj.seoDataProvider
+          : defaultSeoDataProvider(providers);
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [workspaceId]);
 
   // Initialize SEO provider availability from React Query hook
@@ -170,6 +191,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         workspaceId,
         businessContext: businessContext.trim() || undefined,
         seoDataMode: seoDataAvailable ? seoDataMode : 'none',
+        seoDataProvider: selectedSeoDataProvider,
         competitorDomains: compList,
         maxPages: maxPages || undefined,
       });
@@ -351,11 +373,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     <ClickableRow
                       key={p.name}
                       onClick={() => {
+                        const previousProvider = activeProvider;
                         setActiveProvider(p.name);
-                        workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {});
+                        setError(null);
+                        workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {
+                          setActiveProvider(previousProvider);
+                          setError('Failed to save SEO data provider');
+                        });
                       }}
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                        (activeProvider || 'semrush') === p.name
+                        selectedSeoDataProvider === p.name
                           ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
                           : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
@@ -368,7 +395,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {(activeProvider || 'semrush') === 'dataforseo'
+                  {selectedSeoDataProvider === 'dataforseo'
                     ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
                     : 'SEMRush: subscription-based traditional keyword intelligence provider.'}
                 </p>

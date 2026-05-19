@@ -123,6 +123,7 @@ export interface SeoDataProvider {
 // ── Provider Registry ─────────────────────────────────────────
 
 export type ProviderName = 'semrush' | 'dataforseo';
+export const DEFAULT_SEO_DATA_PROVIDER: ProviderName = 'dataforseo';
 
 const providers = new Map<ProviderName, SeoDataProvider>();
 
@@ -142,7 +143,7 @@ export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider
     if (p?.isConfigured()) return p;
   }
   // Fall back to any configured provider (DataForSEO is now the primary provider)
-  for (const name of ['dataforseo', 'semrush'] as ProviderName[]) {
+  for (const name of [DEFAULT_SEO_DATA_PROVIDER, 'semrush'] as ProviderName[]) {
     const p = providers.get(name);
     if (p?.isConfigured()) return p;
   }
