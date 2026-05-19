@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **370 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **371 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 371. Intelligence Consumer Builder Foundation
+
+**What it does:** Adds a shared server-side generation-context layer in `server/intelligence/generation-context-builders.ts` for canonical content and recommendation intelligence assembly. The foundation wraps `buildWorkspaceIntelligence()` and `formatForPrompt()` into explicit `buildContentGenerationContext()` and `buildRecommendationGenerationContext()` paths, alongside a repo audit artifact, an intelligence-consumer rules doc, and an inventory contract test that classifies current AI/recommendation consumers as native, hybrid, or legacy.
+
+**Agency value:** Reduces future prompt-quality work from “grep-and-guess” refactors into guided migrations with a known inventory, tested defaults, and one place to standardize slices, `pagePath`, and learnings-domain behavior.
+
+**Client value:** Indirectly improves recommendation and content quality by making workspace-derived context more consistent before later prompt migrations land.
+
+**Mutual:** Converts a fragile convention into an explicit platform contract, lowering regression risk as more AI/recommendation features are consolidated onto the intelligence layer.
 
 ---
 
