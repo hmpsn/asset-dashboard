@@ -297,6 +297,12 @@ const stmts = createStmtCache(() => ({
       LIMIT -1 OFFSET ?
     )
   `),
+  deleteScoreHistory: db.prepare<[workspaceId: string, pagePath: string]>(
+    'DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path = ?',
+  ),
+  deleteAllScoreHistory: db.prepare<[workspaceId: string]>(
+    'DELETE FROM page_keyword_score_history WHERE workspace_id = ?',
+  ),
 }));
 
 // ── Public API ──
@@ -335,6 +341,18 @@ function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): v
   stmts().pruneScoreHistory.run(workspaceId, pagePath, workspaceId, pagePath, SCORE_HISTORY_PER_PAGE_LIMIT);
 }
 
+function normalizedKeyword(value: string | undefined | null): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function clearScoreHistoryIfPrimaryKeywordChanged(workspaceId: string, entry: PageKeywordMap): void {
+  const pagePath = normalizePath(entry.pagePath);
+  const existing = stmts().getOne.get(workspaceId, pagePath) as PageKeywordRow | undefined;
+  if (!existing) return;
+  if (normalizedKeyword(existing.primary_keyword) === normalizedKeyword(entry.primaryKeyword)) return;
+  stmts().deleteScoreHistory.run(workspaceId, pagePath);
+}
+
 /** Get all page keywords for a workspace. */
 export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
@@ -353,6 +371,7 @@ export function getPageKeyword(workspaceId: string, pagePath: string): PageKeywo
 /** Upsert a single page keyword entry. */
 export function upsertPageKeyword(workspaceId: string, entry: PageKeywordMap): void {
   const run = db.transaction(() => {
+    clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
     stmts().upsert.run(modelToParams(workspaceId, entry));
     maybeRecordScoreSnapshot(workspaceId, entry);
   });
@@ -364,6 +383,7 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
+      clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
       stmt.run(modelToParams(workspaceId, entry));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
@@ -380,6 +400,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
+      clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
       stmt.run(modelToParams(workspaceId, entry));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
@@ -393,6 +414,9 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
     db.prepare(
       `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
     ).run(workspaceId, ...normalizedPaths);
+    db.prepare(
+      `DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+    ).run(workspaceId, ...normalizedPaths);
   });
   run();
 }
@@ -401,6 +425,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
 export function replaceAllPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
   const run = db.transaction(() => {
     stmts().deleteAll.run(workspaceId);
+    stmts().deleteAllScoreHistory.run(workspaceId);
     const stmt = stmts().upsert;
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
@@ -412,12 +437,21 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
 
 /** Delete a single page keyword entry. */
 export function deletePageKeyword(workspaceId: string, pagePath: string): void {
-  stmts().deleteOne.run(workspaceId, normalizePath(pagePath));
+  const run = db.transaction(() => {
+    const normalized = normalizePath(pagePath);
+    stmts().deleteOne.run(workspaceId, normalized);
+    stmts().deleteScoreHistory.run(workspaceId, normalized);
+  });
+  run();
 }
 
 /** Delete all page keywords for a workspace. */
 export function deleteAllPageKeywords(workspaceId: string): void {
-  stmts().deleteAll.run(workspaceId);
+  const run = db.transaction(() => {
+    stmts().deleteAll.run(workspaceId);
+    stmts().deleteAllScoreHistory.run(workspaceId);
+  });
+  run();
 }
 
 /** Clear analysis fields from all pages (preserves keyword assignments). */

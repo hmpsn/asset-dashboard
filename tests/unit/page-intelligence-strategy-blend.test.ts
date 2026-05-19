@@ -65,6 +65,15 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
       pageTitle: 'Changed Keyword',
       primaryKeyword: 'old service keyword',
       secondaryKeywords: [],
+      optimizationScore: 88,
+      analysisGeneratedAt: '2026-04-02T10:00:00Z',
+    });
+
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/changed-keyword',
+      pageTitle: 'Changed Keyword',
+      primaryKeyword: 'old service keyword',
+      secondaryKeywords: [],
       optimizationScore: 82,
       optimizationIssues: ['Old keyword title mismatch'],
       recommendations: ['Rewrite around old keyword'],
@@ -91,6 +100,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result?.contentGaps).toBeUndefined();
     expect(result?.analysisGeneratedAt).toBeUndefined();
     expect(result?.serpFeatures).toBeUndefined();
+    expect(result?.optimizationScoreHistory).toBeUndefined();
   });
 
   it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {
