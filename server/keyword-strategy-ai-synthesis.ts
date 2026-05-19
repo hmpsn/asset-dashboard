@@ -7,6 +7,7 @@ import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { KeywordStrategy, Workspace } from '../shared/types/workspace.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
@@ -118,6 +119,7 @@ interface SynthesizeKeywordStrategyOptions {
   seoContext: string;
   domainKeywords: DomainKeyword[];
   keywordGaps: KeywordGapEntry[];
+  discoveryKeywords: KeywordSourceEvidence[];
   relatedKeywords: RelatedKeyword[];
   competitorKeywords: CompetitorKeywordData[];
   provider: SeoDataProvider | null;
@@ -177,6 +179,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     seoContext: semrushContext,
     domainKeywords: semrushDomainData,
     keywordGaps,
+    discoveryKeywords,
     relatedKeywords: relatedKws,
     competitorKeywords: competitorKeywordData,
     provider,
@@ -356,6 +359,13 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
         keywordPool.set(kw, { volume: gap.volume, difficulty: gap.difficulty, source: `gap:${gap.competitorDomain}` });
       }
     }
+    // Add provider discovery keywords to the pool for sparse/low-footprint sites.
+    for (const dk of discoveryKeywords) {
+      const kw = dk.keyword.toLowerCase();
+      if (!keywordPool.has(kw) && dk.volume > 0) {
+        keywordPool.set(kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
+      }
+    }
     // Add related keywords to the pool
     for (const rk of relatedKws) {
       const kw = rk.keyword.toLowerCase();
@@ -386,7 +396,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
     const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${discoveryKeywords.length} discovery + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
