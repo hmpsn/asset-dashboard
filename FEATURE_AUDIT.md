@@ -5602,7 +5602,7 @@ Bug hardening included:
 **PR:** #662
 
 ### 400. SchemaReviewModal
-**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management.
+**What it does:** Full-screen modal wrapper around SchemaReviewTab, triggered from the schema plan card in InboxTab's Decisions section. Replaces the retired standalone `schema-review` ClientTab route. Escape key closes; WAI-ARIA `role="dialog"` with focus management. Legacy route closeout hardening now canonicalizes both `/client/:workspaceId/schema-review` and `?tab=schema-review` to `/client/:workspaceId/inbox?tab=reviews` so old bookmarks land directly on Reviews.
 
 **Agency value:** Schema review is now embedded in the client inbox workflow instead of a separate nav tab, reducing client confusion about where to find schema feedback.
 
@@ -5610,7 +5610,7 @@ Bug hardening included:
 
 **Mutual:** SchemaReviewTab component is reused (not duplicated); route cleanup removes a stale client navigation entry.
 
-**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed).
+**Files:** `src/components/client/SchemaReviewModal.tsx`; `src/components/client/InboxTab.tsx`; `src/components/ClientDashboard.tsx` (route entry removed); `src/App.tsx`; `src/routes.ts`; `tests/unit/client-routes-redirect.test.tsx`.
 
 **PR:** #662
 

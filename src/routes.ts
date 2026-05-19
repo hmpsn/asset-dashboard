@@ -49,6 +49,7 @@ export function adminPath(workspaceId: string, tab: Page = 'home'): string {
 export function clientPath(workspaceId: string, tab?: string, betaMode?: boolean): string {
   const prefix = betaMode ? '/client/beta' : '/client';
   if (!tab || tab === 'overview') return `${prefix}/${workspaceId}`;
+  if (tab === 'schema-review') return `${prefix}/${workspaceId}/inbox?tab=reviews`;
   if (isClientInboxAlias(tab)) return `${prefix}/${workspaceId}/inbox?tab=${CLIENT_INBOX_ALIASES[tab]}`;
   return `${prefix}/${workspaceId}/${tab}`;
 }
