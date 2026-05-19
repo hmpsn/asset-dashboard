@@ -21,6 +21,36 @@ export const METRICS_SOURCE = {
 
 export type MetricsSource = typeof METRICS_SOURCE[keyof typeof METRICS_SOURCE];
 
+export const KEYWORD_SOURCE_KIND = {
+  KEYWORD_IDEAS: 'keyword_ideas',
+  KEYWORDS_FOR_SITE: 'keywords_for_site',
+  KEYWORD_SUGGESTIONS: 'keyword_suggestions',
+  GOOGLE_ADS_KEYWORDS_FOR_KEYWORDS: 'google_ads_keywords_for_keywords',
+  RELATED_KEYWORDS: 'related_keywords',
+  RANKED_KEYWORDS: 'ranked_keywords',
+  GSC_QUERY: 'gsc_query',
+  CLIENT_REQUESTED: 'client_requested',
+  UNKNOWN: 'unknown',
+} as const;
+
+export type KeywordSourceKind = typeof KEYWORD_SOURCE_KIND[keyof typeof KEYWORD_SOURCE_KIND];
+
+export interface KeywordSourceEvidence {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  cpc: number;
+  competition?: number;
+  trend?: number[];
+  provider: string;
+  sourceKind: KeywordSourceKind;
+  seed?: string;
+  sourceTarget?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  intent?: string;
+  serpFeatures?: string;
+}
+
 export interface UrlLevelKeyword {
   keyword: string;
   position: number;

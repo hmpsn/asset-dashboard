@@ -447,6 +447,190 @@ describe('DataForSeoProvider — getDomainKeywords order_by contract', () => {
   });
 });
 
+describe('DataForSeoProvider — keyword discovery endpoints', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('normalizes keyword_ideas results into source evidence', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword: 'best seo dashboard',
+          keyword_info: {
+            search_volume: 1200,
+            keyword_difficulty: 44,
+            competition: 0.32,
+            cpc: 5.25,
+            monthly_searches: [{ search_volume: 1000 }, { search_volume: 1200 }],
+          },
+          search_intent_info: { main_intent: 'commercial' },
+          serp_info: { serp_item_types: ['organic', 'people_also_ask'] },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordIdeas(['seo dashboard'], 'ws-discovery-ideas', 25, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/keyword_ideas/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({
+      keywords: ['seo dashboard'],
+      limit: 25,
+      language_code: 'en',
+    });
+    expect(body[0]).not.toHaveProperty('order_by');
+    expect(results).toEqual([
+      expect.objectContaining({
+        keyword: 'best seo dashboard',
+        volume: 1200,
+        difficulty: 44,
+        cpc: 5.25,
+        competition: 0.32,
+        provider: 'dataforseo',
+        sourceKind: 'keyword_ideas',
+        seed: 'seo dashboard',
+        intent: 'commercial',
+        serpFeatures: 'organic,people_also_ask',
+      }),
+    ]);
+    expect(results[0].trend).toEqual([1000, 1200]);
+  });
+
+  it('normalizes keywords_for_site results with source target evidence', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword: 'dental implants austin',
+          keyword_info: { search_volume: 900, keyword_difficulty: 38, competition: 0.4, cpc: 8 },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordsForSite('https://www.example.com/services', 'ws-site-discovery', 10, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/keywords_for_site/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({
+      target: 'example.com',
+      limit: 10,
+    });
+    expect(body[0]).not.toHaveProperty('order_by');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'dental implants austin',
+      sourceKind: 'keywords_for_site',
+      sourceTarget: 'example.com',
+      confidence: 'high',
+    }));
+  });
+
+  it('normalizes general keyword_suggestions without question filtering', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [{
+          keyword_data: {
+            keyword: 'seo dashboard software',
+            keyword_info: { search_volume: 700, keyword_difficulty: 41, cpc: 4.5 },
+          },
+        }],
+      }]),
+    } as Response);
+
+    const results = await provider.getKeywordSuggestions('seo dashboard', 'ws-suggestions', 20, 'us');
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).not.toHaveProperty('filters');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'seo dashboard software',
+      sourceKind: 'keyword_suggestions',
+      seed: 'seo dashboard',
+    }));
+  });
+
+  it('normalizes Google Ads keywords_for_keywords results', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([
+        { keyword: 'seo rank tracking software', search_volume: 1300, competition_index: 52, cpc: 6.1, competition: 0.52, monthly_searches: [] },
+      ]),
+    } as Response);
+
+    const results = await provider.getKeywordsForKeywords(['rank tracking'], 'ws-google-ads', 50, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('keywords_data/google_ads/keywords_for_keywords/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toMatchObject({ keywords: ['rank tracking'], sort_by: 'relevance' });
+    expect(body[0]).not.toHaveProperty('limit');
+    expect(results[0]).toEqual(expect.objectContaining({
+      keyword: 'seo rank tracking software',
+      difficulty: 52,
+      sourceKind: 'google_ads_keywords_for_keywords',
+      seed: 'rank tracking',
+    }));
+  });
+
+  it('returns cached discovery candidates without a provider call', async () => {
+    const cached = [{
+      keyword: 'cached discovery keyword',
+      volume: 500,
+      difficulty: 24,
+      cpc: 3.2,
+      provider: 'dataforseo',
+      sourceKind: 'keyword_ideas' as const,
+      seed: 'cached seed',
+      confidence: 'medium' as const,
+    }];
+    vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      data: cached,
+    }));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const provider = new DataForSeoProvider();
+
+    const results = await provider.getKeywordIdeas(['cached seed'], 'ws-discovery-cache', 25, 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(results).toEqual(cached);
+  });
+
+  it('degrades malformed discovery payloads to an empty result', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{ items: [{ keyword_info: { search_volume: 100 } }] }]),
+    } as Response);
+
+    await expect(provider.getKeywordsForSite('example.com', 'ws-malformed-discovery', 10, 'us')).resolves.toEqual([]);
+  });
+
+  it('returns an empty result when a discovery endpoint fails', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('provider unavailable'));
+
+    await expect(provider.getKeywordSuggestions('seo dashboard', 'ws-discovery-failure', 20, 'us')).resolves.toEqual([]);
+  });
+});
+
 describe('DataForSeoProvider — getReferringDomains date normalization', () => {
   afterEach(() => vi.restoreAllMocks());
 

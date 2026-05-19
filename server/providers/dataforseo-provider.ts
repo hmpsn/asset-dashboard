@@ -10,6 +10,7 @@ import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
+import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -161,6 +162,7 @@ function isSubscriptionError(err: unknown): boolean {
 
 const CACHE_TTL_KEYWORD = 720;         // 30 days
 const CACHE_TTL_RELATED = 720;         // 30 days
+const CACHE_TTL_DISCOVERY = 720;       // 30 days
 const CACHE_TTL_DOMAIN_ORGANIC = 168;  // 7 days
 const CACHE_TTL_DOMAIN_OVERVIEW = 168; // 7 days
 const CACHE_TTL_BACKLINKS = 168;       // 7 days
@@ -206,6 +208,23 @@ function cleanUrlTarget(url: string): string {
   } catch { // catch-ok: malformed provider target degrades to domain-style target normalization.
     return cleanDomain(url);
   }
+}
+
+function cacheKeyPart(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180);
+}
+
+function normalizeSeedKeywords(keywords: string[], limit = 10): string[] {
+  const seen = new Set<string>();
+  const seeds: string[] = [];
+  for (const kw of keywords) {
+    const normalized = kw.toLowerCase().trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    seeds.push(normalized);
+    if (seeds.length >= limit) break;
+  }
+  return seeds;
 }
 
 interface DataForSeoResponse {
@@ -321,6 +340,103 @@ function getTaskResult(json: DataForSeoResponse): Record<string, unknown>[] {
 
 function getTaskCost(json: DataForSeoResponse): number {
   return json.tasks?.[0]?.cost ?? 0;
+}
+
+function normalizeMonthlyTrend(kwInfo: Record<string, unknown> | undefined): number[] | undefined {
+  const monthlies = kwInfo?.monthly_searches as Array<{ search_volume?: number }> | undefined;
+  return monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined;
+}
+
+function evidenceFromKeywordData(
+  keywordData: Record<string, unknown> | undefined,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    sourceTarget?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence | null {
+  const keyword = (keywordData?.keyword as string | undefined)?.trim();
+  if (!keyword) return null;
+  const kwInfo = keywordData?.keyword_info as Record<string, unknown> | undefined;
+  const serpInfo = keywordData?.serp_info as Record<string, unknown> | undefined;
+  const searchIntentInfo = keywordData?.search_intent_info as Record<string, unknown> | undefined;
+  const competition = kwInfo?.competition as number | undefined;
+  const competitionIndex = kwInfo?.competition_index as number | undefined;
+  const difficulty = kwInfo?.keyword_difficulty as number | undefined;
+  const mainIntent = searchIntentInfo?.main_intent as string | undefined;
+  const serpFeatures = Array.isArray(serpInfo?.serp_item_types)
+    ? (serpInfo.serp_item_types as string[]).join(',')
+    : undefined;
+
+  return {
+    keyword,
+    volume: (kwInfo?.search_volume as number) ?? 0,
+    difficulty: difficulty ?? competitionIndex ?? Math.round((competition ?? 0) * 100),
+    cpc: (kwInfo?.cpc as number) ?? 0,
+    competition: typeof competition === 'number' ? competition : undefined,
+    trend: normalizeMonthlyTrend(kwInfo),
+    provider: options.provider,
+    sourceKind: options.sourceKind,
+    seed: options.seed,
+    sourceTarget: options.sourceTarget,
+    confidence: options.confidence,
+    intent: mainIntent,
+    serpFeatures,
+  };
+}
+
+function evidenceFromKeywordDataItems(
+  items: Array<Record<string, unknown>>,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    sourceTarget?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence[] {
+  const seen = new Set<string>();
+  const results: KeywordSourceEvidence[] = [];
+  for (const item of items) {
+    const keywordData = (item.keyword_data as Record<string, unknown> | undefined) ?? item;
+    const evidence = evidenceFromKeywordData(keywordData, options);
+    if (!evidence) continue;
+    const normalized = evidence.keyword.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    results.push(evidence);
+  }
+  return results;
+}
+
+function evidenceFromGoogleAdsKeywordItem(
+  item: Record<string, unknown>,
+  options: {
+    provider: string;
+    sourceKind: KeywordSourceKind;
+    seed?: string;
+    confidence?: KeywordSourceEvidence['confidence'];
+  },
+): KeywordSourceEvidence | null {
+  const keyword = (item.keyword as string | undefined)?.trim();
+  if (!keyword) return null;
+  const competition = item.competition as number | undefined;
+  const competitionIndex = item.competition_index as number | undefined;
+  const monthlies = item.monthly_searches as Array<{ search_volume?: number }> | undefined;
+  return {
+    keyword,
+    volume: (item.search_volume as number) ?? 0,
+    difficulty: competitionIndex ?? Math.round((competition ?? 0) * 100),
+    cpc: (item.cpc as number) ?? 0,
+    competition: typeof competition === 'number' ? competition : undefined,
+    trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
+    provider: options.provider,
+    sourceKind: options.sourceKind,
+    seed: options.seed,
+    confidence: options.confidence,
+  };
 }
 
 // ── Provider Implementation ──
@@ -562,6 +678,168 @@ export class DataForSeoProvider implements SeoDataProvider {
       return results;
     } catch (err) {
       log.error({ err }, `DataForSEO keyword_suggestions error for "${keyword}"`);
+      return [];
+    }
+  }
+
+  async getKeywordSuggestions(keyword: string, workspaceId: string, limit = 25, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seed = keyword.toLowerCase().trim();
+    if (!seed) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 100);
+    const cacheKey = `discovery_suggestions_${database}_${cacheKeyPart(seed)}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keyword_suggestions/live', [{
+        keyword: seed,
+        location_code: locationCode(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_SUGGESTIONS,
+        seed,
+        confidence: 'medium',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keyword_suggestions_general', query: seed, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keyword_suggestions discovery error for "${seed}"`);
+      return [];
+    }
+  }
+
+  async getKeywordIdeas(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seeds = normalizeSeedKeywords(keywords, 10);
+    if (seeds.length === 0) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `discovery_ideas_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keyword_ideas/live', [{
+        keywords: seeds,
+        location_code: locationCode(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORD_IDEAS,
+        seed: seeds.join(', '),
+        confidence: 'medium',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keyword_ideas', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keyword_ideas error for "${seeds.join(', ')}"`);
+      return [];
+    }
+  }
+
+  async getKeywordsForSite(target: string, workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const cleanTarget = cleanDomain(target);
+    if (!cleanTarget) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `discovery_site_${database}_${cacheKeyPart(cleanTarget)}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('dataforseo_labs/google/keywords_for_site/live', [{
+        target: cleanTarget,
+        location_code: locationCode(database),
+        language_code: 'en',
+        limit: cappedLimit,
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+      const results = evidenceFromKeywordDataItems(items, {
+        provider: this.name,
+        sourceKind: KEYWORD_SOURCE_KIND.KEYWORDS_FOR_SITE,
+        sourceTarget: cleanTarget,
+        confidence: 'high',
+      });
+      logCreditUsage({ credits: cost, endpoint: 'keywords_for_site', query: cleanTarget, rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keywords_for_site error for "${cleanTarget}"`);
+      return [];
+    }
+  }
+
+  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+    const seeds = normalizeSeedKeywords(keywords, 20);
+    if (seeds.length === 0) return [];
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
+    const cacheKey = `google_ads_keywords_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cached = readCache<KeywordSourceEvidence[]>(workspaceId, cacheKey, CACHE_TTL_DISCOVERY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: cached.length, workspaceId, cached: true });
+      return cached;
+    }
+
+    if (areCreditsExhausted()) return [];
+
+    try {
+      const json = await apiCall('keywords_data/google_ads/keywords_for_keywords/live', [{
+        keywords: seeds,
+        location_code: locationCode(database),
+        language_code: 'en',
+        sort_by: 'relevance',
+      }], workspaceId);
+      const taskResults = getTaskResult(json);
+      const cost = getTaskCost(json);
+      const rawItems = taskResults[0]?.items as Array<Record<string, unknown>> | undefined;
+      const items = rawItems ?? taskResults;
+      const seen = new Set<string>();
+      const results: KeywordSourceEvidence[] = [];
+      for (const item of items.slice(0, cappedLimit)) {
+        const evidence = evidenceFromGoogleAdsKeywordItem(item, {
+          provider: this.name,
+          sourceKind: KEYWORD_SOURCE_KIND.GOOGLE_ADS_KEYWORDS_FOR_KEYWORDS,
+          seed: seeds.join(', '),
+          confidence: 'medium',
+        });
+        if (!evidence) continue;
+        const normalized = evidence.keyword.toLowerCase();
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        results.push(evidence);
+      }
+      logCreditUsage({ credits: cost, endpoint: 'keywords_for_keywords', query: seeds.join(',').slice(0, 100), rowsReturned: results.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, results);
+      return results;
+    } catch (err) {
+      log.error({ err }, `DataForSEO keywords_for_keywords error for "${seeds.join(', ')}"`);
       return [];
     }
   }

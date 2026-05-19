@@ -6,6 +6,7 @@ import { listKeywordGaps } from './keyword-gaps.js';
 import { createLogger } from './logger.js';
 import { listProviders } from './seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
+import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
 
 const log = createLogger('keyword-strategy');
@@ -45,6 +46,7 @@ export interface FetchAndCacheKeywordStrategySeoDataResult {
   seoContext: string;
   domainKeywords: DomainKeyword[];
   keywordGaps: KeywordGapEntry[];
+  discoveryKeywords: KeywordSourceEvidence[];
   relatedKeywords: RelatedKeyword[];
   questionKeywords: QuestionKeywordGroup[];
   competitorKeywords: CompetitorKeywordData[];
@@ -74,6 +76,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
   let seoContext = '';
   let domainKeywords: DomainKeyword[] = [];
   let keywordGaps: KeywordGapEntry[] = [];
+  const discoveryKeywords: KeywordSourceEvidence[] = [];
   const relatedKeywords: RelatedKeyword[] = [];
   const questionKeywords: QuestionKeywordGroup[] = [];
   const competitorKeywords: CompetitorKeywordData[] = [];
@@ -113,7 +116,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       providerReasons.add('no_configured_provider');
     }
     seoDataStatus.reasons = [...providerReasons];
-    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
+    return { seoContext, domainKeywords, keywordGaps, discoveryKeywords, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
   sendProgress('seo-data', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
@@ -127,7 +130,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
     seoDataStatus.status = 'degraded';
     providerReasons.add('missing_site_domain');
     seoDataStatus.reasons = [...providerReasons];
-    return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
+    return { seoContext, domainKeywords, keywordGaps, discoveryKeywords, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
   try {
@@ -241,6 +244,54 @@ export async function fetchAndCacheKeywordStrategySeoData({
 
   if (seoDataMode === 'full') {
     try {
+      sendProgress('seo-data', 'Expanding keyword discovery sources...', 0.63);
+      const discoverySeedKeywords = [
+        ...domainKeywords.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword),
+        ...(ws.keywordStrategy?.siteKeywords ?? []).slice(0, 5),
+      ];
+      const discoveryCalls: Array<Promise<KeywordSourceEvidence[]>> = [];
+      if (provider.getKeywordsForSite) {
+        discoveryCalls.push(provider.getKeywordsForSite(siteDomain, ws.id, 50));
+      }
+      if (provider.getKeywordIdeas && discoverySeedKeywords.length > 0) {
+        discoveryCalls.push(provider.getKeywordIdeas(discoverySeedKeywords, ws.id, 50));
+      }
+      if (provider.getKeywordSuggestions) {
+        for (const seed of discoverySeedKeywords.slice(0, 3)) {
+          discoveryCalls.push(provider.getKeywordSuggestions(seed, ws.id, 20));
+        }
+      }
+      if (provider.getKeywordsForKeywords && discoverySeedKeywords.length > 0) {
+        discoveryCalls.push(provider.getKeywordsForKeywords(discoverySeedKeywords, ws.id, 50));
+      }
+
+      const batches = await Promise.all(discoveryCalls.map(call => call.catch(err => {
+        log.warn({ err }, 'Keyword discovery source failed');
+        providerReasons.add('keyword_discovery_partial_error');
+        return [];
+      })));
+      const seenDiscovery = new Set<string>();
+      for (const keyword of batches.flat()) {
+        const normalized = keyword.keyword.toLowerCase().trim();
+        if (!normalized || seenDiscovery.has(normalized)) continue;
+        seenDiscovery.add(normalized);
+        discoveryKeywords.push(keyword);
+      }
+
+      if (discoveryKeywords.length > 0) {
+        seoContext += `\n\nSEO PROVIDER DISCOVERY KEYWORDS (source-expanded ideas with provider evidence):\n`;
+        seoContext += discoveryKeywords
+          .sort((a, b) => b.volume - a.volume)
+          .slice(0, 40)
+          .map(k => `- "${k.keyword}" (source: ${k.sourceKind}, vol: ${k.volume}/mo, KD: ${k.difficulty}%)`)
+          .join('\n');
+      }
+    } catch (err) {
+      log.error({ err }, 'Keyword discovery expansion error');
+      providerReasons.add('keyword_discovery_error');
+    }
+
+    try {
       sendProgress('seo-data', 'Fetching related keyword ideas...', 0.65);
       const seedKeywords = domainKeywords.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
       for (const seed of seedKeywords) {
@@ -289,6 +340,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
     && domainKeywords.length === 0
     && keywordGaps.length === 0
     && competitorKeywords.length === 0
+    && discoveryKeywords.length === 0
     && relatedKeywords.length === 0
     && questionKeywords.length === 0
   ) {
@@ -299,5 +351,5 @@ export async function fetchAndCacheKeywordStrategySeoData({
     seoDataStatus.reasons = [...providerReasons];
   }
 
-  return { seoContext, domainKeywords, keywordGaps, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
+  return { seoContext, domainKeywords, keywordGaps, discoveryKeywords, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
 }

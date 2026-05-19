@@ -3,6 +3,7 @@
 // Consumers call the registry instead of individual providers.
 
 import { createLogger } from './logger.js';
+import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 
 const log = createLogger('seo-data-provider');
 
@@ -105,6 +106,10 @@ export interface SeoDataProvider {
   getKeywordMetrics(keywords: string[], workspaceId: string, database?: string): Promise<KeywordMetrics[]>;
   getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;
   getQuestionKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<QuestionKeyword[]>;
+  getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
 
   // Domain Analysis
   getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;

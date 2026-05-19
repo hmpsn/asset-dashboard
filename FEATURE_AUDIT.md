@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **442 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **443 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 443. Keyword Source Data Expansion
+
+**What it does:** Expands the keyword provider layer with normalized discovery evidence from DataForSEO Labs keyword ideas, keywords-for-site, general keyword suggestions, and Google Ads keywords-for-keywords. Strategy generation can now collect richer cold-start and seed-expansion candidates through `SeoDataProvider` capabilities, preserve source metadata, and fall back safely if any discovery endpoint is unavailable.
+
+**Agency value:** Gives strategists a wider raw candidate pool before the shared keyword intelligence engine starts filtering and scoring. This is especially helpful for sparse or under-optimized sites where existing rankings alone do not reveal enough opportunity.
+
+**Client value:** Sets up keyword strategies that can discover new opportunities beyond what the site already ranks for, while keeping the current ranking behavior stable until the next quality/scoring PRs land.
+
+**Mutual:** Builds the source-data foundation for the next keyword operating-loop phases: rank-tracking reconciliation, shared keyword intelligence, and explainable strategy UX. Provider-specific payloads stay isolated, so the platform gets better inputs without making strategy code vendor-specific.
 
 ---
 
