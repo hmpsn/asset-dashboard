@@ -22,7 +22,6 @@ import type { AuditSnapshot } from './reports.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
-import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listContentGaps } from './content-gaps.js';
@@ -33,6 +32,7 @@ import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
+import { buildRecommendationStory } from './signal-story-registry.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -668,19 +668,6 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
   }
 }
 
-function decayInsight(page: DecayingPage): string {
-  const decline = Math.abs(page.clickDeclinePct);
-  const clickDrop = page.previousClicks - page.currentClicks;
-  if (page.severity === 'critical') {
-    return `This page lost ${decline}% of its search clicks (${clickDrop} clicks/mo). ` +
-      `Position moved from ${page.previousPosition.toFixed(1)} to ${page.currentPosition.toFixed(1)}. ` +
-      `Refreshing the content — updating facts, improving structure, and targeting current search intent — can recover most of this traffic.`;
-  }
-  return `Search clicks declined ${decline}% (${clickDrop} fewer clicks/mo). ` +
-    `The page may be losing relevance as competitors update their content. ` +
-    `A targeted refresh addressing current search intent could reverse the trend.`;
-}
-
 // ─── Main Engine ──────────────────────────────────────────────────
 
 export async function generateRecommendations(workspaceId: string): Promise<RecommendationSet> {
@@ -952,14 +939,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
         // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
         const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
+        const story = buildRecommendationStory('content_gap', {
+          topic: cg.topic,
+          targetKeyword: cg.targetKeyword,
+          rationale: cg.rationale,
+          suggestedPageType: cg.suggestedPageType,
+          intent: cg.intent,
+          kdNote,
+        });
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
           priority: cg.priority === 'high' ? 'fix_soon' : 'ongoing',
           type: 'content',
-          title: `Content Gap: ${cg.topic}`,
-          description: cg.rationale,
-          insight: strategyInsight('content_gap', cg),
+          title: story.title,
+          description: story.description,
+          insight: story.insight,
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
           impactScore,
@@ -967,7 +962,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
-          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)${kdNote}`,
+          estimatedGain: story.estimatedGain,
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
@@ -990,16 +985,20 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           // 2D: apply page importance multiplier
           const baseScore = pm.currentPosition <= 10 ? 60 : 40;
           const impactScore = Math.min(100, Math.round(baseScore * pageImportanceMultiplier(pm.pagePath)));
+          const story = buildRecommendationStory('ranking_opportunity', {
+            keyword: pm.primaryKeyword,
+            pagePath: pm.pagePath,
+            currentPosition: pm.currentPosition,
+            impressions: pm.impressions,
+          });
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
             priority: pm.currentPosition <= 10 ? 'fix_soon' : 'ongoing',
             type: 'strategy',
-            title: `Ranking Opportunity: "${pm.primaryKeyword}" (pos ${Math.round(pm.currentPosition)})`,
-            description: `${pm.pagePath} ranks #${Math.round(pm.currentPosition)} for "${pm.primaryKeyword}" with ${pm.impressions?.toLocaleString()} impressions. Optimizing this page could push it onto page 1 or into the top 3.`,
-            insight: pm.currentPosition <= 10
-              ? `This page is on page 1 but not in the top 3. Moving from position ${Math.round(pm.currentPosition)} to top 3 could 2-3x click-through rate.`
-              : `This page ranks on page 2 — just outside where most clicks happen. A focused optimization push could move it onto page 1.`,
+            title: story.title,
+            description: story.description,
+            insight: story.insight,
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
             impactScore,
@@ -1007,7 +1006,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
             impressionsAtRisk: pm.impressions || 0,
-            estimatedGain: `Moving to top 3 could increase clicks by ${Math.round((pm.impressions || 0) * 0.15)} - ${Math.round((pm.impressions || 0) * 0.3)}/mo`,
+            estimatedGain: story.estimatedGain,
             actionType: 'manual',
             status: 'pending',
             assignedTo,
@@ -1068,7 +1067,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
       for (const dp of actionableDecay) {
         const pageSlug = toPageSlug(dp.page);
-        const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
 
         const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
         const impactScore = dp.severity === 'critical'
@@ -1076,17 +1074,26 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           : Math.min(70, 40 + Math.round(dp.previousClicks / 100));
 
         const product = mapToProduct('content_refresh', 1);
-        const clicksLost = dp.previousClicks - dp.currentClicks;
+        const story = buildRecommendationStory('content_decay', {
+          pagePath: dp.page,
+          title: dp.title,
+          clickDeclinePct: dp.clickDeclinePct,
+          refreshRecommendation: dp.refreshRecommendation,
+          severity: dp.severity,
+          previousClicks: dp.previousClicks,
+          currentClicks: dp.currentClicks,
+          previousPosition: dp.previousPosition,
+          currentPosition: dp.currentPosition,
+        });
 
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
           priority,
           type: 'content_refresh',
-          title: `Content Decay: ${dp.title || dp.page} (${Math.abs(dp.clickDeclinePct)}% decline)`,
-          description: dp.refreshRecommendation
-            || `This page has lost ${Math.abs(dp.clickDeclinePct)}% of its search clicks. Refresh the content to recover traffic.`,
-          insight: decayInsight(dp),
+          title: story.title,
+          description: story.description,
+          insight: story.insight,
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
           impactScore,
@@ -1094,9 +1101,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
           impressionsAtRisk: dp.previousImpressions,
-          estimatedGain: isHighTraffic
-            ? `Refreshing could recover ${Math.round(clicksLost * 0.5)} – ${clicksLost} clicks/mo`
-            : `Content refresh to reverse ${Math.abs(dp.clickDeclinePct)}% traffic decline`,
+          estimatedGain: story.estimatedGain,
           actionType: product.productType ? 'purchase' : 'manual',
           productType: product.productType,
           productPrice: product.productPrice,
@@ -1133,14 +1138,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const gap = d.estimatedClickGap ?? 0;
       if (gap <= 0) continue;
       const product = mapToProduct('metadata', 1);
+      const story = buildRecommendationStory('ctr_opportunity', {
+        pageSlug,
+        actualCtr: d.actualCtr,
+        expectedCtr: d.expectedCtr,
+        impressions: d.impressions ?? 0,
+        position: d.position ?? 0,
+        gap,
+      });
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
         priority: gap > 50 ? 'fix_now' : 'fix_soon',
         type: 'metadata',
-        title: `CTR Underperformance: /${pageSlug} (${d.actualCtr}% vs ${d.expectedCtr}% expected)`,
-        description: `This page gets ${d.impressions?.toLocaleString()} impressions/mo at position #${d.position?.toFixed(1)} but only ${d.actualCtr}% CTR (expected ~${d.expectedCtr}%). Improving the title and meta description could add ~${gap} clicks/mo.`,
-        insight: `CTR below expected for this position means the title/description isn't compelling enough to earn clicks. Target CTR for position ${d.position?.toFixed(1)} is ~${d.expectedCtr}%.`,
+        title: story.title,
+        description: story.description,
+        insight: story.insight,
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
         impactScore: Math.min(90, 40 + Math.round(gap / 2)),
@@ -1148,7 +1161,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
         impressionsAtRisk: d.impressions ?? 0,
-        estimatedGain: `Optimizing title/meta could recover ~${gap} clicks/mo`,
+        estimatedGain: story.estimatedGain,
         actionType: product.productType ? 'purchase' : 'manual',
         productType: product.productType,
         productPrice: product.productPrice,
@@ -1219,14 +1232,19 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const trafficAtRisk = d.impressions ?? 0;
       const impactScore = Math.min(Math.round(trafficAtRisk / 50), 80);
       const product = mapToProduct('content_refresh', 1);
+      const story = buildRecommendationStory('freshness_alert', {
+        pagePath: d.pagePath,
+        daysSinceLastAnalysis: d.daysSinceLastAnalysis,
+        trafficAtRisk,
+      });
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
         priority: d.daysSinceLastAnalysis > 180 ? 'fix_now' : 'fix_soon',
         type: 'content_refresh',
-        title: `Stale Content: ${d.pagePath} (${d.daysSinceLastAnalysis} days since last update)`,
-        description: `This page hasn't been analyzed in ${d.daysSinceLastAnalysis} days${trafficAtRisk > 0 ? ` and still receives ~${trafficAtRisk.toLocaleString()} monthly impressions` : ''}. A content refresh can protect rankings before they decline.`,
-        insight: `Search engines favor recently-updated content. Pages stale for ${d.daysSinceLastAnalysis > 180 ? 'over 6 months' : 'over 3 months'} face elevated ranking risk.`,
+        title: story.title,
+        description: story.description,
+        insight: story.insight,
         impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
         effort: 'medium',
         impactScore,
@@ -1234,7 +1252,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         affectedPages: [toPageSlug(d.pagePath)],
         trafficAtRisk,
         impressionsAtRisk: trafficAtRisk,
-        estimatedGain: `Refreshing this page can protect ${trafficAtRisk.toLocaleString()} monthly impressions from ranking decline`,
+        estimatedGain: story.estimatedGain,
         actionType: product.productType ? 'purchase' : 'manual',
         productType: product.productType,
         productPrice: product.productPrice,

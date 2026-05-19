@@ -102,8 +102,8 @@
           "source": "Platform insights + AI content audit discussion 2026-05-18",
           "est": "5-8h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Create or extend a deterministic story/action mapping layer so client insight narratives, briefing templates, InsightsDigest cards, and recommendation cards stop translating the same platform signals in separate ways. Reuse the client briefing template discipline: concrete typed payload fields, minimal hedging, data receipts where available, and client-safe outcome language. Fill known narrative gaps for active InsightType values such as site_health and milestone_attribution so they do not fall through to generic client copy. Acceptance: every active insight type has a typed client/admin story mapping or an explicit non-client rationale; tests cover renderer coverage and avoid vague fallback language for high-impact insights."
+          "status": "done",
+          "notes": "Completed in PR4. Added `server/signal-story-registry.ts` as the server-local boundary for signal→story projection across three surfaces: client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy. `server/insight-narrative.ts` now consumes the registry instead of hand-writing inline narrative maps, which closed generic fallback gaps for `audit_finding`, `site_health`, and `milestone_attribution` while keeping explicit non-client exclusions for `strategy_alignment` and `keyword_cluster`. `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry boundary without replacing the existing deterministic templates. `server/recommendations.ts` now uses centralized story copy builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop inventing separate phrasing. Added focused coverage in `tests/unit/signal-story-registry.test.ts` and updated narrative coverage tests."
         },
         {
           "id": "intel-quality-outcome-learning-default-path",

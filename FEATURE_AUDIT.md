@@ -315,6 +315,12 @@ A comprehensive value assessment of every feature in the platform — **371 feat
 - **Noise reduction and strategic negatives**: keyword scoring now filters previously declined terms, down-ranks cannibalization conflicts and existing page-map overlaps, penalizes broad/weak-overlap adjacent terms, and boosts requested/business-priority/client-interest matches.
 - **Optional explainability**: recommendation responses accept `includeReasoning` and can return the winning rationale plus de-prioritized alternatives for admin/debug surfaces without changing the default payload for existing callers.
 
+**PR4 story registry consolidation (2026-05-19):**
+- **Server-local signal-story registry**: added `server/signal-story-registry.ts` as the shared boundary for signal→story projection across client insight narratives, deterministic briefing insight dispatch, and overlapping recommendation copy.
+- **Client insight narrative coverage hardening**: `server/insight-narrative.ts` now consumes registry projectors instead of an inline narrative map, eliminating generic fallback copy for active client-visible insight types such as `audit_finding`, `site_health`, and `milestone_attribution`.
+- **Briefing boundary alignment**: `server/briefing-templates/index.ts` now routes insight/content-gap dispatch through the shared registry while keeping the existing deterministic template modules as the briefing source of truth.
+- **Recommendation copy normalization**: `server/recommendations.ts` now uses centralized story builders for content gaps, ranking opportunities, content decay, CTR underperformance, and freshness alerts so overlapping signals stop drifting in title/description/insight phrasing across surfaces.
+
 **Agency value:** Every AI recommendation now factors in real search behavior (GSC queries) and market-proven recovery baselines. Content briefs for decaying pages arrive with context instead of generic generation. Recovery math in opportunities reflects issue-type reality instead of guessed averages.
 
 **Client value:** Content briefs speak directly to the declining keywords clients are seeing in their analytics. Recommended content priorities reflect actual market conditions, not generic templates.
