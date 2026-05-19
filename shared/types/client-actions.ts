@@ -40,8 +40,11 @@ export interface InternalLinkItem {
   anchorText: string;
   targetUrl: string;
   targetTitle?: string;
-  sourcePage?: string;
+  sourcePageUrl?: string;
+  sourcePageTitle?: string;
   contextSnippet?: string;
+  /** @deprecated Legacy payload field retained for backward-compatible reads. */
+  sourcePage?: string;
 }
 export interface InternalLinkPayload {
   suggestions: InternalLinkItem[];
