@@ -110,7 +110,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       organicOverview: organicOverview || undefined,
       organicLandingPages: organicLandingPages.length > 0 ? organicLandingPages.slice(0, 15) : undefined,
     },
-    generatedAt: new Date().toISOString(),
+    generatedAt: now,
   };
 
   const writeKeywordStrategy = db.transaction(() => {
@@ -166,7 +166,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       sourceId: ws.id,
       pageUrl: null,
       targetKeyword: null,
-      baselineSnapshot: { captured_at: new Date().toISOString() },
+      baselineSnapshot: { captured_at: now },
       attribution: 'platform_executed',
     });
   });

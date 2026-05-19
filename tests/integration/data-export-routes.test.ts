@@ -29,7 +29,7 @@ import { addActivity } from '../../server/activity-log.js';
 import { createPayment } from '../../server/payments.js';
 import { createTemplate } from '../../server/content-templates.js';
 import { createMatrix } from '../../server/content-matrices.js';
-import { updateWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeywordsBatch } from '../../server/page-keywords.js';
 
 const ctx = createTestContext(13305);
@@ -517,6 +517,32 @@ describe('GET /api/export/:workspaceId/strategy — workspace with no strategy',
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBe(0);
+  });
+
+  it('exports table-backed page keywords even when the legacy strategy blob is absent', async () => {
+    const ws = createWorkspace('Table Backed Strategy Export');
+    try {
+      upsertPageKeywordsBatch(ws.id, [
+        {
+          pagePath: '/services/table-backed',
+          pageTitle: 'Table Backed Service',
+          primaryKeyword: 'table backed keyword',
+          secondaryKeywords: ['normalized source'],
+        },
+      ]);
+
+      const res = await api(`/api/export/${ws.id}/strategy`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as Array<{ pagePath: string; primaryKeyword: string }>;
+      expect(body).toEqual([
+        expect.objectContaining({
+          pagePath: '/services/table-backed',
+          primaryKeyword: 'table backed keyword',
+        }),
+      ]);
+    } finally {
+      deleteWorkspace(ws.id);
+    }
   });
 });
 

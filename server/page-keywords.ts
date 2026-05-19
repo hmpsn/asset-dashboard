@@ -208,20 +208,20 @@ const stmts = createStmtCache(() => ({
       validated = excluded.validated,
       url_level_keywords = COALESCE(excluded.url_level_keywords, page_keywords.url_level_keywords),
       url_level_keyword_source = COALESCE(excluded.url_level_keyword_source, page_keywords.url_level_keyword_source),
-      optimization_score = COALESCE(excluded.optimization_score, page_keywords.optimization_score),
-      analysis_generated_at = COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at),
-      optimization_issues = COALESCE(excluded.optimization_issues, page_keywords.optimization_issues),
-      recommendations = COALESCE(excluded.recommendations, page_keywords.recommendations),
-      content_gaps = COALESCE(excluded.content_gaps, page_keywords.content_gaps),
-      primary_keyword_presence = COALESCE(excluded.primary_keyword_presence, page_keywords.primary_keyword_presence),
-      long_tail_keywords = COALESCE(excluded.long_tail_keywords, page_keywords.long_tail_keywords),
-      competitor_keywords = COALESCE(excluded.competitor_keywords, page_keywords.competitor_keywords),
-      estimated_difficulty = COALESCE(excluded.estimated_difficulty, page_keywords.estimated_difficulty),
-      keyword_difficulty = COALESCE(excluded.keyword_difficulty, page_keywords.keyword_difficulty),
-      monthly_volume = COALESCE(excluded.monthly_volume, page_keywords.monthly_volume),
-      topic_cluster = COALESCE(excluded.topic_cluster, page_keywords.topic_cluster),
-      search_intent_confidence = COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence),
-      serp_features = COALESCE(excluded.serp_features, page_keywords.serp_features)
+      optimization_score = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.optimization_score, page_keywords.optimization_score) ELSE excluded.optimization_score END,
+      analysis_generated_at = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at) ELSE excluded.analysis_generated_at END,
+      optimization_issues = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.optimization_issues, page_keywords.optimization_issues) ELSE excluded.optimization_issues END,
+      recommendations = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.recommendations, page_keywords.recommendations) ELSE excluded.recommendations END,
+      content_gaps = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.content_gaps, page_keywords.content_gaps) ELSE excluded.content_gaps END,
+      primary_keyword_presence = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.primary_keyword_presence, page_keywords.primary_keyword_presence) ELSE excluded.primary_keyword_presence END,
+      long_tail_keywords = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.long_tail_keywords, page_keywords.long_tail_keywords) ELSE excluded.long_tail_keywords END,
+      competitor_keywords = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.competitor_keywords, page_keywords.competitor_keywords) ELSE excluded.competitor_keywords END,
+      estimated_difficulty = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.estimated_difficulty, page_keywords.estimated_difficulty) ELSE excluded.estimated_difficulty END,
+      keyword_difficulty = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.keyword_difficulty, page_keywords.keyword_difficulty) ELSE excluded.keyword_difficulty END,
+      monthly_volume = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.monthly_volume, page_keywords.monthly_volume) ELSE excluded.monthly_volume END,
+      topic_cluster = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.topic_cluster, page_keywords.topic_cluster) ELSE excluded.topic_cluster END,
+      search_intent_confidence = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence) ELSE excluded.search_intent_confidence END,
+      serp_features = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.serp_features, page_keywords.serp_features) ELSE excluded.serp_features END
   `),
   deleteOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
@@ -297,6 +297,12 @@ const stmts = createStmtCache(() => ({
       LIMIT -1 OFFSET ?
     )
   `),
+  deleteScoreHistory: db.prepare<[workspaceId: string, pagePath: string]>(
+    'DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path = ?',
+  ),
+  deleteAllScoreHistory: db.prepare<[workspaceId: string]>(
+    'DELETE FROM page_keyword_score_history WHERE workspace_id = ?',
+  ),
 }));
 
 // ── Public API ──
@@ -335,6 +341,18 @@ function maybeRecordScoreSnapshot(workspaceId: string, entry: PageKeywordMap): v
   stmts().pruneScoreHistory.run(workspaceId, pagePath, workspaceId, pagePath, SCORE_HISTORY_PER_PAGE_LIMIT);
 }
 
+function normalizedKeyword(value: string | undefined | null): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function clearScoreHistoryIfPrimaryKeywordChanged(workspaceId: string, entry: PageKeywordMap): void {
+  const pagePath = normalizePath(entry.pagePath);
+  const existing = stmts().getOne.get(workspaceId, pagePath) as PageKeywordRow | undefined;
+  if (!existing) return;
+  if (normalizedKeyword(existing.primary_keyword) === normalizedKeyword(entry.primaryKeyword)) return;
+  stmts().deleteScoreHistory.run(workspaceId, pagePath);
+}
+
 /** Get all page keywords for a workspace. */
 export function listPageKeywords(workspaceId: string): PageKeywordMap[] {
   const rows = stmts().listByWs.all(workspaceId) as PageKeywordRow[];
@@ -353,6 +371,7 @@ export function getPageKeyword(workspaceId: string, pagePath: string): PageKeywo
 /** Upsert a single page keyword entry. */
 export function upsertPageKeyword(workspaceId: string, entry: PageKeywordMap): void {
   const run = db.transaction(() => {
+    clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
     stmts().upsert.run(modelToParams(workspaceId, entry));
     maybeRecordScoreSnapshot(workspaceId, entry);
   });
@@ -364,6 +383,7 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
+      clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
       stmt.run(modelToParams(workspaceId, entry));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
@@ -380,18 +400,23 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
   const run = db.transaction(() => {
     const stmt = stmts().upsert;
     for (const entry of entries) {
+      clearScoreHistoryIfPrimaryKeywordChanged(workspaceId, entry);
       stmt.run(modelToParams(workspaceId, entry));
       maybeRecordScoreSnapshot(workspaceId, entry);
     }
     if (entries.length === 0) {
       // Empty batch — delete all rows for this workspace
       stmts().deleteAll.run(workspaceId);
+      stmts().deleteAllScoreHistory.run(workspaceId);
       return;
     }
     const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
     const placeholders = normalizedPaths.map(() => '?').join(', ');
     db.prepare(
       `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+    ).run(workspaceId, ...normalizedPaths);
+    db.prepare(
+      `DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
     ).run(workspaceId, ...normalizedPaths);
   });
   run();
@@ -401,6 +426,7 @@ export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKey
 export function replaceAllPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
   const run = db.transaction(() => {
     stmts().deleteAll.run(workspaceId);
+    stmts().deleteAllScoreHistory.run(workspaceId);
     const stmt = stmts().upsert;
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
@@ -412,12 +438,21 @@ export function replaceAllPageKeywords(workspaceId: string, entries: PageKeyword
 
 /** Delete a single page keyword entry. */
 export function deletePageKeyword(workspaceId: string, pagePath: string): void {
-  stmts().deleteOne.run(workspaceId, normalizePath(pagePath));
+  const run = db.transaction(() => {
+    const normalized = normalizePath(pagePath);
+    stmts().deleteOne.run(workspaceId, normalized);
+    stmts().deleteScoreHistory.run(workspaceId, normalized);
+  });
+  run();
 }
 
 /** Delete all page keywords for a workspace. */
 export function deleteAllPageKeywords(workspaceId: string): void {
-  stmts().deleteAll.run(workspaceId);
+  const run = db.transaction(() => {
+    stmts().deleteAll.run(workspaceId);
+    stmts().deleteAllScoreHistory.run(workspaceId);
+  });
+  run();
 }
 
 /** Clear analysis fields from all pages (preserves keyword assignments). */

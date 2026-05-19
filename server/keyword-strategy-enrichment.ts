@@ -72,6 +72,67 @@ export interface EnrichKeywordStrategyResult {
   cannibalization: KeywordStrategyCannibalizationIssue[];
 }
 
+function normalizeTopicKeyword(value: string | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function hasMultiWordTopicSignal(keyword: string): boolean {
+  return normalizeTopicKeyword(keyword).split(' ').filter(Boolean).length >= 2;
+}
+
+export function isTopicKeywordCoveredByPageMap(
+  keyword: string,
+  pageMap: StrategyPageMapEntry[] | undefined,
+): boolean {
+  const normalizedKeyword = normalizeTopicKeyword(keyword);
+  if (!normalizedKeyword || !pageMap?.length) return false;
+
+  for (const page of pageMap) {
+    const assignedKeywords = [
+      page.primaryKeyword,
+      ...(page.secondaryKeywords ?? []),
+    ].map(normalizeTopicKeyword).filter(Boolean);
+
+    if (assignedKeywords.some(assigned =>
+      assigned === normalizedKeyword
+      || (hasMultiWordTopicSignal(normalizedKeyword) && assigned.includes(normalizedKeyword))
+    )) {
+      return true;
+    }
+
+    // Page titles and slugs are weaker than explicit keyword assignments, so only
+    // use phrase matches. This catches service pages like /services/cosmetic-dentistry
+    // without claiming broad one-word terms such as "dentist" are fully covered.
+    if (hasMultiWordTopicSignal(normalizedKeyword)) {
+      const pageSignal = normalizeTopicKeyword(`${page.pageTitle ?? ''} ${page.pagePath}`);
+      if (pageSignal.includes(normalizedKeyword)) return true;
+    }
+  }
+
+  return false;
+}
+
+function removePageCoveredContentGaps(
+  contentGaps: StrategyContentGap[] | undefined,
+  pageMap: StrategyPageMapEntry[] | undefined,
+): { kept: StrategyContentGap[]; removed: StrategyContentGap[] } {
+  if (!contentGaps?.length) return { kept: [], removed: [] };
+  const kept: StrategyContentGap[] = [];
+  const removed: StrategyContentGap[] = [];
+  for (const gap of contentGaps) {
+    if (isTopicKeywordCoveredByPageMap(gap.targetKeyword, pageMap)) {
+      removed.push(gap);
+    } else {
+      kept.push(gap);
+    }
+  }
+  return { kept, removed };
+}
+
 function resolvePageUrl(baseUrl: string, pagePath: string): string | null {
   if (!baseUrl || !pagePath) return null;
   try {
@@ -180,9 +241,12 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
       });
       if (matchingRows.length > 0) {
-        const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-        if (kwMatch) {
-          pm.currentPosition = kwMatch.position;
+        const primaryKeyword = pm.primaryKeyword.trim().toLowerCase();
+        if (primaryKeyword) {
+          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(primaryKeyword));
+          if (kwMatch) {
+            pm.currentPosition = kwMatch.position;
+          }
         }
         // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -426,6 +490,17 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
     }
   }
 
+  if (strategy.contentGaps?.length) {
+    const { kept, removed } = removePageCoveredContentGaps(strategy.contentGaps, strategy.pageMap);
+    if (removed.length > 0) {
+      log.info({
+        workspaceId,
+        removed: removed.map(gap => gap.targetKeyword),
+      }, 'Removed content gaps already covered by strategy page map');
+      strategy.contentGaps = kept;
+    }
+  }
+
   // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
   if (strategy.contentGaps?.length) {
     for (const cg of strategy.contentGaps) {
@@ -442,7 +517,8 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   {
     const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
     for (const pm of strategy.pageMap ?? []) {
-      const kw = pm.primaryKeyword.toLowerCase();
+      const kw = pm.primaryKeyword.trim().toLowerCase();
+      if (!kw) continue;
       if (!kwPages.has(kw)) kwPages.set(kw, []);
       kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
     }
@@ -550,7 +626,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   if (keywordPool.size >= 10) {
     try {
       sendProgress('enrichment', 'Building topical authority clusters...', 0.92);
-      const ownedKws = new Set(domainKeywords.map(k => k.keyword.toLowerCase()));
+      const ownedRankingKws = new Set(domainKeywords.map(k => k.keyword.toLowerCase()));
 
       // Top keywords by volume for AI clustering
       const poolForClustering = [...keywordPool.entries()]
@@ -596,8 +672,10 @@ Rules:
             .filter((k: string) => keywordPool.has(k));
           if (normalizedKws.length < 3) continue;
 
-          const owned = normalizedKws.filter((k: string) => ownedKws.has(k));
-          const gap = normalizedKws.filter((k: string) => !ownedKws.has(k));
+          const owned = normalizedKws.filter((k: string) =>
+            ownedRankingKws.has(k) || isTopicKeywordCoveredByPageMap(k, strategy.pageMap)
+          );
+          const gap = normalizedKws.filter((k: string) => !owned.includes(k));
           const coverage = Math.round((owned.length / normalizedKws.length) * 100);
 
           let avgPos: number | undefined;

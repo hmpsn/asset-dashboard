@@ -79,6 +79,17 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
   });
 
   it('adds site discovery keywords when domain ranked keywords are thin', async () => {
+    const getKeywordsForKeywords = vi.fn(async () => [
+      {
+        keyword: 'planner grouped dental term',
+        volume: 1_000_000,
+        difficulty: 21,
+        cpc: 0,
+        provider: 'dataforseo',
+        sourceKind: 'google_ads_keywords_for_keywords' as const,
+        seed: 'dentist',
+      },
+    ]);
     const provider = makeProvider('dataforseo', {
       getKeywordsForSite: vi.fn(async () => [
         {
@@ -92,6 +103,7 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
           confidence: 'high',
         },
       ]),
+      getKeywordsForKeywords,
     });
 
     const result = await fetchAndCacheKeywordStrategySeoData({
@@ -112,5 +124,9 @@ describe('fetchAndCacheKeywordStrategySeoData provider status', () => {
     ]);
     expect(result.seoContext).toContain('SEO PROVIDER DISCOVERY KEYWORDS');
     expect(result.seoDataStatus.status).toBe('available');
+    expect(getKeywordsForKeywords).not.toHaveBeenCalled();
+    expect(result.discoveryKeywords).not.toContainEqual(expect.objectContaining({
+      sourceKind: 'google_ads_keywords_for_keywords',
+    }));
   });
 });

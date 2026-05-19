@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { computeOpportunityScore } from '../../server/routes/keyword-strategy.js';
+import {
+  isStrategyQualityDiscoveryKeyword,
+  upsertKeywordPoolCandidate,
+} from '../../server/keyword-strategy-helpers.js';
 
 describe('computeOpportunityScore', () => {
   it('returns undefined when volume is 0 and no other signals', () => {
@@ -72,5 +76,81 @@ describe('content gap sort order', () => {
     expect(sorted[0].volume).toBe(500);
     expect(sorted[1].volume).toBeNull();  // null sorts as unenriched (middle)
     expect(sorted[2].volume).toBe(0);
+  });
+});
+
+describe('keyword pool source quality', () => {
+  it('upgrades a GSC-only candidate with stronger provider evidence', () => {
+    const pool = new Map<string, { volume: number; difficulty: number; source: string }>();
+
+    upsertKeywordPoolCandidate(pool, 'cosmetic dentistry', {
+      volume: 40,
+      difficulty: 0,
+      source: 'gsc',
+    });
+    upsertKeywordPoolCandidate(pool, 'Cosmetic Dentistry', {
+      volume: 1200,
+      difficulty: 36,
+      source: 'competitor:example.com',
+    });
+
+    expect(pool.get('cosmetic dentistry')).toEqual({
+      volume: 1200,
+      difficulty: 36,
+      source: 'competitor:example.com',
+    });
+  });
+
+  it('does not replace stronger provider evidence with weaker GSC evidence', () => {
+    const pool = new Map<string, { volume: number; difficulty: number; source: string }>();
+
+    upsertKeywordPoolCandidate(pool, 'dental implants', {
+      volume: 2400,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+    });
+    upsertKeywordPoolCandidate(pool, 'dental implants', {
+      volume: 3000,
+      difficulty: 0,
+      source: 'gsc',
+    });
+
+    expect(pool.get('dental implants')).toEqual({
+      volume: 2400,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+    });
+  });
+
+  it('requires usable demand and difficulty for discovery keywords', () => {
+    expect(isStrategyQualityDiscoveryKeyword({
+      keyword: 'teeth whitening',
+      sourceKind: 'keyword_ideas',
+      provider: 'dataforseo',
+      seed: 'dentist',
+      volume: 1000,
+      difficulty: 28,
+      cpc: 4.5,
+    })).toBe(true);
+
+    expect(isStrategyQualityDiscoveryKeyword({
+      keyword: 'unknown idea',
+      sourceKind: 'keyword_ideas',
+      provider: 'dataforseo',
+      seed: 'dentist',
+      volume: 0,
+      difficulty: 28,
+      cpc: 4.5,
+    })).toBe(false);
+
+    expect(isStrategyQualityDiscoveryKeyword({
+      keyword: 'difficulty missing',
+      sourceKind: 'keyword_ideas',
+      provider: 'dataforseo',
+      seed: 'dentist',
+      volume: 500,
+      difficulty: 0,
+      cpc: 4.5,
+    })).toBe(false);
   });
 });

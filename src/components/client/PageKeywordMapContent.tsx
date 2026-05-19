@@ -260,7 +260,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <span className="t-caption-sm text-accent-brand truncate inline-flex items-center gap-1">
                                 {page.primaryKeyword}
                                 {page.validated === false && (
-                                  <span title="This keyword has no confirmed search volume in SEMRush">
+                                  <span title="This keyword does not yet have confirmed provider search-volume data. GSC or client evidence may still support it.">
                                     <Badge label="Unvalidated" tone="amber" variant="outline" />
                                   </span>
                                 )}
