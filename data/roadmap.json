@@ -64,6 +64,95 @@
       ]
     },
     {
+      "id": "sprint-intelligence-quality-consolidation",
+      "name": "Intelligence Quality Consolidation — Recommendations & AI Content",
+      "hours": "28-44",
+      "rationale": "Close the root quality gaps in platform insights and AI content generation by joining mature subsystems through the existing intelligence conventions instead of hand-rolling context, scoring, narrative, and evidence handling per feature. The target architecture is: workspace data -> intelligence slices -> shared generation context -> AI operation contract -> deterministic recommendation/story output -> tracked action/outcome -> future intelligence.",
+      "items": [
+        {
+          "id": "intel-quality-preplan-audit-guardrails",
+          "title": "AI/recommendation context pre-plan audit + guardrails",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "3-5h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Completed in PR1. Added `docs/superpowers/audits/2026-05-18-intelligence-consumer-consolidation-audit.md` with an exhaustive native/hybrid/legacy inventory and migration order, added the soft-guardrail rules doc `docs/rules/intelligence-consumer-builders.md`, added a CLAUDE.md rule + key-doc entry, and added `tests/contract/intelligence-consumer-inventory.test.ts` so new server-side AI/recommendation intelligence consumers must be explicitly classified before they land. No production behavior changes shipped in this item."
+        },
+        {
+          "id": "intel-quality-shared-context-builders",
+          "title": "Shared generation context builders for recommendations and content",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "4-7h",
+          "priority": "P0",
+          "status": "done",
+          "notes": "Completed in PR1. Added `server/intelligence/generation-context-builders.ts` with `buildContentGenerationContext()` and `buildRecommendationGenerationContext()`, both wrapping `buildWorkspaceIntelligence()` + `formatForPrompt()` with one shared `slices` source of truth. Builder defaults now encode canonical slices, `pagePath` behavior, `learningsDomain`, and verbosity without migrating production callers yet. Added `tests/unit/generation-context-builders.test.ts` to verify default slices, `pageProfile` inclusion, same-array slice/section parity, and override threading for `learningsDomain`, verbosity, and token budget."
+        },
+        {
+          "id": "intel-quality-content-brief-decay-migration",
+          "title": "Migrate content briefs and content decay recommendations onto shared context",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "5-8h",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Refactor generateBrief() and generateRefreshRecommendation() to consume the shared content/recommendation context builders rather than assembling SEO context, page analysis, direct insight lookups, and learnings in bespoke blocks. Preserve existing SERP, reference URL, style example, template, GA4, and decay-query inputs, but route workspace-derived intelligence through the shared convention. Acceptance: generated prompts still include brand voice authority, personas, knowledge base, page profile, content gaps, cannibalization/decay/ranking insights, and outcome learnings when enabled; tests cover both rich-data and cold-start workspaces. This should not redesign the brief schema or post generation UX."
+        },
+        {
+          "id": "intel-quality-story-registry",
+          "title": "Unified signal-to-story registry for insights, briefings, and recommendations",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Create or extend a deterministic story/action mapping layer so client insight narratives, briefing templates, InsightsDigest cards, and recommendation cards stop translating the same platform signals in separate ways. Reuse the client briefing template discipline: concrete typed payload fields, minimal hedging, data receipts where available, and client-safe outcome language. Fill known narrative gaps for active InsightType values such as site_health and milestone_attribution so they do not fall through to generic client copy. Acceptance: every active insight type has a typed client/admin story mapping or an explicit non-client rationale; tests cover renderer coverage and avoid vague fallback language for high-impact insights."
+        },
+        {
+          "id": "intel-quality-outcome-learning-default-path",
+          "title": "Make outcome learning a first-class recommendation/content input",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Move outcome learnings from optional prompt garnish toward a reusable scoring/context input. The outcome-ai-injection flag currently defaults off, so generators often fall back to general SEO best practices instead of workspace-specific empirical memory. This item should define the safe rollout posture, ensure context builders expose learnings when enabled and gracefully explain absence when disabled, and begin feeding measured win rates/playbooks/ROI attribution into recommendation ranking and content strategy prompts. Acceptance: tests prove brief/recommendation contexts include learnings when data exists; recommendation scoring has a typed hook for outcome adjustment; no production flag flip happens without tier/rollout criteria."
+        },
+        {
+          "id": "intel-quality-ai-operation-contracts",
+          "title": "Expand AI operation contracts and structured-output hardening",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Migrate remaining high-value AI calls that manually pass feature/model/researchMode/responseFormat into named AI operation contracts where practical. Tighten JSON-returning paths such as SEO meta generation, voice scoring, and other post-review helpers to use responseFormat/json mode plus Zod validation rather than regex extraction or loose JSON.parse. Acceptance: each migrated operation declares provider/model intent, output mode, parser expectation, researchMode posture, retry policy, timeout profile, and tests for malformed output/provider failure. Direct-provider exceptions remain documented only where helper abstractions cannot represent the payload, such as vision/multimodal calls."
+        },
+        {
+          "id": "intel-quality-evidence-ledger-mvp",
+          "title": "Evidence ledger MVP for AI-generated content quality",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "6-10h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Add a minimal source/evidence ledger for generated content. Preserve source packs from SERP/reference scraping, store claim-to-verify records with likely source candidates, and make post-review show the reviewer which claims need source confirmation rather than only a flat claimsToVerify list. The MVP should respect current content-quality-grounding rules: AI may surface claims and source candidates but must not auto-check factual_accuracy or no_hallucinations. Acceptance: briefs/posts preserve source metadata, AI review attaches claims to source candidates when available, public/client handoff never implies automated fact-checking, and tests cover no-source, partial-source, and malformed-source cases."
+        },
+        {
+          "id": "intel-quality-authority-context-expansion",
+          "title": "Authority/backlink context expansion for ambition-aware recommendations",
+          "source": "Platform insights + AI content audit discussion 2026-05-18",
+          "est": "3-5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Broaden use of authority and backlink context where recommendations judge keyword/content ambition. The intelligence layer can enrich seoContext with backlinkProfile, but most generators avoid the opt-in path and recommendation scoring relies on coarse domain-strength buckets. This item should define when provider-backed authority data is worth the cost, add it to shared context builders for strategy/recommendation paths where appropriate, and keep network calls cached/optional. Acceptance: content/keyword recommendations can distinguish within-reach opportunities from authority-building prerequisites, failure to fetch authority data degrades to an explicit 'authority unknown' posture, and provider-call budgets remain within performance registry expectations."
+        },
+        {
+          "id": "intel-quality-keyword-recommendation-noise-reduction",
+          "title": "Reduce noisy keyword recommendations and strengthen business-fit ranking",
+          "source": "Follow-up from platform insights audit / user report 2026-05-18",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Current keyword recommendation quality is split across two systems and the main 'recommend keywords' path is often more deterministic than strategic. `server/keyword-recommendations.ts` builds a candidate pool from provider-related keywords plus overlapping GSC queries, scores mainly on volume/difficulty/CPC, and only optionally uses AI re-ranking when `useAI` is enabled; the content-matrix routes default `useAI` to false. Separately, full keyword strategy generation is AI-heavy (`server/keyword-strategy-ai-synthesis.ts`), but that is not the same path as matrix recommendation picking. This item should reduce recommendation noise at the root rather than only tuning prompts.\nImplementation goals:\n1. Audit the current matrix/standalone keyword recommendation consumers and determine whether AI ranking should remain opt-in, become default when meaningful workspace context exists, or split into 'fast' vs 'best-fit' modes.\n2. Tighten candidate-pool quality before ranking: stronger filtering of weak SEMrush-related terms, better handling of broad adjacency matches from GSC, and explicit rejection of keywords that conflict with client-declined terms, weak business fit, or low-actionability patterns.\n3. Introduce harder strategic negatives in ranking: cannibalization risk, existing page-map conflicts, irrelevant SERP intent, low commercial/business relevance, and authority mismatch when authority data exists.\n4. Strengthen business-fit/context ranking by routing keyword recommendation ranking through the shared intelligence conventions where appropriate (at minimum seoContext + learnings + clientSignals; possibly pageProfile/contentPipeline depending on caller) instead of treating business context as an optional text blob.\n5. Improve observability/explainability: recommendation responses should be able to explain why the top keyword won and why obvious alternatives were de-prioritized (e.g. stronger intent fit, less cannibalization, better historical win range, better match to client priorities). This can be admin-facing first; no client UX commitment is required in the initial slice.\n6. Add quality guardrails/tests for common failure modes: noisy adjacent terms, branded competitor leakage, declined keyword resurfacing, duplicate intent clusters, and cases where a generic high-volume term beats a more commercially aligned long-tail term.\nAcceptance:\n- The recommendation path no longer relies primarily on raw opportunity scoring when better workspace context exists.\n- Known-noisy cases are either filtered out before ranking or explicitly down-ranked for a typed reason.\n- AI ranking, if enabled by default, degrades gracefully to deterministic ranking when context is thin or the provider/model fails.\n- Tests cover both deterministic fallback and context-rich ranking paths.\n- Manual QA compares 5-10 representative seed keywords across at least two workspaces and confirms fewer irrelevant/broad recommendations.\nSequencing note: this is related to the same consolidation theme, but it is not blocked on the PR2 content-brief/content-decay migration. If scoped tightly, it can ship as its own follow-up PR after the shared builder migrations land."
+        }
+      ]
+    },
+    {
       "id": "sprint-roadmap-closeout-residuals",
       "name": "Roadmap Residual Closeout — Near-Finish Sprint Cleanup",
       "hours": "8-13",
