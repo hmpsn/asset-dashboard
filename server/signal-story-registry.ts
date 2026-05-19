@@ -318,12 +318,14 @@ type RecommendationStoryInputMap = {
     suggestedPageType?: string | null;
     intent: string;
     kdNote?: string;
+    authorityContext?: string;
   };
   ranking_opportunity: {
     keyword: string;
     pagePath: string;
     currentPosition: number;
     impressions: number;
+    authorityContext?: string;
   };
   content_decay: {
     pagePath: string;
@@ -358,11 +360,11 @@ const recommendationStories: {
     title: `Content Gap: ${input.topic}`,
     description: input.rationale,
     insight: `Content opportunity: "${input.topic}" targeting "${input.targetKeyword}". ${input.rationale}`,
-    estimatedGain: `New ${input.suggestedPageType || 'page'} targeting "${input.targetKeyword}" (${input.intent} intent)${input.kdNote ?? ''}`,
+    estimatedGain: `New ${input.suggestedPageType || 'page'} targeting "${input.targetKeyword}" (${input.intent} intent)${input.kdNote ?? ''}${input.authorityContext ? ` ${input.authorityContext}` : ''}`,
   }),
   ranking_opportunity: (input) => ({
     title: `Ranking Opportunity: "${input.keyword}" (pos ${Math.round(input.currentPosition)})`,
-    description: `${input.pagePath} ranks #${Math.round(input.currentPosition)} for "${input.keyword}" with ${input.impressions.toLocaleString()} impressions. Optimizing this page can push it onto page 1 or into the top 3.`,
+    description: `${input.pagePath} ranks #${Math.round(input.currentPosition)} for "${input.keyword}" with ${input.impressions.toLocaleString()} impressions. Optimizing this page can push it onto page 1 or into the top 3.${input.authorityContext ? ` ${input.authorityContext}` : ''}`,
     insight: input.currentPosition <= 10
       ? `This page is on page 1 but not in the top 3. Moving from position ${Math.round(input.currentPosition)} to top 3 can 2-3x click-through rate.`
       : `This page ranks on page 2 — just outside where most clicks happen. A focused optimization push can move it onto page 1.`,

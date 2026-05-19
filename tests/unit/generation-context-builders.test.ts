@@ -44,6 +44,7 @@ describe('generation context builders', () => {
       slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'],
       pagePath: undefined,
       learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
     });
     expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
       verbosity: 'detailed',
@@ -73,6 +74,7 @@ describe('generation context builders', () => {
       slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'pageProfile'],
       pagePath: '/pricing',
       learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
     });
     expect(result.pagePath).toBe('/pricing');
     expect(result.slices).toContain('pageProfile');
@@ -85,6 +87,7 @@ describe('generation context builders', () => {
       slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'],
       pagePath: undefined,
       learningsDomain: 'all',
+      enrichWithBacklinks: undefined,
     });
     expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
       verbosity: 'detailed',
@@ -109,6 +112,7 @@ describe('generation context builders', () => {
       slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth', 'pageProfile'],
       pagePath: '/services/seo',
       learningsDomain: 'technical',
+      enrichWithBacklinks: undefined,
     });
     expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
       verbosity: 'compact',
@@ -130,6 +134,7 @@ describe('generation context builders', () => {
       slices: customSlices,
       pagePath: '/pricing',
       learningsDomain: 'content',
+      enrichWithBacklinks: undefined,
     });
     expect(formatForPrompt).toHaveBeenCalledWith(mockIntelligence, {
       verbosity: 'detailed',
@@ -164,5 +169,18 @@ describe('generation context builders', () => {
     });
 
     expect(result.learningsAvailability).toBe('degraded');
+  });
+
+  it('threads backlink enrichment through when a recommendation-style caller opts in', async () => {
+    await buildRecommendationGenerationContext('ws-backlinks', {
+      enrichWithBacklinks: true,
+    });
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-backlinks', {
+      slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline', 'siteHealth'],
+      pagePath: undefined,
+      learningsDomain: 'all',
+      enrichWithBacklinks: true,
+    });
   });
 });

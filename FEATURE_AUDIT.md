@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **373 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **374 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 374. Authority-Aware Recommendation Context
+
+**What it does:** Expands recommendation intelligence with an explicit authority-context layer for ambition-sensitive keyword and content suggestions. `server/authority-context.ts` now owns the shared KD-vs-authority classification and backlink-footprint posture used by recommendation consumers. Recommendation-style builders can opt into backlink enrichment without making it a shared default, keyword recommendation candidates now return an explicit posture (`authority_unknown`, `within_current_authority_range`, or `requires_authority_building`), and ambition-sensitive recommendation copy can now say whether an opportunity is realistically within reach or probably needs authority building first.
+
+**Agency value:** Makes keyword and content recommendations more trustworthy. Strategists can separate “good idea, but too ambitious right now” from “worth acting on immediately” without relying on gut feel or hidden scoring penalties.
+
+**Client value:** Recommendations become easier to understand and act on. Instead of only seeing KD numbers, clients and internal teams get clearer guidance about whether the site can realistically compete now or needs backlink/authority work first.
+
+**Mutual:** Raises the quality bar for recommendation framing without increasing noise. The platform stays honest when authority data is missing and more useful when it is available.
 
 ---
 

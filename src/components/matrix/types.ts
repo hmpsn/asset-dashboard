@@ -1,4 +1,8 @@
-import type { ContentPageType, TemplateSection } from '../../../shared/types/content';
+import type {
+  ContentPageType,
+  KeywordCandidate as SharedKeywordCandidate,
+  TemplateSection,
+} from '../../../shared/types/content';
 
 export type { TemplateSection };
 
@@ -85,11 +89,4 @@ export interface MatrixCell {
   expectedSchemaTypes?: string[];
 }
 
-export interface KeywordCandidate {
-  keyword: string;
-  volume: number;
-  difficulty: number;
-  cpc: number;
-  source: 'pattern' | 'semrush_related' | 'ai_suggested' | 'gsc';
-  isRecommended: boolean;
-}
+export type KeywordCandidate = SharedKeywordCandidate;

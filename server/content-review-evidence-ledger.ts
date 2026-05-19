@@ -24,7 +24,7 @@ function tokenize(value: string): string[] {
 }
 
 function extractNumericTokens(value: string): string[] {
-  return Array.from(new Set((value.match(/\b(?:19|20)\d{2}\b|\b\d+(?:[.,]\d+)?%?\b/g) ?? [])));
+  return Array.from(new Set((value.match(/\b(?:19|20)\d{2}\b|\b\d{1,3}(?:,\d{3})*(?:\.\d+)?%?\b|\b\d+(?:\.\d+)?%?\b/g) ?? [])));
 }
 
 function overlapCount(a: string[], b: string[]): number {
@@ -55,7 +55,6 @@ function buildReferenceCandidates(
     const numericOverlap = numericTokens.filter(token => `${result.title} ${result.url}`.includes(token)).length;
     if (
       overlap >= 2
-      || (numericTokens.length > 0 && overlap >= 1)
       || (numericTokens.length > 0 && numericOverlap > 0 && overlap >= 1)
     ) {
       candidates.push({
@@ -63,7 +62,7 @@ function buildReferenceCandidates(
         label: result.title,
         url: result.url,
         position: result.position,
-        confidence: overlap >= 3 || numericOverlap > 0 ? 'strong' : 'possible',
+        confidence: overlap >= 3 || (overlap >= 2 && numericOverlap > 0) ? 'strong' : 'possible',
         matchReason: numericOverlap > 0
           ? 'Shares the same numeric/statistical signal as the claim.'
           : 'Shares the strongest topic overlap among saved top results.',
@@ -84,7 +83,7 @@ function buildReferenceCandidates(
     }
   }
 
-  for (const referenceUrl of evidence.referenceUrls) {
+  for (const referenceUrl of evidence.referenceUrls ?? []) {
     const referenceLabel = inferReferenceLabel(referenceUrl);
     const referenceTokens = tokenize(`${referenceLabel} ${referenceUrl}`);
     const overlap = overlapCount(claimTokens, referenceTokens);

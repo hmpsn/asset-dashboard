@@ -659,6 +659,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 67,
+      "title": "Authority-Aware Keyword Recommendations",
+      "oneLiner": "Recommendation flows can now tell whether a keyword is within reach, requires authority building, or lacks enough backlink context to judge confidently",
+      "category": "content",
+      "painPoints": ["keyword-strategy", "content-quality", "competitive-intel"],
+      "tier": "growth",
+      "impact": "medium",
+      "clientFacing": true
     }
   ]
 }
