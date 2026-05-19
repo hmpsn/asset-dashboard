@@ -7,6 +7,7 @@ import {
 } from '../../outcome-tracking.js';
 import { toInsightPageId } from '../../helpers.js';
 import { createLogger } from '../../logger.js';
+import db from '../../db/index.js';
 import type { AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { ClientAction, ClientActionOriginMetadata, ClientActionSourceType } from '../../../shared/types/client-actions.js';
 import type { ActionType } from '../../../shared/types/outcome-tracking.js';
@@ -19,6 +20,48 @@ const OUTCOME_ACTION_TYPE_BY_SOURCE: Record<ClientActionSourceType, ActionType> 
   redirect_proposal: 'audit_fix_applied',
   content_decay: 'content_refreshed',
 };
+
+const ensureLifecycleTrackedActionTx = db.transaction((params: {
+  workspaceId: string;
+  actionType: ActionType;
+  sourceId: string;
+  pageUrl: string | null;
+  targetKeyword: string | null;
+  actionStatus: ClientAction['status'];
+  actionTitle: string;
+}) => {
+  const existing = getActionByWorkspaceAndSource(params.workspaceId, 'client_action', params.sourceId);
+  if (existing) return existing;
+
+  return recordAction({ // recordAction-ok: lifecycle action creation is called only via workspace-scoped feedback loop
+    workspaceId: params.workspaceId,
+    actionType: params.actionType,
+    sourceType: 'client_action',
+    sourceId: params.sourceId,
+    pageUrl: params.pageUrl,
+    targetKeyword: params.targetKeyword,
+    baselineSnapshot: {
+      captured_at: new Date().toISOString(),
+    },
+    attribution: 'platform_executed',
+    context: {
+      notes: `Lifecycle action recorded from client action ${params.actionStatus}: ${params.actionTitle}`,
+      relatedActions: [params.sourceId],
+    },
+  });
+});
+
+function ensureLifecycleTrackedAction(params: {
+  workspaceId: string;
+  actionType: ActionType;
+  sourceId: string;
+  pageUrl: string | null;
+  targetKeyword: string | null;
+  actionStatus: ClientAction['status'];
+  actionTitle: string;
+}) {
+  return ensureLifecycleTrackedActionTx.immediate(params);
+}
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -101,19 +144,19 @@ function findSingleFallbackInsightId(
   for (const insight of unresolved) {
     if (pageId && insight.pageId === pageId) {
       matches.add(insight.id);
-      continue;
     }
-    if (!keywordNeedle) continue;
-    const insightData = insight.data as Record<string, unknown>;
-    const keywordCandidates = [
-      insight.strategyKeyword,
-      asString(insightData.keyword),
-      asString(insightData.query),
-    ]
-      .filter((entry): entry is string => typeof entry === 'string')
-      .map(entry => entry.toLowerCase());
-    if (keywordCandidates.includes(keywordNeedle)) {
-      matches.add(insight.id);
+    if (keywordNeedle) {
+      const insightData = insight.data as Record<string, unknown>;
+      const keywordCandidates = [
+        insight.strategyKeyword,
+        asString(insightData.keyword),
+        asString(insightData.query),
+      ]
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => entry.toLowerCase());
+      if (keywordCandidates.includes(keywordNeedle)) {
+        matches.add(insight.id);
+      }
     }
   }
 
@@ -161,6 +204,7 @@ function applyOutcomeFeedback(
   action: ClientAction,
   origin: ClientActionOriginMetadata,
 ): void {
+  let upgradedExistingSourceAction = false;
   if (origin.trackingSourceId) {
     const existingSourceAction = getActionByWorkspaceAndSource(
       workspaceId,
@@ -176,7 +220,12 @@ function applyOutcomeFeedback(
         relatedActions: Array.from(new Set([...(existingSourceAction.context.relatedActions ?? []), action.id])),
       };
       updateActionContext(existingSourceAction.id, workspaceId, nextContext);
+      upgradedExistingSourceAction = true;
     }
+  }
+
+  if (upgradedExistingSourceAction) {
+    return;
   }
 
   const existingLifecycleAction = getActionByWorkspaceAndSource(workspaceId, 'client_action', action.id);
@@ -188,21 +237,14 @@ function applyOutcomeFeedback(
   }
 
   if (workspaceId) {
-    recordAction({ // recordAction-ok: workspaceId provided by workspace-scoped mutation routes
+    ensureLifecycleTrackedAction({ // recordAction-ok: transaction helper enforces idempotent lifecycle creation per workspace/source
       workspaceId,
       actionType: OUTCOME_ACTION_TYPE_BY_SOURCE[action.sourceType],
-      sourceType: 'client_action',
       sourceId: action.id,
       pageUrl: origin.pageUrl ?? null,
       targetKeyword: origin.targetKeyword ?? null,
-      baselineSnapshot: {
-        captured_at: new Date().toISOString(),
-      },
-      attribution: 'platform_executed',
-      context: {
-        notes: `Lifecycle action recorded from client action ${action.status}: ${action.title}`,
-        relatedActions: [action.id],
-      },
+      actionStatus: action.status,
+      actionTitle: action.title,
     });
   }
 }

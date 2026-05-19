@@ -16,9 +16,10 @@ vi.mock('../../server/broadcast.js', () => ({
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
-import { getClientAction } from '../../server/client-actions.js';
+import { createClientAction, getClientAction } from '../../server/client-actions.js';
 import { getInsightById, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getActionByWorkspaceAndSource, recordAction } from '../../server/outcome-tracking.js';
+import { applyClientActionFeedbackLoop } from '../../server/domains/inbox/client-action-feedback-loop.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
@@ -100,6 +101,17 @@ function activitiesForAction(workspaceId: string, actionId: string, type?: strin
     actionNeedle: `%"actionId":"${actionId}"%`,
     type,
   }) as ActivityRow[];
+}
+
+function lifecycleActionCount(workspaceId: string, actionId: string): number {
+  const row = db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count
+    FROM tracked_actions
+    WHERE workspace_id = ?
+      AND source_type = 'client_action'
+      AND source_id = ?
+  `).get(workspaceId, actionId) as { count: number };
+  return row.count;
 }
 
 async function listAdminActions(workspaceId: string): Promise<ClientAction[]> {
@@ -415,9 +427,34 @@ describe('client action mutation safety', () => {
     expect(upgradedSource?.context.relatedActions).toContain(created.id);
 
     const lifecycleAction = getActionByWorkspaceAndSource(wsId, 'client_action', created.id);
+    expect(lifecycleAction).toBeNull();
+  });
+
+  it('creates at most one lifecycle tracked action when feedback loop is applied repeatedly', () => {
+    const action = createClientAction({
+      workspaceId: wsId,
+      sourceType: 'internal_link',
+      sourceId: 'mutation-safety:lifecycle-dedupe',
+      title: 'Lifecycle dedupe probe',
+      summary: 'Repeated feedback-loop calls should not duplicate tracked lifecycle actions.',
+      payload: {
+        metadata: {
+          origin: {
+            pageUrl: '/services',
+            targetKeyword: 'seo services',
+          },
+        },
+      },
+    });
+
+    applyClientActionFeedbackLoop(wsId, action, 'approved');
+    applyClientActionFeedbackLoop(wsId, action, 'completed');
+    applyClientActionFeedbackLoop(wsId, action, 'approved');
+
+    expect(lifecycleActionCount(wsId, action.id)).toBe(1);
+    const lifecycleAction = getActionByWorkspaceAndSource(wsId, 'client_action', action.id);
     expect(lifecycleAction).toMatchObject({
       workspaceId: wsId,
-      actionType: 'content_refreshed',
       attribution: 'platform_executed',
     });
   });
