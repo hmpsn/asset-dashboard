@@ -28,17 +28,21 @@ const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/copy-refresh.ts', aiImport: "from './ai.js'" },
   { path: 'server/diagnostic-orchestrator.ts', aiImport: "from './ai.js'" },
   { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
-  { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'" },
-  { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'" },
   { path: 'server/schema-plan.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/content-posts.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
 ];
 
+const migratedOperationBackedStructuredFiles: Array<{ path: string; aiImport: string; operations: string[] }> = [
+  { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
+  { path: 'server/copy-voice-feedback.ts', aiImport: "from './ai.js'", operations: ['voice-feedback-suggest'] },
+  { path: 'server/meeting-brief-generator.ts', aiImport: "from './ai.js'", operations: ['meeting-brief'] },
+  { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
+];
+
 const migratedParsedJsonTextFiles: Array<{ path: string; aiImport: string }> = [
   { path: 'server/keyword-recommendations.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/ai.ts', aiImport: "from '../ai.js'" },
-  { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'" },
 ];
 
 const migratedAnthropicGenerationFiles: Array<{ path: string; aiImport: string }> = [
@@ -65,6 +69,21 @@ describe('AI dispatch migration', () => {
       expect(source, file.path).toContain('callAI({');
       expect(source, file.path).toContain("responseFormat: { type: 'json_object' }");
       // Parsing helpers may still live in openai-helpers; migrated files must not import the provider call.
+      expect(source, file.path).not.toMatch(
+        /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
+      );
+      expect(source, file.path).not.toContain('callOpenAI({');
+    }
+  });
+
+  it('keeps operation-backed structured generation paths on callAI with named operations', () => {
+    for (const file of migratedOperationBackedStructuredFiles) {
+      const source = readFileSync(file.path, 'utf-8');
+      expect(source, file.path).toContain(file.aiImport);
+      expect(source, file.path).toContain('callAI({');
+      for (const operation of file.operations) {
+        expect(source, file.path).toContain(`operation: '${operation}'`);
+      }
       expect(source, file.path).not.toMatch(
         /import\s+\{[^}]*\bcallOpenAI\b[^}]*\}\s+from ['"]\.\.?\/openai-helpers\.js['"]/,
       );
@@ -111,6 +130,7 @@ describe('AI dispatch migration', () => {
     const migratedFiles = [
       ...migratedGeneralGenerationFiles,
       ...migratedJsonGenerationFiles,
+      ...migratedOperationBackedStructuredFiles,
       ...migratedParsedJsonTextFiles,
       ...migratedAnthropicGenerationFiles,
     ];

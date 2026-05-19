@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
+import { z } from 'zod';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { callAI } from './ai.js';
+import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -14,6 +16,28 @@ const log = createLogger('meeting-brief-generator');
 const BRIEF_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'siteHealth', 'contentPipeline', 'clientSignals',
 ];
+
+const meetingBriefRecommendationSchema = z.object({
+  action: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+});
+
+const meetingBriefAiOutputSchema = z.object({
+  situationSummary: z.string().trim().min(1),
+  wins: z.array(z.string().trim().min(1)),
+  attention: z.array(z.string().trim().min(1)),
+  recommendations: z.array(meetingBriefRecommendationSchema),
+  blueprintProgress: z.string().nullable().optional(),
+});
+
+function normalizeMeetingBriefAiOutput(
+  parsed: z.infer<typeof meetingBriefAiOutputSchema>,
+): MeetingBriefAIOutput {
+  return {
+    ...parsed,
+    blueprintProgress: parsed.blueprintProgress ?? null,
+  };
+}
 
 /** Assembles At-a-Glance metrics directly from intelligence slices — no AI involved. */
 export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): MeetingBriefMetrics {
@@ -152,21 +176,21 @@ Avoid: "Your site health score is 78. You have 12 open insights."
   ];
 
   const result = await callAI({
-    model: 'gpt-5.4',
+    operation: 'meeting-brief',
     system: systemPrompt,
     messages,
     maxTokens: 2000,
     temperature: 0.3,
-    responseFormat: { type: 'json_object' },
-    feature: 'meeting-brief',
     workspaceId,
   });
 
   let parsed: MeetingBriefAIOutput;
   try {
-    parsed = JSON.parse(result.text) as MeetingBriefAIOutput;
+    parsed = normalizeMeetingBriefAiOutput(
+      parseStructuredAIOutput(result.text, meetingBriefAiOutputSchema, 'meeting-brief'),
+    );
   } catch (err) {
-    log.debug({ err }, 'meeting-brief-generator: AI returned invalid JSON — retrying');
+    log.debug({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined }, 'meeting-brief-generator: AI returned invalid structured output — retrying');
     // Retry once — ask the model to fix its own JSON
     const retryMessages: typeof messages = [
       ...messages,
@@ -174,20 +198,20 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
     const retryResult = await callAI({
-      model: 'gpt-5.4',
+      operation: 'meeting-brief',
       system: systemPrompt,
       messages: retryMessages,
       maxTokens: 2000,
       temperature: 0.1,
-      responseFormat: { type: 'json_object' },
-      feature: 'meeting-brief',
       workspaceId,
     });
     try {
-      parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
+      parsed = normalizeMeetingBriefAiOutput(
+        parseStructuredAIOutput(retryResult.text, meetingBriefAiOutputSchema, 'meeting-brief'),
+      );
     } catch (err) {
-      log.error({ err, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid JSON after retry');
-      throw new Error('Meeting brief AI returned invalid JSON after retry');
+      log.error({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid structured output after retry');
+      throw new Error('Meeting brief AI returned invalid structured output after retry');
     }
   }
 

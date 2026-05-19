@@ -5,8 +5,11 @@
  */
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
 import { callAI } from './ai.js';
+import type { AIOperationId } from './ai-operation-registry.js';
+import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
+import { z } from 'zod';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -23,6 +26,22 @@ const log = createLogger('content-posts-ai');
 const CONTENT_MODEL = 'gpt-5.4';         // fallback + structured tasks
 const CLAUDE_MODEL = 'claude-sonnet-4-6' as const;
 const CLAUDE_TEMP = 0.7;
+
+const seoMetaResponseSchema = z.object({
+  seoTitle: z.string().trim().min(1),
+  seoMetaDescription: z.string().trim().min(1),
+});
+
+const unifyResponseSchema = z.object({
+  introduction: z.string().optional(),
+  sections: z.array(z.string()).optional(),
+  conclusion: z.string().optional(),
+});
+
+const voiceScoringResponseSchema = z.object({
+  voiceScore: z.number().finite(),
+  voiceFeedback: z.string().optional(),
+});
 
 /**
  * Strip a single wrapping ```json ... ``` (or ``` ... ```) fence from a string.
@@ -46,10 +65,11 @@ function stripCodeFence(text: string): string {
  * so callers can use `parseJsonFallback` / `JSON.parse` directly.
  */
 export async function callCreativeAI(opts: {
+  operation?: AIOperationId;
   systemPrompt: string;
   userPrompt: string;
   maxTokens: number;
-  feature: string;
+  feature?: string;
   workspaceId: string;
   /** Optional temperature override (default: 0.7 for both providers) */
   temperature?: number;
@@ -67,6 +87,7 @@ export async function callCreativeAI(opts: {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
+  const featureLabel = feature ?? opts.operation ?? 'creative-ai';
 
   // Claude has no structured JSON mode — lean on the system prompt instead.
   const effectiveSystem = json
@@ -76,6 +97,7 @@ export async function callCreativeAI(opts: {
   if (isAnthropicConfigured()) {
     try {
       const result = await callAI({
+        operation: opts.operation,
         provider: 'anthropic',
         model: CLAUDE_MODEL,
         system: effectiveSystem,
@@ -89,17 +111,18 @@ export async function callCreativeAI(opts: {
         researchMode: opts.researchMode,
         signal: opts.signal,
       });
-      log.info(`[${feature}] Generated with Claude`);
+      log.info(`[${featureLabel}] Generated with Claude`);
       const text = result.text.trim();
       return json ? stripCodeFence(text) : text;
     } catch (err) {
       if (opts.signal?.aborted) throw err;
-      log.info(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+      log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
   }
 
   // Fallback to GPT (or primary if no Anthropic key)
   const result = await callAI({
+    operation: opts.operation,
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
     maxTokens,
@@ -110,7 +133,7 @@ export async function callCreativeAI(opts: {
     signal: opts.signal,
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
-  log.info(`[${feature}] Generated with GPT`);
+  log.info(`[${featureLabel}] Generated with GPT`);
   const text = result.text.trim();
   return json ? stripCodeFence(text) : text;
 }
@@ -579,18 +602,15 @@ Return valid JSON only:
       'You are an expert SEO copywriter. Return only valid JSON with seoTitle and seoMetaDescription.',
     );
     const result = await callAI({
-      model: CONTENT_MODEL,
+      operation: 'content-post-seo-meta',
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
       temperature: 0.5,
-      feature: 'content-post-seo-meta',
       workspaceId,
       signal: options.signal,
     });
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]) as { seoTitle: string; seoMetaDescription: string };
+    const parsed = parseStructuredAIOutput(result.text, seoMetaResponseSchema, 'content-post-seo-meta');
     if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
     return null;
   } catch (err) {
@@ -683,6 +703,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
   log.info(`Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
   const rawResult = await callCreativeAI({
+    operation: 'content-post-unify',
     systemPrompt: buildSystemPrompt(
       workspaceId,
       'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
@@ -698,12 +719,7 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
   });
 
   try {
-    const jsonMatch = rawResult.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      log.warn('Unification: no JSON object found in response');
-      return null;
-    }
-    const parsed = JSON.parse(jsonMatch[0]) as { introduction?: string; sections?: string[]; conclusion?: string };
+    const parsed = parseStructuredAIOutput(rawResult, unifyResponseSchema, 'content-post-unify');
     // Validate sections count matches
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
       log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
@@ -775,34 +791,26 @@ Return ONLY valid JSON in this exact format:
   );
 
   const result = await callAI({
-    model: CONTENT_MODEL,
+    operation: 'voice-scoring',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.3,
-    feature: 'voice-scoring',
     workspaceId,
   });
 
   try {
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      log.warn('Voice scoring: no JSON object found in response');
-      return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
-    }
-    const parsed = JSON.parse(jsonMatch[0]) as { voiceScore?: unknown; voiceFeedback?: unknown };
-    const rawScore = typeof parsed.voiceScore === 'number' ? parsed.voiceScore : Number.NaN;
-    if (!Number.isFinite(rawScore)) {
-      log.warn({ voiceScore: parsed.voiceScore }, 'Voice scoring: invalid non-finite score from AI');
-      return { voiceScore: null, voiceFeedback: 'Voice scoring failed — invalid score returned by AI.' };
-    }
-    const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+    const parsed = parseStructuredAIOutput(result.text, voiceScoringResponseSchema, 'voice-scoring');
+    const score = Math.max(0, Math.min(100, Math.round(parsed.voiceScore)));
     const feedback = typeof parsed.voiceFeedback === 'string' && parsed.voiceFeedback.trim()
       ? parsed.voiceFeedback
       : 'No feedback provided.';
     log.info(`Voice score for post ${post.id}: ${score}/100`);
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {
+    if (err instanceof StructuredAIOutputError && err.issues) {
+      log.warn({ issues: err.issues }, 'Voice scoring: structured output validation failed');
+    }
     log.warn({ err }, 'Failed to parse voice scoring JSON');
     return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
   }
