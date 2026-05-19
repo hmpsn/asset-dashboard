@@ -24,11 +24,6 @@ vi.mock('../../server/schema-generation-context.js', () => ({
       siteId: 'test-site',
       workspaceId: 'test-workspace',
     },
-    gscMap: new Map(),
-    ga4Map: new Map(),
-    queryPageData: {},
-    insightsMap: {},
-    validationsByPageId: {},
   })),
 }));
 
