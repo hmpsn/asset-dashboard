@@ -371,6 +371,116 @@ describe('question keyword matching logic', () => {
 });
 
 describe('URL-level keyword intelligence', () => {
+  it('does not apply suspicious million-volume bulk metrics to page assignments', async () => {
+    const getKeywordMetrics = vi.fn(async () => [
+      {
+        keyword: 'schedule dental appointment austin',
+        volume: 1_000_000,
+        difficulty: 21,
+        cpc: 0,
+        competition: 0,
+        results: 0,
+        trend: [],
+      },
+    ]);
+    const provider = {
+      name: 'dataforseo',
+      isConfigured: () => true,
+      getKeywordMetrics,
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_planner_grouped_page_map_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [{
+          pagePath: '/schedule-dental-appointment/austin',
+          pageTitle: 'Schedule Dental Appointment Austin',
+          primaryKeyword: 'schedule dental appointment austin',
+          secondaryKeywords: [],
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'quick',
+      sendProgress: () => undefined,
+    });
+
+    expect(getKeywordMetrics).toHaveBeenCalledWith(
+      ['schedule dental appointment austin'],
+      'ws_planner_grouped_page_map_guard',
+    );
+    const page = result.strategy.pageMap?.[0];
+    expect(page?.volume).toBeUndefined();
+    expect(page?.difficulty).toBeUndefined();
+    expect(page?.metricsSource).toBeUndefined();
+  });
+
+  it('does not apply suspicious million-volume bulk metrics to content gaps', async () => {
+    const provider = {
+      name: 'dataforseo',
+      isConfigured: () => true,
+      getKeywordMetrics: vi.fn(async () => [
+        {
+          keyword: 'schedule dental appointment austin',
+          volume: 1_000_000,
+          difficulty: 21,
+          cpc: 0,
+          competition: 0,
+          results: 0,
+          trend: [],
+        },
+      ]),
+      getRelatedKeywords: async () => [],
+      getQuestionKeywords: async () => [],
+      getDomainKeywords: async () => [],
+      getDomainOverview: async () => null,
+      getCompetitors: async () => [],
+      getKeywordGap: async () => [],
+      getBacklinksOverview: async () => null,
+      getReferringDomains: async () => [],
+    } satisfies SeoDataProvider;
+
+    const result = await enrichKeywordStrategy({
+      workspaceId: 'ws_planner_grouped_content_gap_guard',
+      baseUrl: 'https://example.com',
+      strategy: {
+        pageMap: [],
+        contentGaps: [{
+          topic: 'Scheduling',
+          targetKeyword: 'schedule dental appointment austin',
+          priority: 'medium',
+        }],
+      },
+      keywordPool: new Map(),
+      businessSection: '',
+      searchData: { gscData: [], analyticsData: null, insights: [], decayContexts: [] },
+      domainKeywords: [],
+      questionKeywords: [],
+      competitorKeywords: [],
+      provider,
+      seoDataMode: 'quick',
+      sendProgress: () => undefined,
+    });
+
+    const gap = result.strategy.contentGaps?.[0];
+    expect(gap?.volume).toBeUndefined();
+    expect(gap?.difficulty).toBeUndefined();
+  });
+
   it('uses provider URL-level keywords before domain-level fallback for page assignments', async () => {
     const provider = {
       name: 'semrush',

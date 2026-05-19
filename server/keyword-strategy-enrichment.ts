@@ -13,7 +13,7 @@ import {
   type StrategyContentGap,
   type StrategyOutput,
 } from './keyword-strategy-ai-synthesis.js';
-import { computeOpportunityScore } from './keyword-strategy-helpers.js';
+import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './keyword-strategy-helpers.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 
@@ -343,7 +343,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         for (const pm of strategy.pageMap ?? []) {
           if (!pm.volume) {
             const m = metricMap.get(pm.primaryKeyword.toLowerCase());
-            if (m) {
+            if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
               pm.cpc = m.cpc;
@@ -396,7 +396,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         for (const cg of strategy.contentGaps) {
           if (cg.volume == null) {
             const m = cgMap.get(cg.targetKeyword.toLowerCase());
-            if (m) {
+            if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               cg.volume = m.volume;
               cg.difficulty = m.difficulty;
             }
@@ -740,6 +740,7 @@ Rules:
       try {
         const extra = await provider.getKeywordMetrics(missing.slice(0, 30), workspaceId);
         for (const m of extra) {
+          if (isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) continue;
           found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
         }
     } catch (err) {

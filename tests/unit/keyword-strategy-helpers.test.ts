@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeOpportunityScore } from '../../server/routes/keyword-strategy.js';
 import {
   isStrategyQualityDiscoveryKeyword,
+  isSuspiciousPlannerGroupedVolume,
   upsertKeywordPoolCandidate,
 } from '../../server/keyword-strategy-helpers.js';
 
@@ -152,5 +153,11 @@ describe('keyword pool source quality', () => {
       difficulty: 0,
       cpc: 4.5,
     })).toBe(false);
+  });
+
+  it('flags million-volume planner-grouped metrics as suspicious for strategy enrichment', () => {
+    expect(isSuspiciousPlannerGroupedVolume('schedule dental appointment austin', 1_000_000)).toBe(true);
+    expect(isSuspiciousPlannerGroupedVolume('schedule dental appointment austin', 999_999)).toBe(false);
+    expect(isSuspiciousPlannerGroupedVolume('', 1_000_000)).toBe(false);
   });
 });
