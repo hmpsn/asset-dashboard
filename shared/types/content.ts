@@ -142,7 +142,7 @@ export interface ContentReviewClaimEvidence {
 }
 
 export interface ContentReviewEvidence {
-  referenceUrls: string[];
+  referenceUrls?: string[];
   peopleAlsoAsk: string[];
   topResults: { position: number; title: string; url: string }[];
   note: string;
@@ -340,6 +340,11 @@ export interface KeywordCandidate {
   cpc: number;
   source: 'pattern' | 'semrush_related' | 'ai_suggested' | 'gsc';
   isRecommended: boolean;
+  authorityAssessment?: {
+    posture: 'authority_unknown' | 'within_current_authority_range' | 'requires_authority_building';
+    note: string;
+    referringDomains?: number;
+  };
 }
 
 export interface KeywordRecommendationReasoningAlternative {

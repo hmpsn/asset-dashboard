@@ -146,6 +146,7 @@ describe('getKeywordRecommendations ranking behavior', () => {
     expect(mockBuildRecommendationGenerationContext).toHaveBeenCalledWith('ws_test', expect.objectContaining({
       slices: ['seoContext', 'learnings', 'clientSignals'],
       learningsDomain: 'strategy',
+      enrichWithBacklinks: true,
     }));
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(result.recommended).toBe('24 hour plumber austin');
@@ -233,6 +234,43 @@ describe('getKeywordRecommendations ranking behavior', () => {
 
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(result.recommended).toBe('24 hour plumber austin');
+  });
+
+  it('surfaces authority posture when backlink data indicates the keyword is too ambitious', async () => {
+    mockBuildRecommendationGenerationContext.mockResolvedValue({
+      ...baseContext,
+      intelligence: {
+        ...baseContext.intelligence,
+        seoContext: {
+          ...baseContext.intelligence.seoContext,
+          backlinkProfile: {
+            totalBacklinks: 120,
+            referringDomains: 12,
+          },
+        },
+      },
+    });
+    mockGetRelatedKeywords.mockResolvedValue([
+      { keyword: 'enterprise plumber austin', volume: 220, difficulty: 74, cpc: 16 },
+    ]);
+
+    const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
+    const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: false, includeReasoning: true });
+
+    expect(result.candidates[0]?.authorityAssessment?.posture).toBe('requires_authority_building');
+    expect(result.reasoning?.recommendedReason).toContain('Requires authority building');
+  });
+
+  it('degrades to authority_unknown when backlink data is unavailable', async () => {
+    mockBuildRecommendationGenerationContext.mockResolvedValue(baseContext);
+    mockGetRelatedKeywords.mockResolvedValue([
+      { keyword: 'emergency plumber austin', volume: 300, difficulty: 42, cpc: 18 },
+    ]);
+
+    const { getKeywordRecommendations } = await import('../../server/keyword-recommendations.js');
+    const result = await getKeywordRecommendations('ws_test', 'emergency plumber austin', { useAI: false });
+
+    expect(result.candidates[0]?.authorityAssessment?.posture).toBe('authority_unknown');
   });
 
   it('excludes the current cell from cannibalization penalties when requested by cell id', async () => {

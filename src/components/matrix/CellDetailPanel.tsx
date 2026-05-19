@@ -38,6 +38,20 @@ const STATUS_DOT_COLOR: Record<string, string> = {
   zinc: '#71717a',
 };
 
+type AuthorityPosture = NonNullable<NonNullable<MatrixCell['keywordCandidates']>[number]['authorityAssessment']>['posture'];
+
+function authorityTone(posture?: AuthorityPosture): 'zinc' | 'amber' | 'emerald' {
+  if (posture === 'requires_authority_building') return 'amber';
+  if (posture === 'within_current_authority_range') return 'emerald';
+  return 'zinc';
+}
+
+function authorityLabel(posture?: AuthorityPosture): string {
+  if (posture === 'requires_authority_building') return 'Needs authority';
+  if (posture === 'within_current_authority_range') return 'Within reach';
+  return 'Authority unknown';
+}
+
 export function CellDetailPanel({
   cell,
   onClose,
@@ -150,7 +164,17 @@ export function CellDetailPanel({
               {cell.keywordCandidates && (() => {
                 const rec = cell.keywordCandidates.find(c => c.isRecommended);
                 return rec ? (
-                  <p className="t-caption-sm text-[var(--brand-text)]">{rec.volume}/mo &middot; KD {rec.difficulty} &middot; ${rec.cpc}</p>
+                  <div className="space-y-1">
+                    <p className="t-caption-sm text-[var(--brand-text)]">{rec.volume}/mo &middot; KD {rec.difficulty} &middot; ${rec.cpc}</p>
+                    {rec.authorityAssessment && (
+                      <>
+                        <div>
+                          <Badge label={authorityLabel(rec.authorityAssessment.posture)} tone={authorityTone(rec.authorityAssessment.posture)} />
+                        </div>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">{rec.authorityAssessment.note}</p>
+                      </>
+                    )}
+                  </div>
                 ) : null;
               })()}
               <Button
@@ -179,6 +203,9 @@ export function CellDetailPanel({
                     <span>{c.volume}/mo</span>
                     <span>KD {c.difficulty}</span>
                     <Badge label={c.source === 'pattern' ? 'Pattern' : c.source === 'semrush_related' ? 'SEMRush' : 'AI'} tone={c.source === 'pattern' ? 'zinc' : c.source === 'semrush_related' ? 'blue' : 'teal'} />
+                    {c.authorityAssessment && (
+                      <Badge label={authorityLabel(c.authorityAssessment.posture)} tone={authorityTone(c.authorityAssessment.posture)} />
+                    )}
                   </div>
                 </div>
               ))}

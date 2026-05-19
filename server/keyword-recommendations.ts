@@ -15,6 +15,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js
 import { checkKeywordCannibalization, type CannibalizationConflict } from './cannibalization-detection.js';
 import { createLogger } from './logger.js';
 import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment, buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
+import { assessAuthorityFromBacklinks } from './authority-context.js';
 import type {
   KeywordCandidate,
   KeywordRecommendationReasoning,
@@ -340,9 +341,10 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
   }
 
   const authorityMismatchPenalty = inferAuthorityMismatchPenalty(candidate, ctx.backlinkProfile);
+  const authorityAssessment = assessAuthorityFromBacklinks(candidate.difficulty, ctx.backlinkProfile);
   if (authorityMismatchPenalty > 0) {
     score -= authorityMismatchPenalty;
-    penaltyReasons.push('Difficulty looks high relative to the current backlink footprint');
+    penaltyReasons.push(authorityAssessment.note);
   }
 
   const uniqueReasons = [...new Set([...reasons, ...penaltyReasons])].slice(0, 5);
@@ -357,6 +359,7 @@ function scoreKeywordCandidate(candidate: KeywordCandidate, ctx: CandidateScorin
     _penaltyReasons: [...new Set(penaltyReasons)],
     _fitSignals: [...new Set(fitSignals)],
     _conflictSeverity: conflictSeverity,
+    authorityAssessment,
   };
 }
 
@@ -379,9 +382,12 @@ function buildReasoning(candidates: ScoredCandidate[]): KeywordRecommendationRea
   const recommendedReasons = recommended._reasons.length > 0
     ? recommended._reasons.slice(0, 2)
     : ['Best blend of opportunity, strategic fit, and execution risk'];
+  const authorityLead = recommended.authorityAssessment?.posture !== 'within_current_authority_range'
+    ? recommended.authorityAssessment?.note
+    : undefined;
 
   return {
-    recommendedReason: recommendedReasons.join(' '),
+    recommendedReason: [authorityLead, ...recommendedReasons].filter(Boolean).join(' '),
     alternatives: candidates
       .slice(1, 4)
       .map(candidate => ({
@@ -463,6 +469,10 @@ export async function getKeywordRecommendations(
       cpc: 0,
       source: 'pattern',
       isRecommended: true,
+      authorityAssessment: {
+        posture: 'authority_unknown',
+        note: 'Authority unknown — backlink data is unavailable, so treat keyword difficulty cautiously.',
+      },
     }];
     return {
       seedKeyword,
@@ -484,6 +494,7 @@ export async function getKeywordRecommendations(
       learningsDomain: 'strategy',
       verbosity: 'detailed',
       tokenBudget: 2400,
+      enrichWithBacklinks: true,
     }).catch(err => {
       log.warn({ err, workspaceId }, 'Keyword recommendation context build failed — continuing with provider-only fallback');
       return null;
@@ -517,6 +528,7 @@ export async function getKeywordRecommendations(
         cpc: seed.cpc,
         source: 'pattern',
         isRecommended: false,
+        authorityAssessment: undefined,
       }
     : {
         keyword: seedKeyword,
@@ -525,6 +537,10 @@ export async function getKeywordRecommendations(
         cpc: 0,
         source: 'pattern',
         isRecommended: false,
+        authorityAssessment: {
+          posture: 'authority_unknown',
+          note: 'Authority unknown — backlink data is unavailable, so treat keyword difficulty cautiously.',
+        },
       });
 
   for (const relatedKeyword of related.slice(0, maxCandidates - 1)) {
@@ -565,6 +581,7 @@ export async function getKeywordRecommendations(
             cpc: 0,
             source: 'gsc',
             isRecommended: false,
+            authorityAssessment: undefined,
           });
         }
       }

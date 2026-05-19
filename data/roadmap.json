@@ -138,8 +138,8 @@
           "source": "Platform insights + AI content audit discussion 2026-05-18",
           "est": "3-5h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "Broaden use of authority and backlink context where recommendations judge keyword/content ambition. The intelligence layer can enrich seoContext with backlinkProfile, but most generators avoid the opt-in path and recommendation scoring relies on coarse domain-strength buckets. This item should define when provider-backed authority data is worth the cost, add it to shared context builders for strategy/recommendation paths where appropriate, and keep network calls cached/optional. Acceptance: content/keyword recommendations can distinguish within-reach opportunities from authority-building prerequisites, failure to fetch authority data degrades to an explicit 'authority unknown' posture, and provider-call budgets remain within performance registry expectations."
+          "status": "done",
+          "notes": "Completed in PR8. Added a shared authority-context helper, threaded opt-in backlink enrichment through recommendation builders, and surfaced explicit authority posture in keyword recommendations and ambition-sensitive recommendation copy. Keyword recommendation candidates now degrade to an explicit authority_unknown posture when backlink data is unavailable, and recommendation-style consumers opt into backlink enrichment without making it a builder default. Focused tests cover helper logic, builder pass-through, route payload shape, and keyword ranking posture."
         },
         {
           "id": "intel-quality-keyword-recommendation-noise-reduction",

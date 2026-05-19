@@ -127,6 +127,28 @@ describe('ReviewChecklist', () => {
     expect(screen.queryByText(/automated fact-check/i)).not.toBeInTheDocument();
   });
 
+  it('degrades safely when cached evidence uses the older shape without reference URLs', () => {
+    render(
+      <ReviewChecklist
+        postStatus="draft"
+        reviewChecklist={emptyChecklist}
+        showChecklist
+        onToggleShowChecklist={vi.fn()}
+        onToggleItem={vi.fn()}
+        onChangeStatus={vi.fn()}
+        evidence={{
+          peopleAlsoAsk: ['How much does dental SEO cost?'],
+          topResults: [{ position: 1, title: 'Dental SEO pricing guide', url: 'https://example.com/pricing-guide' }],
+          note: 'Reviewer support only.',
+        } as AIReviewResponse['evidence']}
+      />,
+    );
+
+    expect(screen.getByText('Saved Evidence')).toBeInTheDocument();
+    expect(screen.queryByText('Reference URLs')).not.toBeInTheDocument();
+    expect(screen.getByText('Dental SEO pricing guide')).toBeInTheDocument();
+  });
+
   it('renders claim-level evidence and explicit no-source posture after AI review', async () => {
     const onRunAIReview = vi.fn(async () => makeReviewResponse());
 
@@ -151,5 +173,45 @@ describe('ReviewChecklist', () => {
     expect(screen.getByText('Reference URLs')).toBeInTheDocument();
     expect(screen.getByText('Revenue grew 42% in 2026 for top-performing SaaS companies.')).toBeInTheDocument();
     expect(screen.getByText(/No likely source found in the saved evidence/i)).toBeInTheDocument();
+  });
+
+  it('falls back to flat claims when claimEvidence is absent', async () => {
+    const onRunAIReview = vi.fn(async () => ({
+      review: {
+        factual_accuracy: {
+          pass: false,
+          reason: 'Human source review required.',
+          humanReviewRequired: true,
+          claimsToVerify: ['Revenue grew 42% in 2026 for top-performing SaaS companies.'],
+        },
+        brand_voice: { pass: true, reason: 'Good voice match.' },
+        internal_links: { pass: true, reason: 'Internal links are present.' },
+        no_hallucinations: {
+          pass: false,
+          reason: 'Human review required.',
+          humanReviewRequired: true,
+          claimsToVerify: ['This quote came from a named industry analyst.'],
+        },
+        meta_optimized: { pass: true, reason: 'Metadata is in range.' },
+        word_count_target: { pass: true, reason: 'Word count is in range.' },
+      },
+    }));
+
+    render(
+      <ReviewChecklist
+        postStatus="draft"
+        reviewChecklist={emptyChecklist}
+        showChecklist
+        onToggleShowChecklist={vi.fn()}
+        onToggleItem={vi.fn()}
+        onChangeStatus={vi.fn()}
+        onRunAIReview={onRunAIReview}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /AI Pre-Check/i }));
+
+    expect(await screen.findByText('Revenue grew 42% in 2026 for top-performing SaaS companies.')).toBeInTheDocument();
+    expect(screen.queryByText(/No likely source found in the saved evidence/i)).not.toBeInTheDocument();
   });
 });

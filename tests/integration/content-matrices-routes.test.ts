@@ -169,6 +169,7 @@ describe('Content Matrices — CRUD', () => {
       recommended: 'Emergency plumber in Austin',
     });
     expect(Array.isArray(body.candidates)).toBe(true);
+    expect(body.candidates[0]?.authorityAssessment?.posture).toBe('authority_unknown');
     expect(typeof body.reasoning?.recommendedReason).toBe('string');
   });
 
@@ -180,6 +181,7 @@ describe('Content Matrices — CRUD', () => {
     const body = await res.json();
     expect(body.seedKeyword).toBeTruthy();
     expect(Array.isArray(body.candidates)).toBe(true);
+    expect(body.candidates[0]?.authorityAssessment?.posture).toBe('authority_unknown');
     expect(body).not.toHaveProperty('reasoning');
   });
 

@@ -119,6 +119,19 @@ describe('signal-story-registry', () => {
     expect(story.estimatedGain).toContain('clicks/mo');
   });
 
+  it('threads authority context into ambition-sensitive recommendation copy', () => {
+    const story = buildRecommendationStory('content_gap', {
+      topic: 'Emergency plumbing financing page',
+      targetKeyword: 'emergency plumbing financing',
+      rationale: 'Clients are asking about financing during urgent repairs.',
+      suggestedPageType: 'service',
+      intent: 'commercial',
+      authorityContext: 'Requires authority building — KD 68 looks ambitious for the current backlink footprint (12 referring domains).',
+    });
+
+    expect(story.estimatedGain).toContain('Requires authority building');
+  });
+
   it('keeps briefing milestone support routed through the shared registry boundary', () => {
     expect(SUPPORTED_BRIEFING_INSIGHT_TYPES).toContain('milestone_attribution');
     expect(SUPPORTED_BRIEFING_INSIGHT_TYPES).toContain('content_decay');

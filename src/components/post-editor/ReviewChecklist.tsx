@@ -144,11 +144,11 @@ export function ReviewChecklist({
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">Reviewer support</span>
                   </div>
                   <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{evidenceToShow.note}</p>
-                  {evidenceToShow.referenceUrls.length > 0 && (
+                  {(evidenceToShow.referenceUrls?.length ?? 0) > 0 && (
                     <div className="mt-2">
                       <p className="t-caption-sm text-[var(--brand-text)]">Reference URLs</p>
                       <ul className="mt-1 space-y-1">
-                        {evidenceToShow.referenceUrls.map(referenceUrl => (
+                        {evidenceToShow.referenceUrls?.map(referenceUrl => (
                           <li key={referenceUrl} className="t-caption-sm text-[var(--brand-text-muted)]">
                             <a href={referenceUrl} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-teal-300 hover:text-teal-200">
                               <span className="truncate">{referenceUrl}</span>

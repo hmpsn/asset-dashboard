@@ -35,6 +35,11 @@ import { normalizePageUrl } from './helpers.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
+import {
+  adjustKdImpactScore,
+  assessAuthorityFromBacklinks,
+  kdClassificationNote,
+} from './authority-context.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -99,63 +104,11 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
 }
 
-/** Classification of a keyword's difficulty relative to a domain's authority.
- * Single source of truth for KD-gap boundaries — consumed by both
- * `adjustKdImpactScore` (score multiplier) and `kdClassificationNote`
- * (user-facing copy) so the boundaries can never drift.
- * @internal exported for unit testing
- */
-export type KdClassification = 'very-challenging' | 'challenging' | 'within-reach' | 'aligned';
-
-/** Classifies a keyword's difficulty vs. a domain's authority bucket.
- * Returns `'aligned'` when domain strength is unknown (domainStrength === 0).
- * Boundaries are inclusive at both ends so callers never see off-by-one drift.
- * @internal exported for unit testing
- */
-export function classifyKdGap(difficulty: number, domainStrength: number): KdClassification {
-  if (!domainStrength) return 'aligned';
-  const kdGap = difficulty - domainStrength;
-  if (kdGap >= 30)  return 'very-challenging';
-  if (kdGap >= 15)  return 'challenging';
-  if (kdGap <= -20) return 'within-reach';
-  return 'aligned';
-}
-
-/** Score multipliers per KD classification. Centralized so they stay in lockstep
- * with `classifyKdGap` boundaries and the user-facing copy.
- */
-const KD_SCORE_MULTIPLIER: Record<KdClassification, number> = {
-  'very-challenging': 0.6,
-  'challenging':      0.8,
-  'aligned':          1.0,
-  'within-reach':     1.2,
-};
-
-/** Adjusts a content-gap impact score based on keyword difficulty vs domain strength.
- * @internal exported for unit testing
- */
-export function adjustKdImpactScore(baseScore: number, difficulty: number, domainStrength: number): number {
-  const classification = classifyKdGap(difficulty, domainStrength);
-  const adjusted = Math.round(baseScore * KD_SCORE_MULTIPLIER[classification]);
-  return classification === 'within-reach' ? Math.min(100, adjusted) : adjusted;
-}
-
-/** Returns a user-facing KD note (prefixed with a leading space) matching the
- * classification, or an empty string when no note is warranted. Consumes the
- * same classifier as `adjustKdImpactScore` so note + score can never disagree.
- * @internal exported for unit testing
- */
-export function kdClassificationNote(difficulty: number, domainStrength: number): string {
-  switch (classifyKdGap(difficulty, domainStrength)) {
-    case 'very-challenging':
-    case 'challenging':
-      return ` (KD ${difficulty} may be challenging — consider building authority first)`;
-    case 'within-reach':
-      return ` (KD ${difficulty} is well within reach for your domain)`;
-    case 'aligned':
-      return '';
-  }
-}
+export {
+  adjustKdImpactScore,
+  classifyKdGap,
+  kdClassificationNote,
+} from './authority-context.js';
 
 function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
   if (type === 'content_refresh') return 'content_refreshed';
@@ -721,15 +674,17 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
   const recommendationContext = await buildRecommendationGenerationContext(workspaceId, {
-    slices: ['learnings'],
+    slices: ['learnings', 'seoContext'],
     learningsDomain: 'all',
     verbosity: 'standard',
     tokenBudget: 800,
+    enrichWithBacklinks: true,
   }).catch(err => {
     log.warn({ err, workspaceId }, 'Recommendation learnings context unavailable — continuing without outcome adjustments');
     return null;
   });
   const outcomeLearnings = recommendationContext?.intelligence.learnings;
+  const backlinkProfile = recommendationContext?.intelligence.seoContext?.backlinkProfile;
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
@@ -994,6 +949,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
         // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
         const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
+        const authorityAssessment = assessAuthorityFromBacklinks(cg.difficulty ?? null, backlinkProfile);
         const story = buildRecommendationStory('content_gap', {
           topic: cg.topic,
           targetKeyword: cg.targetKeyword,
@@ -1001,6 +957,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           suggestedPageType: cg.suggestedPageType,
           intent: cg.intent,
           kdNote,
+          authorityContext: authorityAssessment.note,
         });
         const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
           impactScore,
@@ -1047,11 +1004,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           // 2D: apply page importance multiplier
           const baseScore = pm.currentPosition <= 10 ? 60 : 40;
           const impactScore = Math.min(100, Math.round(baseScore * pageImportanceMultiplier(pm.pagePath)));
+          const authorityAssessment = assessAuthorityFromBacklinks(pm.difficulty ?? null, backlinkProfile);
           const story = buildRecommendationStory('ranking_opportunity', {
             keyword: pm.primaryKeyword,
             pagePath: pm.pagePath,
             currentPosition: pm.currentPosition,
             impressions: pm.impressions,
+            authorityContext: authorityAssessment.note,
           });
           const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
             impactScore,

@@ -15,6 +15,7 @@ interface GenerationContextBuilderOptions {
   tokenBudget?: number;
   learningsDomain?: LearningsDomain;
   slices?: readonly IntelligenceSlice[];
+  enrichWithBacklinks?: boolean;
 }
 
 export interface GenerationContextResult {
@@ -39,6 +40,7 @@ async function buildGenerationContext(
     slices,
     pagePath: opts.pagePath,
     learningsDomain: opts.learningsDomain,
+    enrichWithBacklinks: opts.enrichWithBacklinks,
   });
   const promptContext = formatForPrompt(intelligence, {
     verbosity: opts.verbosity,
