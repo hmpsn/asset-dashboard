@@ -60,7 +60,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     expect(result!.volume).toBe(1200);
   });
 
-  it('does not restamp persisted Page Intelligence analysis during same-keyword strategy refresh', () => {
+  it('updates strategy freshness during same-keyword refresh while preserving Page Intelligence fields', () => {
     upsertPageKeyword(wsId, {
       pagePath: '/services/same-keyword-refresh',
       pageTitle: 'Same Keyword Refresh',
@@ -85,7 +85,7 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
     const result = getPageKeyword(wsId, '/services/same-keyword-refresh');
     expect(result?.optimizationScore).toBe(84);
     expect(result?.optimizationIssues).toEqual(['Old issue']);
-    expect(result?.analysisGeneratedAt).toBe('2026-04-03T10:00:00Z');
+    expect(result?.analysisGeneratedAt).toBe('2026-05-19T10:00:00Z');
     expect(result?.volume).toBe(1400);
   });
 

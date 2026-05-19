@@ -209,24 +209,7 @@ const stmts = createStmtCache(() => ({
       url_level_keywords = COALESCE(excluded.url_level_keywords, page_keywords.url_level_keywords),
       url_level_keyword_source = COALESCE(excluded.url_level_keyword_source, page_keywords.url_level_keyword_source),
       optimization_score = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.optimization_score, page_keywords.optimization_score) ELSE excluded.optimization_score END,
-      analysis_generated_at = CASE
-        WHEN lower(trim(page_keywords.primary_keyword)) != lower(trim(excluded.primary_keyword)) THEN excluded.analysis_generated_at
-        WHEN excluded.optimization_score IS NOT NULL
-          OR excluded.optimization_issues IS NOT NULL
-          OR excluded.recommendations IS NOT NULL
-          OR excluded.content_gaps IS NOT NULL
-          OR excluded.primary_keyword_presence IS NOT NULL
-          OR excluded.long_tail_keywords IS NOT NULL
-          OR excluded.competitor_keywords IS NOT NULL
-          OR excluded.estimated_difficulty IS NOT NULL
-          OR excluded.keyword_difficulty IS NOT NULL
-          OR excluded.monthly_volume IS NOT NULL
-          OR excluded.topic_cluster IS NOT NULL
-          OR excluded.search_intent_confidence IS NOT NULL
-          OR excluded.serp_features IS NOT NULL
-        THEN COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at)
-        ELSE page_keywords.analysis_generated_at
-      END,
+      analysis_generated_at = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at) ELSE excluded.analysis_generated_at END,
       optimization_issues = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.optimization_issues, page_keywords.optimization_issues) ELSE excluded.optimization_issues END,
       recommendations = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.recommendations, page_keywords.recommendations) ELSE excluded.recommendations END,
       content_gaps = CASE WHEN lower(trim(page_keywords.primary_keyword)) = lower(trim(excluded.primary_keyword)) THEN COALESCE(excluded.content_gaps, page_keywords.content_gaps) ELSE excluded.content_gaps END,
