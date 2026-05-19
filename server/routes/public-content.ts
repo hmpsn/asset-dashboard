@@ -55,6 +55,7 @@ import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/cont
 const log = createLogger('public-content');
 const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
+type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -62,6 +63,19 @@ function activityCommentPreview(content: string): string {
   return content.length > ACTIVITY_COMMENT_PREVIEW_LENGTH
     ? `${content.slice(0, ACTIVITY_COMMENT_PREVIEW_LENGTH - 3)}...`
     : content;
+}
+
+function recordTrackedKeywordActivity(
+  workspaceId: string,
+  type: TrackedKeywordActivityType,
+  title: string,
+  actor?: { id?: string; name?: string },
+): void {
+  try {
+    addActivity(workspaceId, type, title, '', {}, actor); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+  } catch (err) {
+    log.warn({ err, workspaceId, type }, 'tracked-keyword activity log failed');
+  }
 }
 
 function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
@@ -547,7 +561,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   res.json({ keywords });
 
   if (!alreadyTracked) {
-    addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    recordTrackedKeywordActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
 
     // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
@@ -576,7 +590,7 @@ router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTracke
   res.json({ keywords });
   if (wasTracked) {
     const actor = getClientActor(req, ws.id);
-    addActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    recordTrackedKeywordActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword, removed: true });
   }
 });

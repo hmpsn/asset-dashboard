@@ -33,12 +33,16 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './helpers.js';
 import { buildRecommendationStory } from './signal-story-registry.js';
+import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
+import { applyOutcomeAdjustmentScore, buildOutcomeAdjustment } from './outcome-learning-default-path.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
+import type { LearningsSlice } from '../shared/types/intelligence.js';
+import type { ActionType } from '../shared/types/outcome-tracking.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -151,6 +155,31 @@ export function kdClassificationNote(difficulty: number, domainStrength: number)
     case 'aligned':
       return '';
   }
+}
+
+function recommendationOutcomeActionType(type: RecType, source: string): ActionType {
+  if (type === 'content_refresh') return 'content_refreshed';
+  if (type === 'metadata') return 'meta_updated';
+  if (type === 'schema') return 'schema_deployed';
+  if (type === 'content') return 'content_published';
+  if (type === 'strategy' && source.startsWith('strategy:content-gap')) return 'content_published';
+  if (type === 'strategy') return 'insight_acted_on';
+  return 'audit_fix_applied';
+}
+
+function applyRecommendationOutcomeAdjustment(
+  baseScore: number,
+  type: RecType,
+  source: string,
+  learnings: LearningsSlice | null | undefined,
+  difficulty?: number | null,
+): number {
+  const adjustment = buildOutcomeAdjustment({
+    actionType: recommendationOutcomeActionType(type, source),
+    learnings,
+    difficulty,
+  });
+  return applyOutcomeAdjustmentScore(baseScore, adjustment);
 }
 
 // ─── Recommendation source keys ────────────────────────────────────
@@ -691,6 +720,16 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const audit: AuditSnapshot | null = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
+  const recommendationContext = await buildRecommendationGenerationContext(workspaceId, {
+    slices: ['learnings'],
+    learningsDomain: 'all',
+    verbosity: 'standard',
+    tokenBudget: 800,
+  }).catch(err => {
+    log.warn({ err, workspaceId }, 'Recommendation learnings context unavailable — continuing without outcome adjustments');
+    return null;
+  });
+  const outcomeLearnings = recommendationContext?.intelligence.learnings;
 
   // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
   const domainStrength = await resolveDomainStrength(ws, workspaceId);
@@ -791,6 +830,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           ? `Fixing this could increase organic clicks by ${rate.perRec} on ${group.pages.length} affected page${group.pages.length !== 1 ? 's' : ''}`
           : `Improves SEO health score and search engine compatibility across ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`;
 
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        recType,
+        RecSource.audit(group.check),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -801,7 +846,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: auditInsight(group.check, group.severity, group.pages.length, group.totalClicks, sortedPages.map(p => p.slug)),
         impact,
         effort,
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
@@ -837,6 +882,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         ? `Affects ${pages.length} page${pages.length !== 1 ? 's' : ''} on the site`
         : 'Affects the entire site';
 
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        'technical',
+        RecSource.auditSiteWide(issue.check),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -847,7 +898,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: issue.message,
         impact: isCrit ? 'high' : 'medium',
         effort: 'low',
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
@@ -881,12 +932,16 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
         const hasTraffic = t.clicks > 0 || t.impressions > 0;
         const impactScore = qw.estimatedImpact === 'high' ? 75 : qw.estimatedImpact === 'medium' ? 55 : 35;
-        // 2D: apply page importance multiplier
         const pageMultiplier = pageImportanceMultiplier(qw.pagePath);
-        const adjustedScore = Math.min(100, Math.round(impactScore * pageMultiplier));
         const priority: RecPriority = !hasTraffic
           ? 'fix_later'
           : qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon';
+        const adjustedScore = applyRecommendationOutcomeAdjustment(
+          Math.min(100, Math.round(impactScore * pageMultiplier)),
+          'strategy',
+          RecSource.strategyQuickWin(),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -947,6 +1002,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           intent: cg.intent,
           kdNote,
         });
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          impactScore,
+          'content',
+          RecSource.strategyContentGap(),
+          outcomeLearnings,
+          cg.difficulty ?? null,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -957,7 +1019,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: story.insight,
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
-          impactScore,
+          impactScore: adjustedImpactScore,
           source: RecSource.strategyContentGap(),
           affectedPages: [],
           trafficAtRisk: 0,
@@ -991,6 +1053,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             currentPosition: pm.currentPosition,
             impressions: pm.impressions,
           });
+          const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+            impactScore,
+            'strategy',
+            RecSource.strategyRankingOpp(),
+            outcomeLearnings,
+            pm.difficulty ?? null,
+          );
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
@@ -1001,7 +1070,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             insight: story.insight,
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
-            impactScore,
+            impactScore: adjustedImpactScore,
             source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
@@ -1033,6 +1102,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (!mismatch) continue;
       intentMismatchCount++;
       const pageSlug = toPageSlug(pk.pagePath);
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        50,
+        'strategy',
+        RecSource.strategyIntentMismatch(pageSlug),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -1043,7 +1118,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: `Pages rank better when page type matches search intent. ${reason}`,
         impact: 'medium',
         effort: 'medium',
-        impactScore: 50,
+        impactScore: adjustedImpactScore,
         source: RecSource.strategyIntentMismatch(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: 0,
@@ -1086,6 +1161,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           currentPosition: dp.currentPosition,
         });
 
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          impactScore,
+          'content_refresh',
+          RecSource.decay(pageSlug),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -1096,7 +1177,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: story.insight,
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
-          impactScore,
+          impactScore: adjustedImpactScore,
           source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
@@ -1146,6 +1227,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         position: d.position ?? 0,
         gap,
       });
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        Math.min(90, 40 + Math.round(gap / 2)),
+        'metadata',
+        RecSource.ctrOpportunity(pageSlug),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -1156,7 +1243,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: story.insight,
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
-        impactScore: Math.min(90, 40 + Math.round(gap / 2)),
+        impactScore: adjustedImpactScore,
         source: RecSource.ctrOpportunity(pageSlug),
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
@@ -1190,6 +1277,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       for (let actionIdx = 0; actionIdx < Math.min(report.remediationActions.length, 5); actionIdx++) {
         const action = report.remediationActions[actionIdx];
         const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
+        const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+          diagImpactMap[action.impact] ?? 55,
+          recType,
+          RecSource.diagnostic(report.id, actionIdx, action.title),
+          outcomeLearnings,
+        );
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -1200,7 +1293,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           insight: `Identified by deep diagnostic investigation (report ${report.id.slice(0, 8)}). ${action.description}`,
           impact: action.impact,
           effort: action.effort,
-          impactScore: diagImpactMap[action.impact] ?? 55,
+          impactScore: adjustedImpactScore,
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
           affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
@@ -1237,6 +1330,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         daysSinceLastAnalysis: d.daysSinceLastAnalysis,
         trafficAtRisk,
       });
+      const adjustedImpactScore = applyRecommendationOutcomeAdjustment(
+        impactScore,
+        'content_refresh',
+        RecSource.freshnessAlert(toPageSlug(d.pagePath)),
+        outcomeLearnings,
+      );
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -1247,7 +1346,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         insight: story.insight,
         impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
         effort: 'medium',
-        impactScore,
+        impactScore: adjustedImpactScore,
         source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
         affectedPages: [toPageSlug(d.pagePath)],
         trafficAtRisk,

@@ -126,6 +126,7 @@ export interface InsightsSlice {
 }
 
 export interface LearningsSlice {
+  availability: 'ready' | 'disabled' | 'no_data' | 'degraded';
   summary: WorkspaceLearnings | null;
   confidence: LearningsConfidence | null;
   /** Top action types by win rate — from summary.overall.topActionTypes */

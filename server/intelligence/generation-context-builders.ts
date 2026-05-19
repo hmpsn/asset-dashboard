@@ -1,6 +1,7 @@
 import type {
   IntelligenceOptions,
   IntelligenceSlice,
+  LearningsSlice,
   PromptVerbosity,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
@@ -22,6 +23,7 @@ export interface GenerationContextResult {
   promptContext: string;
   pagePath?: string;
   learningsDomain: LearningsDomain;
+  learningsAvailability: LearningsSlice['availability'] | 'not_requested';
 }
 
 export interface ContentGenerationContextOptions extends GenerationContextBuilderOptions {}
@@ -50,6 +52,9 @@ async function buildGenerationContext(
     promptContext,
     pagePath: opts.pagePath,
     learningsDomain: opts.learningsDomain,
+    learningsAvailability: slices.includes('learnings')
+      ? (intelligence.learnings?.availability ?? 'degraded')
+      : 'not_requested',
   };
 }
 

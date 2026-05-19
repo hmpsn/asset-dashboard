@@ -25,6 +25,7 @@ import {
 import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 
 
 const log = createLogger('content-brief');
@@ -1168,13 +1169,19 @@ The outline sections MUST match the following template sections in order. You ma
   }
 
   let learningsBlock = '';
+  let learningsStatusBlock = '';
   try {
-    const { promptContext } = await buildContentGenerationContext(workspaceId, {
+    const { promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
       slices: ['learnings'],
       learningsDomain: 'content',
     });
     if (hasMeaningfulBuilderPromptContext(promptContext)) {
       learningsBlock = `\n\n${promptContext}`;
+    } else {
+      const statusNote = buildOutcomeLearningStatusNote(learningsAvailability, 'content');
+      if (statusNote) {
+        learningsStatusBlock = `\n\nOUTCOME LEARNING STATUS:\n${statusNote}`;
+      }
     }
   } catch (err) {
     if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
@@ -1195,7 +1202,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}${learningsStatusBlock}
 
 Generate a content brief in the following JSON format:
 {

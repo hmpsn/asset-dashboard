@@ -18,6 +18,15 @@ const mockIntelligence: WorkspaceIntelligence = {
   version: 1,
   workspaceId: 'ws-test',
   assembledAt: '2026-05-18T00:00:00.000Z',
+  learnings: {
+    availability: 'ready',
+    summary: null,
+    confidence: null,
+    topActionTypes: [],
+    overallWinRate: 0,
+    recentTrend: null,
+    playbooks: [],
+  },
 };
 
 describe('generation context builders', () => {
@@ -45,6 +54,7 @@ describe('generation context builders', () => {
     expect(result.slices).toEqual(['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline']);
     expect(result.promptContext).toBe('[Workspace Intelligence]');
     expect(result.learningsDomain).toBe('content');
+    expect(result.learningsAvailability).toBe('ready');
   });
 
   it('reuses the same slices reference for assembly and formatting', async () => {
@@ -84,6 +94,7 @@ describe('generation context builders', () => {
     });
     expect(result.slices).toContain('siteHealth');
     expect(result.learningsDomain).toBe('all');
+    expect(result.learningsAvailability).toBe('ready');
   });
 
   it('threads learningsDomain, verbosity, and tokenBudget overrides through both calls', async () => {
@@ -127,5 +138,31 @@ describe('generation context builders', () => {
       learningsDomain: 'content',
     });
     expect(result.slices).toBe(customSlices);
+  });
+
+  it('surfaces not_requested learnings availability when the learnings slice is omitted', async () => {
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+      ...mockIntelligence,
+      learnings: undefined,
+    });
+
+    const result = await buildContentGenerationContext('ws-no-learnings', {
+      slices: ['seoContext'],
+    });
+
+    expect(result.learningsAvailability).toBe('not_requested');
+  });
+
+  it('surfaces degraded learnings availability when the learnings slice was requested but missing', async () => {
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+      ...mockIntelligence,
+      learnings: undefined,
+    });
+
+    const result = await buildContentGenerationContext('ws-degraded', {
+      slices: ['learnings'],
+    });
+
+    expect(result.learningsAvailability).toBe('degraded');
   });
 });

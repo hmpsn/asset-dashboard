@@ -51,6 +51,7 @@ describe('generateRefreshRecommendation — GSC query breakdown', () => {
       promptContext: '[Workspace Intelligence]\n\n## SEO Context\nBusiness: Local plumbing services',
       pagePath: '/plumbing',
       learningsDomain: 'all',
+      learningsAvailability: 'ready',
     });
   });
 

@@ -98,6 +98,7 @@ beforeEach(() => {
     promptContext: '',
     pagePath: opts.pagePath,
     learningsDomain: opts.learningsDomain ?? 'content',
+    learningsAvailability: 'not_requested',
   }));
 });
 

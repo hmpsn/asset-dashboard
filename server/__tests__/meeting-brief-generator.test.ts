@@ -59,6 +59,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     seoEdits: { pending: 0, applied: 0, inReview: 0 },
   },
   learnings: {
+    availability: 'ready',
     summary: null,
     confidence: null,
     topActionTypes: [],
