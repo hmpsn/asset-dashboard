@@ -10,7 +10,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Activity, Shield,
-  BookOpen, DollarSign, Trophy, Sparkles, Layers, FileSearch, Map,
+  BookOpen, DollarSign, Trophy, Sparkles, Layers, FileSearch, Map, ListChecks,
 } from 'lucide-react';
 
 interface NavItem {
@@ -79,6 +79,7 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
+      { id: 'seo-keywords', label: 'Keywords', icon: ListChecks, needsSite: true, desc: 'Command center for keyword lifecycle, evidence, tracking, and handoffs' },
       { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
     ]},
     { label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
