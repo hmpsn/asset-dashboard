@@ -451,6 +451,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       refetchClient('intelligence', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
+      refetchClient('client-insights', '');
+      refetchClient('intelligence', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => refetchClient('annotations', ''),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.ANOMALIES_UPDATE]: () => refetchClient('anomalies', ''),

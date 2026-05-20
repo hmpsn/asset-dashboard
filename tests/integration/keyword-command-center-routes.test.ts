@@ -78,4 +78,20 @@ describe('Keyword Command Center routes', () => {
       }),
     ]));
   });
+
+  it('POST pause or retire returns 404 when the keyword is not tracked', async () => {
+    const pause = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
+      action: 'pause_tracking',
+      keyword: 'Untracked Route Keyword',
+    });
+    expect(pause.status).toBe(404);
+    await expect(pause.json()).resolves.toEqual({ error: 'Keyword is not tracked' });
+
+    const retire = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {
+      action: 'retire',
+      keyword: 'Untracked Route Keyword',
+    });
+    expect(retire.status).toBe(404);
+    await expect(retire.json()).resolves.toEqual({ error: 'Keyword is not tracked' });
+  });
 });

@@ -672,11 +672,13 @@ export function applyKeywordCommandCenterAction(
         message = `"${keyword}" is now active in keyword tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING:
+        if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.PAUSED);
         message = `"${keyword}" was paused from active tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE:
+        if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
         message = `"${keyword}" was retired from active strategy-owned tracking.`;

@@ -49,6 +49,7 @@ router.post('/api/webflow/keyword-command-center/:workspaceId/actions', requireW
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Keyword action failed';
     if (message === 'Workspace not found') return res.status(404).json({ error: message });
+    if (message === 'Keyword is not tracked') return res.status(404).json({ error: message });
     if (message === 'keyword required') return res.status(400).json({ error: message });
     if (message.includes('requires explicit confirmation')) return res.status(409).json({ error: message });
     next(err);

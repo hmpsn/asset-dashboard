@@ -237,6 +237,18 @@ describe('applyKeywordCommandCenterAction', () => {
     ]));
   });
 
+  it('does not report pause or retire success when the keyword is not tracked', () => {
+    expect(() => applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
+      keyword: 'untracked keyword',
+    })).toThrow(/Keyword is not tracked/);
+
+    expect(() => applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+      keyword: 'untracked keyword',
+    })).toThrow(/Keyword is not tracked/);
+  });
+
   it('protects manual, pinned, and client-requested keywords from accidental retirement', () => {
     addTrackedKeyword(workspaceId, 'manual keyword', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
     addTrackedKeyword(workspaceId, 'pinned keyword', { pinned: true, source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY });
