@@ -166,6 +166,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
     },
     [WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED]: (data: unknown) => {
       const siteId = typeof data === 'object' && data !== null && 'siteId' in data
@@ -301,6 +302,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.STRATEGY_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
@@ -313,6 +315,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingLatest(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.rankTrackingHistory(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });

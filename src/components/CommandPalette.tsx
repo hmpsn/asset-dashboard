@@ -40,6 +40,7 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'media', label: 'Assets', icon: Image, group: 'Site Health' },
   // SEO Strategy
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO Strategy', needsSite: true },
+  { id: 'seo-keywords', label: 'Keywords', icon: ListChecks, group: 'SEO Strategy', needsSite: true },
   { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'SEO Strategy', needsSite: true },
   // Optimization
   { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'Optimization', needsSite: true },
