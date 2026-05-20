@@ -22,7 +22,8 @@ import { filterDeclinedFromPool } from './strategy-filters.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from './workspace-intelligence.js';
 import { buildStrategyIntelligenceBlock, getPagesNeedingAnalysis, isStrategyQualityDiscoveryKeyword, isSuspiciousPlannerGroupedVolume, upsertKeywordPoolCandidate } from './keyword-strategy-helpers.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
-import { isStrategyPoolEligibleKeyword, normalizeKeyword } from './keyword-intelligence/index.js';
+import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
+import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 
 const log = createLogger('keyword-strategy:synthesis');
 
@@ -132,6 +133,7 @@ export interface SynthesizeKeywordStrategyResult {
   pagesToAnalyze: KeywordStrategyPageInfo[];
   keywordPool: KeywordStrategyKeywordPool;
   businessSection: string;
+  keywordEvaluationContext: KeywordEvaluationContext;
   upToDate?: boolean;
   freshPageCount?: number;
 }
@@ -277,6 +279,18 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       }
     }
 
+    const strategyKeywordEvaluationContext = buildStrategyKeywordEvaluationContext({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      businessContext,
+      seoContext: strategySeo,
+      clientSignals,
+      declinedKeywords,
+      requestedKeywords,
+      approvedKeywords,
+      strictBusinessFit: true,
+    });
+
     let strategy: StrategyOutput = {};
     // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
     let pagesToAnalyze: typeof pageInfo = [];
@@ -299,7 +313,11 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
-        return { strategy: ws.keywordStrategy ?? null, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection };
+        const currentStrategy = {
+          ...(ws.keywordStrategy ?? {}),
+          pageMap: existingPageKeywords,
+        } as StrategyOutput;
+        return { strategy: currentStrategy, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
       }
     }
     // For AI batching we only process stale pages; preserved pages are merged back after.
@@ -328,24 +346,6 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     let semrushBatchRef = '';
     const semrushByPath = new Map<string, typeof semrushDomainData>();
     // Populate keyword pool from ALL available data sources
-    const strategyKeywordEvaluationContext = {
-      workspaceId: ws.id,
-      businessTerms: [
-        ws.name,
-        businessContext,
-        strategySeo?.businessContext ?? '',
-        strategySeo?.knowledgeBase ?? '',
-        strategySeo?.brandVoice ?? '',
-      ],
-      businessPriorities: clientSignals?.businessPriorities ?? [],
-      contentGapTopics: (clientSignals?.contentGapVotes ?? []).map(vote => vote.topic),
-      recentChatTopics: clientSignals?.recentChatTopics ?? [],
-      declinedKeywords,
-      requestedKeywords,
-      approvedKeywords,
-      rejectionReasons: clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [],
-      strictBusinessFit: false,
-    };
     const isEligibleStrategyPoolKeyword = (keyword: { keyword: string; volume?: number; difficulty?: number; cpc?: number; source?: string; sourceKind?: string }): boolean => {
       const evaluation = isStrategyPoolEligibleKeyword(keyword, strategyKeywordEvaluationContext);
       if (evaluation.suppressed) {
@@ -952,7 +952,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         });
 
         // Append feedback-loop signals to give the AI real performance context
-        const stratSignals = buildStrategySignals(strategyEligibleInsights);
+        const stratSignals = buildStrategySignals(strategyEligibleInsights, { keywordEvaluationContext: strategyKeywordEvaluationContext });
         if (stratSignals.length > 0) {
           intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
         }
@@ -1127,5 +1127,5 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
 }

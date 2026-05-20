@@ -195,6 +195,53 @@ describe('reconcileStrategyRankTracking', () => {
     }));
   });
 
+
+  it('retires strategy-owned noisy keywords after sanitizer removes them from the refreshed strategy', () => {
+    const firstRun = '2026-05-19T10:00:00.000Z';
+    const secondRun = '2026-05-20T10:00:00.000Z';
+    addTrackedKeyword(workspaceId, 'paper tiger', {
+      source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
+      pagePath: '/platform',
+      strategyGeneratedAt: firstRun,
+      lastStrategySeenAt: firstRun,
+    });
+    addTrackedKeyword(workspaceId, 'client requested keyword', {
+      source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
+    });
+
+    const changeSet = reconcileStrategyRankTracking({
+      workspaceId,
+      generatedAt: secondRun,
+      keywordStrategy: {
+        siteKeywords: ['keyword intelligence platform'],
+        generatedAt: secondRun,
+      },
+      pageMap: [
+        pageKeyword({
+          pagePath: '/platform',
+          pageTitle: 'Platform',
+          primaryKeyword: 'keyword intelligence platform',
+        }),
+      ],
+    });
+
+    expect(changeSet.replaced.map(k => k.query)).toEqual(['paper tiger']);
+    expect(changeSet.manuallyPreserved.map(k => k.query)).toContain('client requested keyword');
+    expect(getTrackedKeywords(workspaceId).map(k => k.query)).toEqual(expect.arrayContaining([
+      'keyword intelligence platform',
+      'client requested keyword',
+    ]));
+    expect(getTrackedKeywords(workspaceId).map(k => k.query)).not.toContain('paper tiger');
+    expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        query: 'paper tiger',
+        status: TRACKED_KEYWORD_STATUS.REPLACED,
+        replacedBy: 'keyword intelligence platform',
+        deprecatedAt: secondRun,
+      }),
+    ]));
+  });
+
   it('normalizes legacy tracked keyword rows and preserves active rank output metadata', () => {
     db.prepare(`
       INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)

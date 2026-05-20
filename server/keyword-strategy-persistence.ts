@@ -12,6 +12,7 @@ import { recordAction, getActionBySource } from './outcome-tracking.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
+import { normalizePath } from './helpers.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
 import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin, SeoDataStatus } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
@@ -29,6 +30,8 @@ export interface PersistKeywordStrategyOptions {
   strategy: StrategyOutput;
   strategyMode: 'full' | 'incremental';
   pagesToAnalyze: KeywordStrategyPageInfo[];
+  extraPagePaths?: string[];
+  removedPagePaths?: string[];
   siteKeywordMetrics: KeywordStrategySiteKeywordMetric[];
   keywordGaps: KeywordGapEntry[];
   competitorKeywordData: CompetitorKeywordData[];
@@ -128,11 +131,18 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       upsertAndCleanPageKeywords(ws.id, stampedMap);
     } else {
       // Only update pages actually re-analyzed in this incremental run.
-      const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
+      const analyzedPaths = new Set(pagesToAnalyze.map(p => normalizePath(p.path)));
+      const extraPagePaths = new Set((options.extraPagePaths ?? []).map(pagePath => normalizePath(pagePath)));
+      const pathsToUpdate = new Set([...analyzedPaths, ...extraPagePaths]);
+      const explicitlyRemovedPaths = new Set((options.removedPagePaths ?? []).map(pagePath => normalizePath(pagePath)));
       const analyzedMappings = pageMap
-        .filter((pm) => analyzedPaths.has(pm.pagePath))
+        .filter((pm) => pathsToUpdate.has(normalizePath(pm.pagePath)))
         .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
+      for (const pagePath of explicitlyRemovedPaths) {
+        db.prepare('DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id
+        db.prepare('DELETE FROM page_keyword_score_history WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id
+      }
     }
 
     replaceAllContentGaps(ws.id, newContentGaps);

@@ -297,7 +297,7 @@ export function evaluateKeywordCandidate(
     suppressed = true;
     scoreDelta -= 50;
     reasons.push({ type: 'noise_pattern', message: 'Rejects a known low-actionability false-positive keyword pattern', weight: -50 });
-  } else if (ctx.strictBusinessFit && hasBusinessFitContext && providerOwned && businessFit.score === 0 && requestedMatches.length === 0 && approvedMatches.length === 0 && candidate.volume > 0) {
+  } else if (ctx.strictBusinessFit && hasBusinessFitContext && providerOwned && !strongBusinessPhraseMatch && businessFit.score === 0 && requestedMatches.length === 0 && approvedMatches.length === 0) {
     scoreDelta -= 18;
     reasons.push({ type: 'business_mismatch', message: 'No clear overlap with the workspace business context or approved/requested keywords', weight: -18 });
   }
@@ -327,6 +327,9 @@ export function isStrategyPoolEligibleKeyword(
   if (!normalizeKeyword(candidate.keyword)) {
     result.suppressed = true;
     result.reasons.push({ type: 'noise_pattern', message: 'Blank keyword candidate', weight: -100 });
+  }
+  if ((ctx.strictBusinessFit ?? false) && result.reasons.some(reason => reason.type === 'business_mismatch' && reason.weight <= -12)) {
+    result.suppressed = true;
   }
   return result;
 }

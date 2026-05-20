@@ -345,6 +345,16 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
 
 // ── Client Keyword Feedback ──────────────────────────
 
+function notifyPublicKeywordFeedbackChanged(workspaceId: string, payload: Record<string, unknown>): void {
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+}
+
 // Client: list their keyword feedback
 router.get('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -378,7 +388,7 @@ router.post('/api/public/keyword-feedback/:workspaceId', requireClientStrategyMu
   }
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
+  notifyPublicKeywordFeedbackChanged(ws.id, { keyword: kw, status, source });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
   addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
   res.json({ keyword: kw, status, reason: reason || null });
@@ -419,7 +429,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
   insert(keywords);
   const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  notifyPublicKeywordFeedbackChanged(ws.id, { updated: keywords.length });
   if (approvedKeywords.length > 0) {
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
       action: 'feedback_bulk_approved',
@@ -434,6 +444,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', requireClientStrat
 });
 
 // Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
+// broadcast-ok: notifyPublicKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
 router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const wsId = req.params.workspaceId;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
@@ -472,7 +483,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   }
 
   log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+  notifyPublicKeywordFeedbackChanged(ws.id, {
     keyword,
     status: 'cleared',
     previousStatus: existing.status,

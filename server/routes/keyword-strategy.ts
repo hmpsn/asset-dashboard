@@ -11,7 +11,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { addTrackedKeyword, addTrackedKeywords } from '../rank-tracking.js';
 import { trackedKeywordSourceForFeedback } from '../keyword-feedback-tracking.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -27,6 +27,8 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
+import { buildStrategyKeywordEvaluationContext } from '../keyword-strategy-context.js';
+import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -471,6 +473,16 @@ function getAllFeedback(workspaceId: string) {
   return db.prepare('SELECT * FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(workspaceId);
 }
 
+function notifyKeywordFeedbackChanged(workspaceId: string, payload: Record<string, unknown>): void {
+  invalidateIntelligenceCache(workspaceId);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.STRATEGY_UPDATED, payload);
+}
+
 // Admin: list all feedback for workspace
 router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -508,7 +520,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess
   }
 
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status, source });
+  notifyKeywordFeedbackChanged(ws.id, { keyword: kw, status, source });
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
@@ -547,7 +559,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
   const approvedKeywords = approvedKeywordEntries.map(entry => entry.query);
 
   log.info(`Bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { updated: keywords.length });
+  notifyKeywordFeedbackChanged(ws.id, { updated: keywords.length });
   if (approvedKeywords.length > 0) {
     addActivity(ws.id, 'rank_tracking_updated', 'Tracked keywords approved', `${approvedKeywords.length} approved keywords added to rank tracking`, {
       keywords: approvedKeywords,
@@ -565,7 +577,8 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceA
 });
 
 // Delete feedback (un-decline a keyword)
-// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
+// broadcast-ok: notifyKeywordFeedbackChanged broadcasts strategy/signal invalidation after real feedback deletes.
+// activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event.
 router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -576,6 +589,12 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWork
     return existing;
   });
   const existing = removeFeedback();
+  invalidateIntelligenceCache(ws.id);
+  broadcastToWorkspace(ws.id, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId: ws.id,
+    reason: 'keyword_feedback',
+    updatedAt: new Date().toISOString(),
+  });
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, status: 'cleared', previousStatus: existing?.status ?? null, source: existing?.source ?? null });
   res.json({ deleted: kw });
 });
@@ -583,13 +602,30 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWork
 // --- Intelligence Signals ---
 // GET /api/webflow/keyword-strategy/:workspaceId/signals
 
-router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
     const insights = getInsights(ws.id);
-    const signals = buildStrategySignals(insights);
-    res.json({ signals });
+    try {
+      const intelligence = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'clientSignals'] });
+      const keywordEvaluationContext = buildStrategyKeywordEvaluationContext({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        businessContext: ws.keywordStrategy?.businessContext,
+        seoContext: intelligence.seoContext,
+        clientSignals: intelligence.clientSignals,
+        declinedKeywords: [...new Set([...(intelligence.clientSignals?.keywordFeedback.rejected ?? []), ...getDeclinedKeywords(ws.id)])],
+        requestedKeywords: getRequestedKeywords(ws.id),
+        approvedKeywords: intelligence.clientSignals?.keywordFeedback.approved ?? [],
+        strictBusinessFit: true,
+      });
+      const signals = buildStrategySignals(insights, { keywordEvaluationContext });
+      return res.json({ signals });
+    } catch (err) {
+      log.warn({ err, workspaceId: ws.id }, 'Failed to build keyword context for strategy signals; returning unfiltered signals');
+      return res.json({ signals: buildStrategySignals(insights) });
+    }
   } catch (err) {
     log.error({ err, workspaceId: ws.id }, 'Failed to build strategy signals');
     res.json({ signals: [] });

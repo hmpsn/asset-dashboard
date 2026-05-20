@@ -6267,3 +6267,16 @@ Bug hardening included:
 **Mutual:** Converts partial hardening into closed roadmap outcomes with regression tests and documented ownership boundaries.
 
 **Files:** `server/ai.ts`; `server/routes/ai.ts`; `tests/contract/factual-ai-output-contracts.test.ts`; `server/reports.ts`; `server/audit-snapshot-views.ts`; `tests/unit/audit-snapshot-views.test.ts`; `docs/superpowers/audits/2026-05-18-internal-link-recommendation-source-audit.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+---
+
+### 442. Keyword Strategy Refactor + Signal Hygiene
+**What it does:** Adds the missing final hygiene boundary between the PR12 shared keyword-intelligence engine and persisted keyword strategy outputs. `server/keyword-strategy-sanitizer.ts` now runs before persistence/rank-tracking reconciliation, removing blank, declined, or known-noisy selected keywords; repairing page primaries through an explicit fallback order; and dropping unrecoverable page mappings rather than persisting empty strategy keywords. Strategy Signals now route keyword-derived signals through shared keyword-intelligence evaluation when context is available, so stale/noisy competitor-gap insights no longer leak into the Strategy card or strategy-generation prompt blocks.
+
+**Agency value:** Makes keyword strategy generation easier to reason about by giving final selected outputs one deterministic quality gate after AI/enrichment mutations. This reduces whack-a-mole debugging when provider data, AI assignments, insight feedback, and rank tracking disagree.
+
+**Client value:** Strategy and rank-tracking surfaces stop carrying obviously irrelevant or stale generated terms forward, while historical rank data and raw insight history remain preserved for auditability.
+
+**Mutual:** Creates a cleaner foundation for the upcoming strategy explainability/action-loop UX pass: the UI can explain selected keywords and retired tracking state without first compensating for noisy backend primitives.
+
+**Files:** `server/keyword-strategy-context.ts`; `server/keyword-strategy-sanitizer.ts`; `server/keyword-strategy-generation.ts`; `server/keyword-strategy-ai-synthesis.ts`; `server/insight-feedback.ts`; `server/routes/keyword-strategy.ts`; `tests/unit/keyword-strategy-sanitizer.test.ts`; `tests/unit/insight-feedback.test.ts`; `tests/unit/rank-tracking-reconciliation.test.ts`; `docs/superpowers/audits/2026-05-20-keyword-strategy-refactor-signal-hygiene.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
