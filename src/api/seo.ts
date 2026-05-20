@@ -1,6 +1,7 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { LatestRank, RankHistoryEntry, TrackedKeyword } from '../../shared/types/rank-tracking';
+import type { KeywordStrategyDiff as StrategyDiff } from '../../shared/types/keyword-strategy-ux';
 import { readNdjsonStream } from './streamUtils';
 export {
   schema,
@@ -17,17 +18,7 @@ const workspaceQuery = (workspaceId?: string) => workspaceId ? `?workspaceId=${e
 const appendWorkspaceQuery = (url: string, workspaceId?: string) =>
   workspaceId ? `${url}${url.includes('?') ? '&' : '?'}workspaceId=${encodeURIComponent(workspaceId)}` : url;
 
-export interface StrategyDiff {
-  previousGeneratedAt: string;
-  currentGeneratedAt: string;
-  newKeywords: string[];
-  lostKeywords: string[];
-  newGaps: string[];
-  resolvedGaps: string[];
-  keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[];
-  prevSiteKeywordCount: number;
-  currSiteKeywordCount: number;
-}
+export type { StrategyDiff };
 
 // ── Audit ───────────────────────────────────────────────────────
 export const audit = {

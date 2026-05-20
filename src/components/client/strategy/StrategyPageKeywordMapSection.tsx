@@ -8,6 +8,7 @@ type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
 interface StrategyPageKeywordMapSectionProps {
   effectiveTier: Tier;
   pageMap: ClientKeywordStrategy['pageMap'];
+  strategyUx?: ClientKeywordStrategy['strategyUx'];
   expandedSections: Set<string>;
   toggleSection: (section: string) => void;
   workspaceId?: string;
@@ -23,6 +24,7 @@ interface StrategyPageKeywordMapSectionProps {
 export function StrategyPageKeywordMapSection({
   effectiveTier,
   pageMap,
+  strategyUx,
   expandedSections,
   toggleSection,
   workspaceId,
@@ -66,6 +68,7 @@ export function StrategyPageKeywordMapSection({
               onDeclineKeyword={onDeclineKeyword}
               onUndoFeedback={undoFeedback}
               isLoadingFeedback={isLoadingFeedback}
+              explanations={strategyUx?.explanations?.filter(explanation => explanation.role === 'page_keyword')}
             />
           )}
         </SectionCard>

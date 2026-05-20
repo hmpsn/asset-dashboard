@@ -362,6 +362,32 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(Array.isArray(body.pageMap)).toBe(true);
   });
 
+  it('response includes optional strategy UX explanations without raw competitor evidence', async () => {
+    const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.strategyUx).toBeDefined();
+    expect(body.strategyUx.refreshSummary).toEqual(expect.objectContaining({
+      currentGeneratedAt: expect.any(String),
+      added: expect.any(Number),
+      newContentGaps: expect.any(Number),
+    }));
+    expect(Array.isArray(body.strategyUx.explanations)).toBe(true);
+    expect(body.strategyUx.explanations.length).toBeGreaterThan(0);
+    expect(body.strategyUx.explanations.filter((explanation: { rawEvidenceOnly?: boolean }) => explanation.rawEvidenceOnly)).toEqual([]);
+    expect(body.strategyUx.explanations.some((explanation: { role?: string }) => explanation.role === 'competitor_gap')).toBe(false);
+    expect(body.strategyUx.rawEvidenceNote).toBeUndefined();
+    expect(body.strategyUx.explanations[0]).toEqual(expect.objectContaining({
+      keyword: expect.any(String),
+      normalizedKeyword: expect.any(String),
+      nextAction: expect.objectContaining({
+        type: expect.any(String),
+        label: expect.any(String),
+      }),
+    }));
+  });
+
   it('siteKeywords array is non-empty and preserves seeded values', async () => {
     const res = await api(`/api/public/seo-strategy/${strategyWsId}`);
     const body = await res.json();

@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Button, IconButton } from '../../ui';
+import { Badge, Button, IconButton } from '../../ui';
 import { kdFraming } from '../../../lib/kdFraming.js';
 import {
   ROLE_DISPLAY_LABELS,
@@ -56,6 +56,9 @@ export function StrategyKeywordDrawer({
   const isConfirmed = drawerRow.status === 'client' || drawerRow.status === 'strategy';
   const isRemoving = removingKeyword === drawerRow.normalized;
   const unenriched = drawerRow.enrichmentStatus === 'unenriched';
+  const explanation = drawerRow.explanation;
+  const primaryReason = explanation?.reasons[0] ?? drawerRow.rationale ?? drawerRow.opportunityDetail;
+  const nextAction = explanation?.nextAction;
 
   return (
     <>
@@ -160,28 +163,35 @@ export function StrategyKeywordDrawer({
             </div>
           )}
 
-          {(drawerRow.rationale ?? drawerRow.opportunityDetail) && (
+          {primaryReason && (
             <div>
               <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Why it's in the strategy</div>
               <p className="t-body text-[var(--brand-text-muted)] leading-relaxed">
-                {drawerRow.rationale ?? drawerRow.opportunityDetail}
+                {primaryReason}
               </p>
+              {explanation?.reasons && explanation.reasons.length > 1 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {explanation.reasons.slice(1, 4).map(reason => (
+                    <Badge key={reason} tone="teal" variant="outline" size="sm" label={reason} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           <div className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-3">
             <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Next move</div>
             <p className="t-body text-[var(--brand-text)] leading-relaxed mb-3">
-              {drawerRow.nextMoveDetail}
+              {nextAction?.detail ?? drawerRow.nextMoveDetail}
             </p>
             {drawerRow.role === 'content' && (
-              <Button variant="primary" size="sm" onClick={() => { onTabChange?.('content'); closeDrawer(); }}>
-                Request content
+              <Button variant="primary" size="sm" onClick={() => { onTabChange?.(nextAction?.targetTab ?? 'content-plan'); closeDrawer(); }}>
+                {nextAction?.label ?? 'Request content'}
               </Button>
             )}
             {(drawerRow.role === 'page' || drawerRow.role === 'strategy') && drawerRow.pagePath && (
               <Button variant="secondary" size="sm" onClick={() => { onTabChange?.('health'); closeDrawer(); }}>
-                Go to page
+                {nextAction?.label ?? 'Go to page'}
               </Button>
             )}
           </div>
@@ -228,6 +238,22 @@ export function StrategyKeywordDrawer({
                         {SIGNAL_LABELS[src] ?? src}
                       </span>
                     ))}
+                  </div>
+                )}
+                {explanation?.sourceEvidence && explanation.sourceEvidence.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {explanation.sourceEvidence.slice(0, 4).map(source => (
+                      <span key={source} className="t-caption-sm text-[var(--brand-text-muted)]">
+                        {source}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {explanation?.tracking && (
+                  <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                    Tracking: <span className="text-[var(--brand-text)]">
+                      {explanation.tracking.status === 'not_tracked' ? 'Not tracked yet' : explanation.tracking.status.replace('_', ' ')}
+                    </span>
                   </div>
                 )}
               </div>

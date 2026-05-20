@@ -430,6 +430,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.RANK_TRACKING_UPDATED]: () => {
       refetchClient('rank-history', '');
       refetchClient('latest-ranks', '');
+      refetchClient('strategy', '');
+      refetchClient('page-keywords', '');
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.OUTCOME_SCORED]: () => {

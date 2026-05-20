@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
 import { Badge, Button, Icon } from '../ui';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
+import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
 import { post } from '../../api';
+import { normalizeKeyword } from './strategy/strategyKeywordDisplay';
 
 interface GscKeyword {
   query: string;
@@ -38,6 +40,7 @@ interface PageKeywordMapContentProps {
   onDeclineKeyword?: (keyword: string, source: string) => void;
   onUndoFeedback?: (keyword: string) => void;
   isLoadingFeedback?: (keyword: string) => boolean;
+  explanations?: KeywordStrategyExplanation[];
 }
 
 type FilterTab = 'all' | 'ranking' | 'opportunities' | 'falling';
@@ -76,7 +79,7 @@ function positionTone(pos: number): 'emerald' | 'amber' | 'zinc' {
   return 'zinc';
 }
 
-export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback }: PageKeywordMapContentProps) {
+export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback, explanations = [] }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
@@ -116,6 +119,10 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
     });
     return groups;
   }, [filteredPages]);
+  const explanationByKeyword = useMemo(
+    () => new Map(explanations.map(explanation => [explanation.normalizedKeyword, explanation])),
+    [explanations],
+  );
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders(prev => {
@@ -211,6 +218,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                     const isOpportunity = !page.currentPosition && (page.impressions || 0) > 0;
                     const isExpanded = expandedPages.has(page.pagePath);
                     const kwCount = page.gscKeywords?.length || 0;
+                    const explanation = page.primaryKeyword ? explanationByKeyword.get(normalizeKeyword(page.primaryKeyword)) : undefined;
                     
                     return (
                       <div key={page.pagePath} className={`transition-all ${isExpanded ? 'bg-[var(--surface-3)]/20' : ''}`}>
@@ -295,6 +303,9 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 )}
                               </span>
                             )}
+                            {explanation?.nextAction && (
+                              <Badge label={explanation.nextAction.label} tone="teal" variant="outline" />
+                            )}
                           </div>
                         </Button>
 
@@ -339,6 +350,15 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 ) : (
                                   <span>No keyword data available. Regenerate strategy with GSC connected to see per-keyword metrics.</span>
                                 )}
+                              </div>
+                            )}
+
+                            {explanation && (
+                              <div className="mt-2 rounded-[var(--radius-md)] border border-teal-500/20 bg-teal-500/10 px-3 py-2">
+                                <div className="t-caption-sm font-medium text-teal-300 mb-1">Why this page matters</div>
+                                <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
+                                  {explanation.reasons[0] ?? explanation.nextAction.detail}
+                                </p>
                               </div>
                             )}
 

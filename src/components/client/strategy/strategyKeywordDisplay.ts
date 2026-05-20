@@ -1,3 +1,5 @@
+import type { KeywordStrategyExplanation } from '../../../../shared/types/keyword-strategy-ux.js';
+
 export type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
 export type StrategyKeywordRole = 'strategy' | 'page' | 'content' | 'idea';
 export type OpportunityTone = 'emerald' | 'amber' | 'blue' | 'zinc';
@@ -34,7 +36,11 @@ export interface StrategyKeywordTableRow extends PriorityKeywordItem {
   rationale?: string;
   trendDirection?: 'rising' | 'declining' | 'stable';
   enrichmentStatus: 'enriched' | 'partial' | 'unenriched';
+  explanation?: KeywordStrategyExplanation;
 }
+
+export const normalizeKeyword = (keyword: string) =>
+  keyword.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
 // Single source of truth for role display labels — used in list rows and drawer badge.
 export const ROLE_DISPLAY_LABELS: Record<string, string> = {
