@@ -4,6 +4,10 @@
 
 import { createLogger } from './logger.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
+import type {
+  LocalVisibilityProviderRequest,
+  LocalVisibilityProviderResult,
+} from '../shared/types/local-seo.js';
 
 const log = createLogger('seo-data-provider');
 
@@ -123,6 +127,9 @@ export interface SeoDataProvider {
   // Backlinks
   getBacklinksOverview(domain: string, workspaceId: string, database?: string): Promise<BacklinksOverview | null>;
   getReferringDomains(domain: string, workspaceId: string, limit?: number, database?: string): Promise<ReferringDomain[]>;
+
+  // Local SEO visibility
+  getLocalVisibility?(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult>;
 }
 
 // ── Provider Registry ─────────────────────────────────────────

@@ -77,6 +77,7 @@ export const queryKeys = {
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
+    localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
     rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,

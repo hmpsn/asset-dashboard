@@ -216,6 +216,7 @@ const CONTEXT_BY_EVENT_KEY: Record<WsEventKey, BoundedContextId> = {
   RECOMMENDATIONS_UPDATED: 'seo-health',
   STRATEGY_UPDATED: 'seo-health',
   RANK_TRACKING_UPDATED: 'seo-health',
+  LOCAL_SEO_UPDATED: 'seo-health',
 };
 
 const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
@@ -229,6 +230,7 @@ const PAYLOAD_NOTE_BY_EVENT_KEY: Partial<Record<WsEventKey, string>> = {
   DIAGNOSTIC_FAILED: 'Diagnostic failure payload with report id and failure context.',
   STRATEGY_UPDATED: 'Strategy keyword/score updates and related summary invalidation payload.',
   RANK_TRACKING_UPDATED: 'Rank-tracking keyword lifecycle, snapshot, and strategy reconciliation updates.',
+  LOCAL_SEO_UPDATED: 'Local SEO market configuration and visibility refresh updates.',
 };
 
 const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -242,6 +244,7 @@ const INVALIDATION_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   BRIEFING_PUBLISHED: ['queryKeys.client.briefing', 'queryKeys.admin.briefing'],
   STRATEGY_UPDATED: ['queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.workspaceHome'],
   RANK_TRACKING_UPDATED: ['queryKeys.admin.rankTracking*', 'queryKeys.client.rankTracking*', 'queryKeys.admin.keywordStrategy', 'queryKeys.client.strategy', 'queryKeys.admin.pageKeywords', 'queryKeys.admin.intelligence'],
+  LOCAL_SEO_UPDATED: ['queryKeys.admin.localSeo', 'queryKeys.admin.keywordCommandCenter', 'queryKeys.admin.keywordStrategy'],
 };
 
 const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
@@ -262,6 +265,7 @@ const ACTIVITY_OVERRIDES: Partial<Record<WsEventKey, string[]>> = {
   RECOMMENDATIONS_UPDATED: ['recommendation_resolved'],
   STRATEGY_UPDATED: ['client_keyword_feedback', 'client_keyword_tracked'],
   RANK_TRACKING_UPDATED: ['rank_tracking_updated', 'rank_snapshot'],
+  LOCAL_SEO_UPDATED: ['local_seo_updated'],
 };
 
 function collectTsFiles(dir: string): string[] {

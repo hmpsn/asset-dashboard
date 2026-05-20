@@ -12,6 +12,14 @@ import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
+import {
+  LOCAL_SEO_DEVICE,
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
+  LOCAL_VISIBILITY_STATUS,
+  type LocalVisibilityBusinessResult,
+  type LocalVisibilityProviderRequest,
+  type LocalVisibilityProviderResult,
+} from '../../shared/types/local-seo.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -168,6 +176,7 @@ const CACHE_TTL_DOMAIN_ORGANIC = 168;  // 7 days
 const CACHE_TTL_DOMAIN_OVERVIEW = 168; // 7 days
 const CACHE_TTL_BACKLINKS = 168;       // 7 days
 const CACHE_TTL_COMPETITORS = 336;     // 14 days
+const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -438,6 +447,64 @@ function evidenceFromGoogleAdsKeywordItem(
     seed: options.seed,
     confidence: options.confidence,
   };
+}
+
+function stringFromUnknown(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function numberFromUnknown(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: number): LocalVisibilityBusinessResult | null {
+  const title = stringFromUnknown(item.title) ?? stringFromUnknown(item.name);
+  if (!title) return null;
+  const url = stringFromUnknown(item.url) ?? stringFromUnknown(item.website);
+  let domain = stringFromUnknown(item.domain);
+  if (!domain && url) domain = cleanDomain(url);
+  const address = stringFromUnknown(item.address) ?? stringFromUnknown(item.description);
+  return {
+    title,
+    rank: numberFromUnknown(item.rank_group) ?? numberFromUnknown(item.rank_absolute) ?? fallbackRank,
+    domain,
+    url,
+    phone: stringFromUnknown(item.phone),
+    address,
+    cid: stringFromUnknown(item.cid) ?? stringFromUnknown(item.place_id),
+  };
+}
+
+function extractLocalPackItems(result: Record<string, unknown>): LocalVisibilityBusinessResult[] {
+  const items = Array.isArray(result.items) ? result.items as Array<Record<string, unknown>> : [];
+  const localPacks = items.filter(item => stringFromUnknown(item.type) === 'local_pack');
+  const results: LocalVisibilityBusinessResult[] = [];
+
+  for (const localPack of localPacks) {
+    const nested = Array.isArray(localPack.items)
+      ? localPack.items as Array<Record<string, unknown>>
+      : Array.isArray(localPack.local_pack)
+        ? localPack.local_pack as Array<Record<string, unknown>>
+        : [];
+    if (nested.length > 0) {
+      for (const item of nested) {
+        const normalized = normalizeLocalResultItem(item, results.length + 1);
+        if (normalized) results.push(normalized);
+      }
+      continue;
+    }
+
+    const single = normalizeLocalResultItem(localPack, results.length + 1);
+    if (single) results.push(single);
+  }
+  return results;
+}
+
+function localVisibilityLocationIdentity(market: LocalVisibilityProviderRequest['market']): string {
+  if (market.providerLocationCode) return String(market.providerLocationCode);
+  if (market.providerLocationName?.trim()) return market.providerLocationName.trim();
+  if (typeof market.latitude === 'number' && typeof market.longitude === 'number') return `${market.latitude}_${market.longitude}`;
+  return market.id;
 }
 
 // ── Provider Implementation ──
@@ -842,6 +909,94 @@ export class DataForSeoProvider implements SeoDataProvider {
     } catch (err) {
       log.error({ err }, `DataForSEO keywords_for_keywords error for "${seeds.join(', ')}"`);
       return [];
+    }
+  }
+
+  async getLocalVisibility(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult> {
+    const keyword = request.keyword.trim();
+    const market = request.market;
+    const device = request.device === LOCAL_SEO_DEVICE.MOBILE ? LOCAL_SEO_DEVICE.MOBILE : LOCAL_SEO_DEVICE.DESKTOP;
+    const languageCode = request.languageCode || 'en';
+    const sourceEndpoint = LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP;
+    const capturedAt = new Date().toISOString();
+    const cacheKey = [
+      'local_visibility',
+      cacheKeyPart(keyword),
+      market.id,
+      cacheKeyPart(localVisibilityLocationIdentity(market)),
+      device,
+      languageCode,
+      sourceEndpoint,
+    ].join('_');
+    const cached = readCache<LocalVisibilityProviderResult>(workspaceId, cacheKey, CACHE_TTL_LOCAL_VISIBILITY);
+    if (cached) {
+      logCreditUsage({ credits: 0, endpoint: 'local_visibility_google_organic_serp', query: `${keyword} @ ${market.label}`, rowsReturned: cached.results.length, workspaceId, cached: true });
+      return { ...cached, capturedAt };
+    }
+
+    if (areCreditsExhausted()) {
+      return {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent: false,
+        results: [],
+        status: LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+        degradedReason: 'DataForSEO credits are temporarily exhausted',
+      };
+    }
+
+    try {
+      const locationSelector = market.providerLocationCode
+        ? { location_code: market.providerLocationCode }
+        : market.providerLocationName
+          ? { location_name: market.providerLocationName }
+          : typeof market.latitude === 'number' && typeof market.longitude === 'number'
+            ? { location_coordinate: `${market.latitude},${market.longitude},10z` }
+            : null;
+      if (!locationSelector) {
+        throw new Error('Local visibility requires a DataForSEO location code, location name, or coordinates');
+      }
+      const json = await apiCall('serp/google/organic/live/advanced', [{
+        keyword,
+        ...locationSelector,
+        language_code: languageCode,
+        device,
+        depth: Math.max(10, Math.min(request.maxResults, 20)),
+      }], workspaceId);
+      const result = getTaskResult(json)[0] ?? {};
+      const localResults = extractLocalPackItems(result).slice(0, request.maxResults);
+      const localPackPresent = localResults.length > 0
+        || (Array.isArray(result.items) && (result.items as Array<Record<string, unknown>>).some(item => stringFromUnknown(item.type) === 'local_pack'));
+      const payload: LocalVisibilityProviderResult = {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent,
+        results: localResults,
+        status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+      };
+      const cost = getTaskCost(json);
+      logCreditUsage({ credits: cost, endpoint: 'local_visibility_google_organic_serp', query: `${keyword} @ ${market.label}`, rowsReturned: localResults.length, workspaceId, cached: false });
+      writeCache(workspaceId, cacheKey, payload);
+      return payload;
+    } catch (err) {
+      log.error({ err, keyword, marketId: market.id }, 'DataForSEO local visibility error');
+      return {
+        keyword,
+        marketId: market.id,
+        provider: this.name,
+        sourceEndpoint,
+        capturedAt,
+        localPackPresent: false,
+        results: [],
+        status: LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+        degradedReason: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 

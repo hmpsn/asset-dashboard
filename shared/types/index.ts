@@ -17,6 +17,7 @@ export type * from './client-signals.ts';
 export type * from './meeting-brief.ts';
 export * from './keywords.ts';
 export type * from './keyword-command-center.ts';
+export * from './local-seo.ts';
 export type * from './brand-engine.ts';
 export type * from './outcome-tracking.ts';
 export type * from './copy-pipeline.ts';

@@ -121,6 +121,12 @@ const COVERAGE_SIGNALS: Record<BackgroundJobType, CoverageSignal[]> = {
       mustContainOneOf: [BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE, 'BACKGROUND_JOB_TYPES.ACTION_PLAYBOOK_EXECUTE'],
     },
   ],
+  [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH]: [
+    {
+      file: 'tests/integration/local-seo-routes.test.ts',
+      mustContainOneOf: [BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, 'BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH'],
+    },
+  ],
 };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

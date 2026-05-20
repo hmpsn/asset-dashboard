@@ -1,0 +1,207 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTestContext } from './helpers.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { addTrackedKeyword } from '../../server/rank-tracking.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
+
+process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';
+
+const ctx = createTestContext(13361); // port-ok: next free after 13360
+const { api, postJson } = ctx;
+
+let workspaceId = '';
+let otherWorkspaceId = '';
+
+beforeAll(async () => {
+  await ctx.startServer();
+  const ws = createWorkspace('Local SEO Route Test Dental');
+  workspaceId = ws.id;
+  otherWorkspaceId = createWorkspace('Other Local SEO Route Test Dental').id;
+  updateWorkspace(workspaceId, {
+    liveDomain: 'https://local-dental.example.com',
+    seoDataProvider: 'dataforseo',
+    businessProfile: {
+      phone: '(512) 555-0123',
+      address: {
+        street: '123 Congress Ave',
+        city: 'Austin',
+        state: 'TX',
+        country: 'US',
+      },
+    },
+  });
+  addTrackedKeyword(workspaceId, 'Austin Dentist', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+}, 25_000);
+
+afterAll(async () => {
+  deleteWorkspace(workspaceId);
+  deleteWorkspace(otherWorkspaceId);
+  await ctx.stopServer();
+});
+
+describe('Local SEO routes', () => {
+  it('GET returns posture suggestions, suggested markets, caps, and empty snapshots safely', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.featureEnabled).toBe(true);
+    expect(body.settings).toEqual(expect.objectContaining({ posture: 'unknown' }));
+    expect(body.settings.suggestionReasons.length).toBeGreaterThan(0);
+    expect(body.suggestedMarkets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Austin, TX', city: 'Austin', status: 'needs_review' }),
+    ]));
+    expect(body.caps).toEqual({ maxMarkets: 3, maxKeywordsPerRefresh: 25 });
+    expect(body.latestSnapshots).toEqual([]);
+  });
+
+  it('PUT stores admin posture and explicit markets', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        posture: 'local',
+        markets: [{
+          label: 'Austin, TX',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026201,
+          providerLocationName: 'Austin,Texas,United States',
+          status: 'active',
+        }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.settings).toEqual(expect.objectContaining({ posture: 'local', postureSource: 'admin_override' }));
+    expect(body.markets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Austin, TX', status: 'active', providerLocationCode: 1026201 }),
+    ]));
+  });
+
+  it('PUT preserves existing market provider identity and status when fields are omitted', async () => {
+    const current = await (await api(`/api/local-seo/${workspaceId}`)).json();
+    const activeMarket = current.markets.find((market: { label: string }) => market.label === 'Austin, TX');
+
+    const updatedActive = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{
+          id: activeMarket.id,
+          label: 'Austin Core',
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+        }],
+      }),
+    });
+    expect(updatedActive.status).toBe(200);
+    const activeBody = await updatedActive.json();
+    expect(activeBody.markets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: activeMarket.id, label: 'Austin Core', status: 'active', providerLocationCode: 1026201 }),
+    ]));
+
+    const inactiveWrite = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{
+          label: 'Round Rock',
+          city: 'Round Rock',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationName: 'Round Rock,Texas,United States',
+          status: 'inactive',
+        }],
+      }),
+    });
+    expect(inactiveWrite.status).toBe(200);
+    const inactiveBody = await inactiveWrite.json();
+    const inactiveMarket = inactiveBody.markets.find((market: { label: string }) => market.label === 'Round Rock');
+
+    const updatedInactive = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{
+          id: inactiveMarket.id,
+          label: 'Round Rock North',
+          city: 'Round Rock',
+          stateOrRegion: 'TX',
+          country: 'US',
+        }],
+      }),
+    });
+    expect(updatedInactive.status).toBe(200);
+    const updatedInactiveBody = await updatedInactive.json();
+    expect(updatedInactiveBody.markets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: inactiveMarket.id, label: 'Round Rock North', status: 'inactive', providerLocationName: 'Round Rock,Texas,United States' }),
+    ]));
+  });
+
+  it('POST refresh starts a capped background job from local-intent keywords', async () => {
+    const res = await postJson(`/api/local-seo/${workspaceId}/refresh`, {
+      marketIds: ['missing-market'],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.jobId).toEqual(expect.any(String));
+    expect(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH).toBe('local-seo-refresh');
+    expect(body.selectedMarketCount).toBe(0);
+    expect(body.selectedKeywordCount).toBeGreaterThan(0);
+    expect(body.selectedKeywordCount).toBeLessThanOrEqual(25);
+  });
+
+  it('rejects more than three active markets across existing and newly added markets', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { label: 'Houston', city: 'Houston', country: 'US', providerLocationName: 'Houston,Texas,United States', status: 'active' },
+          { label: 'Dallas', city: 'Dallas', country: 'US', providerLocationName: 'Dallas,Texas,United States', status: 'active' },
+          { label: 'San Antonio', city: 'San Antonio', country: 'US', providerLocationName: 'San Antonio,Texas,United States', status: 'active' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects active markets without a provider location identity', async () => {
+    const res = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { label: 'Ambiguous Austin', city: 'Austin', country: 'US', status: 'active' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects caller-supplied market ids that do not belong to the workspace', async () => {
+    const otherWrite = await api(`/api/local-seo/${otherWorkspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        posture: 'local',
+        markets: [{ label: 'Other Austin', city: 'Austin', country: 'US', providerLocationName: 'Austin,Texas,United States', status: 'active' }],
+      }),
+    });
+    expect(otherWrite.status).toBe(200);
+    const otherBody = await otherWrite.json();
+    const otherMarketId = otherBody.markets[0].id;
+
+    const crossWorkspace = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [{ id: otherMarketId, label: 'Hijack', city: 'Austin', country: 'US', status: 'active' }],
+      }),
+    });
+    expect(crossWorkspace.status).toBe(404);
+  });
+});
