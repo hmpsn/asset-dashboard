@@ -164,6 +164,29 @@ describe('buildKeywordCommandCenter', () => {
       metrics: expect.objectContaining({ volume: 1029, difficulty: 49 }),
     }));
   });
+
+  it('moves promoted raw evidence into tracked lifecycle status', async () => {
+    replaceAllKeywordGaps(workspaceId, [{
+      keyword: 'promotable provider keyword',
+      volume: 1_200,
+      difficulty: 44,
+      competitorPosition: 5,
+      competitorDomain: 'competitor.example',
+    }]);
+
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE,
+      keyword: 'promotable provider keyword',
+    });
+
+    const payload = await buildKeywordCommandCenter(workspaceId);
+    const row = payload!.rows.find(item => item.normalizedKeyword === 'promotable provider keyword');
+    expect(row).toEqual(expect.objectContaining({
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.TRACKED,
+      rawEvidenceOnly: true,
+      tracking: expect.objectContaining({ status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+    }));
+  });
 });
 
 describe('applyKeywordCommandCenterAction', () => {

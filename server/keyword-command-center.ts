@@ -173,7 +173,6 @@ function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.tracking && isInactiveTracking(row.tracking)) return KEYWORD_COMMAND_CENTER_STATUS.RETIRED;
   if (row.feedback?.status === 'approved') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.feedback?.status === 'requested') return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
-  if (row.explanation?.rawEvidenceOnly || row.rawEvidenceOnly) return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
   if (row.explanation && row.explanation.role !== 'competitor_gap') return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
   if (row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY || row.tracking?.source === TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD) {
     return KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY;
@@ -181,6 +180,7 @@ function lifecycleStatus(row: DraftRow): KeywordCommandCenterStatus {
   if (row.tracking && (row.tracking.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE) {
     return KEYWORD_COMMAND_CENTER_STATUS.TRACKED;
   }
+  if (row.explanation?.rawEvidenceOnly || row.rawEvidenceOnly) return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
   if (row.rank) return KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW;
   return KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE;
 }
